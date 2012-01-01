@@ -22,19 +22,25 @@ Here is the pie chart code I used:
 <script src="https://gist.github.com/1515754.js?file=piechart.R"></script> 
 
 Visits to top ten posts:
+
 <img style=" margin-right: 2em; border:none" src="http://farm8.staticflickr.com/7158/6613213609_e491cd6f95_d.jpg"/>
 
 Visits by by pages:
-![pages](/images/pages.png)
+
+<img style=" margin-right: 2em; border:none" src="http://farm8.staticflickr.com/7033/6613216069_6c7b0d2aca_d.jpg"/>
 
 Visits by top referring sites:
-![sites](/images/referring_sites.png)
+
+<img style=" margin-right: 2em; border:none" src="http://farm8.staticflickr.com/7008/6613217859_a03bcfee3e_d.jpg"/>
 
 Visits by country:
-![country](/images/country.png)
+
+<img style=" margin-right: 2em; border:none" src="http://farm8.staticflickr.com/7027/6613219049_97cf21a84e_d.jpg"/>
 
 Visits by browsers:
-![browsers](/images/browsers.png)
+
+<img style=" margin-right: 2em; border:none" src="http://farm8.staticflickr.com/7147/6613232905_5a98d82f87_d.jpg"/>
 
 Visits by operating system:
-![os](/images/operating_system.png)
+
+<img style=" margin-right: 2em; border:none" src="http://farm8.staticflickr.com/7005/6613236311_7cab55afd6_d.jpg"/>
