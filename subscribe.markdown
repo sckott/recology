@@ -5,6 +5,7 @@
 
 You can [subscribe to this site's content][subscribe] in an RSS Reader, such as [Google Reader][reader].
 
+
 [Follow Recology on Twitter][twitter] if you'd like to get updates from your Twitter stream.
 
 [subscribe]: http://feeds.feedburner.com/feedburner/XX
