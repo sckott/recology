@@ -3,11 +3,7 @@ name: recology-is-1-yr-old-
 layout: blog-post
 title: Recology is 1 yr old...
 date: 2011-12-23 18:52:00 -06:00
-tags: 
-- ggplot2
-- Evolution
-- Ecology
-- R
+tags: [ggplot2, Evolution, Ecology, R]
 ---
 
 This blog has lasted a whole year already. &nbsp;Thanks for reading and commenting. 
@@ -22,4 +18,23 @@ Anywho, here is the breakdown of visits to this blog, visualized using #ggplot2,
 
 [jeco]: http://jecologyblog.wordpress.com/
 
-Here is the pie chart code I used:<br /><br /><script src="https://gist.github.com/1515754.js?file=piechart.R"></script><br /><br /><br /><br />Visits to top ten posts:<br /><div class="separator" style="clear: both; text-align: center;"><a href="http://1.bp.blogspot.com/-oxOejtId3pk/TvUZHgCLNhI/AAAAAAAAFOs/qzwQjvL67wg/s1600/post_name.png" imageanchor="1" style="clear: left; float: left; margin-bottom: 1em; margin-right: 1em;"><img border="0" height="256" src="http://1.bp.blogspot.com/-oxOejtId3pk/TvUZHgCLNhI/AAAAAAAAFOs/qzwQjvL67wg/s400/post_name.png" width="400" /></a></div><div class="separator" style="clear: both; text-align: center;"><br /></div><br />Visits by by pages:<br /><div class="separator" style="clear: both; text-align: center;"><a href="http://1.bp.blogspot.com/--HFo9634gm4/TvUZHOMeuYI/AAAAAAAAFOk/XH-Vsz0teE4/s1600/pages.png" imageanchor="1" style="clear: left; float: left; margin-bottom: 1em; margin-right: 1em;"><img border="0" height="256" src="http://1.bp.blogspot.com/--HFo9634gm4/TvUZHOMeuYI/AAAAAAAAFOk/XH-Vsz0teE4/s400/pages.png" width="400" /></a></div><br /><div class="separator" style="clear: both; text-align: center;"><br /></div><br />Visits by top referring sites:<br /><a href="http://1.bp.blogspot.com/-yEsgVN2jYuI/TvUZH5SM6KI/AAAAAAAAFO0/RR0ci-85i-o/s1600/referring_sites.png" imageanchor="1" style="margin-left: 1em; margin-right: 1em; text-align: center;"><img border="0" height="256" src="http://1.bp.blogspot.com/-yEsgVN2jYuI/TvUZH5SM6KI/AAAAAAAAFO0/RR0ci-85i-o/s400/referring_sites.png" width="400" /></a><br /><br />Visits by country:<br /><a href="http://2.bp.blogspot.com/-Nbc87rh-YLQ/TvUZGNha6ZI/AAAAAAAAFOU/kwkr8ETCgzw/s1600/country.png" imageanchor="1" style="margin-left: 1em; margin-right: 1em; text-align: center;"><img border="0" height="256" src="http://2.bp.blogspot.com/-Nbc87rh-YLQ/TvUZGNha6ZI/AAAAAAAAFOU/kwkr8ETCgzw/s400/country.png" width="400" /></a><br /><br />Visits by browsers:<br /><a href="http://3.bp.blogspot.com/-_lTP5ebo1SE/TvUZFk2A0LI/AAAAAAAAFOM/rhrX6HP6BU4/s1600/browsers.png" imageanchor="1" style="margin-left: 1em; margin-right: 1em; text-align: center;"><img border="0" height="256" src="http://3.bp.blogspot.com/-_lTP5ebo1SE/TvUZFk2A0LI/AAAAAAAAFOM/rhrX6HP6BU4/s400/browsers.png" width="400" /></a><br /><br />Visits by operating system:<br /><a href="http://4.bp.blogspot.com/-36jNeyIKoMo/TvUZGq5meAI/AAAAAAAAFOc/drSRaDV6F50/s1600/operating_system.png" imageanchor="1" style="margin-left: 1em; margin-right: 1em; text-align: center;"><img border="0" height="256" src="http://4.bp.blogspot.com/-36jNeyIKoMo/TvUZGq5meAI/AAAAAAAAFOc/drSRaDV6F50/s400/operating_system.png" width="400" /></a><br /><br /><br />
+Here is the pie chart code I used:
+<script src="https://gist.github.com/1515754.js?file=piechart.R"></script> 
+
+Visits to top ten posts:
+![top posts](/images/post_name.png)
+
+Visits by by pages:
+![pages](/images/pages.png)
+
+Visits by top referring sites:
+![sites](/images/referring_sites.png)
+
+Visits by country:
+![country](/images/country.png)
+
+Visits by browsers:
+![browsers](/images/browsers.png)
+
+Visits by operating system:
+![os](/images/operating_system.png)
