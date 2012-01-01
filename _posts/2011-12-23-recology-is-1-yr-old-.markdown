@@ -24,6 +24,9 @@ Here is the pie chart code I used:
 Visits to top ten posts:
 ![top posts](/images/post_name.png)
 
+<img style=" margin-right: 2em; border:none" src="http://flic.kr/p/b5os1i"
+       width="375" height="375" />
+
 Visits by by pages:
 ![pages](/images/pages.png)
 
