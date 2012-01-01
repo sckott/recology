@@ -22,9 +22,7 @@ Here is the pie chart code I used:
 <script src="https://gist.github.com/1515754.js?file=piechart.R"></script> 
 
 Visits to top ten posts:
-![top posts](/images/post_name.png)
-
-<img style=" margin-right: 2em; border:none" src="http://www.flickr.com/photos/65562827@N06/6613213609/"
+<img style=" margin-right: 2em; border:none" src="http://farm8.staticflickr.com/7158/6613213609_e491cd6f95_d.jpg"
        width="375" height="375" />
 
 Visits by by pages:
