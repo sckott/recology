@@ -1,1 +1,0 @@
-jekyll --auto --server
