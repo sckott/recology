@@ -3,7 +3,7 @@
   layout: default
 ---
 
-##
+### Publications
 
 +  Chamberlain, S.A., S.M. Hovick,...et al...K.D. Whitney. (In review). Does phylogeny matter? Assessing the impact of phylogenetic information in ecological meta-analysis.  Ecology Letters. 
 
