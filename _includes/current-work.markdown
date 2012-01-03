@@ -1,3 +1,0 @@
-### My Current Work
-
-aXXXXX
