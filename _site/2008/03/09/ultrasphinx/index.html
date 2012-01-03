@@ -1,0 +1,617 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="utf-8">
+    <title>Richard Huang - ultrasphinx</title>
+    <meta name="author" content="Richard Huang" />
+    <meta name="google-site-verification" content="KDVRO6hdZ0Vww31dac2Yomyd7xjmMMFEZw2Fzq5acuY" />
+    <link rel="stylesheet" type="text/css" href="/stylesheets/screen.css">
+    <link href="http://feeds.feedburner.com/richard-huang" rel="alternate" title="RSS" type="application/rss+xml" />
+    <script type="text/javascript" src="https://ajax.googleapis.com/ajax/libs/jquery/1.7.1/jquery.min.js"></script>
+    <script type="text/javascript" src="/javascripts/jquery.github_v2.js"></script>
+  </head>
+
+  <body>
+    <div id="header" class="section">
+      <div class="wrapper">
+        <strong id="blog-title">
+          <a href="/" rel="home">Richard Huang's Website</a>
+        </strong>
+        <p id="blog-description"></p>
+        <div id="navigation">
+          <ul class="nav clearfix">
+            <li class="first-child"><a href="/blog.html">Blog</a></li>
+            <li><a href="/projects.html">Projects</a></li>
+            <li><a href="/about.html">About</a></li>
+          </ul>
+        </div>
+      </div>
+    </div>
+    <div id="main" class="section">
+      <div class="wrapper">
+        <div id="content">
+          <div class="full">
+  <h1 class="entry-title">
+    <a href="/2008/03/09/ultrasphinx/" title="ultrasphinx" rel="bookmark">ultrasphinx</a>
+  </h1>
+  <!-- AddThis Button BEGIN -->
+  <div class="addthis_toolbox addthis_default_style ">
+    <a class="addthis_button_facebook_like" fb:like:layout="button_count"></a>
+    <a class="addthis_button_tweet"></a>
+    <a class="addthis_button_google_plusone" g:plusone:size="medium"></a>
+    <a class="addthis_counter addthis_pill_style"></a>
+  </div>
+  <!-- AddThis Button END -->
+  <div class="entry-content full-content">
+    <p>ultrasphinx是基于sphinx的rails全文搜索插件。我们将在一个已有的博客系统上增加全文搜索来学习这个插件，</p>
+
+<p>1. 首先确保系统已经安装以下软件：
+* MySQL 5.0
+* Sphinx 0.9.8-dev r1112
+* Rails 2.0.2
+并且需要安装chronic gem，rails应用使用的是mysql数据库</p>
+
+<p>2. 安装插件：</p>
+
+<div class="highlight"><pre><code class="bash"><span class="nv">$script</span>/plugin install -x svn://rubyforge.org/var/svn/fauna/ultrasphinx/trunk
+<span class="nv">$mkdir</span> config/ultrasphinx
+<span class="nv">$cp</span> vendor/plugin/ultrasphinx/examples/default.base config/ultrasphinx/
+</code></pre>
+</div>
+
+
+<p>3. 标记需要索引的内容：</p>
+
+<div class="highlight"><pre><code class="ruby"><span class="c1">#app/models/post.rb</span>
+<span class="n">is_indexed</span> <span class="ss">:fields</span> <span class="o">=&gt;</span> <span class="o">[</span><span class="n">title</span><span class="p">,</span> <span class="n">body</span><span class="o">]</span>
+</code></pre>
+</div>
+
+
+
+
+<div class="highlight"><pre><code class="ruby"><span class="c1">#app/models/comment.rb</span>
+<span class="n">is_indexed</span> <span class="ss">:fields</span> <span class="o">=&gt;</span> <span class="o">[</span><span class="n">body</span><span class="o">]</span> 
+</code></pre>
+</div>
+
+
+<p>4. 多model的统计配置：</p>
+
+<div class="highlight"><pre><code class="ruby"><span class="c1">#config/initializers/ultrasphinx.rb</span>
+<span class="no">Ultrasphinx</span><span class="o">::</span><span class="no">Search</span><span class="o">.</span><span class="n">client_options</span><span class="o">[</span><span class="ss">:with_subtotals</span><span class="o">]</span> <span class="o">=</span> <span class="kp">true</span>
+</code></pre>
+</div>
+
+
+<p>5. 生成索引，并运行ultrasphinx：</p>
+
+<div class="highlight"><pre><code class="bash"><span class="nv">$rake</span> ultrasphinx:configure
+<span class="nv">$sudo</span> rake ultrasphinx:index
+<span class="nv">$sudo</span> rake ultrasphinx:daemon:start
+</code></pre>
+</div>
+
+
+<p>6.增加search controller：</p>
+
+<div class="highlight"><pre><code class="bash"><span class="nv">$script</span>/generate controller search
+</code></pre>
+</div>
+
+
+
+
+<div class="highlight"><pre><code class="ruby"><span class="c1">#app/controllers/search_controller.rb</span>
+<span class="k">class</span> <span class="nc">SearchController</span>  <span class="no">ApplicationController</span>
+  <span class="k">def</span> <span class="nf">index</span>
+    <span class="vi">@search</span> <span class="o">=</span> <span class="no">Ultrasphinx</span><span class="o">::</span><span class="no">Search</span><span class="o">.</span><span class="n">new</span><span class="p">(</span><span class="ss">:query</span> <span class="o">=&gt;</span> <span class="n">params</span><span class="o">[</span><span class="ss">:q</span><span class="o">]</span><span class="p">,</span>
+                                      <span class="ss">:class_names</span> <span class="o">=&gt;</span> <span class="no">SearchHelper</span><span class="o">::</span><span class="n">class_name</span><span class="p">(</span><span class="n">params</span><span class="o">[</span><span class="ss">:category</span><span class="o">]</span><span class="p">),</span>
+                                      <span class="ss">:page</span> <span class="o">=&gt;</span> <span class="n">params</span><span class="o">[</span><span class="ss">:page</span><span class="o">]||</span> <span class="mi">1</span><span class="p">,</span>
+                                      <span class="ss">:per_page</span> <span class="o">=&gt;</span> <span class="mi">10</span><span class="p">)</span>
+    <span class="vi">@search</span><span class="o">.</span><span class="n">run</span>
+  <span class="k">end</span>
+<span class="k">end</span>
+</code></pre>
+</div>
+
+
+
+
+<div class="highlight"><pre><code class="ruby"><span class="c1">#app/helpers/search_helper.rb</span>
+<span class="k">module</span> <span class="nn">SearchHelper</span>
+  <span class="k">def</span> <span class="nf">output_results</span><span class="p">(</span><span class="n">search</span><span class="p">)</span>
+    <span class="n">stat</span> <span class="o">=</span> <span class="s2">&quot;搜索结果：&quot;</span>
+    <span class="n">search</span><span class="o">.</span><span class="n">results</span><span class="o">.</span><span class="n">each</span> <span class="k">do</span> <span class="o">|</span><span class="n">result</span><span class="o">|</span>
+      <span class="n">stat</span>  <span class="p">(</span><span class="n">render</span> <span class="ss">:partial</span> <span class="o">=&gt;</span> <span class="s2">&quot;</span><span class="si">#{</span><span class="n">result</span><span class="o">.</span><span class="n">class</span><span class="o">.</span><span class="n">to_s</span><span class="o">.</span><span class="n">downcase</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">,</span> <span class="ss">:object</span> <span class="o">=&gt;</span> <span class="n">result</span><span class="p">)</span>
+    <span class="k">end</span>
+
+    <span class="n">stat</span> <span class="o">&lt;&lt;</span> <span class="s2">&quot;共&quot;</span> <span class="o">&lt;&lt;</span> <span class="n">search</span><span class="o">.</span><span class="n">total_entries</span><span class="o">.</span><span class="n">to_s</span> <span class="o">&lt;&lt;</span> <span class="s2">&quot;结果。&quot;</span>
+
+    <span class="n">search</span><span class="o">.</span><span class="n">subtotals</span><span class="o">.</span><span class="n">each</span> <span class="k">do</span> <span class="o">|</span><span class="n">category</span><span class="p">,</span> <span class="n">count</span><span class="o">|</span>
+      <span class="n">stat</span> <span class="o">&lt;&lt;</span> <span class="no">SearchHelper</span><span class="o">::</span><span class="n">ui_name</span><span class="p">(</span><span class="n">category</span><span class="p">)</span> <span class="o">&lt;&lt;</span> <span class="s2">&quot;:&quot;</span> <span class="o">&lt;&lt;</span> <span class="n">count</span><span class="o">.</span><span class="n">to_s</span> <span class="o">&lt;&lt;</span> <span class="s2">&quot;条结果</span><span class="se">\t</span><span class="s2">&quot;</span>
+    <span class="k">end</span>
+    <span class="n">stat</span>
+  <span class="k">end</span>
+
+  <span class="k">def</span> <span class="nc">self</span><span class="o">.</span><span class="nf">class_name</span><span class="p">(</span><span class="n">category_value</span><span class="p">)</span>
+    <span class="n">r</span> <span class="o">=</span> <span class="no">SEARCH_CATEGORIES</span><span class="o">.</span><span class="n">detect</span> <span class="k">do</span> <span class="o">|</span><span class="n">c</span><span class="o">|</span>
+      <span class="n">c</span><span class="o">[</span><span class="mi">2</span><span class="o">]</span> <span class="o">==</span> <span class="n">category_value</span>
+    <span class="k">end</span> <span class="o">||</span> <span class="no">SEARCH_CATEGORIES</span><span class="o">[</span><span class="mi">0</span><span class="o">]</span>
+    <span class="n">r</span><span class="o">[</span><span class="mi">1</span><span class="o">]</span>
+  <span class="k">end</span>
+
+  <span class="k">def</span> <span class="nc">self</span><span class="o">.</span><span class="nf">ui_name</span><span class="p">(</span><span class="n">class_name</span><span class="p">)</span>
+    <span class="n">r</span> <span class="o">=</span> <span class="no">SEARCH_CATEGORIES</span><span class="o">.</span><span class="n">detect</span> <span class="k">do</span> <span class="o">|</span><span class="n">c</span><span class="o">|</span>
+      <span class="n">c</span><span class="o">[</span><span class="mi">1</span><span class="o">]</span> <span class="o">==</span> <span class="n">class_name</span>
+    <span class="k">end</span> <span class="o">||</span> <span class="no">SEARCH_CATEGORIES</span><span class="o">[</span><span class="mi">0</span><span class="o">]</span>
+    <span class="n">r</span><span class="o">[</span><span class="mi">0</span><span class="o">]</span>
+  <span class="k">end</span>
+
+  <span class="no">SEARCH_CATEGORIES</span> <span class="o">=</span> <span class="o">[</span>
+    <span class="c1">#uiname, classname, uivalue</span>
+    <span class="o">[</span><span class="s1">&#39;所有&#39;</span><span class="p">,</span> <span class="kp">nil</span><span class="p">,</span> <span class="s1">&#39;all&#39;</span><span class="o">]</span><span class="p">,</span>
+    <span class="o">[</span><span class="s1">&#39;文章&#39;</span><span class="p">,</span> <span class="s1">&#39;Post&#39;</span><span class="p">,</span> <span class="s1">&#39;post&#39;</span><span class="o">]</span><span class="p">,</span>
+    <span class="o">[</span><span class="s1">&#39;评论&#39;</span><span class="p">,</span> <span class="s1">&#39;Comment&#39;</span><span class="p">,</span> <span class="s1">&#39;comment&#39;</span><span class="o">]</span>
+  <span class="o">].</span><span class="n">freeze</span>
+<span class="k">end</span>
+</code></pre>
+</div>
+
+
+<p>7. 提供搜索页面和搜索结果显示页面：</p>
+
+<div class="highlight"><pre><code class="rhtml">#app/views/shared/_search.html.erb
+<span class="nt">&lt;form</span> <span class="na">action=</span><span class="s">&quot;/search&quot;</span> <span class="na">method=</span><span class="s">&quot;get&quot;</span> <span class="na">id=</span><span class="s">&quot;search_form&quot;</span><span class="nt">&gt;</span>
+  <span class="nt">&lt;label</span> <span class="na">for=</span><span class="s">&quot;search_category&quot;</span><span class="nt">&gt;</span>类别：<span class="nt">&lt;/label&gt;</span>
+  <span class="nt">&lt;select</span> <span class="na">id=</span><span class="s">&quot;search_category&quot;</span> <span class="na">name=</span><span class="s">&quot;category&quot;</span><span class="nt">&gt;</span>
+    <span class="nt">&lt;option</span> <span class="na">value=</span><span class="s">&quot;all&quot;</span> <span class="na">selected=</span><span class="s">&quot;selected&quot;</span><span class="nt">&gt;</span>所有<span class="nt">&lt;/option&gt;</span>
+    <span class="nt">&lt;option</span> <span class="na">value=</span><span class="s">&quot;post&quot;</span><span class="nt">&gt;</span>文章<span class="nt">&lt;/option&gt;</span>
+    <span class="nt">&lt;option</span> <span class="na">value=</span><span class="s">&quot;comment&quot;</span><span class="nt">&gt;</span>评论<span class="nt">&lt;/option&gt;</span>
+  <span class="nt">&lt;/select&gt;</span>
+  <span class="nt">&lt;label</span> <span class="na">for=</span><span class="s">&quot;q&quot;</span><span class="nt">&gt;</span>关键字：<span class="nt">&lt;/label&gt;</span>
+  <span class="nt">&lt;input</span> <span class="na">type=</span><span class="s">&quot;text&quot;</span> <span class="na">name=</span><span class="s">&quot;q&quot;</span> <span class="na">value=</span><span class="s">&quot;</span><span class="cp">&lt;%=</span> <span class="n">params</span><span class="o">[</span><span class="ss">:q</span><span class="o">]</span> <span class="cp">%&gt;</span><span class="s">&quot;</span> <span class="na">id=</span><span class="s">&quot;q&quot;</span><span class="nt">&gt;</span>
+  <span class="nt">&lt;input</span> <span class="na">type=</span><span class="s">&quot;submit&quot;</span> <span class="na">value=</span><span class="s">&quot;搜索&quot;</span><span class="nt">&gt;</span>
+<span class="nt">&lt;/form&gt;</span>
+</code></pre>
+</div>
+
+
+
+
+<div class="highlight"><pre><code class="rhtml">#app/views/search/_post.html.erb
+文章：<span class="cp">&lt;%=</span> <span class="n">post</span><span class="o">.</span><span class="n">title</span> <span class="cp">%&gt;</span>
+<span class="cp">&lt;%=</span> <span class="n">post</span><span class="o">.</span><span class="n">body</span> <span class="cp">%&gt;</span>
+</code></pre>
+</div>
+
+
+
+
+<div class="highlight"><pre><code class="rhtml">#app/views/search/_comment.html.erb
+评论：
+<span class="cp">&lt;%=</span> <span class="n">comment</span><span class="o">.</span><span class="n">body</span> <span class="cp">%&gt;</span>
+</code></pre>
+</div>
+
+
+
+
+<div class="highlight"><pre><code class="rhtml">#app/views/search/index.html.erb
+<span class="cp">&lt;%=</span> <span class="n">output_results</span><span class="p">(</span><span class="vi">@search</span><span class="p">)</span> <span class="cp">%&gt;</span>
+<span class="cp">&lt;%=</span> <span class="n">will_paginate</span><span class="p">(</span><span class="vi">@search</span><span class="p">)</span> <span class="cp">%&gt;</span>
+</code></pre>
+</div>
+
+
+<p>8. 中文支持：</p>
+
+<div class="highlight"><pre><code class="ruby"><span class="c1">#config/ultrasphinx/default.base</span>
+<span class="n">ngram_len</span> <span class="o">=</span> <span class="mi">1</span>
+<span class="n">ngram_chars</span> <span class="o">=</span> <span class="n">U</span><span class="o">+</span><span class="mi">4</span><span class="no">E00</span><span class="o">.</span><span class="n">.U</span><span class="o">+</span><span class="mi">9</span><span class="no">FBB</span><span class="p">,</span> <span class="n">U</span><span class="o">+</span><span class="mi">3400</span><span class="o">.</span><span class="n">.U</span><span class="o">+</span><span class="mi">4</span><span class="no">DB5</span><span class="p">,</span> <span class="n">U</span><span class="o">+</span><span class="mi">20000</span><span class="o">.</span><span class="n">.U</span><span class="o">+</span><span class="mi">2</span><span class="no">A6D6</span><span class="p">,</span> <span class="n">U</span><span class="o">+</span><span class="no">FA0E</span><span class="p">,</span> <span class="n">U</span><span class="o">+</span><span class="no">FA0F</span><span class="p">,</span> <span class="n">U</span><span class="o">+</span><span class="no">FA11</span><span class="p">,</span> <span class="n">U</span><span class="o">+</span><span class="no">FA13</span><span class="p">,</span> <span class="n">U</span><span class="o">+</span><span class="no">FA14</span><span class="p">,</span> <span class="n">U</span><span class="o">+</span><span class="no">FA1F</span><span class="p">,</span> <span class="n">U</span><span class="o">+</span><span class="no">FA21</span><span class="p">,</span> <span class="n">U</span><span class="o">+</span><span class="no">FA23</span><span class="p">,</span> <span class="n">U</span><span class="o">+</span><span class="no">FA24</span><span class="p">,</span> <span class="n">U</span><span class="o">+</span><span class="no">FA27</span><span class="p">,</span> <span class="n">U</span><span class="o">+</span><span class="no">FA28</span><span class="p">,</span> <span class="n">U</span><span class="o">+</span><span class="no">FA29</span><span class="p">,</span> <span class="n">U</span><span class="o">+</span><span class="mi">3105</span><span class="o">.</span><span class="n">.U</span><span class="o">+</span><span class="mi">312</span><span class="n">C</span><span class="p">,</span> <span class="n">U</span><span class="o">+</span><span class="mi">31</span><span class="no">A0</span><span class="o">.</span><span class="n">.U</span><span class="o">+</span><span class="mi">31</span><span class="no">B7</span><span class="p">,</span> <span class="n">U</span><span class="o">+</span><span class="mi">3041</span><span class="p">,</span> <span class="n">U</span><span class="o">+</span><span class="mi">3043</span><span class="p">,</span> <span class="n">U</span><span class="o">+</span><span class="mi">3045</span><span class="p">,</span> <span class="n">U</span><span class="o">+</span><span class="mi">3047</span><span class="p">,</span> <span class="n">U</span><span class="o">+</span><span class="mi">3049</span><span class="p">,</span> <span class="n">U</span><span class="o">+</span><span class="mi">304</span><span class="n">B</span><span class="p">,</span> <span class="n">U</span><span class="o">+</span><span class="mi">304</span><span class="n">D</span><span class="p">,</span> <span class="n">U</span><span class="o">+</span><span class="mi">304</span><span class="n">F</span><span class="p">,</span> <span class="n">U</span><span class="o">+</span><span class="mi">3051</span><span class="p">,</span> <span class="n">U</span><span class="o">+</span><span class="mi">3053</span><span class="p">,</span> <span class="n">U</span><span class="o">+</span><span class="mi">3055</span><span class="p">,</span> <span class="n">U</span><span class="o">+</span><span class="mi">3057</span><span class="p">,</span> <span class="n">U</span><span class="o">+</span><span class="mi">3059</span><span class="p">,</span> <span class="n">U</span><span class="o">+</span><span class="mi">305</span><span class="n">B</span><span class="p">,</span> <span class="n">U</span><span class="o">+</span><span class="mi">305</span><span class="n">D</span><span class="p">,</span> <span class="n">U</span><span class="o">+</span><span class="mi">305</span><span class="n">F</span><span class="p">,</span> <span class="n">U</span><span class="o">+</span><span class="mi">3061</span><span class="p">,</span> <span class="n">U</span><span class="o">+</span><span class="mi">3063</span><span class="p">,</span> <span class="n">U</span><span class="o">+</span><span class="mi">3066</span><span class="p">,</span> <span class="n">U</span><span class="o">+</span><span class="mi">3068</span><span class="p">,</span> <span class="n">U</span><span class="o">+</span><span class="mi">306</span><span class="n">A</span><span class="o">.</span><span class="n">.U</span><span class="o">+</span><span class="mi">306</span><span class="n">F</span><span class="p">,</span> <span class="n">U</span><span class="o">+</span><span class="mi">3072</span><span class="p">,</span> <span class="n">U</span><span class="o">+</span><span class="mi">3075</span><span class="p">,</span> <span class="n">U</span><span class="o">+</span><span class="mi">3078</span><span class="p">,</span> <span class="n">U</span><span class="o">+</span><span class="mi">307</span><span class="n">B</span><span class="p">,</span> <span class="n">U</span><span class="o">+</span><span class="mi">307</span><span class="n">E</span><span class="o">.</span><span class="n">.U</span><span class="o">+</span><span class="mi">3083</span><span class="p">,</span> <span class="n">U</span><span class="o">+</span><span class="mi">3085</span><span class="p">,</span> <span class="n">U</span><span class="o">+</span><span class="mi">3087</span><span class="p">,</span> <span class="n">U</span><span class="o">+</span><span class="mi">3089</span><span class="o">.</span><span class="n">.U</span><span class="o">+</span><span class="mi">308</span><span class="n">E</span><span class="p">,</span> <span class="n">U</span><span class="o">+</span><span class="mi">3090</span><span class="o">.</span><span class="n">.U</span><span class="o">+</span><span class="mi">3093</span><span class="p">,</span> <span class="n">U</span><span class="o">+</span><span class="mi">30</span><span class="no">A1</span><span class="p">,</span> <span class="n">U</span><span class="o">+</span><span class="mi">30</span><span class="no">A3</span><span class="p">,</span> <span class="n">U</span><span class="o">+</span><span class="mi">30</span><span class="no">A5</span><span class="p">,</span> <span class="n">U</span><span class="o">+</span><span class="mi">30</span><span class="no">A7</span><span class="p">,</span> <span class="n">U</span><span class="o">+</span><span class="mi">30</span><span class="no">A9</span><span class="p">,</span> <span class="n">U</span><span class="o">+</span><span class="mi">30</span><span class="no">AD</span><span class="p">,</span> <span class="n">U</span><span class="o">+</span><span class="mi">30</span><span class="no">AF</span><span class="p">,</span> <span class="n">U</span><span class="o">+</span><span class="mi">30</span><span class="no">B3</span><span class="p">,</span> <span class="n">U</span><span class="o">+</span><span class="mi">30</span><span class="no">B5</span><span class="p">,</span> <span class="n">U</span><span class="o">+</span><span class="mi">30</span><span class="no">BB</span><span class="p">,</span> <span class="n">U</span><span class="o">+</span><span class="mi">30</span><span class="no">BD</span><span class="p">,</span> <span class="n">U</span><span class="o">+</span><span class="mi">30</span><span class="no">BF</span><span class="p">,</span> <span class="n">U</span><span class="o">+</span><span class="mi">30</span><span class="no">C1</span><span class="p">,</span> <span class="n">U</span><span class="o">+</span><span class="mi">30</span><span class="no">C3</span><span class="p">,</span> <span class="n">U</span><span class="o">+</span><span class="mi">30</span><span class="no">C4</span><span class="p">,</span> <span class="n">U</span><span class="o">+</span><span class="mi">30</span><span class="no">C6</span><span class="p">,</span> <span class="n">U</span><span class="o">+</span><span class="mi">30</span><span class="no">CA</span><span class="p">,</span> <span class="n">U</span><span class="o">+</span><span class="mi">30</span><span class="no">CB</span><span class="p">,</span> <span class="n">U</span><span class="o">+</span><span class="mi">30</span><span class="no">CD</span><span class="p">,</span> <span class="n">U</span><span class="o">+</span><span class="mi">30</span><span class="no">CE</span><span class="p">,</span> <span class="n">U</span><span class="o">+</span><span class="mi">30</span><span class="no">DE</span><span class="p">,</span> <span class="n">U</span><span class="o">+</span><span class="mi">30</span><span class="no">DF</span><span class="p">,</span> <span class="n">U</span><span class="o">+</span><span class="mi">30</span><span class="no">E1</span><span class="p">,</span> <span class="n">U</span><span class="o">+</span><span class="mi">30</span><span class="no">E2</span><span class="p">,</span> <span class="n">U</span><span class="o">+</span><span class="mi">30</span><span class="no">E3</span><span class="p">,</span> <span class="n">U</span><span class="o">+</span><span class="mi">30</span><span class="no">E5</span><span class="p">,</span> <span class="n">U</span><span class="o">+</span><span class="mi">30</span><span class="no">E7</span><span class="p">,</span> <span class="n">U</span><span class="o">+</span><span class="mi">30</span><span class="no">EE</span><span class="p">,</span> <span class="n">U</span><span class="o">+</span><span class="mi">30</span><span class="no">F0</span><span class="o">.</span><span class="n">.U</span><span class="o">+</span><span class="mi">30</span><span class="no">F3</span><span class="p">,</span> <span class="n">U</span><span class="o">+</span><span class="mi">30</span><span class="no">F5</span><span class="p">,</span> <span class="n">U</span><span class="o">+</span><span class="mi">30</span><span class="no">F6</span><span class="p">,</span> <span class="n">U</span><span class="o">+</span><span class="mi">31</span><span class="no">F0</span><span class="p">,</span> <span class="n">U</span><span class="o">+</span><span class="mi">31</span><span class="no">F1</span><span class="p">,</span> <span class="n">U</span><span class="o">+</span><span class="mi">31</span><span class="no">F2</span><span class="p">,</span> <span class="n">U</span><span class="o">+</span><span class="mi">31</span><span class="no">F3</span><span class="p">,</span> <span class="n">U</span><span class="o">+</span><span class="mi">31</span><span class="no">F4</span><span class="p">,</span> <span class="n">U</span><span class="o">+</span><span class="mi">31</span><span class="no">F5</span><span class="p">,</span> <span class="n">U</span><span class="o">+</span><span class="mi">31</span><span class="no">F6</span><span class="p">,</span> <span class="n">U</span><span class="o">+</span><span class="mi">31</span><span class="no">F7</span><span class="p">,</span> <span class="n">U</span><span class="o">+</span><span class="mi">31</span><span class="no">F8</span><span class="p">,</span> <span class="n">U</span><span class="o">+</span><span class="mi">31</span><span class="no">F9</span><span class="p">,</span> <span class="n">U</span><span class="o">+</span><span class="mi">31</span><span class="no">FA</span><span class="p">,</span> <span class="n">U</span><span class="o">+</span><span class="mi">31</span><span class="no">FB</span><span class="p">,</span> <span class="n">U</span><span class="o">+</span><span class="mi">31</span><span class="no">FC</span><span class="p">,</span> <span class="n">U</span><span class="o">+</span><span class="mi">31</span><span class="no">FD</span><span class="p">,</span> <span class="n">U</span><span class="o">+</span><span class="mi">31</span><span class="no">FE</span><span class="p">,</span> <span class="n">U</span><span class="o">+</span><span class="mi">31</span><span class="no">FF</span><span class="p">,</span> <span class="n">U</span><span class="o">+</span><span class="no">AC00</span><span class="o">.</span><span class="n">.U</span><span class="o">+</span><span class="no">D7A3</span><span class="p">,</span> <span class="n">U</span><span class="o">+</span><span class="mi">1100</span><span class="o">.</span><span class="n">.U</span><span class="o">+</span><span class="mi">1159</span><span class="p">,</span> <span class="n">U</span><span class="o">+</span><span class="mi">1161</span><span class="o">.</span><span class="n">.U</span><span class="o">+</span><span class="mi">11</span><span class="no">A2</span><span class="p">,</span> <span class="n">U</span><span class="o">+</span><span class="mi">11</span><span class="no">A8</span><span class="o">.</span><span class="n">.U</span><span class="o">+</span><span class="mi">11</span><span class="no">F9</span><span class="p">,</span> <span class="n">U</span><span class="o">+</span><span class="no">A000</span><span class="o">.</span><span class="n">.U</span><span class="o">+</span><span class="no">A48C</span><span class="p">,</span> <span class="n">U</span><span class="o">+</span><span class="no">A492</span><span class="o">.</span><span class="n">.U</span><span class="o">+</span><span class="no">A4C6</span>
+</code></pre>
+</div>
+
+
+<p>9. 重新索引和服务：</p>
+
+<div class="highlight"><pre><code class="bash"><span class="nv">$rake</span> ultrasphinx:configure
+<span class="nv">$sudo</span> rake ultrasphinx:index
+<span class="nv">$sudo</span> rake ultrasphinx:daemon:restart
+</code></pre>
+</div>
+
+
+
+
+    <div class="clear"></div>
+  </div>
+  <!-- AddThis Button BEGIN -->
+  <div class="addthis_toolbox addthis_default_style ">
+    <a class="addthis_button_facebook_like" fb:like:layout="button_count"></a>
+    <a class="addthis_button_tweet"></a>
+    <a class="addthis_button_google_plusone" g:plusone:size="medium"></a>
+    <a class="addthis_counter addthis_pill_style"></a>
+  </div>
+  <!-- AddThis Button END -->
+  <p class="alt-font tight">
+    Posted in&nbsp;
+    
+    <a href="/categories/Rails Plugins" title="Rails Plugins" rel="category tag">Rails Plugins</a>
+    
+  </p>
+  <p class="by-line">
+    <span class="date full-date">
+      <abbr class="published" title="Sun Mar 09 00:00:00 -0800 2008">09 Mar 2008</abbr>
+    </span>
+  </p>
+  <div class="clear"></div>
+</div>
+<div class="rule">
+  <hr/>
+</div>
+
+<div id="disqus_thread"></div>
+<script type="text/javascript" src="http://s7.addthis.com/js/250/addthis_widget.js#pubid=flyerhzm"></script>
+<script type="text/javascript">
+  var disqus_shortname = 'richard-huang';
+
+  var disqus_url = "http://www.huangzhimin.com/2008/03/09/ultrasphinx/";
+
+  (function() {
+      var dsq = document.createElement('script'); dsq.type = 'text/javascript'; dsq.async = true;
+      dsq.src = 'http://' + disqus_shortname + '.disqus.com/embed.js';
+      (document.getElementsByTagName('head')[0] || document.getElementsByTagName('body')[0]).appendChild(dsq);
+  })();
+</script>
+<noscript>Please enable JavaScript to view the <a href="http://disqus.com/?ref_noscript">comments powered by Disqus.</a></noscript>
+<a href="http://disqus.com" class="dsq-brlink">blog comments powered by <span class="logo-disqus">Disqus</span></a>
+
+
+        </div>
+        <div id="sidebar">
+          <div id="carrington-subscribe" class="widget">
+            <h2 class="widget-title">Subscribe</h2>
+            <a class="feed alignright" title="RSS 2.0 feed for posts" rel="alternate" href="http://feeds.feedburner.com/richard-huang">
+              <img src="/images/rss-button.gif" alt="latest posts" title="latest posts">
+            </a>
+          </div>
+          <div id="carrington-about" class="widget">
+            <div class="about">
+              <h2 class="widget-title">About</h2>
+              <p>My name is Richard Huang, a Rubyist and open source advocate.</p>
+              <a class="more" href="/about.html">more →</a>
+            </div>
+          </div>
+          <div id="carrington-speaker" class="widget">
+            <img src="/images/160x160speaker.png">
+          </div>
+          <div id="primary-sidebar">
+            <div class="widget">
+              <h2 class="widget-title">Categories</h2>
+              <ul>
+                
+                <li><a href="/categories/jekyll">jekyll (1)</a></li>
+                
+                <li><a href="/categories/mongodb">mongodb (2)</a></li>
+                
+                <li><a href="/categories/GAE">GAE (1)</a></li>
+                
+                <li><a href="/categories/Linux">Linux (4)</a></li>
+                
+                <li><a href="/categories/html">html (2)</a></li>
+                
+                <li><a href="/categories/Java Web">Java Web (3)</a></li>
+                
+                <li><a href="/categories/Resque">Resque (1)</a></li>
+                
+                <li><a href="/categories/Rack">Rack (1)</a></li>
+                
+                <li><a href="/categories/RubyGems">RubyGems (7)</a></li>
+                
+                <li><a href="/categories/rake">rake (1)</a></li>
+                
+                <li><a href="/categories/php">php (2)</a></li>
+                
+                <li><a href="/categories/disqus">disqus (1)</a></li>
+                
+                <li><a href="/categories/Less">Less (1)</a></li>
+                
+                <li><a href="/categories/ActiveRecord">ActiveRecord (5)</a></li>
+                
+                <li><a href="/categories/Rails">Rails (35)</a></li>
+                
+                <li><a href="/categories/css">css (9)</a></li>
+                
+                <li><a href="/categories/sql">sql (1)</a></li>
+                
+                <li><a href="/categories/maven">maven (1)</a></li>
+                
+                <li><a href="/categories/Vim">Vim (1)</a></li>
+                
+                <li><a href="/categories/Ruby">Ruby (33)</a></li>
+                
+                <li><a href="/categories/Presentation">Presentation (7)</a></li>
+                
+                <li><a href="/categories/contact-list">contact-list (6)</a></li>
+                
+                <li><a href="/categories/Java">Java (9)</a></li>
+                
+                <li><a href="/categories/Github">Github (1)</a></li>
+                
+                <li><a href="/categories/flex">flex (4)</a></li>
+                
+                <li><a href="/categories/Rails Plugins">Rails Plugins (12)</a></li>
+                
+                <li><a href="/categories/passenger">passenger (1)</a></li>
+                
+                <li><a href="/categories/Sinatra">Sinatra (1)</a></li>
+                
+                <li><a href="/categories/Nginx">Nginx (2)</a></li>
+                
+                <li><a href="/categories/Facebook">Facebook (2)</a></li>
+                
+                <li><a href="/categories/Android">Android (2)</a></li>
+                
+                <li><a href="/categories/Rspec">Rspec (3)</a></li>
+                
+                <li><a href="/categories/javascript">javascript (4)</a></li>
+                
+                <li><a href="/categories/Life">Life (19)</a></li>
+                
+                <li><a href="/categories/git">git (1)</a></li>
+                
+                <li><a href="/categories/Seo">Seo (1)</a></li>
+                
+                <li><a href="/categories/Git">Git (4)</a></li>
+                
+                <li><a href="/categories/Ldap">Ldap (1)</a></li>
+                
+                <li><a href="/categories/mongoid">mongoid (7)</a></li>
+                
+                <li><a href="/categories/webrick">webrick (3)</a></li>
+                
+                <li><a href="/categories/msn">msn (1)</a></li>
+                
+                <li><a href="/categories/Capistrano">Capistrano (3)</a></li>
+                
+                <li><a href="/categories/redis">redis (1)</a></li>
+                
+                <li><a href="/categories/uml">uml (1)</a></li>
+                
+                <li><a href="/categories/Hostmonster">Hostmonster (5)</a></li>
+                
+                <li><a href="/categories/jquery">jquery (1)</a></li>
+                
+                <li><a href="/categories/Twitter">Twitter (2)</a></li>
+                
+                <li><a href="/categories/HTTP">HTTP (4)</a></li>
+                
+              </ul>
+            </div>
+          </div>
+          <div id="secondary-sidebar">
+            <div class="widget">
+              <h2 class="widget-title">Recent Posts</h2>
+              <ul>
+                
+                <li>
+                  <a href="/2011/12/13/rake-arguments/" title="rake arguments" rel="bookmark">rake arguments</a>
+                </li>
+                
+                <li>
+                  <a href="/2011/12/12/passenger-with-redis/" title="passenger with redis" rel="bookmark">passenger with redis</a>
+                </li>
+                
+                <li>
+                  <a href="/2011/11/14/avoid-committing-git-conflicts/" title="avoid committing git conflicts" rel="bookmark">avoid committing git conflicts</a>
+                </li>
+                
+                <li>
+                  <a href="/2011/11/06/after_commit/" title="after_commit" rel="bookmark">after_commit</a>
+                </li>
+                
+                <li>
+                  <a href="/2011/10/31/reset_counter-in-rails/" title="reset_counter in rails" rel="bookmark">reset_counter in rails</a>
+                </li>
+                
+                <li>
+                  <a href="/2011/10/21/rspec-filter/" title="use rspec filter to speed up tests" rel="bookmark">use rspec filter to speed up tests</a>
+                </li>
+                
+                <li>
+                  <a href="/2011/07/17/rubykaigi-presentation/" title="rubykaigi presentation" rel="bookmark">rubykaigi presentation</a>
+                </li>
+                
+                <li>
+                  <a href="/2011/03/27/beijing-ruby-event/" title="beijing ruby线下活动" rel="bookmark">beijing ruby线下活动</a>
+                </li>
+                
+                <li>
+                  <a href="/2011/03/22/upgrade-mongoid-multiple-database/" title="Upgrade Mongoid - Multiple databases" rel="bookmark">Upgrade Mongoid - Multiple databases</a>
+                </li>
+                
+                <li>
+                  <a href="/2011/03/21/upgrade-mongoid-update_attribute/" title="Upgrade Mongoid - update_attribute" rel="bookmark">Upgrade Mongoid - update_attribute</a>
+                </li>
+                
+              </ul>
+              <div class="clear"></div>
+            </div>
+            <div class="widget">
+              <h2 class="widget-title">Archives</h2>
+              <ul>
+                
+                <li>
+                  <a href="/2011/12">December 2011</a> (2 posts)
+                </li>
+                
+                <li>
+                  <a href="/2011/11">November 2011</a> (2 posts)
+                </li>
+                
+                <li>
+                  <a href="/2011/10">October 2011</a> (2 posts)
+                </li>
+                
+                <li>
+                  <a href="/2011/07">July 2011</a> (1 posts)
+                </li>
+                
+                <li>
+                  <a href="/2011/03">March 2011</a> (5 posts)
+                </li>
+                
+                <li>
+                  <a href="/2011/01">January 2011</a> (6 posts)
+                </li>
+                
+                <li>
+                  <a href="/2010/12">December 2010</a> (1 posts)
+                </li>
+                
+                <li>
+                  <a href="/2010/08">August 2010</a> (1 posts)
+                </li>
+                
+                <li>
+                  <a href="/2010/07">July 2010</a> (1 posts)
+                </li>
+                
+                <li>
+                  <a href="/2010/06">June 2010</a> (4 posts)
+                </li>
+                
+                <li>
+                  <a href="/2010/05">May 2010</a> (4 posts)
+                </li>
+                
+                <li>
+                  <a href="/2010/04">April 2010</a> (4 posts)
+                </li>
+                
+                <li>
+                  <a href="/2010/03">March 2010</a> (6 posts)
+                </li>
+                
+                <li>
+                  <a href="/2010/02">February 2010</a> (4 posts)
+                </li>
+                
+                <li>
+                  <a href="/2010/01">January 2010</a> (5 posts)
+                </li>
+                
+                <li>
+                  <a href="/2009/12">December 2009</a> (7 posts)
+                </li>
+                
+                <li>
+                  <a href="/2009/11">November 2009</a> (5 posts)
+                </li>
+                
+                <li>
+                  <a href="/2009/10">October 2009</a> (4 posts)
+                </li>
+                
+                <li>
+                  <a href="/2009/09">September 2009</a> (11 posts)
+                </li>
+                
+                <li>
+                  <a href="/2009/08">August 2009</a> (13 posts)
+                </li>
+                
+                <li>
+                  <a href="/2009/07">July 2009</a> (8 posts)
+                </li>
+                
+                <li>
+                  <a href="/2009/06">June 2009</a> (9 posts)
+                </li>
+                
+                <li>
+                  <a href="/2009/05">May 2009</a> (7 posts)
+                </li>
+                
+                <li>
+                  <a href="/2009/04">April 2009</a> (7 posts)
+                </li>
+                
+                <li>
+                  <a href="/2009/01">January 2009</a> (2 posts)
+                </li>
+                
+                <li>
+                  <a href="/2008/12">December 2008</a> (3 posts)
+                </li>
+                
+                <li>
+                  <a href="/2008/11">November 2008</a> (4 posts)
+                </li>
+                
+                <li>
+                  <a href="/2008/08">August 2008</a> (5 posts)
+                </li>
+                
+                <li>
+                  <a href="/2008/07">July 2008</a> (1 posts)
+                </li>
+                
+                <li>
+                  <a href="/2008/06">June 2008</a> (1 posts)
+                </li>
+                
+                <li>
+                  <a href="/2008/04">April 2008</a> (1 posts)
+                </li>
+                
+                <li>
+                  <a href="/2008/03">March 2008</a> (6 posts)
+                </li>
+                
+                <li>
+                  <a href="/2008/02">February 2008</a> (2 posts)
+                </li>
+                
+              </ul>
+              <div class="clear"></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div id="footer" class="section">
+      <div class="wrapper">
+        <a id="generator-link">
+          Proudly powered by
+          <a href="https://github.com/mojombo/jekyll" rel="generator">Jekyll</a>
+          and
+          <a href="http://carringtontheme.com" title="Carrington theme for WordPress">Carrington</a>
+      </div>
+      <div id="developer-link">
+      </div>
+    </div>
+    <a href="http://github.com/flyerhzm"><img style="position: absolute; top: 0; right: 0; border: 0;" src="https://assets2.github.com/img/e6bef7a091f5f3138b8cd40bc3e114258dd68ddf?repo=&url=http%3A%2F%2Fs3.amazonaws.com%2Fgithub%2Fribbons%2Fforkme_right_red_aa0000.png&path=" alt="Fork me on GitHub"></a>
+    <script type="text/javascript">
+      var disqus_shortname = 'richard-huang';
+
+      (function () {
+        var s = document.createElement('script'); s.async = true;
+        s.type = 'text/javascript';
+        s.src = 'http://' + disqus_shortname + '.disqus.com/count.js';
+        (document.getElementsByTagName('HEAD')[0] || document.getElementsByTagName('BODY')[0]).appendChild(s);
+      }());
+    </script>
+    <script type="text/javascript">
+      var gaJsHost = (("https:" == document.location.protocol) ? "https://ssl." : "http://www.");
+      document.write(unescape("%3Cscript src='" + gaJsHost + "google-analytics.com/ga.js' type='text/javascript'%3E%3C/script%3E"));
+    </script>
+    <script type="text/javascript">
+      try {
+        var pageTracker = _gat._getTracker("UA-8561975-1");
+        pageTracker._trackPageview();
+      } catch(err) {}
+    </script>
+  </body>
+</html>

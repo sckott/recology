@@ -1,0 +1,1006 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="utf-8">
+    <title>Richard Huang - Richard Huang's Website</title>
+    <meta name="author" content="Richard Huang" />
+    <meta name="google-site-verification" content="KDVRO6hdZ0Vww31dac2Yomyd7xjmMMFEZw2Fzq5acuY" />
+    <link rel="stylesheet" type="text/css" href="/stylesheets/screen.css">
+    <link href="http://feeds.feedburner.com/richard-huang" rel="alternate" title="RSS" type="application/rss+xml" />
+    <script type="text/javascript" src="https://ajax.googleapis.com/ajax/libs/jquery/1.7.1/jquery.min.js"></script>
+    <script type="text/javascript" src="/javascripts/jquery.github_v2.js"></script>
+  </head>
+
+  <body>
+    <div id="header" class="section">
+      <div class="wrapper">
+        <strong id="blog-title">
+          <a href="/" rel="home">Richard Huang's Website</a>
+        </strong>
+        <p id="blog-description"></p>
+        <div id="navigation">
+          <ul class="nav clearfix">
+            <li class="first-child"><a href="/blog.html">Blog</a></li>
+            <li><a href="/projects.html">Projects</a></li>
+            <li><a href="/about.html">About</a></li>
+          </ul>
+        </div>
+      </div>
+    </div>
+    <div id="main" class="section">
+      <div class="wrapper">
+        <div id="content">
+          <!-- AddThis Button BEGIN -->
+<div class="addthis_toolbox addthis_default_style ">
+  <a class="addthis_button_facebook_like" fb:like:layout="button_count"></a>
+  <a class="addthis_button_tweet"></a>
+  <a class="addthis_button_google_plusone" g:plusone:size="medium"></a>
+  <a class="addthis_counter addthis_pill_style"></a>
+</div>
+<script type="text/javascript" src="http://s7.addthis.com/js/250/addthis_widget.js#pubid=flyerhzm"></script>
+<!-- AddThis Button END -->
+
+  <div class="full">
+    <h1 class="entry-title">
+      <a href="/2011/03/08/upgrade-mongoid-many-to-many-associations/" title="Upgrade Mongoid - Many to many association" rel="bookmark">Upgrade Mongoid - Many to many association</a>
+    </h1>
+    <div class="entry-content full-content">
+      <p>Before mongoid 2.0.0.rc1, there is no default support for many to many association. So we use join document (aka join table in relational database) to implement the many to many association.</p>
+
+<p>For example, we have two documents users and accounts, one user has many accounts and one account contains many users, to establish the many to many relationship between users and accounts, we create a new document named user_accounts, the document looks like</p>
+
+<div class="highlight"><pre><code class="javascript"><span class="p">{</span><span class="s1">&#39;_id&#39;</span><span class="o">:</span> <span class="s1">&#39;4d76d3a70bdb822d08000001&#39;</span><span class="p">,</span> <span class="s1">&#39;user_id&#39;</span><span class="o">:</span> <span class="nx">BSON</span><span class="o">::</span><span class="nx">ObjectId</span><span class="p">(</span><span class="s1">&#39;4d76d3b80bdb822d080015b3&#39;</span><span class="p">),</span> <span class="s1">&#39;account_id&#39;</span><span class="o">:</span> <span class="nx">BSON</span><span class="o">::</span><span class="nx">ObjectId</span><span class="p">(</span><span class="s1">&#39;4d76d3b90bdb822d080015b7&#39;</span><span class="p">)}</span>
+</code></pre>
+</div>
+
+
+<p>and the models are defined as follows</p>
+
+<div class="highlight"><pre><code class="ruby"><span class="k">class</span> <span class="nc">User</span>
+  <span class="kp">include</span> <span class="no">Mongoid</span><span class="o">::</span><span class="no">Document</span>
+  <span class="n">references_many</span> <span class="ss">:user_accounts</span>
+<span class="k">end</span>
+
+<span class="k">class</span> <span class="nc">Account</span>
+  <span class="kp">include</span> <span class="no">Mongoid</span><span class="o">::</span><span class="no">Document</span>
+  <span class="n">references_many</span> <span class="ss">:user_accounts</span>
+<span class="k">end</span>
+
+<span class="k">class</span> <span class="nc">UserAccount</span>
+  <span class="kp">include</span> <span class="no">Mongoid</span><span class="o">::</span><span class="no">Document</span>
+  <span class="n">referenced_in</span> <span class="ss">:user</span>
+  <span class="n">referenced_in</span> <span class="ss">:account</span>
+<span class="k">end</span>
+</code></pre>
+</div>
+
+
+<p>Are you familiar with it, it's what activerecord did for many to many association.</p>
+
+<p>I'm glad that mongoid began to support many to many association after mongoid 2.0.0.rc1, the new syntax is "referenes_and_referenced_in_many".</p>
+
+<div class="highlight"><pre><code class="ruby"><span class="k">class</span> <span class="nc">User</span>
+  <span class="kp">include</span> <span class="no">Mongoid</span><span class="o">::</span><span class="no">Document</span>
+  <span class="n">references_and_referenced_in_many</span> <span class="ss">:accounts</span>
+<span class="k">end</span>
+
+<span class="k">class</span> <span class="nc">Account</span>
+  <span class="kp">include</span> <span class="no">Mongoid</span><span class="o">::</span><span class="no">Document</span>
+  <span class="n">references_and_referenced_in_many</span> <span class="ss">:users</span>
+<span class="k">end</span>
+</code></pre>
+</div>
+
+
+<p>We don't need the join document any more. The implementation of mongoid is different with activerecord, it uses array attribute to store the relationship at both sides. Like</p>
+
+<p>These are user documents</p>
+
+<div class="highlight"><pre><code class="javascript"><span class="p">{</span><span class="s1">&#39;_id&#39;</span><span class="o">:</span> <span class="s1">&#39;4d76d3a90bdb822d08000009&#39;</span><span class="p">,</span> <span class="nx">account_ids</span><span class="o">:</span> <span class="p">[</span><span class="nx">BSON</span><span class="o">::</span><span class="nx">ObjectId</span><span class="p">(</span><span class="s1">&#39;4d76d3aa0bdb822d0800001b&#39;</span><span class="p">),</span> <span class="nx">BSON</span><span class="o">::</span><span class="nx">ObjectId</span><span class="p">(</span><span class="s1">&#39;4d76d3aa0bdb822d0800001d&#39;</span><span class="p">),</span> <span class="nx">BSON</span><span class="o">::</span><span class="nx">ObjectId</span><span class="p">(</span><span class="s1">&#39;4d76d3aa0bdb822d08000017&#39;</span><span class="p">)]}</span>
+<span class="p">{</span><span class="s1">&#39;_id&#39;</span><span class="o">:</span> <span class="s1">&#39;4d76d3a80bdb822d08000005&#39;</span><span class="p">,</span> <span class="nx">account_ids</span><span class="o">:</span> <span class="p">[</span><span class="nx">BSON</span><span class="o">::</span><span class="nx">ObjectId</span><span class="p">(</span><span class="s1">&#39;4d76d3aa0bdb822d08000017&#39;</span><span class="p">),</span> <span class="nx">BSON</span><span class="o">::</span><span class="nx">ObjectId</span><span class="p">(</span><span class="s1">&#39;4d76d3a90bdb822d08000015&#39;</span><span class="p">)]}</span>
+</code></pre>
+</div>
+
+
+<p>And these are account documents</p>
+
+<div class="highlight"><pre><code class="javascript"><span class="p">{</span><span class="s1">&#39;_id&#39;</span><span class="o">:</span> <span class="s1">&#39;4d76d3aa0bdb822d08000017&#39;</span><span class="p">,</span> <span class="nx">user_ids</span><span class="o">:</span> <span class="p">[</span><span class="nx">BSON</span><span class="o">::</span><span class="nx">ObjectId</span><span class="p">(</span><span class="s1">&#39;4d76d3a80bdb822d08000005&#39;</span><span class="p">),</span> <span class="nx">BSON</span><span class="o">::</span><span class="nx">ObjectId</span><span class="p">(</span><span class="s1">&#39;4d76d3a90bdb822d08000009&#39;</span><span class="p">),</span> <span class="nx">BSON</span><span class="o">::</span><span class="nx">ObjectId</span><span class="p">(</span><span class="s1">&#39;4d76d3a90bdb822d0800000d&#39;</span><span class="p">)]}</span>
+<span class="p">{</span><span class="s1">&#39;_id&#39;</span><span class="o">:</span> <span class="s1">&#39;4d76d3aa0bdb822d0800001b&#39;</span><span class="p">,</span> <span class="nx">user_ids</span><span class="o">:</span> <span class="p">[</span><span class="nx">SON</span><span class="o">::</span><span class="nx">ObjectId</span><span class="p">(</span><span class="s1">&#39;4d76d3a90bdb822d08000009&#39;</span><span class="p">),</span> <span class="nx">BSON</span><span class="o">::</span><span class="nx">ObjectId</span><span class="p">(</span><span class="s1">&#39;4d76d3a90bdb822d08000011&#39;</span><span class="p">)]}</span>
+</code></pre>
+</div>
+
+
+<p>As mongodb support the Array type, it is really easy to maintain the many to many relationship.</p>
+
+<p>Btw, if you use</p>
+
+<div class="highlight"><pre><code class="ruby"><span class="n">references_many</span> <span class="ss">:name</span><span class="p">,</span> <span class="ss">:stored_as</span> <span class="o">=&gt;</span> <span class="ss">:array</span>
+</code></pre>
+</div>
+
+
+<p>before, you will receive a runtime error. You should use</p>
+
+<div class="highlight"><pre><code class="ruby"><span class="n">references_and_referenced_in_many</span> <span class="ss">:name</span>
+</code></pre>
+</div>
+
+
+<p>instead.</p>
+
+      <div class="clear"></div>
+    </div>
+    <p class="alt-font tight">
+      Posted in&nbsp;
+      
+      <a href="/categories/mongoid" title="mongoid" rel="category tag">mongoid</a>
+      
+      <a href="/categories/Ruby" title="Ruby" rel="category tag">Ruby</a>
+      
+    </p>
+    <p class="comments-link">
+      <a href='/2011/03/08/upgrade-mongoid-many-to-many-associations/#disqus_thread'>Comments</a>
+    </p>
+    <p class="by-line">
+      <span class="date full-date">
+        <abbr class="published" title="Tue Mar 08 00:00:00 -0800 2011">08 Mar 2011</abbr>
+      </span>
+    </p>
+    <div class="clear"></div>
+  </div>
+  <div class="rule"><hr/></div>
+
+  <div class="full">
+    <h1 class="entry-title">
+      <a href="/2011/03/01/upgrade-mongoid-hash-arguments-for-group/" title="Upgrade Mongoid - Hash arguments for group" rel="bookmark">Upgrade Mongoid - Hash arguments for group</a>
+    </h1>
+    <div class="entry-content full-content">
+      <p>You will receive a warning for the group method call after upgrading mongoid.</p>
+
+<div class="highlight"><pre><code class="bash">Collection#group no longer take a list of paramters. This usage is deprecated.
+</code></pre>
+</div>
+
+
+<p>exactly this is because mongo gem changes the group method definition.</p>
+
+<p>Before</p>
+
+<div class="highlight"><pre><code class="ruby"><span class="n">key</span> <span class="o">=</span> <span class="o">[</span><span class="s2">&quot;ad_id&quot;</span><span class="o">]</span>
+<span class="n">conditions</span> <span class="o">=</span> <span class="p">{</span> <span class="s1">&#39;ad_id&#39;</span> <span class="o">=&gt;</span> <span class="p">{</span> <span class="s1">&#39;$in&#39;</span> <span class="o">=&gt;</span> <span class="n">ad_ids</span> <span class="p">}</span> <span class="p">}</span>
+<span class="n">initial</span> <span class="o">=</span> <span class="p">{</span> <span class="s2">&quot;impressions&quot;</span> <span class="o">=&gt;</span> <span class="mi">0</span><span class="o">.</span><span class="mi">0</span><span class="p">,</span> <span class="s2">&quot;clicks&quot;</span> <span class="o">=&gt;</span> <span class="mi">0</span><span class="o">.</span><span class="mi">0</span> <span class="p">}</span>
+<span class="n">reduce</span> <span class="o">=</span> <span class="s2">&quot;a reduce javascript function&quot;</span>
+
+<span class="no">AdStat</span><span class="o">.</span><span class="n">collection</span><span class="o">.</span><span class="n">group</span><span class="p">(</span><span class="n">key</span><span class="p">,</span> <span class="n">conditions</span><span class="p">,</span> <span class="n">initial</span><span class="p">,</span> <span class="n">reduce</span><span class="p">)</span><span class="o">.</span><span class="n">each</span> <span class="k">do</span> <span class="o">|</span><span class="n">e</span><span class="o">|</span>
+  <span class="o">.</span><span class="n">.</span><span class="o">.</span><span class="n">.</span><span class="o">.</span><span class="n">.</span>
+<span class="k">end</span>
+</code></pre>
+</div>
+
+
+<p>After</p>
+
+<div class="highlight"><pre><code class="ruby"><span class="n">key</span> <span class="o">=</span> <span class="o">[</span><span class="s2">&quot;ad_id&quot;</span><span class="o">]</span>
+<span class="n">conditions</span> <span class="o">=</span> <span class="p">{</span> <span class="s1">&#39;ad_id&#39;</span> <span class="o">=&gt;</span> <span class="p">{</span> <span class="s1">&#39;$in&#39;</span> <span class="o">=&gt;</span> <span class="n">ad_ids</span> <span class="p">}</span> <span class="p">}</span>
+<span class="n">initial</span> <span class="o">=</span> <span class="p">{</span> <span class="s2">&quot;impressions&quot;</span> <span class="o">=&gt;</span> <span class="mi">0</span><span class="o">.</span><span class="mi">0</span><span class="p">,</span> <span class="s2">&quot;clicks&quot;</span> <span class="o">=&gt;</span> <span class="mi">0</span><span class="o">.</span><span class="mi">0</span> <span class="p">}</span>
+<span class="n">reduce</span> <span class="o">=</span> <span class="s2">&quot;a reduce javascript function&quot;</span>
+
+<span class="no">AdStat</span><span class="o">.</span><span class="n">collection</span><span class="o">.</span><span class="n">group</span><span class="p">(</span><span class="ss">:key</span> <span class="o">=&gt;</span> <span class="n">key</span><span class="p">,</span> <span class="ss">:conditions</span> <span class="o">=&gt;</span> <span class="n">conditions</span><span class="p">,</span> <span class="ss">:initial</span> <span class="o">=&gt;</span> <span class="n">initial</span><span class="p">,</span> <span class="ss">:reduce</span> <span class="o">=&gt;</span> <span class="n">reduce</span><span class="p">)</span><span class="o">.</span><span class="n">each</span> <span class="k">do</span> <span class="o">|</span><span class="n">e</span><span class="o">|</span>
+  <span class="o">.</span><span class="n">.</span><span class="o">.</span><span class="n">.</span><span class="o">.</span><span class="n">.</span>
+<span class="k">end</span>
+</code></pre>
+</div>
+
+
+<p>This is the usage of hash arguments, it makes the group calling more readable.</p>
+
+      <div class="clear"></div>
+    </div>
+    <p class="alt-font tight">
+      Posted in&nbsp;
+      
+      <a href="/categories/mongoid" title="mongoid" rel="category tag">mongoid</a>
+      
+      <a href="/categories/Ruby" title="Ruby" rel="category tag">Ruby</a>
+      
+    </p>
+    <p class="comments-link">
+      <a href='/2011/03/01/upgrade-mongoid-hash-arguments-for-group/#disqus_thread'>Comments</a>
+    </p>
+    <p class="by-line">
+      <span class="date full-date">
+        <abbr class="published" title="Tue Mar 01 00:00:00 -0800 2011">01 Mar 2011</abbr>
+      </span>
+    </p>
+    <div class="clear"></div>
+  </div>
+  <div class="rule"><hr/></div>
+
+  <div class="full">
+    <h1 class="entry-title">
+      <a href="/2011/01/28/upgrade-mongoid-default-type-for-field/" title="Upgrade Mongoid - Default Type for Field" rel="bookmark">Upgrade Mongoid - Default Type for Field</a>
+    </h1>
+    <div class="entry-content full-content">
+      <p>If you have watched the episode about <a href="http://railscasts.com/episodes/238-mongoid">mongoid</a> from railscast, ryanb removed the default type String for field, like</p>
+
+<div class="highlight"><pre><code class="ruby"><span class="k">class</span> <span class="nc">Article</span>
+  <span class="n">field</span> <span class="ss">:name</span><span class="p">,</span> <span class="ss">:type</span> <span class="o">=&gt;</span> <span class="nb">String</span>
+  <span class="n">field</span> <span class="ss">:content</span><span class="p">,</span> <span class="ss">:type</span> <span class="o">=&gt;</span> <span class="nb">String</span>
+<span class="k">end</span>
+</code></pre>
+</div>
+
+
+<p>can be written as</p>
+
+<div class="highlight"><pre><code class="ruby"><span class="k">class</span> <span class="nc">Article</span>
+  <span class="n">field</span> <span class="ss">:name</span>
+  <span class="n">field</span> <span class="ss">:content</span>
+<span class="k">end</span>
+</code></pre>
+</div>
+
+
+<p>but it is not valid from mongoid.2.0.0.rc.1 again, the default type of field is changed from String to Object, that means we should explicitly set the type for each field.</p>
+
+      <div class="clear"></div>
+    </div>
+    <p class="alt-font tight">
+      Posted in&nbsp;
+      
+      <a href="/categories/mongoid" title="mongoid" rel="category tag">mongoid</a>
+      
+      <a href="/categories/Ruby" title="Ruby" rel="category tag">Ruby</a>
+      
+    </p>
+    <p class="comments-link">
+      <a href='/2011/01/28/upgrade-mongoid-default-type-for-field/#disqus_thread'>Comments</a>
+    </p>
+    <p class="by-line">
+      <span class="date full-date">
+        <abbr class="published" title="Fri Jan 28 00:00:00 -0800 2011">28 Jan 2011</abbr>
+      </span>
+    </p>
+    <div class="clear"></div>
+  </div>
+  <div class="rule"><hr/></div>
+
+  <div class="full">
+    <h1 class="entry-title">
+      <a href="/2011/01/27/upgrade-mongoid-write-tests-first/" title="Upgrade Mongoid - Write Tests First" rel="bookmark">Upgrade Mongoid - Write Tests First</a>
+    </h1>
+    <div class="entry-content full-content">
+      <p>Mongoid is one of the popular Object Document Mappings between Ruby and Mongo, and it is still evolving. We began to use mongoid 2.0.0.beta.20 several weeks ago, the author of mongoid @durran said he wanted to release the 2.0.0 last week (As you know 2.0.0 is still not released yet, but he really did a lot of awesome work), so we tried the version 2.0.0.rc.6 to prepare upgrading to final 2.0.0.</p>
+
+<p>I'm working on upgrading mongoid from 2.0.0.beta.20 to 2.0.0.rc.6 these days. I'm willing to write several posts to share my experience about upgrading.</p>
+
+<p>At the first post, I just want you keep in mind that <strong>don't do any upgrading before you write tests for your models</strong>. There are many api changes between mongoid 2.0.0.beta.20 and 2.0.0.rc.6, I can't imagine how to upgrade without tests, as our project has almost 30 models and 100 view pages, I can't check the models and views one by one. Luckily, we have built many rspec tests for models and cucumber tests.</p>
+
+<p>It's expected that many test failures raised after upgrading, if I fixed all the failures, the job to upgrade is complete.</p>
+
+<p>I have to say I like such upgrading job, I read the source codes of mongoid, checked git logs, sometimes thought why they made such changes, and always learned a lot from reading source codes. :-)</p>
+
+      <div class="clear"></div>
+    </div>
+    <p class="alt-font tight">
+      Posted in&nbsp;
+      
+      <a href="/categories/mongoid" title="mongoid" rel="category tag">mongoid</a>
+      
+      <a href="/categories/Ruby" title="Ruby" rel="category tag">Ruby</a>
+      
+    </p>
+    <p class="comments-link">
+      <a href='/2011/01/27/upgrade-mongoid-write-tests-first/#disqus_thread'>Comments</a>
+    </p>
+    <p class="by-line">
+      <span class="date full-date">
+        <abbr class="published" title="Thu Jan 27 00:00:00 -0800 2011">27 Jan 2011</abbr>
+      </span>
+    </p>
+    <div class="clear"></div>
+  </div>
+  <div class="rule"><hr/></div>
+
+  <div class="full">
+    <h1 class="entry-title">
+      <a href="/2011/01/20/migrate-custom-blog-to-jekyll-and-disqus/" title="Migrate Custom Blog to Jekyll and Disqus" rel="bookmark">Migrate Custom Blog to Jekyll and Disqus</a>
+    </h1>
+    <div class="entry-content full-content">
+      <p>I wrote my blog system by myself about 3 years ago, using rails. It's good, but not cool enough, I just need some changes to make my blog better. After googling, I found jekyll, which is a simple, blog aware, static site generator, that means no databases and much less resources wanted, sounds great.</p>
+
+<h2>Build a Blog by Jekyll</h2>
+
+<p>Then I began to build the new blog system by jekyll two weeks ago. It's really easy to install and use, check the document <a href="https://github.com/mojombo/jekyll">here</a>. As you know, I'm a developer, of course I install the pygments for code highlight. But there are several limitations for the default jekyll.</p>
+
+<ol>
+<li>no category section on sidebar.</li>
+<li>no archive section on sidebar.</li>
+<li>no categroy page, which lists the posts in that category.</li>
+<li>no monthly archive page, which list posts by month.</li>
+<li>no comments, yep, it generates a static website.</li>
+<li><strike>can't display liquid codes on post.</strike>(Use literal tag to display liquid codes)</li>
+</ol>
+
+
+<p>Like rails, jekyll supports plugins and extensions so that we can extend it as we want. Originally I planed to host my blog on github, but I found github doesn't support any plugins and extensions, it only supports the default official jekyll. Bad news, I have to host it on my own server with jekyll extensions, it's not a big problem.</p>
+
+<p>The best extesion of jekyll I found is <a href="https://github.com/rfelix/jekyll_ext">jekyll_ext</a>, it provides a really flexible way to extend jekyll. The author also shares his jekyll <a href="https://github.com/rfelix/my_jekyll_extensions">extensions</a> using jekyll_ext. I forked the <a href="http://disqus.com">extensions</a> to fix the generation of archive page and add the archive section on sidebar.</p>
+
+<p>OK, let me show how to fix the above limitation with my forked extension.</p>
+
+<p>1. category section on sidebar.</p>
+
+<div class="highlight"><pre><code class="html"><span class="nt">&lt;ul&gt;</span>
+  {% for category in site.categories %}
+  <span class="nt">&lt;li&gt;&lt;a</span> <span class="na">href=</span><span class="s">&quot;/categories/{{category | first}}&quot;</span><span class="nt">&gt;</span>{{category | first}} ({{category | last | size }})<span class="nt">&lt;/a&gt;&lt;/li&gt;</span>
+  {% endfor %}
+<span class="nt">&lt;/ul&gt;</span>
+</code></pre>
+</div>
+
+
+<p>2. archive section on sidebar.</p>
+
+<div class="highlight"><pre><code class="html"><span class="nt">&lt;ul&gt;</span>
+  {% for monthly_archive in site.monthly_archives reversed %}
+  <span class="nt">&lt;li&gt;</span>
+    <span class="nt">&lt;a</span> <span class="na">href=</span><span class="s">&quot;{{ site.baseurl }}/{{ monthly_archive.url }}&quot;</span><span class="nt">&gt;</span>{{ monthly_archive.name }}<span class="nt">&lt;/a&gt;</span> ({{ monthly_archive.posts | size }} posts)
+  <span class="nt">&lt;/li&gt;</span>
+  {% endfor %}
+<span class="nt">&lt;/ul&gt;</span>
+</code></pre>
+</div>
+
+
+<p>3. category page, add a layout <code>category_index.html</code></p>
+
+<div class="highlight"><pre><code class="html">---
+layout: default
+---
+
+<span class="nt">&lt;h1</span> <span class="na">class=</span><span class="s">&quot;page-title&quot;</span><span class="nt">&gt;</span>
+  Category Archives:
+  <span class="nt">&lt;a</span> <span class="na">href=</span><span class="s">&quot;/categories/{{page.category}}&quot;</span><span class="nt">&gt;</span>{{page.category}}<span class="nt">&lt;/a&gt;</span>
+<span class="nt">&lt;/h1&gt;</span>
+<span class="nt">&lt;ol</span> <span class="na">class=</span><span class="s">&quot;archive&quot;</span><span class="nt">&gt;</span>
+{% for post in site.categories[page.category] %}
+  <span class="nt">&lt;li&gt;</span>
+    <span class="nt">&lt;div</span> <span class="na">class=</span><span class="s">&quot;excerpt&quot;</span><span class="nt">&gt;</span>
+      <span class="nt">&lt;strong</span> <span class="na">class=</span><span class="s">&quot;entry-title&quot;</span><span class="nt">&gt;</span>
+        <span class="nt">&lt;a</span> <span class="na">href=</span><span class="s">&quot;{{ post.url }}&quot;</span> <span class="na">title=</span><span class="s">&quot;{{ post.title }}&quot;</span> <span class="na">rel=</span><span class="s">&quot;bookmark&quot;</span><span class="nt">&gt;</span>{{ post.title }}<span class="nt">&lt;/a&gt;</span>
+      <span class="nt">&lt;/strong&gt;</span>
+      <span class="nt">&lt;span</span> <span class="na">class=</span><span class="s">&quot;date small&quot;</span><span class="nt">&gt;</span>
+        <span class="nt">&lt;abbr</span> <span class="na">class=</span><span class="s">&quot;published&quot;</span> <span class="na">title=</span><span class="s">&quot;{{ post.date }}&quot;</span><span class="nt">&gt;</span>{{ post.date | date_to_string }}<span class="nt">&lt;/abbr&gt;</span>
+      <span class="nt">&lt;/span&gt;</span>
+      <span class="nt">&lt;p</span> <span class="na">class=</span><span class="s">&quot;alt-font&quot;</span><span class="nt">&gt;</span>
+        Posted in<span class="ni">&amp;nbsp;</span>
+        {% for category in post.categories %}
+        <span class="nt">&lt;a</span> <span class="na">href=</span><span class="s">&quot;/categories/{{ category }}&quot;</span> <span class="na">title=</span><span class="s">&quot;{{ category }}&quot;</span> <span class="na">rel=</span><span class="s">&quot;category tag&quot;</span><span class="nt">&gt;</span>{{ category }}<span class="nt">&lt;/a&gt;</span>
+        {% endfor %}
+      <span class="nt">&lt;/p&gt;</span>
+      <span class="nt">&lt;p</span> <span class="na">class=</span><span class="s">&quot;comments-link&quot;</span><span class="nt">&gt;</span>
+        <span class="nt">&lt;a</span> <span class="na">href=</span><span class="s">&#39;{{post.url}}#disqus_thread&#39;</span><span class="nt">&gt;</span>Comments<span class="nt">&lt;/a&gt;</span>
+      <span class="nt">&lt;/p&gt;</span>
+    <span class="nt">&lt;/div&gt;</span>
+  <span class="nt">&lt;/li&gt;</span>
+{% endfor %}
+<span class="nt">&lt;/ol&gt;</span>
+</code></pre>
+</div>
+
+
+<p>4. monthly archive page, add a layout <code>archive_monthly.html</code></p>
+
+<div class="highlight"><pre><code class="html">---
+layout: default
+---
+
+<span class="nt">&lt;h1&gt;</span>{{ page.month | to_month }} {{ page.year }}<span class="nt">&lt;/h1&gt;</span>
+<span class="nt">&lt;ol</span> <span class="na">class=</span><span class="s">&quot;archive&quot;</span><span class="nt">&gt;</span>
+  {% for d in (1..31) reversed %}
+    {% if site.collated_posts[page.year][page.month][d] %}
+      {% for post in site.collated_posts[page.year][page.month][d] reversed %}
+      <span class="nt">&lt;li&gt;</span>
+        <span class="nt">&lt;div</span> <span class="na">class=</span><span class="s">&quot;excerpt&quot;</span><span class="nt">&gt;</span>
+          <span class="nt">&lt;strong</span> <span class="na">class=</span><span class="s">&quot;entry-title&quot;</span><span class="nt">&gt;</span>
+            <span class="nt">&lt;a</span> <span class="na">href=</span><span class="s">&quot;{{ post.url }}&quot;</span> <span class="na">title=</span><span class="s">&quot;{{ post.title }}&quot;</span> <span class="na">rel=</span><span class="s">&quot;bookmark&quot;</span><span class="nt">&gt;</span>{{ post.title }}<span class="nt">&lt;/a&gt;</span>
+          <span class="nt">&lt;/strong&gt;</span>
+          <span class="nt">&lt;span</span> <span class="na">class=</span><span class="s">&quot;date small&quot;</span><span class="nt">&gt;</span>
+            <span class="nt">&lt;abbr</span> <span class="na">class=</span><span class="s">&quot;published&quot;</span> <span class="na">title=</span><span class="s">&quot;{{ post.date }}&quot;</span><span class="nt">&gt;</span>{{ post.date | date_to_string }}<span class="nt">&lt;/abbr&gt;</span>
+          <span class="nt">&lt;/span&gt;</span>
+          <span class="nt">&lt;p</span> <span class="na">class=</span><span class="s">&quot;alt-font&quot;</span><span class="nt">&gt;</span>
+            Posted in<span class="ni">&amp;nbsp;</span>
+            {% for category in post.categories %}
+            <span class="nt">&lt;a</span> <span class="na">href=</span><span class="s">&quot;/categories/{{ category }}&quot;</span> <span class="na">title=</span><span class="s">&quot;{{ category }}&quot;</span> <span class="na">rel=</span><span class="s">&quot;category tag&quot;</span><span class="nt">&gt;</span>{{ category }}<span class="nt">&lt;/a&gt;</span>
+            {% endfor %}
+          <span class="nt">&lt;/p&gt;</span>
+          <span class="nt">&lt;p</span> <span class="na">class=</span><span class="s">&quot;comments-link&quot;</span><span class="nt">&gt;</span>
+            <span class="nt">&lt;a</span> <span class="na">href=</span><span class="s">&#39;{{post.url}}#disqus_thread&#39;</span><span class="nt">&gt;</span>Comments<span class="nt">&lt;/a&gt;</span>
+          <span class="nt">&lt;/p&gt;</span>
+        <span class="nt">&lt;/div&gt;</span>
+      <span class="nt">&lt;/li&gt;</span>
+      {% endfor %}
+    {% endif %}
+  {% endfor %}
+<span class="nt">&lt;/ol&gt;</span>
+</code></pre>
+</div>
+
+
+<p>5. comments, hmmm...it's impossible for jekyll to provide comments functionality, but I guess you know the web service <a href="http://disqus.com">disqus</a> which provides an online comment system. You can get two javascripts after you creating an forum on disqus, one for posting/displaying comments, the other is to dispaly comments count for each post. The following is the javascript to post/display comments.</p>
+
+<div class="highlight"><pre><code class="html"><span class="nt">&lt;div</span> <span class="na">id=</span><span class="s">&quot;disqus_thread&quot;</span><span class="nt">&gt;&lt;/div&gt;</span>
+<span class="nt">&lt;script </span><span class="na">type=</span><span class="s">&quot;text/javascript&quot;</span><span class="nt">&gt;</span>
+  <span class="kd">var</span> <span class="nx">disqus_shortname</span> <span class="o">=</span> <span class="s1">&#39;richard-huang&#39;</span><span class="p">;</span>
+
+  <span class="kd">var</span> <span class="nx">disqus_url</span> <span class="o">=</span> <span class="s2">&quot;http://www.huangzhimin.com/2011/01/20/migrate-custom-blog-to-jekyll-and-disqus/&quot;</span><span class="p">;</span>
+
+  <span class="p">(</span><span class="kd">function</span><span class="p">()</span> <span class="p">{</span>
+      <span class="kd">var</span> <span class="nx">dsq</span> <span class="o">=</span> <span class="nb">document</span><span class="p">.</span><span class="nx">createElement</span><span class="p">(</span><span class="s1">&#39;script&#39;</span><span class="p">);</span> <span class="nx">dsq</span><span class="p">.</span><span class="nx">type</span> <span class="o">=</span> <span class="s1">&#39;text/javascript&#39;</span><span class="p">;</span> <span class="nx">dsq</span><span class="p">.</span><span class="nx">async</span> <span class="o">=</span> <span class="kc">true</span><span class="p">;</span>
+      <span class="nx">dsq</span><span class="p">.</span><span class="nx">src</span> <span class="o">=</span> <span class="s1">&#39;http://&#39;</span> <span class="o">+</span> <span class="nx">disqus_shortname</span> <span class="o">+</span> <span class="s1">&#39;.disqus.com/embed.js&#39;</span><span class="p">;</span>
+      <span class="p">(</span><span class="nb">document</span><span class="p">.</span><span class="nx">getElementsByTagName</span><span class="p">(</span><span class="s1">&#39;head&#39;</span><span class="p">)[</span><span class="mi">0</span><span class="p">]</span> <span class="o">||</span> <span class="nb">document</span><span class="p">.</span><span class="nx">getElementsByTagName</span><span class="p">(</span><span class="s1">&#39;body&#39;</span><span class="p">)[</span><span class="mi">0</span><span class="p">]).</span><span class="nx">appendChild</span><span class="p">(</span><span class="nx">dsq</span><span class="p">);</span>
+  <span class="p">})();</span>
+<span class="nt">&lt;/script&gt;</span>
+<span class="nt">&lt;noscript&gt;</span>Please enable JavaScript to view the <span class="nt">&lt;a</span> <span class="na">href=</span><span class="s">&quot;http://disqus.com/?ref_noscript&quot;</span><span class="nt">&gt;</span>comments powered by Disqus.<span class="nt">&lt;/a&gt;&lt;/noscript&gt;</span>
+<span class="nt">&lt;a</span> <span class="na">href=</span><span class="s">&quot;http://disqus.com&quot;</span> <span class="na">class=</span><span class="s">&quot;dsq-brlink&quot;</span><span class="nt">&gt;</span>blog comments powered by <span class="nt">&lt;span</span> <span class="na">class=</span><span class="s">&quot;logo-disqus&quot;</span><span class="nt">&gt;</span>Disqus<span class="nt">&lt;/span&gt;&lt;/a&gt;</span>
+</code></pre>
+</div>
+
+
+<p>And the javascript to display comments count.</p>
+
+<div class="highlight"><pre><code class="html"><span class="nt">&lt;script </span><span class="na">type=</span><span class="s">&quot;text/javascript&quot;</span><span class="nt">&gt;</span>
+  <span class="kd">var</span> <span class="nx">disqus_shortname</span> <span class="o">=</span> <span class="s1">&#39;richard-huang&#39;</span><span class="p">;</span>
+
+  <span class="p">(</span><span class="kd">function</span> <span class="p">()</span> <span class="p">{</span>
+    <span class="kd">var</span> <span class="nx">s</span> <span class="o">=</span> <span class="nb">document</span><span class="p">.</span><span class="nx">createElement</span><span class="p">(</span><span class="s1">&#39;script&#39;</span><span class="p">);</span> <span class="nx">s</span><span class="p">.</span><span class="nx">async</span> <span class="o">=</span> <span class="kc">true</span><span class="p">;</span>
+    <span class="nx">s</span><span class="p">.</span><span class="nx">type</span> <span class="o">=</span> <span class="s1">&#39;text/javascript&#39;</span><span class="p">;</span>
+    <span class="nx">s</span><span class="p">.</span><span class="nx">src</span> <span class="o">=</span> <span class="s1">&#39;http://&#39;</span> <span class="o">+</span> <span class="nx">disqus_shortname</span> <span class="o">+</span> <span class="s1">&#39;.disqus.com/count.js&#39;</span><span class="p">;</span>
+    <span class="p">(</span><span class="nb">document</span><span class="p">.</span><span class="nx">getElementsByTagName</span><span class="p">(</span><span class="s1">&#39;HEAD&#39;</span><span class="p">)[</span><span class="mi">0</span><span class="p">]</span> <span class="o">||</span> <span class="nb">document</span><span class="p">.</span><span class="nx">getElementsByTagName</span><span class="p">(</span><span class="s1">&#39;BODY&#39;</span><span class="p">)[</span><span class="mi">0</span><span class="p">]).</span><span class="nx">appendChild</span><span class="p">(</span><span class="nx">s</span><span class="p">);</span>
+  <span class="p">}());</span>
+<span class="nt">&lt;/script&gt;</span>
+</code></pre>
+</div>
+
+
+<p><strike>
+6. can't display liquid codes. I found this limitation while I'm writing this post, it's impossible to display raw liquid codes, as liquid always try to execute each liquid code. I have to write a custom tag raw to solve this issue.</p>
+
+<div class="highlight"><pre><code class="ruby"><span class="k">module</span> <span class="nn">Jekyll</span>
+  <span class="k">class</span> <span class="nc">Raw</span> <span class="o">&lt;</span> <span class="no">Liquid</span><span class="o">::</span><span class="no">Block</span>
+
+    <span class="k">def</span> <span class="nf">parse</span><span class="p">(</span><span class="n">tokens</span><span class="p">)</span>
+      <span class="vi">@nodelist</span> <span class="o">||=</span> <span class="o">[]</span>
+      <span class="vi">@nodelist</span><span class="o">.</span><span class="n">clear</span>
+
+      <span class="k">while</span> <span class="n">token</span> <span class="o">=</span> <span class="n">tokens</span><span class="o">.</span><span class="n">shift</span>
+        <span class="k">case</span> <span class="n">token</span>
+        <span class="k">when</span> <span class="no">IsTag</span>
+          <span class="k">if</span> <span class="n">token</span> <span class="o">=~</span> <span class="no">FullToken</span>
+            <span class="k">if</span> <span class="n">block_delimiter</span> <span class="o">==</span> <span class="vg">$1</span>
+              <span class="n">end_tag</span>
+              <span class="k">return</span>
+            <span class="k">end</span>
+            <span class="vi">@nodelist</span> <span class="o">&lt;&lt;</span> <span class="n">token</span>
+          <span class="k">else</span>
+            <span class="k">raise</span> <span class="no">SyntaxError</span><span class="p">,</span> <span class="s2">&quot;Tag &#39;</span><span class="si">#{</span><span class="n">token</span><span class="si">}</span><span class="s2">&#39; was not properly terminated with regexp: </span><span class="si">#{</span><span class="no">TagEnd</span><span class="o">.</span><span class="n">inspect</span><span class="si">}</span><span class="s2"> &quot;</span>
+          <span class="k">end</span>
+        <span class="k">else</span>
+          <span class="vi">@nodelist</span> <span class="o">&lt;&lt;</span> <span class="n">token</span>
+        <span class="k">end</span>
+      <span class="k">end</span>
+
+      <span class="c1"># Make sure that its ok to end parsing in the current block.</span>
+      <span class="c1"># Effectively this method will throw and exception unless the current block is</span>
+      <span class="c1"># of type Document</span>
+      <span class="n">assert_missing_delimitation!</span>
+    <span class="k">end</span>
+  <span class="k">end</span>
+<span class="k">end</span>
+
+<span class="no">Liquid</span><span class="o">::</span><span class="no">Template</span><span class="o">.</span><span class="n">register_tag</span><span class="p">(</span><span class="s1">&#39;raw&#39;</span><span class="p">,</span> <span class="no">Jekyll</span><span class="o">::</span><span class="no">Raw</span><span class="p">)</span>
+</code></pre>
+</div>
+
+
+<p>So you can use the raw tag to escape all the liquid codes as you want.
+</strike></p>
+
+<p><strong>You can get the source code of my blog system on <a href="https://github.com/flyerhzm.github.com">github</a>.</strong></p>
+
+<h2>Migrate Legacy Data</h2>
+
+<p>OK, the new blog system is complete, but what about the old blog posts
+and comments? I want to migrate them to the new system.</p>
+
+<p>I'm a developer, so it's not too difficult for to migrate old data.</p>
+
+<p><strong>Migrate old posts</strong></p>
+
+<p>Like the common blog system, the old post is saved as html format. After working on several projects on github, I start to love markdown, so I decide to convert all the old html posts to markdown format. There is a project named <a href="https://github.com/xijo/reverse-markdown">reverse-markdown</a> to do this job, I also forked it to handle code highlight (before I used syntaxhighlighter, now is <code>{% highlight language %}...{% endhighlight %}</code>), here is the <a href="https://gist.github.com/788039">script</a>.</p>
+
+<p>Then I began to migrate old posts</p>
+
+<div class="highlight"><pre><code class="ruby"><span class="nb">require</span> <span class="s1">&#39;rtranslate&#39;</span>
+
+<span class="no">Post</span><span class="o">.</span><span class="n">all</span><span class="o">.</span><span class="n">each</span> <span class="k">do</span> <span class="o">|</span><span class="n">post</span><span class="o">|</span>
+  <span class="n">dir</span> <span class="o">=</span> <span class="s2">&quot;temp&quot;</span>
+  <span class="n">translated_title</span> <span class="o">=</span> <span class="no">Translate</span><span class="o">.</span><span class="n">t</span><span class="p">(</span><span class="n">post</span><span class="o">.</span><span class="n">title</span><span class="p">,</span> <span class="s1">&#39;CHINESE_SIMPLIFIED&#39;</span><span class="p">,</span> <span class="s1">&#39;ENGLISH&#39;</span><span class="p">)</span>
+  <span class="n">filename</span> <span class="o">=</span> <span class="n">post</span><span class="o">.</span><span class="n">created_at</span><span class="o">.</span><span class="n">strftime</span><span class="p">(</span><span class="s2">&quot;%Y-%m-%d&quot;</span><span class="p">)</span> <span class="o">+</span> <span class="s2">&quot;-&quot;</span> <span class="o">+</span> <span class="n">translated_title</span><span class="o">.</span><span class="n">parameterize</span>
+  <span class="no">File</span><span class="o">.</span><span class="n">open</span><span class="p">(</span><span class="s2">&quot;</span><span class="si">#{</span><span class="n">dir</span><span class="si">}</span><span class="s2">/</span><span class="si">#{</span><span class="n">filename</span><span class="si">}</span><span class="s2">.markdown&quot;</span><span class="p">,</span> <span class="s2">&quot;w+&quot;</span><span class="p">)</span> <span class="k">do</span> <span class="o">|</span><span class="n">file</span><span class="o">|</span>
+    <span class="n">file</span><span class="o">.</span><span class="n">puts</span> <span class="o">&lt;&lt;-</span><span class="no">EOF</span>
+<span class="sh">---</span>
+<span class="sh">layout: post</span>
+<span class="sh">title: #{post.title.gsub(&quot;&amp;#65281;&quot;, &quot;！&quot;).gsub(&quot;&amp;#65292;&quot;, &quot;，&quot;)}</span>
+<span class="sh">categories:</span>
+<span class="sh">- #{Translate.t(post.category.name, &#39;CHINESE_SIMPLIFIED&#39;, &#39;ENGLISH&#39;)}</span>
+<span class="sh">---</span>
+<span class="sh">#{ReverseMarkdown.new.parse_string(post.body)}</span>
+<span class="no">    EOF</span>
+  <span class="k">end</span>
+<span class="k">end</span>
+</code></pre>
+</div>
+
+
+<p>I run the above codes in rails console, the above codes translate the post title and category name from Chinese to English, convert the body of post from html to markdown, and then save them under temp directory.</p>
+
+<p>After running the codes, there are a lot of posts generated under temp directory, I just copy them to the _post directory in the new blog system, then the posts migration is complete. Cool!</p>
+
+<p><strong>Migrate old comments</strong></p>
+
+<p>Migrating comments is a bit difficult, it takes me a few days to play with disqus api. Luckily disqus provides a api console, I really like it.</p>
+
+<p>The following codes are what I used to migrate comments to disqus.</p>
+
+<div class="highlight"><pre><code class="ruby"><span class="nb">require</span> <span class="s1">&#39;rubygems&#39;</span>
+<span class="nb">require</span> <span class="s1">&#39;rest_client&#39;</span>
+<span class="nb">require</span> <span class="s1">&#39;json&#39;</span>
+<span class="nb">require</span> <span class="s1">&#39;open-uri&#39;</span>
+
+<span class="n">disqus_url</span> <span class="o">=</span> <span class="s1">&#39;http://disqus.com/api/3.0&#39;</span>
+
+<span class="n">secret_key</span> <span class="o">=</span> <span class="s1">&#39;your secret key&#39;</span>
+<span class="n">current_blog_base_url</span> <span class="o">=</span> <span class="s1">&#39;http://www.huangzhimin.com&#39;</span>
+
+<span class="n">resource</span> <span class="o">=</span> <span class="no">RestClient</span><span class="o">::</span><span class="no">Resource</span><span class="o">.</span><span class="n">new</span> <span class="n">disqus_url</span>
+
+<span class="n">forum_id</span> <span class="o">=</span> <span class="s1">&#39;richard-huang&#39;</span>
+
+<span class="no">Comment</span><span class="o">.</span><span class="n">all</span><span class="o">.</span><span class="n">each</span> <span class="k">do</span> <span class="o">|</span><span class="n">comment</span><span class="o">|</span>
+  <span class="n">translated_title</span> <span class="o">=</span> <span class="no">Translate</span><span class="o">.</span><span class="n">t</span><span class="p">(</span><span class="n">comment</span><span class="o">.</span><span class="n">post</span><span class="o">.</span><span class="n">title</span><span class="p">,</span> <span class="s1">&#39;CHINESE_SIMPLIFIED&#39;</span><span class="p">,</span> <span class="s1">&#39;ENGLISH&#39;</span><span class="p">)</span>
+
+  <span class="n">filename</span> <span class="o">=</span> <span class="n">comment</span><span class="o">.</span><span class="n">post</span><span class="o">.</span><span class="n">created_at</span><span class="o">.</span><span class="n">strftime</span><span class="p">(</span><span class="s2">&quot;%Y/%m/%d&quot;</span><span class="p">)</span> <span class="o">+</span> <span class="s2">&quot;/&quot;</span> <span class="o">+</span> <span class="n">translated_title</span><span class="o">.</span><span class="n">parameterize</span>
+  <span class="n">post_url</span> <span class="o">=</span> <span class="s2">&quot;</span><span class="si">#{</span><span class="n">current_blog_base_url</span><span class="si">}</span><span class="s2">/</span><span class="si">#{</span><span class="n">filename</span><span class="si">}</span><span class="s2">/&quot;</span>
+  <span class="n">title</span> <span class="o">=</span> <span class="s2">&quot;Richard Huang - </span><span class="si">#{</span><span class="n">comment</span><span class="o">.</span><span class="n">post</span><span class="o">.</span><span class="n">title</span><span class="si">}</span><span class="s2">&quot;</span>
+
+  <span class="k">begin</span>
+    <span class="nb">open</span><span class="p">(</span><span class="n">post_url</span><span class="p">)</span>
+
+    <span class="n">thread_id</span> <span class="o">=</span> <span class="kp">nil</span>
+    <span class="no">JSON</span><span class="o">.</span><span class="n">parse</span><span class="p">(</span><span class="n">resource</span><span class="o">[</span><span class="s1">&#39;/threads/list.json?api_secret=&#39;</span><span class="o">+</span><span class="n">secret_key</span><span class="o">+</span><span class="s1">&#39;&amp;forum=&#39;</span><span class="o">+</span><span class="n">forum_id</span><span class="o">].</span><span class="n">get</span><span class="p">)</span><span class="o">[</span><span class="s2">&quot;response&quot;</span><span class="o">].</span><span class="n">each</span> <span class="k">do</span> <span class="o">|</span><span class="n">thread</span><span class="o">|</span>
+      <span class="n">thread_id</span> <span class="o">=</span> <span class="n">thread</span><span class="o">[</span><span class="s2">&quot;id&quot;</span><span class="o">]</span> <span class="k">if</span> <span class="n">thread</span><span class="o">[</span><span class="s2">&quot;link&quot;</span><span class="o">]</span> <span class="o">==</span> <span class="n">post_url</span>
+    <span class="k">end</span>
+
+    <span class="k">unless</span> <span class="n">thread_id</span>
+      <span class="n">request_body</span> <span class="o">=</span> <span class="p">{</span><span class="ss">:forum</span> <span class="o">=&gt;</span> <span class="n">forum_id</span><span class="p">,</span> <span class="ss">:title</span> <span class="o">=&gt;</span> <span class="n">title</span><span class="p">,</span> <span class="ss">:url</span> <span class="o">=&gt;</span> <span class="n">post_url</span><span class="p">}</span>
+      <span class="n">thread</span> <span class="o">=</span> <span class="no">JSON</span><span class="o">.</span><span class="n">parse</span><span class="p">(</span><span class="n">resource</span><span class="o">[</span><span class="s1">&#39;/threads/create.json?api_secret=&#39;</span><span class="o">+</span><span class="n">secret_key</span><span class="o">].</span><span class="n">post</span><span class="p">(</span><span class="n">request_body</span><span class="p">))</span><span class="o">[</span><span class="s2">&quot;response&quot;</span><span class="o">]</span>
+      <span class="n">thread_id</span> <span class="o">=</span> <span class="n">thread</span><span class="o">[</span><span class="s2">&quot;id&quot;</span><span class="o">]</span>
+    <span class="k">end</span>
+
+    <span class="n">request_body</span> <span class="o">=</span> <span class="p">{</span><span class="ss">:thread</span> <span class="o">=&gt;</span> <span class="n">thread_id</span><span class="p">,</span> <span class="ss">:message</span> <span class="o">=&gt;</span> <span class="n">comment</span><span class="o">.</span><span class="n">body</span><span class="o">.</span><span class="n">strip</span><span class="p">,</span> <span class="ss">:author_name</span> <span class="o">=&gt;</span> <span class="n">comment</span><span class="o">.</span><span class="n">author</span><span class="p">,</span> <span class="ss">:date</span> <span class="o">=&gt;</span> <span class="n">comment</span><span class="o">.</span><span class="n">created_at</span><span class="o">.</span><span class="n">to_i</span><span class="p">}</span>
+    <span class="n">request_body</span><span class="o">.</span><span class="n">merge!</span><span class="p">(</span><span class="ss">:author_email</span> <span class="o">=&gt;</span> <span class="n">comment</span><span class="o">.</span><span class="n">mail</span><span class="o">.</span><span class="n">blank?</span> <span class="p">?</span> <span class="s2">&quot;anonymous@gmail.com&quot;</span> <span class="p">:</span> <span class="n">comment</span><span class="o">.</span><span class="n">mail</span><span class="p">)</span>
+    <span class="n">request_body</span><span class="o">.</span><span class="n">merge!</span><span class="p">(</span><span class="ss">:author_url</span> <span class="o">=&gt;</span> <span class="n">comment</span><span class="o">.</span><span class="n">website</span><span class="p">)</span> <span class="k">if</span> <span class="n">comment</span><span class="o">.</span><span class="n">website</span><span class="o">.</span><span class="n">present?</span>
+    <span class="k">if</span> <span class="no">JSON</span><span class="o">.</span><span class="n">parse</span><span class="p">(</span><span class="n">resource</span><span class="o">[</span><span class="s1">&#39;/posts/create.json?api_secret=&#39;</span><span class="o">+</span><span class="n">secret_key</span><span class="o">].</span><span class="n">post</span><span class="p">(</span><span class="n">request_body</span><span class="p">))</span><span class="o">[</span><span class="s2">&quot;code&quot;</span><span class="o">]</span> <span class="o">==</span> <span class="mi">0</span>
+      <span class="nb">puts</span> <span class="s2">&quot;Success: </span><span class="si">#{</span><span class="n">comment</span><span class="o">.</span><span class="n">author</span><span class="si">}</span><span class="s2"> on </span><span class="si">#{</span><span class="n">comment</span><span class="o">.</span><span class="n">post</span><span class="o">.</span><span class="n">title</span><span class="si">}</span><span class="s2">&quot;</span>
+    <span class="k">else</span>
+      <span class="nb">puts</span> <span class="s2">&quot;FAIL: </span><span class="si">#{</span><span class="n">comment</span><span class="o">.</span><span class="n">author</span><span class="si">}</span><span class="s2"> on </span><span class="si">#{</span><span class="n">comment</span><span class="o">.</span><span class="n">post</span><span class="o">.</span><span class="n">title</span><span class="si">}</span><span class="s2">&quot;</span>
+    <span class="k">end</span>
+  <span class="k">rescue</span>
+    <span class="nb">puts</span> <span class="s2">&quot;Rescue: </span><span class="si">#{</span><span class="n">post_url</span><span class="si">}</span><span class="s2">&quot;</span>
+  <span class="k">end</span>
+<span class="k">end</span>
+</code></pre>
+</div>
+
+
+<p>The aboved codes are also run in rails console, it works as follows.</p>
+
+<ol>
+<li>checks if the new post url existed.</li>
+<li>if so, it reads or creates a thread, one thread on disqus is corresponding to one post url in blog system.</li>
+<li>then create a post on disque, one post on disqus is corresponding to one comment in blog system.</li>
+</ol>
+
+
+<p>There is a problem, in disqus, email of comment author can't be empty, but in my old blog system the email of comment user can be empty, so I have use "anonymous@gmail.com" instead. This is the only limitation when I migrate old comments.</p>
+
+<p>Everything works well. I love my new blog system.</p>
+
+      <div class="clear"></div>
+    </div>
+    <p class="alt-font tight">
+      Posted in&nbsp;
+      
+      <a href="/categories/jekyll" title="jekyll" rel="category tag">jekyll</a>
+      
+      <a href="/categories/disqus" title="disqus" rel="category tag">disqus</a>
+      
+    </p>
+    <p class="comments-link">
+      <a href='/2011/01/20/migrate-custom-blog-to-jekyll-and-disqus/#disqus_thread'>Comments</a>
+    </p>
+    <p class="by-line">
+      <span class="date full-date">
+        <abbr class="published" title="Thu Jan 20 00:00:00 -0800 2011">20 Jan 2011</abbr>
+      </span>
+    </p>
+    <div class="clear"></div>
+  </div>
+  <div class="rule"><hr/></div>
+
+
+<div class="pagination">
+  <span class="previous">
+    
+      
+      <a href="/page2/" title="Previous Page">&laquo; Previous</a>
+      
+    
+  </span>
+  <span class="next">
+    
+    <a href="/page4/" title="Next Page">Next &raquo;</a>
+    
+  </span>
+</div>
+<script type="text/javascript" src="http://s7.addthis.com/js/250/addthis_widget.js#pubid=flyerhzm"></script>
+
+        </div>
+        <div id="sidebar">
+          <div id="carrington-subscribe" class="widget">
+            <h2 class="widget-title">Subscribe</h2>
+            <a class="feed alignright" title="RSS 2.0 feed for posts" rel="alternate" href="http://feeds.feedburner.com/richard-huang">
+              <img src="/images/rss-button.gif" alt="latest posts" title="latest posts">
+            </a>
+          </div>
+          <div id="carrington-about" class="widget">
+            <div class="about">
+              <h2 class="widget-title">About</h2>
+              <p>My name is Richard Huang, a Rubyist and open source advocate.</p>
+              <a class="more" href="/about.html">more →</a>
+            </div>
+          </div>
+          <div id="carrington-speaker" class="widget">
+            <img src="/images/160x160speaker.png">
+          </div>
+          <div id="primary-sidebar">
+            <div class="widget">
+              <h2 class="widget-title">Categories</h2>
+              <ul>
+                
+                <li><a href="/categories/jekyll">jekyll (1)</a></li>
+                
+                <li><a href="/categories/mongodb">mongodb (2)</a></li>
+                
+                <li><a href="/categories/GAE">GAE (1)</a></li>
+                
+                <li><a href="/categories/Linux">Linux (4)</a></li>
+                
+                <li><a href="/categories/html">html (2)</a></li>
+                
+                <li><a href="/categories/Java Web">Java Web (3)</a></li>
+                
+                <li><a href="/categories/Resque">Resque (1)</a></li>
+                
+                <li><a href="/categories/Rack">Rack (1)</a></li>
+                
+                <li><a href="/categories/RubyGems">RubyGems (7)</a></li>
+                
+                <li><a href="/categories/rake">rake (1)</a></li>
+                
+                <li><a href="/categories/php">php (2)</a></li>
+                
+                <li><a href="/categories/disqus">disqus (1)</a></li>
+                
+                <li><a href="/categories/Less">Less (1)</a></li>
+                
+                <li><a href="/categories/ActiveRecord">ActiveRecord (5)</a></li>
+                
+                <li><a href="/categories/Rails">Rails (35)</a></li>
+                
+                <li><a href="/categories/css">css (9)</a></li>
+                
+                <li><a href="/categories/sql">sql (1)</a></li>
+                
+                <li><a href="/categories/maven">maven (1)</a></li>
+                
+                <li><a href="/categories/Vim">Vim (1)</a></li>
+                
+                <li><a href="/categories/Ruby">Ruby (33)</a></li>
+                
+                <li><a href="/categories/Presentation">Presentation (7)</a></li>
+                
+                <li><a href="/categories/contact-list">contact-list (6)</a></li>
+                
+                <li><a href="/categories/Java">Java (9)</a></li>
+                
+                <li><a href="/categories/Github">Github (1)</a></li>
+                
+                <li><a href="/categories/flex">flex (4)</a></li>
+                
+                <li><a href="/categories/Rails Plugins">Rails Plugins (12)</a></li>
+                
+                <li><a href="/categories/passenger">passenger (1)</a></li>
+                
+                <li><a href="/categories/Sinatra">Sinatra (1)</a></li>
+                
+                <li><a href="/categories/Nginx">Nginx (2)</a></li>
+                
+                <li><a href="/categories/Facebook">Facebook (2)</a></li>
+                
+                <li><a href="/categories/Android">Android (2)</a></li>
+                
+                <li><a href="/categories/Rspec">Rspec (3)</a></li>
+                
+                <li><a href="/categories/javascript">javascript (4)</a></li>
+                
+                <li><a href="/categories/Life">Life (19)</a></li>
+                
+                <li><a href="/categories/git">git (1)</a></li>
+                
+                <li><a href="/categories/Seo">Seo (1)</a></li>
+                
+                <li><a href="/categories/Git">Git (4)</a></li>
+                
+                <li><a href="/categories/Ldap">Ldap (1)</a></li>
+                
+                <li><a href="/categories/mongoid">mongoid (7)</a></li>
+                
+                <li><a href="/categories/webrick">webrick (3)</a></li>
+                
+                <li><a href="/categories/msn">msn (1)</a></li>
+                
+                <li><a href="/categories/Capistrano">Capistrano (3)</a></li>
+                
+                <li><a href="/categories/redis">redis (1)</a></li>
+                
+                <li><a href="/categories/uml">uml (1)</a></li>
+                
+                <li><a href="/categories/Hostmonster">Hostmonster (5)</a></li>
+                
+                <li><a href="/categories/jquery">jquery (1)</a></li>
+                
+                <li><a href="/categories/Twitter">Twitter (2)</a></li>
+                
+                <li><a href="/categories/HTTP">HTTP (4)</a></li>
+                
+              </ul>
+            </div>
+          </div>
+          <div id="secondary-sidebar">
+            <div class="widget">
+              <h2 class="widget-title">Recent Posts</h2>
+              <ul>
+                
+                <li>
+                  <a href="/2011/12/13/rake-arguments/" title="rake arguments" rel="bookmark">rake arguments</a>
+                </li>
+                
+                <li>
+                  <a href="/2011/12/12/passenger-with-redis/" title="passenger with redis" rel="bookmark">passenger with redis</a>
+                </li>
+                
+                <li>
+                  <a href="/2011/11/14/avoid-committing-git-conflicts/" title="avoid committing git conflicts" rel="bookmark">avoid committing git conflicts</a>
+                </li>
+                
+                <li>
+                  <a href="/2011/11/06/after_commit/" title="after_commit" rel="bookmark">after_commit</a>
+                </li>
+                
+                <li>
+                  <a href="/2011/10/31/reset_counter-in-rails/" title="reset_counter in rails" rel="bookmark">reset_counter in rails</a>
+                </li>
+                
+                <li>
+                  <a href="/2011/10/21/rspec-filter/" title="use rspec filter to speed up tests" rel="bookmark">use rspec filter to speed up tests</a>
+                </li>
+                
+                <li>
+                  <a href="/2011/07/17/rubykaigi-presentation/" title="rubykaigi presentation" rel="bookmark">rubykaigi presentation</a>
+                </li>
+                
+                <li>
+                  <a href="/2011/03/27/beijing-ruby-event/" title="beijing ruby线下活动" rel="bookmark">beijing ruby线下活动</a>
+                </li>
+                
+                <li>
+                  <a href="/2011/03/22/upgrade-mongoid-multiple-database/" title="Upgrade Mongoid - Multiple databases" rel="bookmark">Upgrade Mongoid - Multiple databases</a>
+                </li>
+                
+                <li>
+                  <a href="/2011/03/21/upgrade-mongoid-update_attribute/" title="Upgrade Mongoid - update_attribute" rel="bookmark">Upgrade Mongoid - update_attribute</a>
+                </li>
+                
+              </ul>
+              <div class="clear"></div>
+            </div>
+            <div class="widget">
+              <h2 class="widget-title">Archives</h2>
+              <ul>
+                
+                <li>
+                  <a href="/2011/12">December 2011</a> (2 posts)
+                </li>
+                
+                <li>
+                  <a href="/2011/11">November 2011</a> (2 posts)
+                </li>
+                
+                <li>
+                  <a href="/2011/10">October 2011</a> (2 posts)
+                </li>
+                
+                <li>
+                  <a href="/2011/07">July 2011</a> (1 posts)
+                </li>
+                
+                <li>
+                  <a href="/2011/03">March 2011</a> (5 posts)
+                </li>
+                
+                <li>
+                  <a href="/2011/01">January 2011</a> (6 posts)
+                </li>
+                
+                <li>
+                  <a href="/2010/12">December 2010</a> (1 posts)
+                </li>
+                
+                <li>
+                  <a href="/2010/08">August 2010</a> (1 posts)
+                </li>
+                
+                <li>
+                  <a href="/2010/07">July 2010</a> (1 posts)
+                </li>
+                
+                <li>
+                  <a href="/2010/06">June 2010</a> (4 posts)
+                </li>
+                
+                <li>
+                  <a href="/2010/05">May 2010</a> (4 posts)
+                </li>
+                
+                <li>
+                  <a href="/2010/04">April 2010</a> (4 posts)
+                </li>
+                
+                <li>
+                  <a href="/2010/03">March 2010</a> (6 posts)
+                </li>
+                
+                <li>
+                  <a href="/2010/02">February 2010</a> (4 posts)
+                </li>
+                
+                <li>
+                  <a href="/2010/01">January 2010</a> (5 posts)
+                </li>
+                
+                <li>
+                  <a href="/2009/12">December 2009</a> (7 posts)
+                </li>
+                
+                <li>
+                  <a href="/2009/11">November 2009</a> (5 posts)
+                </li>
+                
+                <li>
+                  <a href="/2009/10">October 2009</a> (4 posts)
+                </li>
+                
+                <li>
+                  <a href="/2009/09">September 2009</a> (11 posts)
+                </li>
+                
+                <li>
+                  <a href="/2009/08">August 2009</a> (13 posts)
+                </li>
+                
+                <li>
+                  <a href="/2009/07">July 2009</a> (8 posts)
+                </li>
+                
+                <li>
+                  <a href="/2009/06">June 2009</a> (9 posts)
+                </li>
+                
+                <li>
+                  <a href="/2009/05">May 2009</a> (7 posts)
+                </li>
+                
+                <li>
+                  <a href="/2009/04">April 2009</a> (7 posts)
+                </li>
+                
+                <li>
+                  <a href="/2009/01">January 2009</a> (2 posts)
+                </li>
+                
+                <li>
+                  <a href="/2008/12">December 2008</a> (3 posts)
+                </li>
+                
+                <li>
+                  <a href="/2008/11">November 2008</a> (4 posts)
+                </li>
+                
+                <li>
+                  <a href="/2008/08">August 2008</a> (5 posts)
+                </li>
+                
+                <li>
+                  <a href="/2008/07">July 2008</a> (1 posts)
+                </li>
+                
+                <li>
+                  <a href="/2008/06">June 2008</a> (1 posts)
+                </li>
+                
+                <li>
+                  <a href="/2008/04">April 2008</a> (1 posts)
+                </li>
+                
+                <li>
+                  <a href="/2008/03">March 2008</a> (6 posts)
+                </li>
+                
+                <li>
+                  <a href="/2008/02">February 2008</a> (2 posts)
+                </li>
+                
+              </ul>
+              <div class="clear"></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div id="footer" class="section">
+      <div class="wrapper">
+        <a id="generator-link">
+          Proudly powered by
+          <a href="https://github.com/mojombo/jekyll" rel="generator">Jekyll</a>
+          and
+          <a href="http://carringtontheme.com" title="Carrington theme for WordPress">Carrington</a>
+      </div>
+      <div id="developer-link">
+      </div>
+    </div>
+    <a href="http://github.com/flyerhzm"><img style="position: absolute; top: 0; right: 0; border: 0;" src="https://assets2.github.com/img/e6bef7a091f5f3138b8cd40bc3e114258dd68ddf?repo=&url=http%3A%2F%2Fs3.amazonaws.com%2Fgithub%2Fribbons%2Fforkme_right_red_aa0000.png&path=" alt="Fork me on GitHub"></a>
+    <script type="text/javascript">
+      var disqus_shortname = 'richard-huang';
+
+      (function () {
+        var s = document.createElement('script'); s.async = true;
+        s.type = 'text/javascript';
+        s.src = 'http://' + disqus_shortname + '.disqus.com/count.js';
+        (document.getElementsByTagName('HEAD')[0] || document.getElementsByTagName('BODY')[0]).appendChild(s);
+      }());
+    </script>
+    <script type="text/javascript">
+      var gaJsHost = (("https:" == document.location.protocol) ? "https://ssl." : "http://www.");
+      document.write(unescape("%3Cscript src='" + gaJsHost + "google-analytics.com/ga.js' type='text/javascript'%3E%3C/script%3E"));
+    </script>
+    <script type="text/javascript">
+      try {
+        var pageTracker = _gat._getTracker("UA-8561975-1");
+        pageTracker._trackPageview();
+      } catch(err) {}
+    </script>
+  </body>
+</html>
