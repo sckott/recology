@@ -1,9 +1,9 @@
 --- 
 name: r-and-google-visualization-api-wikispeedia
-layout: blog-post
+layout: post
 title: "R and Google Visualization API: Wikispeedia"
 date: 2011-01-17 19:48:00 -06:00
-tags: 
+categories: 
 - GoogleVis
 - R
 ---

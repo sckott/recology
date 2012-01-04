@@ -1,9 +1,9 @@
 --- 
 name: new-approach-to-analysis-of-phylogenetic-community-structure
-layout: blog-post
+layout: post
 title: New approach to analysis of phylogenetic community structure
 date: 2011-01-05 07:54:00.001000 -06:00
-tags: 
+categories: 
 - Evolution
 - Papers
 - Ecology

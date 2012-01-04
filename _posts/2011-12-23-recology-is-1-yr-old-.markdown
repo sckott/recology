@@ -1,9 +1,13 @@
 --- 
 name: recology-is-1-yr-old-
-layout: blog-post
+layout: post
 title: Recology is 1 yr old...
 date: 2011-12-23 18:52:00 -06:00
-tags: [ggplot2, Evolution, Ecology, R]
+categories: 
+- ggplot2
+- Evolution
+- Ecology
+- R
 ---
 
 This blog has lasted a whole year already. &nbsp;Thanks for reading and commenting. 

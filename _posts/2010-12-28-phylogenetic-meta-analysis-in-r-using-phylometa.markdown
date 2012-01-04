@@ -1,9 +1,9 @@
 --- 
 name: phylogenetic-meta-analysis-in-r-using-phylometa
-layout: blog-post
+layout: post
 title: Phylogenetic meta-analysis in R using Phylometa
 date: 2010-12-28 07:15:00.002000 -06:00
-tags: 
+categories: 
 - ggplot2
 - Evolution
 - Ecology

@@ -1,9 +1,9 @@
 --- 
 name: r-bloggers
-layout: blog-post
+layout: post
 title: R-bloggers
 date: 2011-01-05 08:11:00 -06:00
-tags: 
+categories: 
 - R
 ---
 

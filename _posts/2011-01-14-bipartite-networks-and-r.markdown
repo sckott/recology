@@ -1,9 +1,9 @@
 --- 
 name: bipartite-networks-and-r
-layout: blog-post
+layout: post
 title: Bipartite networks and R
 date: 2011-01-14 09:05:00 -06:00
-tags: 
+categories: 
 - Networks
 - R
 ---
