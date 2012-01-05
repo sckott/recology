@@ -15,12 +15,7 @@ title: Publications
 
 5. Holland, J.N., Chamberlain, S.A.,& K.C. Horn. 2010. Temporal variation in extrafloral nectar 	secretion by reproductive tissues of the senita cactus, _Pachycereus schottii_ (Cactaceae), in the Sonoran Desert of Mexico. _Journal of Arid Environments_ 74(6):712-714.
 
-6. Chamberlain, S.A., & J.N. Holland. 2009. Quantitative synthesis of context-dependency in ant-plant protection mutualisms. _Ecology_ 90(9):2384-2392. [pdf1][]
-
-Also, please see two other meta-analyses on this same topic:
-
-+ Trager, M.D., S. Bhotika, J.A. Hostetler, G.V. Andrade, M.A. Rodriguez-Cabal, C.S. McKeon, C.W. Osenberg and  B.M. Bolker. 2010. Benefits for plants in ant-plant protective mutualisms: A meta-analysis. _PLoS ONE_ 5(12): e14308. doi:10.1371/journal.pone.0014308
-+ Rosumek F.B. ,et al. 2009. Ants on plants: a meta-analysis of the role of ants as plant biotic defenses. _Oecologia_ 60:537–549
+6. Chamberlain, S.A., & J.N. Holland. 2009. Quantitative synthesis of context-dependency in ant-plant protection mutualisms. _Ecology_ 90(9):2384-2392. [pdf1][] ***
 
 7. Holland, J.N., S.A.Chamberlain, A.M. Waguespack, and A.S. Kinyo. 2009. Effects of pollen load and donor diversity on variation in seed and fruit size in a columnar cactus, _Pachycereus schottii_ (Cactaceae). _International Journal of Plant Sciences_ 170:467-475. 
 
@@ -35,5 +30,10 @@ Also, please see two other meta-analyses on this same topic:
 12. Holland, J.N. &S.A. Chamberlain. 2007. Ecological and evolutionary mechanisms for low seed:ovule ratios: need for a pluralistic approach? _Ecology_ 88(3):706-715.
 
 13. Schlising, R.A. &S.A. Chamberlain. 2006. Biology of the geophytic lily, _Triteleia laxa_ (Themidaceae), in grasslands of the Northern Sacramento Valley. _Madroño_ 53(4):321-341.
+
+
+***Also, please see two other meta-analyses on this same topic:
++ Trager, M.D., S. Bhotika, J.A. Hostetler, G.V. Andrade, M.A. Rodriguez-Cabal, C.S. McKeon, C.W. Osenberg and  B.M. Bolker. 2010. Benefits for plants in ant-plant protective mutualisms: A meta-analysis. _PLoS ONE_ 5(12): e14308. doi:10.1371/journal.pone.0014308
++ Rosumek F.B. ,et al. 2009. Ants on plants: a meta-analysis of the role of ants as plant biotic defenses. _Oecologia_ 60:537–549
 
 [pdf1]: /pdfs/Chamberlain&Holland2009Ecology.pdf
