@@ -33,7 +33,9 @@ title: Publications
 
 
 ***Also, please see two other meta-analyses on this same topic:
+
 + Trager, M.D., S. Bhotika, J.A. Hostetler, G.V. Andrade, M.A. Rodriguez-Cabal, C.S. McKeon, C.W. Osenberg and  B.M. Bolker. 2010. Benefits for plants in ant-plant protective mutualisms: A meta-analysis. _PLoS ONE_ 5(12): e14308. doi:10.1371/journal.pone.0014308
+
 + Rosumek F.B. ,et al. 2009. Ants on plants: a meta-analysis of the role of ants as plant biotic defenses. _Oecologia_ 60:537–549
 
 [pdf1]: /pdfs/Chamberlain&Holland2009Ecology.pdf
