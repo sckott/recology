@@ -18,6 +18,6 @@ title: Blogs
 
 [Journal of Ecology blog]: http://jecologyblog.wordpress.com/
 [Recology]: http://schamberlain.github.com/blog.html
-[Lab Notebook]: http://schamberlain.github.com/labnotebook/
+[Lab Notebook]: http://schamberlain.github.com/labnotebook
 [rOpenSci blog]: http://ropensci.org/articles/
 [INNGE blog]: http://innge.net/?q=blog
