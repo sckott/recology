@@ -1,5 +1,5 @@
 --- 
-name: rnpn-an-r-interface-for-the-national-phenology-network
+name: rnpn-r-interface-for-national-phenology
 layout: post
 title: "rnpn: An R interface for the National Phenology Network"
 date: 2011-08-31 10:26:00 -05:00
