@@ -1,5 +1,5 @@
 --- 
-name: just-for-fun-recovery-gov-data-snooping
+name: just-for-fun-recoverygov-data-snooping
 layout: post
 title: "just for fun: Recovery.gov data snooping"
 date: 2011-01-11 10:52:00.006000 -06:00

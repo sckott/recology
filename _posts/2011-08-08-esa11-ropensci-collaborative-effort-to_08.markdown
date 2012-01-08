@@ -1,5 +1,5 @@
 --- 
-name: -esa11-ropensci-a-collaborative-effort-to-develop-r-based-tools-for-facilitating-open-science
+name: esa11-ropensci-collaborative-effort-to_08
 layout: post
 title: "(#ESA11) rOpenSci: a collaborative effort to develop R-based tools for facilitating Open Science"
 date: 2011-08-08 10:06:00 -05:00
