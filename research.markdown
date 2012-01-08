@@ -22,7 +22,7 @@ Visual description of research (C=competition, P=predation, M=mutualism):
 
 ### How do plants balance multiple mutualists? Correlations among traits for attracting protective bodyguards and pollinators in cotton (Gossypium)?
 
-Paper early view at Evolutionary Ecoloy (here)
+Paper early view at Evolutionary Ecoloy [here][]
 
 Visual description of research:
 
@@ -31,7 +31,7 @@ Visual description of research:
 
 ### Ant-plant mutualisms (meta-analysis)
 
-See the publication in Ecology here
+See the publication in Ecology [here][]
 
 Visual description of research (location of ant-plant protection studies used in meta-analysis)
 
@@ -40,8 +40,10 @@ Visual description of research (location of ant-plant protection studies used in
 
 ### Ecological networks
 
-See the publications in Functional Ecology and Oecologia here
+See the publications in Functional Ecology and Oecologia here [here][]
 
 Visual description of research:
 
 ![Summary of results](/images/research_antbodysize2.png)
+
+[here]: /publications
