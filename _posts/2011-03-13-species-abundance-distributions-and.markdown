@@ -1,5 +1,5 @@
 --- 
-name: species-abundance-distributions-and-basketball
+name: species-abundance-distributions-and
 layout: post
 title: Species abundance distributions and basketball
 date: 2011-03-13 15:00:00 -05:00

@@ -1,5 +1,5 @@
 --- 
-name: troubling-news-for-the-teaching-of-evolution
+name: troubling-news-for-teaching-of
 layout: post
 title: Troubling news for the teaching of evolution
 date: 2011-02-09 08:20:00.009000 -06:00

@@ -1,5 +1,5 @@
 --- 
-name: plyr-s-idata-frame-vs-data-frame
+name: plyrs-idataframe-vs-dataframe
 layout: post
 title: plyr's idata.frame VS. data.frame
 date: 2011-05-13 15:16:00.001000 -05:00

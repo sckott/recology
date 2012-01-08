@@ -1,5 +1,5 @@
 --- 
-name: five-ways-to-visualize-your-pairwise-comparisons
+name: for-all-your-pairwise-comparison-needs
 layout: post
 title: Five ways to visualize your pairwise comparisons
 date: 2011-03-05 12:49:00.006000 -06:00
