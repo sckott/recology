@@ -1,5 +1,5 @@
 --- 
-name: a-simple-function-for-plotting-phylogenies-in-ggplot2
+name: simple-function-for-plotting
 layout: post
 title: A simple function for plotting phylogenies in ggplot2
 date: 2011-05-17 14:37:00.001000 -05:00
