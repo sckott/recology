@@ -15,7 +15,7 @@ Very little work has been done to incorporate the influence of crops into select
 
 Visual description of research (C=competition, P=predation, M=mutualism):
 
-![Preliminary results](/images/research_condMA.png)
+![Preliminary results](/images/research_condMA2.png)
 
 
 ## Past Research
@@ -26,7 +26,7 @@ Paper early view at Evolutionary Ecoloy (here)
 
 Visual description of research:
 
-![Cotton research cartoon](/images/research_cotton.png)
+![Cotton research cartoon](/images/research_cotton2.png)
 
 
 ### Ant-plant mutualisms (meta-analysis)
@@ -35,7 +35,7 @@ See the publication in Ecology here
 
 Visual description of research (location of ant-plant protection studies used in meta-analysis)
 
-![Map of locaiton of studies](/images/research_antplantMA.png)
+![Map of locaiton of studies](/images/research_antplantMA2.png)
 
 
 ### Ecological networks
@@ -44,4 +44,4 @@ See the publications in Functional Ecology and Oecologia here
 
 Visual description of research:
 
-![Summary of results](/images/research_antbodysize.png)
+![Summary of results](/images/research_antbodysize2.png)
