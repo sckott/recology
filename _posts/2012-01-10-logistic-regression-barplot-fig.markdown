@@ -18,10 +18,13 @@ Here's the code:
 Here's a few examples using datasets provided with the ggplot2 package:
 
 `loghistplot(mtcars[,c("mpg","vs")])`
-![mtcars plot](/images/mtcarsplot.png "Plot of mtcars dataset using loghistplot fxn")
+
+![mtcars plot](/images/mtcarsplot.png)
+
 
 `loghistplot(movies[,c("rating","Action")])`
-![movies plot](/images/moviesplot.png "Plot of movies dataset using loghistplot fxn")
+
+![movies plot](/images/moviesplot.png)
 
 
 
