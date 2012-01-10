@@ -19,12 +19,12 @@ Here's a few examples using datasets provided with the ggplot2 package:
 
 `loghistplot(mtcars[,c("mpg","vs")])`
 
-![mtcars plot](/images/mtcarsplot.png)
+![mtcars plot](/images/posts/mtcarsplot.png)
 
 
 `loghistplot(movies[,c("rating","Action")])`
 
-![movies plot](/images/moviesplot.png)
+![movies plot](/images/posts/moviesplot.png)
 
 
 
