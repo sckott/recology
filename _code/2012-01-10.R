@@ -17,6 +17,7 @@ loghistplot  <- function(data) {
   # create plots
   a <- ggplot(data, aes(x = x, y = y)) +
     theme_bw(base_size=16) +
+    geom_point(alpha = 0.5, position = position_jitter(w=0, h=0.02)) +
     geom_smooth(method = "glm", family = "binomial", se = TRUE,
                 colour='black', size=1.5, alpha = 0.3) +
     #     scale_y_continuous(limits=c(0,1), breaks=c(0,1)) +
@@ -65,6 +66,32 @@ loghistplot  <- function(data) {
   print(a, vp = vpa_)
 }
 
+
+logpointplot  <- function(data) {
+  
+  require(ggplot2); require(gridExtra) # load packages
+  
+  names(data) <- c('x','y') # rename columns
+  
+  # get min and max axis values
+  min_x <- min(data$x)
+  max_x <- max(data$x)
+  min_y <- min(data$y)
+  max_y <- max(data$y)
+  
+  # create plots
+  ggplot(data, aes(x = x, y = y)) +
+    theme_bw(base_size=16) +
+    geom_point(alpha = 0.5, position = position_jitter(w=0, h=0.02)) +
+    geom_smooth(method = "glm", family = "binomial", se = TRUE,
+                colour='black', size=1.5, alpha = 0.3) +
+    scale_x_continuous(limits=c(min_x,max_x)) +
+    opts(panel.grid.major = theme_blank(),
+         panel.grid.minor=theme_blank(),
+         panel.background = theme_blank()) +
+    labs(y = "Probability\n", x = "\nYour X Variable")
+
+}
 # Examples
-# loghistplot(mtcars[,c("mpg","vs")])
-# loghistplot(movies[,c("rating","Action")])
+# logpointplot(mtcars[,c("mpg","vs")])
+# logpointplot(movies[,c("rating","Action")])

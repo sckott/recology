@@ -27,5 +27,16 @@ Here's a few examples using datasets provided with the ggplot2 package:
 ![movies plot](/images/posts/moviesplot.png)
 
 
+And two examples of the logpointplot function:
+
+`logpointplot(mtcars[,c("mpg","vs")])`
+
+![mtcars point plot](/images/posts/logpointplot1.png)
+
+
+`logpointplot(movies[,c("rating","Action")])`
+
+![movies point plot](/images/posts/logpointplot2.png)
+
 
 [here]: http://esapubs.org/bulletin/backissues/085-3/bulletinjuly2004_2column.htm#tools1
