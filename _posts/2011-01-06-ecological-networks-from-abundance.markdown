@@ -2,6 +2,7 @@
 name: ecological-networks-from-abundance
 layout: post
 title: Ecological networks from abundance distributions
+author: Scott Chamberlain
 date: 2011-01-06 08:58:00.001000 -06:00
 categories: 
 - Ecology

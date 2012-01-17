@@ -2,6 +2,7 @@
 name: rbold-an-r-interface-for-bold-systems-barcode-repository
 layout: post
 title: "rbold: An R Interface for Bold Systems barcode repository"
+author: Scott Chamberlain
 date: 2011-06-28 09:27:00.001000 -05:00
 categories: 
 - openaccess

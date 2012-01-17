@@ -2,6 +2,7 @@
 name: phylometa-from-r-udpate
 layout: post
 title: Phylometa from R - UDPATE
+author: Scott Chamberlain
 date: 2011-04-01 16:18:00.003000 -05:00
 categories: 
 - ggplot2

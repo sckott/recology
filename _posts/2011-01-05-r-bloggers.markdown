@@ -2,6 +2,7 @@
 name: r-bloggers
 layout: post
 title: R-bloggers
+author: Scott Chamberlain
 date: 2011-01-05 08:11:00 -06:00
 categories: 
 - R

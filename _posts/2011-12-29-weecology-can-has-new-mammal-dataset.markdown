@@ -2,6 +2,7 @@
 name: weecology-can-has-new-mammal-dataset
 layout: post
 title: Weecology can has new mammal dataset
+author: Scott Chamberlain
 date: 2011-12-29 08:11:00 -06:00
 categories: 
 - Datasets

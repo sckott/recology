@@ -2,6 +2,7 @@
 name: rstudio-beta-2-is-out-
 layout: post
 title: RStudio Beta 2 is Out!
+author: Scott Chamberlain
 date: 2011-04-11 09:33:00 -05:00
 categories: 
 

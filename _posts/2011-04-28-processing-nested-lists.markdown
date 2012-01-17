@@ -2,6 +2,7 @@
 name: processing-nested-lists
 layout: post
 title: Processing nested lists
+author: Scott Chamberlain
 date: 2011-04-28 17:41:00 -05:00
 categories: 
 - R

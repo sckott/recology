@@ -1,7 +1,8 @@
 --- 
 name: just-for-fun-recoverygov-data-snooping
 layout: post
-title: "just for fun: Recovery.gov data snooping"
+title: "Just for fun: Recovery.gov data snooping"
+author: Scott Chamberlain
 date: 2011-01-11 10:52:00.006000 -06:00
 categories: 
 - ggplot2

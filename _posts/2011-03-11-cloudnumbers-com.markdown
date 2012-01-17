@@ -2,6 +2,7 @@
 name: cloudnumbers-com
 layout: post
 title: cloudnumbers.com
+author: Scott Chamberlain
 date: 2011-03-11 07:28:00.001000 -06:00
 categories: 
 - Methods

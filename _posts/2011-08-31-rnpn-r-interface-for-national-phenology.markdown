@@ -2,6 +2,7 @@
 name: rnpn-r-interface-for-national-phenology
 layout: post
 title: "rnpn: An R interface for the National Phenology Network"
+author: Scott Chamberlain
 date: 2011-08-31 10:26:00 -05:00
 categories: 
 - ropensci

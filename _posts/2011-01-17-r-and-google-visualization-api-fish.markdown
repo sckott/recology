@@ -2,6 +2,7 @@
 name: r-and-google-visualization-api-fish
 layout: post
 title: "R and Google Visualization API: Fish harvests"
+author: Scott Chamberlain
 date: 2011-01-17 21:04:00.002000 -06:00
 categories: 
 - ggplot2

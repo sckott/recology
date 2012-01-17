@@ -2,6 +2,7 @@
 name: check-out-phyloseminar-org
 layout: post
 title: Check out Phyloseminar.org
+author: Scott Chamberlain
 date: 2011-03-04 08:22:00 -06:00
 categories: 
 - Evolution

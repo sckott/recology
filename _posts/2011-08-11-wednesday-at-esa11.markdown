@@ -2,6 +2,7 @@
 name: wednesday-at-esa11
 layout: post
 title: "Wednesday at #ESA11"
+author: Scott Chamberlain
 date: 2011-08-11 08:50:00 -05:00
 categories: 
 - openaccess

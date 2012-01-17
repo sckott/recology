@@ -2,6 +2,7 @@
 name: phylogenetic-analysis-with-the-phangorn-package-an-example
 layout: post
 title: "Phylogenetic analysis with the phangorn package: an example"
+author: Scott Chamberlain
 date: 2011-02-21 12:31:00.001000 -06:00
 categories: 
 - Evolution

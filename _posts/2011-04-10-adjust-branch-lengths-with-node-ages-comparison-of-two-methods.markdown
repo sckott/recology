@@ -2,6 +2,7 @@
 name: adjust-branch-lengths-with-node-ages-comparison-of-two-methods
 layout: post
 title: "Adjust branch lengths with node ages: comparison of two methods"
+author: Scott Chamberlain
 date: 2011-04-10 13:02:00.003000 -05:00
 categories: 
 - phylocom

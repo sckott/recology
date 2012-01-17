@@ -2,6 +2,7 @@
 name: new-approach-to-analysis-of-phylogenetic-community-structure
 layout: post
 title: New approach to analysis of phylogenetic community structure
+author: Scott Chamberlain
 date: 2011-01-05 07:54:00.001000 -06:00
 categories: 
 - Evolution

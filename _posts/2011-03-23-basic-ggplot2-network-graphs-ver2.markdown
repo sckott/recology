@@ -2,6 +2,7 @@
 name: basic-ggplot2-network-graphs-ver2
 layout: post
 title: basic ggplot2 network graphs - ver2
+author: Scott Chamberlain
 date: 2011-03-23 14:09:00 -05:00
 categories: 
 - ggplot2

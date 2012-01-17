@@ -1,7 +1,8 @@
 --- 
 name: -ten-simple-rules-for-oa-publishers-talk-by-philip-bourne
 layout: post
-title: "\"Ten Simple Rules for OA Publishers\" talk by Philip Bourne"
+title: Ten Simple Rules for OA Publishers talk by Philip Bourne
+author: Scott Chamberlain
 date: 2011-09-23 14:44:00 -05:00
 categories: 
 - openaccess

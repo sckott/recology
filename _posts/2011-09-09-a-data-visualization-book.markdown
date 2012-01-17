@@ -2,6 +2,7 @@
 name: a-data-visualization-book
 layout: post
 title: A Data Visualization Book
+author: Scott Chamberlain
 date: 2011-09-09 01:28:00 -05:00
 categories: 
 

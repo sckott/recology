@@ -2,6 +2,7 @@
 name: phenotypic-selection-analysis-in-r
 layout: post
 title: Phenotypic selection analysis in R
+author: Scott Chamberlain
 date: 2011-02-24 09:43:00.001000 -06:00
 categories: 
 - Methods

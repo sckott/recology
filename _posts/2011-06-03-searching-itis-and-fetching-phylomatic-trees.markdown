@@ -2,6 +2,7 @@
 name: searching-itis-and-fetching-phylomatic-trees
 layout: post
 title: searching ITIS and fetching Phylomatic trees
+author: Scott Chamberlain
 date: 2011-06-03 17:35:00.001000 -05:00
 categories: 
 - Phylogenetics

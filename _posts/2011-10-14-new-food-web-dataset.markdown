@@ -2,6 +2,7 @@
 name: new-food-web-dataset
 layout: post
 title: New food web dataset
+author: Scott Chamberlain
 date: 2011-10-14 13:00:00 -05:00
 categories: 
 - ggplot2

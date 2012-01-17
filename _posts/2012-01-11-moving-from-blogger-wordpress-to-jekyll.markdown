@@ -2,6 +2,7 @@
 name: moving-from-blogger-wordpress-to-jekyll
 layout: post
 title: Moving from blogger and wordpress to jekyll
+author: Scott Chamberlain
 date: 2012-01-11
 categories: 
 - thoughts

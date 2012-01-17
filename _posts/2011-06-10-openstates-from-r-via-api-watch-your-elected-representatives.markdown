@@ -2,6 +2,7 @@
 name: openstates-from-r-via-api-watch-your-elected-representatives
 layout: post
 title: "OpenStates from R via API: watch your elected representatives"
+author: Scott Chamberlain
 date: 2011-06-10 23:19:00 -05:00
 categories: 
 - R

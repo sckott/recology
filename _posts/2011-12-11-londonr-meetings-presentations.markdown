@@ -2,6 +2,7 @@
 name: londonr-meetings-presentations
 layout: post
 title: LondonR meetings presentations
+author: Scott Chamberlain
 date: 2011-12-11 11:59:00.001000 -06:00
 categories: 
 - segue

@@ -2,6 +2,7 @@
 name: archiving-ecologyevolution-data-sets
 layout: post
 title: Archiving ecology/evolution data sets online
+author: Scott Chamberlain
 date: 2011-07-15 21:02:00 -05:00
 categories: 
 - openaccess

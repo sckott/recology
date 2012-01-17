@@ -2,6 +2,7 @@
 name: my-take-on-an-r-introduction-talk
 layout: post
 title: My take on an R introduction talk
+author: Scott Chamberlain
 date: 2011-09-09 13:03:00 -05:00
 categories: 
 - openaccess

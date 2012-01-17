@@ -2,6 +2,7 @@
 name: -drewconway-interview-on-datanoborders-at-the-strata-conference
 layout: post
 title: "@drewconway interview on @DataNoBorders at the Strata conference"
+author: Scott Chamberlain
 date: 2011-09-22 23:10:00 -05:00
 categories: 
 - openaccess

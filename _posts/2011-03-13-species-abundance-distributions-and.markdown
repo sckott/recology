@@ -2,6 +2,7 @@
 name: species-abundance-distributions-and
 layout: post
 title: Species abundance distributions and basketball
+author: Scott Chamberlain
 date: 2011-03-13 15:00:00 -05:00
 categories: 
 - Papers

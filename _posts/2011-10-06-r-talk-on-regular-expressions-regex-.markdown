@@ -2,6 +2,7 @@
 name: r-talk-on-regular-expressions-regex-
 layout: post
 title: R talk on regular expressions (regex)
+author: Scott Chamberlain
 date: 2011-10-06 10:50:00.001000 -05:00
 categories: 
 - regex

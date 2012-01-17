@@ -2,6 +2,7 @@
 name: rhipe-package-in-r-for-interfacing-between-hadoop-and-r
 layout: post
 title: RHIPE package in R for interfacing between Hadoop and R
+author: Scott Chamberlain
 date: 2011-05-04 19:11:00 -05:00
 categories: 
 - Methods

@@ -2,6 +2,7 @@
 name: thursday-at-esa11
 layout: post
 title: "Thursday at #ESA11"
+author: Scott Chamberlain
 date: 2011-08-12 08:11:00.002000 -05:00
 categories: 
 - Meetings

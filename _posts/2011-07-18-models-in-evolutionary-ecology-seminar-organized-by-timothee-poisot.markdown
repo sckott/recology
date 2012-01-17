@@ -2,6 +2,7 @@
 name: models-in-evolutionary-ecology-seminar-organized-by-timothee-poisot
 layout: post
 title: Models in Evolutionary Ecology seminar, organized by Timothee Poisot
+author: Scott Chamberlain
 date: 2011-07-18 07:27:00 -05:00
 categories: 
 - Meetings

@@ -2,6 +2,7 @@
 name: troubling-news-for-teaching-of
 layout: post
 title: Troubling news for the teaching of evolution
+author: Scott Chamberlain
 date: 2011-02-09 08:20:00.009000 -06:00
 categories: 
 - ggplot2

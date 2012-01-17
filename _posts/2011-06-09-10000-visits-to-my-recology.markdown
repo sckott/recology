@@ -2,6 +2,7 @@
 name: 10000-visits-to-my-recology
 layout: post
 title: "> 10,000 visits to Recology!!!!"
+author: Scott Chamberlain
 date: 2011-06-09 12:09:00.001000 -05:00
 categories: 
 

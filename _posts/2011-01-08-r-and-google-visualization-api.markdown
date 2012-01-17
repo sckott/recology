@@ -2,6 +2,7 @@
 name: r-and-google-visualization-api
 layout: post
 title: R and Google Visualization API
+author: Scott Chamberlain
 date: 2011-01-08 19:33:00 -06:00
 categories: 
 - Ecology

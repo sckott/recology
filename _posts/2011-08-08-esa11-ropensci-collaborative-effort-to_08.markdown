@@ -2,6 +2,7 @@
 name: esa11-ropensci-collaborative-effort-to_08
 layout: post
 title: "(#ESA11) rOpenSci: a collaborative effort to develop R-based tools for facilitating Open Science"
+author: Scott Chamberlain
 date: 2011-08-08 10:06:00 -05:00
 categories: 
 - openaccess

@@ -2,6 +2,7 @@
 name: check-out-a-video-of-my-research-at-rockethub
 layout: post
 title: Check out a video of my research at RocketHub
+author: Scott Chamberlain
 date: 2011-11-01 09:36:00 -05:00
 categories: 
 - begging

@@ -2,6 +2,7 @@
 name: phylogenetic-signal-simulations
 layout: post
 title: phylogenetic signal simulations
+author: Scott Chamberlain
 date: 2011-05-18 08:13:00 -05:00
 categories: 
 - ggplot2

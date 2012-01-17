@@ -2,6 +2,7 @@
 name: two-sex-demographic-models-in-r
 layout: post
 title: Two-sex demographic models in R
+author: Scott Chamberlain
 date: 2011-10-26 09:31:00 -05:00
 categories: 
 - Papers

@@ -2,6 +2,7 @@
 name: just-turned-on-mobile-template-for-this-blog-let-me-know-if-it-works
 layout: post
 title: Just turned on 'mobile template' for this blog, let me know if it works
+author: Scott Chamberlain
 date: 2011-06-09 12:50:00.002000 -05:00
 categories: 
 

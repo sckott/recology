@@ -2,6 +2,7 @@
 name: my-talk-on-doing-phylogenetics-in-r
 layout: post
 title: My talk on doing phylogenetics in R
+author: Scott Chamberlain
 date: 2011-11-18 13:15:00.001000 -06:00
 categories: 
 - packages

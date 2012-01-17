@@ -2,6 +2,7 @@
 name: farmer-s-markets-data
 layout: post
 title: Farmer's markets data
+author: Scott Chamberlain
 date: 2011-02-16 22:41:00.001000 -06:00
 categories: 
 - ggplot2

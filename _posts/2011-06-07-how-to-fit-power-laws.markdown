@@ -2,6 +2,7 @@
 name: how-to-fit-power-laws
 layout: post
 title: How to fit power laws
+author: Scott Chamberlain
 date: 2011-06-07 15:24:00 -05:00
 categories: 
 - Methods

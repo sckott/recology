@@ -2,6 +2,7 @@
 name: comparison-of-functions-for-comparative-phylogenetics
 layout: post
 title: Comparison of functions for comparative phylogenetics
+author: Scott Chamberlain
 date: 2011-05-11 10:08:00 -05:00
 categories: 
 - Evolution

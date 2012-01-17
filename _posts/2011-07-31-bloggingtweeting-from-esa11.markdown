@@ -2,6 +2,7 @@
 name: bloggingtweeting-from-esa11
 layout: post
 title: "Blogging/tweeting from #ESA11"
+author: Scott Chamberlain
 date: 2011-07-31 14:46:00.005000 -05:00
 categories: 
 - openaccess

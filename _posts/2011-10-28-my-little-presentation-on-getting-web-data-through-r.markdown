@@ -2,6 +2,7 @@
 name: my-little-presentation-on-getting-web-data-through-r
 layout: post
 title: My little presentation on getting web data through R
+author: Scott Chamberlain
 date: 2011-10-28 11:16:00.003000 -05:00
 categories: 
 - ggplot2

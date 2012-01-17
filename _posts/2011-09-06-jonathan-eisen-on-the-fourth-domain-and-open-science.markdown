@@ -2,6 +2,7 @@
 name: jonathan-eisen-on-the-fourth-domain-and-open-science
 layout: post
 title: Jonathan Eisen on the Fourth Domain and Open Science
+author: Scott Chamberlain
 date: 2011-09-06 18:53:00 -05:00
 categories: 
 - vimeo

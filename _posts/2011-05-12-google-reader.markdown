@@ -2,6 +2,7 @@
 name: google-reader
 layout: post
 title: google reader
+author: Scott Chamberlain
 date: 2011-05-12 13:10:00 -05:00
 categories: 
 

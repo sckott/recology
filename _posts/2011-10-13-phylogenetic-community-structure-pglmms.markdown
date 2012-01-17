@@ -2,6 +2,7 @@
 name: phylogenetic-community-structure-pglmms
 layout: post
 title: "Phylogenetic community structure: PGLMMs"
+author: Scott Chamberlain
 date: 2011-10-13 10:18:00.001000 -05:00
 categories: 
 - Evolution

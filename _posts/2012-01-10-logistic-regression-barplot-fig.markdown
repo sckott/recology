@@ -2,6 +2,7 @@
 name: logistic-regression-barplot-fig
 layout: post
 title: Presenting results of logistic regression
+author: Scott Chamberlain
 date: 2012-01-10 07:50:00 -06:00
 categories: 
 - ggplot2

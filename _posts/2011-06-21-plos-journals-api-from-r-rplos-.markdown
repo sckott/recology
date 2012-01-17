@@ -2,6 +2,7 @@
 name: plos-journals-api-from-r-rplos-
 layout: post
 title: "PLoS journals API from R: \"rplos\""
+author: Scott Chamberlain
 date: 2011-06-21 08:30:00 -05:00
 categories: 
 - openaccess

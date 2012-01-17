@@ -2,6 +2,7 @@
 name: open-science-talk-by-carl-boettiger
 layout: post
 title: Open science talk by Carl Boettiger
+author: Scott Chamberlain
 date: 2011-09-22 22:55:00 -05:00
 categories: 
 - openaccess

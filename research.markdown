@@ -1,5 +1,5 @@
 ---
-layout: noblogside
+layout: pages
 title: Research
 ---
 
