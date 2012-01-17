@@ -2,6 +2,7 @@
 name: phylogeny-resolution
 layout: post
 title: Function for phylogeny resolution
+author: Scott Chamberlain
 date: 2012-01-13
 categories: 
 - R

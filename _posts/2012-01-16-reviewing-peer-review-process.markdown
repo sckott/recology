@@ -2,6 +2,7 @@
 name: reviewing-peer-review-process
 layout: post
 title: Taking a Closer Look at Peer Review
+author: Pascal Mickelson
 date: 2012-01-16
 categories: 
 - thoughts
