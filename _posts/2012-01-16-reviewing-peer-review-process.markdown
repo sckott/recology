@@ -9,6 +9,8 @@ categories:
 - peerreview
 ---
 
+Author: Pascal Mickelson
+
 This post is only tangentially about open science.  It is more directly about the process of peer review and how it might be improved.  I am working on a follow-up post about how these points can be addressed in an open publishing environment.
 
 A [recent paper on the arXiv][arXivpaper] got me thinking about the sticking points in the publishing pipeline.  As it stands, most scientists have a pretty good understanding of how peer reviewed publishing is supposed to work.  Once an author—or more likely, a group of authors—decides that a manuscript is ready for action, the following series of events will occur:
