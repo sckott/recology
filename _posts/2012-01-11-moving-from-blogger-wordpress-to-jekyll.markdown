@@ -30,6 +30,8 @@ Here's how to get started:
 3. `git clone` a jekyll template to your machine.  There are hundreds of these now.  Look [here][here2] for your favorite, and `git clone` it. ***
 4. Edit the template you have cloned, and commit and push to GitHub.  That's it.  It will take just a bit to render.  
 
+There is more to it than that, but that is how you can get started.  If you want to add comments, [Disqus][] is a great option.  Once you fork someones jekyll site, make sure to change all the personal/site specific information to your information, including the RSS feed. 
+
 *** Note: You can name your repo for your site/blog as yourgithubname.github.com if you want your URL for the site to be http://yourgithubname.github.com.  Or you can name your repo whatever you want, e.g., disrepo, then the URL will be http://yourgithubname.github.com/disrepo. 
 
 
@@ -41,3 +43,4 @@ Here's how to get started:
 [here2]: https://github.com/mojombo/jekyll/wiki/sites
 [here3]: http://mac.github.com/
 [configgithug]: http://help.github.com/mac-set-up-git/
+[Disqus]: http://disqus.com/
