@@ -10,7 +10,7 @@ categories:
 - phylogenetics
 ---
 
-UPDATE:  Yeah, sp the treeresstats function had a problem in one of the calculations.  I fixed that and added some more calulcations to the function. 
+UPDATE:  Yeah, so the treeresstats function had a problem in one of the calculations.  I fixed that and added some more calulcations to the function. 
 
 I couldn't find any functions to calculate number of polytomies, and related metrics. 
 
@@ -57,9 +57,17 @@ And an example with many trees:
 	</tr>
 	<tr>
 		<td>20</td> <td>13</td> <td>4</td> <td>0.20</td> <td>0.31</td> <td>0.7</td> <td>0.69</td>
+	</tr>
+	<tr>
 		<td>20</td> <td>7</td> <td>3</td> <td>0.15</td> <td>0.43</td> <td>0.9</td> <td>0.57</td>
+	</tr>
+	<tr>
 		<td>20</td> <td>11</td> <td>6</td> <td>0.30</td> <td>0.55</td> <td>1.0</td> <td>0.45</td>
+	</tr>
+	<tr>
 		<td>20</td> <td>13</td> <td>4</td> <td>0.20</td> <td>0.31</td> <td>0.7</td> <td>0.69</td>
+	</tr>
+	<tr>
 		<td>20</td> <td>9</td> <td>5</td> <td>0.25</td> <td>0.56</td> <td>1.0</td> <td>0.44</td>
 	</tr>
 </table>
