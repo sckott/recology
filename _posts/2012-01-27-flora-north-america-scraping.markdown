@@ -3,7 +3,7 @@ name: flora-north-america-scraping
 layout: post
 title: Scraping Flora of North America
 author: Scott Chamberlain
-date: 2012-01-23
+date: 2012-01-27
 categories: 
 - R
 - scraping
