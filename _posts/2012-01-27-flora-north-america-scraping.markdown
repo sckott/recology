@@ -31,7 +31,7 @@ install_github("rfna", "rOpenSci")
 require(rfna)
 ```
 
-Here is an example where a set of URLs is acquired using function `getdaughterURLs`, then the function `receptacle` is used to ask whether of each the taxa at those URLs have paleate or epaleate receptacles. 
+Here is an example where a set of URLs is acquired using function ```getdaughterURLs```, then the function ```receptacle``` is used to ask whether of each the taxa at those URLs have paleate or epaleate receptacles. 
 
 
 <script src="https://gist.github.com/1690353.js?file=rfna_demo.r"></script>
