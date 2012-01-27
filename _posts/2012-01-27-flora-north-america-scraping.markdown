@@ -24,12 +24,12 @@ Further functions will do search, etc.
 
 You can install by:
 
-```R
+    ```R
     install.packages("devtools")
     require(devtools)
     install_github("rfna", "rOpenSci")
     require(rfna)
-```
+    ```
 
 Here is an example where a set of URLs is acquired using function ```getdaughterURLs```, then the function ```receptacle``` is used to ask whether of each the taxa at those URLs have paleate or epaleate receptacles. 
 
