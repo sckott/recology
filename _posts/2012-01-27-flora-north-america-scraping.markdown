@@ -28,7 +28,7 @@ You can install by:
     require(devtools)
     install_github("rfna", "rOpenSci")
     require(rfna)
-
+</br></br>
 
 Here is an example where a set of URLs is acquired using function ```getdaughterURLs```, then the function ```receptacle``` is used to ask whether of each the taxa at those URLs have paleate or epaleate receptacles. 
 
