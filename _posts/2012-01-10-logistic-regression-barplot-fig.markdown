@@ -26,7 +26,7 @@ loghistplot(mtcars[,c("mpg","vs")])
 
 
 {% highlight r %}
-`loghistplot(movies[,c("rating","Action")])`
+loghistplot(movies[,c("rating","Action")])
 {% endhighlight %}
 
 ![movies plot](/images/posts/moviesplot.png)
