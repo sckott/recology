@@ -24,7 +24,7 @@ Further functions will do search, etc.
 
 You can install by:
 
-{% highlight R %}
+{% highlight r %}
 install.packages("devtools")
 require(devtools)
 install_github("rfna", "rOpenSci")
