@@ -20,7 +20,7 @@ Here's a simple function that gives four metrics on a phylo tree object:
 
 Here's output from the gist above:
 
-`
+{% highlight r %}
 $trsize_tips
 [1] 15
 
@@ -41,7 +41,7 @@ $proptipsdescpoly
 
 $propnodesdich
 [1] 0.9230769
-`
+{% endhighlight %}
 
 And an example with many trees:
 

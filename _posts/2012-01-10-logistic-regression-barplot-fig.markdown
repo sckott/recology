@@ -18,24 +18,32 @@ Here's the code:
 
 Here's a few examples using datasets provided with the ggplot2 package:
 
-`loghistplot(mtcars[,c("mpg","vs")])`
+{% highlight r %}
+loghistplot(mtcars[,c("mpg","vs")])
+{% endhighlight %}
 
 ![mtcars plot](/images/posts/mtcarsplot.png)
 
 
+{% highlight r %}
 `loghistplot(movies[,c("rating","Action")])`
+{% endhighlight %}
 
 ![movies plot](/images/posts/moviesplot.png)
 
 
 And two examples of the logpointplot function:
 
-`logpointplot(mtcars[,c("mpg","vs")])`
+{% highlight r %}
+logpointplot(mtcars[,c("mpg","vs")])
+{% endhighlight %}
 
 ![mtcars point plot](/images/posts/logpointplot1.png)
 
 
-`logpointplot(movies[,c("rating","Action")])`
+{% highlight r %}
+logpointplot(movies[,c("rating","Action")])
+{% endhighlight %}
 
 ![movies point plot](/images/posts/logpointplot2.png)
 

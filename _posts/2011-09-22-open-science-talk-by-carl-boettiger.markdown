@@ -10,4 +10,11 @@ categories:
 - Ecology
 - sciencetalks
 ---
-Carl Boettiger gave a talk on the topic of open science to incoming UC Davis graduate students.<br /><br />Here is the audio:&nbsp;http://www.archive.org/details/ThingsIWishIKnewThreeYearsAgo-ByTheDavisOpenScienceGroup&amp;reCache=1<br /><br />Here are the slides:&nbsp;http://hazelnusse.github.com/DOS_WOW2011/#title-slide
+Carl Boettiger gave a talk on the topic of open science to incoming UC Davis graduate students.
+
+Here is the audio [click here][here] 
+
+Here are the slides [clickhere][here2]
+
+[here]: http://www.archive.org/details/ThingsIWishIKnewThreeYearsAgo-ByTheDavisOpenScienceGroup&amp;reCache=1
+[here2]: http://hazelnusse.github.com/DOS_WOW2011/#title-slide
