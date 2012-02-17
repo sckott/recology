@@ -1,7 +1,7 @@
 --- 
 name: math-ecology-survey
 layout: post
-title: Take the INNGE survey on #math and #ecology
+title: Take the INNGE survey on math and ecology
 author: Scott Chamberlain
 date: 2012-02-17
 categories: 
