@@ -4,6 +4,9 @@ title: Research
 ---
 
 The Cerebral Mastication blog has a nice list of R resources (<a href="http://www.cerebralmastication.com/r-resources/">http://www.cerebralmastication.com/r-resources/</a>)<br />
+
+Pairach Piboonrungroj has a nice list of R tutorials (<a href="http://pairach.com/2012/02/26/r-tutorials-from-universities-around-the-world/">here/</a>)<br />
+
 The Ecostudies blog R tricks (<a href="http://pvanb.wordpress.com/links-2/r-tips-tricks/">http://pvanb.wordpress.com/links-2/r-tips-tricks/</a>)<br />
 <u><br />
 </u><br />
