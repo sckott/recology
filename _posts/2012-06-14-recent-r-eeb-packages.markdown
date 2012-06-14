@@ -6,38 +6,39 @@ date: 2012-06-14
 author: Scott Chamberlain
 categories:
 - R
+- python
 - ecology
 - evolution
 ---
 
 Many R packages/tools have come out recently for doing ecology and evolution. All of the below were described in Methods in Ecology and Evolution, except for spider, which came out in [Molecular Ecology Resources][mer]. Here are some highlights.
 
-+ [mvabund][mvabund]
++ [mvabund][mvabund] - [get it](http://cran.r-project.org/web/packages/mvabund/index.html)
 	+ Model-based analysis of multivariate abundance data. Visualising data, fitting predictive models, checking assumptions, hypothesis testing.
-+ [popdemo][popdemo]
++ [popdemo][popdemo] - [get it](http://cran.r-project.org/web/packages/popdemo/index.html)
 	+ Population demography using projection matrix analysis. 
-+ [motmot][motmot] 
++ [motmot][motmot] - [get it](http://cran.r-project.org/web/packages/motmot/index.html)
 	+ Models of trait macroevolution on trees
-+ [spider][spider] 
++ [spider][spider] - [get it](http://cran.r-project.org/web/packages/spider/index.html)
 	+ Analysis of species identity and evolution, with particular reference to DNA barcoding
-+ [BaSTA][BaSTA] 
++ [BaSTA][BaSTA] - [get it](http://cran.r-project.org/web/packages/BaSTA/index.html)
 	+ Bayesian estimation of age-specific survival from incomplete mark–recapture/recovery data with covariates
-+ [abc][abc] 
++ [abc][abc] - [get it](http://cran.r-project.org/web/packages/abc/index.html)
 	+ Approximate Bayesian Computation (ABC)
-+ [RNetLogo][RNetLogo]
++ [RNetLogo][RNetLogo] - [get it](http://cran.r-project.org/web/packages/RNetLogo/index.html)
 	+ Running and exploring individual-based models implemented in NetLogo
-+ [phytools][phytools]
++ [phytools][phytools] - [get it](http://cran.r-project.org/web/packages/phytools/index.html)
 	+ Tools for phylogenetic comparative biology
-+ [smatr3][smatr3]
++ [smatr][smatr] - [get it](http://cran.r-project.org/web/packages/smatr/index.html)
 	+ Estimation and inference about allometric lines
-+ [RBrownie][brown]
++ [RBrownie][brown] - [get it ?](http://www.brianomeara.info/tutorials/brownie)
 	+ Testing hypotheses about rates of evolutionary change
-+ [polytomy resolver][poly] 
++ [polytomy resolver][poly] - [get it](http://onlinelibrary.wiley.com/doi/10.1111/j.2041-210X.2011.00103.x/suppinfo)
 	+ Resolve polytomies on dated phylogenies with their R scripts [here][].
 
 And a cool tool came out for the Python programming language. 
 
-+ [NichePy][NichePy]
++ [NichePy][NichePy] - [get it](https://github.com/bastodian/NichePy)
 	+ Modular tools for estimating the similarity of ecological niche and species distribution models
 
 [mvabund]: http://onlinelibrary.wiley.com/doi/10.1111/j.2041-210X.2012.00190.x/abstract
