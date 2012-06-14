@@ -1,8 +1,10 @@
 ---
+name: recent-r
 layout: post
 title: Recent #rstats packages for ecology and evolution
-author: Scott
-tag:
+date: 2012-06-14
+author: Scott Chamberlain
+categories:
 - R
 - ecology
 - evolution
