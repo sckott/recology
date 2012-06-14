@@ -1,7 +1,7 @@
 ---
 name: recent-r
 layout: post
-title: Recent #rstats packages for ecology and evolution
+title: Recent R packages for ecology and evolution
 date: 2012-06-14
 author: Scott Chamberlain
 categories:
@@ -10,7 +10,7 @@ categories:
 - evolution
 ---
 
-Many R packages/tools have come out recently for doing ecology and evolution. All of the below were described in Methods in Ecology and Evolution, except for spider, which came out in [Molecular Ecology Resources](http://onlinelibrary.wiley.com/journal/10.1111/(ISSN)1755-0998). Here are some highlights.
+Many R packages/tools have come out recently for doing ecology and evolution. All of the below were described in Methods in Ecology and Evolution, except for spider, which came out in [Molecular Ecology Resources][mer]. Here are some highlights.
 
 + [mvabund][mvabund]
 	+ Model-based analysis of multivariate abundance data. Visualising data, fitting predictive models, checking assumptions, hypothesis testing.
@@ -52,3 +52,4 @@ And a cool tool came out for the Python programming language.
 [brown]: http://onlinelibrary.wiley.com/doi/10.1111/j.2041-210X.2011.00112.x/abstract
 [poly]: http://onlinelibrary.wiley.com/doi/10.1111/j.2041-210X.2011.00103.x/abstract
 [NichePy]: http://onlinelibrary.wiley.com/doi/10.1111/j.2041-210X.2011.00184.x/abstract
+[mer]: http://onlinelibrary.wiley.com/journal/10.1111/(ISSN)1755-0998
