@@ -49,7 +49,7 @@ And a cool tool came out for the Python programming language.
 [abc]: http://onlinelibrary.wiley.com/doi/10.1111/j.2041-210X.2011.00179.x/abstract
 [RNetLogo]: http://onlinelibrary.wiley.com/doi/10.1111/j.2041-210X.2011.00180.x/abstract
 [phytools]: http://onlinelibrary.wiley.com/doi/10.1111/j.2041-210X.2011.00169.x/abstract
-[smatr3]: http://onlinelibrary.wiley.com/doi/10.1111/j.2041-210X.2011.00153.x/abstract
+[smatr]: http://onlinelibrary.wiley.com/doi/10.1111/j.2041-210X.2011.00153.x/abstract
 [brown]: http://onlinelibrary.wiley.com/doi/10.1111/j.2041-210X.2011.00112.x/abstract
 [poly]: http://onlinelibrary.wiley.com/doi/10.1111/j.2041-210X.2011.00103.x/abstract
 [NichePy]: http://onlinelibrary.wiley.com/doi/10.1111/j.2041-210X.2011.00184.x/abstract
