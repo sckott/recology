@@ -1,33 +1,26 @@
-require 'jekyll'
+require 'rubygems'
+require 'rake'
+require 'fileutils'
 
-options = Jekyll.configuration({})
-site    = Jekyll::Site.new(options)
-site.read_posts('')
+desc "Draft a new post"
+task :new do
+  puts "What should we call this post for now?"
+  name = STDIN.gets.chomp
+  FileUtils.touch("drafts/#{name}.md")
 
-namespace "categories" do
-  desc "Generate tag pages"
-  task :generate_pages do
-    folder = "categories"
-
-    site.categories.each do |categories, posts|
-      tag_page = "#{folder}/#{categories}.html"
-      tag_page = tag_page.downcase
-
-      File.open(tag_page, 'w') do |file|
-        file.write <<-EOS
----
-layout: categories
-title: "Recology --> posts tagged with #{categories}"
-name: #{categories}
----
-
-<div class="article_list">
-  {% for post in site.categories.#{categories} %}  
-    {% include a_post.html %}
-  {% endfor %}
-</div>
-        EOS
-      end
-    end
+  open("drafts/#{name}.md", 'a') do |f|
+    f.puts "---"
+    f.puts "layout: post"
+    f.puts "title: \"DRAFT: #{name}\""
+    f.puts "---"
   end
 end
+
+
+desc "Startup Jekyll"
+task :start do
+  sh "jekyll --server"
+end
+
+task :default => :start
+
