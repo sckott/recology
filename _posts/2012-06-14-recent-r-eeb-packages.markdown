@@ -1,13 +1,14 @@
 ---
+name: recent-r
 layout: post
 title: Recent R packages for ecology and evolution
-category: information
-tags: R python ecology evolution
-year: 2012
-month: 6
-day: 14
-published: true
-summary: 
+date: 2012-06-14
+author: Scott Chamberlain
+tags:
+- R
+- python
+- ecology
+- evolution
 ---
 
 Many R packages/tools have come out recently for doing ecology and evolution. All of the below were described in Methods in Ecology and Evolution, except for spider, which came out in [Molecular Ecology Resources][mer]. Here are some highlights.
