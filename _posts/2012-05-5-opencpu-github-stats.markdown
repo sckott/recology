@@ -24,24 +24,23 @@ It makes a [ggplot2][] graphic of your watchers and forks on each repo (up to 10
 
 Here's an example from the function.  Paste the following in to your browser and you should get the below figure. 
 
-[http://beta.opencpu.org/R/call/opencpu.demo/gitstats/png][]
+http://beta.opencpu.org/R/call/opencpu.demo/gitstats/png
 
-
-![had](/images/posts/hadley.png)
+![had](/img/hadley.png)
 
 
 
 And you can specify user or organization name using arguments in the URL
 
-[http://beta.opencpu.org/R/call/opencpu.demo/gitstats/png?type='org'&id='ropensci'][]
+http://beta.opencpu.org/R/call/opencpu.demo/gitstats/png?type='org'&id='ropensci'
 
-![ropensci](/images/posts/ropensci.png)
+![ropensci](/img/ropensci.png)
 
 
 
 Sweet. Have fun. 
 
-
+[ggplot2]: http://had.co.nz/ggplot2/
 [OpenCPU]: http://opencpu.org/
 [here]: http://beta.opencpu.org/apps/opencpu.demo/storefunction/
 [http://beta.opencpu.org/R/call/store:tmp/x3e50ee0780/png]: http://beta.opencpu.org/R/call/store:tmp/x3e50ee0780/png
