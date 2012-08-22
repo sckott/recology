@@ -9,6 +9,7 @@ tags:
 - map
 - gridExtra
 - inset
+- R
 ---
 
 ## Here's a quick demo of creating a map with an inset within it using ggplot. The inset is achieved using the `gridExtra` package. 
