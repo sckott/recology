@@ -12,18 +12,34 @@ tags:
 - R
 ---
 
+*********
+
+## UPDATE: changed data source so that the entire example can be run by anone on their own machine. Also, per Joachim's suggestion, I put a box around the blown up area of the map. Thoughts?
+
+*********
+
 ## Here's a quick demo of creating a map with an inset within it using ggplot. The inset is achieved using the `gridExtra` package. 
 
-## Install libraries, set directory, read file
+*********
+
+### Install libraries
 
 {% highlight r %}
-setwd("/Users/ScottMac/Dropbox/CANPOLIN_networks_ms/data")  # change to your directory
 library(ggplot2)
 library(maps)
 library(maptools)
 library(gridExtra)
 library(rgeos)
-dat <- read.csv("siteinfo_blog.csv")
+{% endhighlight %}
+
+
+*********
+
+### Create a data frame
+
+{% highlight r %}
+dat <- data.frame(ecosystem = rep(c("oak", "steppe", "prairie"), each = 8), 
+    lat = rnorm(24, mean = 51, sd = 1), lon = rnorm(24, mean = -113, sd = 5))
 head(dat)
 {% endhighlight %}
 
@@ -31,18 +47,18 @@ head(dat)
 
 {% highlight text %}
   ecosystem   lat    lon
-1  oak sav. 48.81 -123.6
-2  oak sav. 48.79 -123.6
-3  oak sav. 48.82 -124.1
-4  oak sav. 48.82 -124.1
-5  oak sav. 48.78 -123.9
-6  oak sav. 48.78 -123.9
+1       oak 51.81 -109.1
+2       oak 50.41 -115.0
+3       oak 52.20 -112.5
+4       oak 51.67 -114.8
+5       oak 49.75 -105.4
+6       oak 51.42 -114.6
 {% endhighlight %}
 
 
 *********
 
-## Get maps
+### Get maps using the maps library
 
 {% highlight r %}
 # Get a map of Canada
@@ -50,19 +66,35 @@ canadamap <- data.frame(map("world", "Canada", plot = FALSE)[c("x", "y")])
 
 # Get a map of smaller extent
 canadamapsmall <- canadamap[canadamap$x < -90 & canadamap$y < 54, ]
+
+# Make inset rectangle to show area of zoom
+canadamapsmall_ <- na.omit(canadamapsmall)  # omit NA's
+
+# This should get your corner points for the box, picking min and max of
+# lat and lon
+insetrect <- data.frame(xmin = min(canadamapsmall_$x), xmax = max(canadamapsmall_$x), 
+    ymin = min(canadamapsmall_$y), ymax = max(canadamapsmall_$y))
+insetrect
+{% endhighlight %}
+
+
+
+{% highlight text %}
+    xmin   xmax  ymin ymax
+1 -133.1 -90.39 48.05   54
 {% endhighlight %}
 
 
 *********
 
-## Make the maps
+### Make the maps
 
 {% highlight r %}
 # The inset map, all of Canada
 a <- ggplot(canadamap) + 
 	theme_bw(base_size = 22) +
 	geom_path(data = canadamap, aes(x, y), colour = "black", fill = "white") +
-	scale_size(guide="none") +
+	geom_rect(data = insetrect, aes(xmin = xmin, xmax = xmax, ymin = ymin, ymax = ymax), alpha=0, colour="blue", size = 1, linetype=1) +
 	opts(panel.border = theme_rect(colour = 'black', size = 1, linetype=1),
 			 panel.grid.major = theme_blank(), panel.grid.minor=theme_blank(),
 			 panel.background = theme_rect( fill = 'white'),
@@ -89,8 +121,8 @@ b <- ggplot(dat, aes(lon, lat, colour=ecosystem)) +
 
 *********
 
-## Print the two maps together, one an inset of the other
-### This approach uses the `gridExtra` package for flexible alignment, etc. of ggplot graphs
+### Print the two maps together, one an inset of the other
+#### This approach uses the `gridExtra` package for flexible alignment, etc. of ggplot graphs
 
 {% highlight r %}
 grid.newpage()
@@ -100,8 +132,12 @@ print(b, vp = vpb_)
 print(a, vp = vpa_)
 {% endhighlight %}
 
-![center](/img/unnamed-chunk-4.png) 
+![center](/img/unnamed-chunk-5.png) 
 
+
+*********
+
+### Get the .Rmd file used to create this post [at my github account](https://github.com/SChamberlain/schamberlain.github.com/blob/master/_drafts/2012-08-22-ggplot-inset-map.Rmd).
 
 *********
 

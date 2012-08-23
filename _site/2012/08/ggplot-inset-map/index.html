@@ -78,17 +78,33 @@
 	</div>
 </div>
 
-    <h2>Here's a quick demo of creating a map with an inset within it using ggplot. The inset is achieved using the <code>gridExtra</code> package.</h2>
+    <hr />
 
-<h2>Install libraries, set directory, read file</h2>
+<h2>UPDATE: changed data source so that the entire example can be run by anone on their own machine. Also, per Joachim's suggestion, I put a box around the blown up area of the map. Thoughts?</h2>
 
-<div class="highlight"><pre><code class="r">setwd<span class="p">(</span><span class="s">&quot;/Users/ScottMac/Dropbox/CANPOLIN_networks_ms/data&quot;</span><span class="p">)</span>  <span class="c1"># change to your directory</span>
-library<span class="p">(</span>ggplot2<span class="p">)</span>
+<hr />
+
+<h2>Here's a quick demo of creating a map with an inset within it using ggplot. The inset is achieved using the <code>gridExtra</code> package.</h2>
+
+<hr />
+
+<h3>Install libraries</h3>
+
+<div class="highlight"><pre><code class="r">library<span class="p">(</span>ggplot2<span class="p">)</span>
 library<span class="p">(</span>maps<span class="p">)</span>
 library<span class="p">(</span>maptools<span class="p">)</span>
 library<span class="p">(</span>gridExtra<span class="p">)</span>
 library<span class="p">(</span>rgeos<span class="p">)</span>
-dat <span class="o">&lt;-</span> read.csv<span class="p">(</span><span class="s">&quot;siteinfo_blog.csv&quot;</span><span class="p">)</span>
+</code></pre>
+</div>
+
+
+<hr />
+
+<h3>Create a data frame</h3>
+
+<div class="highlight"><pre><code class="r">dat <span class="o">&lt;-</span> data.frame<span class="p">(</span>ecosystem <span class="o">=</span> rep<span class="p">(</span>c<span class="p">(</span><span class="s">&quot;oak&quot;</span><span class="p">,</span> <span class="s">&quot;steppe&quot;</span><span class="p">,</span> <span class="s">&quot;prairie&quot;</span><span class="p">),</span> each <span class="o">=</span> <span class="m">8</span><span class="p">),</span> 
+    lat <span class="o">=</span> rnorm<span class="p">(</span><span class="m">24</span><span class="p">,</span> mean <span class="o">=</span> <span class="m">51</span><span class="p">,</span> sd <span class="o">=</span> <span class="m">1</span><span class="p">),</span> lon <span class="o">=</span> rnorm<span class="p">(</span><span class="m">24</span><span class="p">,</span> mean <span class="o">=</span> <span class="m">-113</span><span class="p">,</span> sd <span class="o">=</span> <span class="m">5</span><span class="p">))</span>
 head<span class="p">(</span>dat<span class="p">)</span>
 </code></pre>
 </div>
@@ -97,38 +113,55 @@ head<span class="p">(</span>dat<span class="p">)</span>
 
 
 <div class="highlight"><pre><code class="text">  ecosystem   lat    lon
-1  oak sav. 48.81 -123.6
-2  oak sav. 48.79 -123.6
-3  oak sav. 48.82 -124.1
-4  oak sav. 48.82 -124.1
-5  oak sav. 48.78 -123.9
-6  oak sav. 48.78 -123.9
+1       oak 51.81 -109.1
+2       oak 50.41 -115.0
+3       oak 52.20 -112.5
+4       oak 51.67 -114.8
+5       oak 49.75 -105.4
+6       oak 51.42 -114.6
 </code></pre>
 </div>
 
 
 <hr />
 
-<h2>Get maps</h2>
+<h3>Get maps using the maps library</h3>
 
 <div class="highlight"><pre><code class="r"><span class="c1"># Get a map of Canada</span>
 canadamap <span class="o">&lt;-</span> data.frame<span class="p">(</span>map<span class="p">(</span><span class="s">&quot;world&quot;</span><span class="p">,</span> <span class="s">&quot;Canada&quot;</span><span class="p">,</span> plot <span class="o">=</span> <span class="kc">FALSE</span><span class="p">)[</span>c<span class="p">(</span><span class="s">&quot;x&quot;</span><span class="p">,</span> <span class="s">&quot;y&quot;</span><span class="p">)])</span>
 
 <span class="c1"># Get a map of smaller extent</span>
 canadamapsmall <span class="o">&lt;-</span> canadamap<span class="p">[</span>canadamap<span class="p">$</span>x <span class="o">&lt;</span> <span class="m">-90</span> <span class="o">&amp;</span> canadamap<span class="p">$</span>y <span class="o">&lt;</span> <span class="m">54</span><span class="p">,</span> <span class="p">]</span>
+
+<span class="c1"># Make inset rectangle to show area of zoom</span>
+canadamapsmall_ <span class="o">&lt;-</span> na.omit<span class="p">(</span>canadamapsmall<span class="p">)</span>  <span class="c1"># omit NA&#39;s</span>
+
+<span class="c1"># This should get your corner points for the box, picking min and max of</span>
+<span class="c1"># lat and lon</span>
+insetrect <span class="o">&lt;-</span> data.frame<span class="p">(</span>xmin <span class="o">=</span> min<span class="p">(</span>canadamapsmall_<span class="p">$</span>x<span class="p">),</span> xmax <span class="o">=</span> max<span class="p">(</span>canadamapsmall_<span class="p">$</span>x<span class="p">),</span> 
+    ymin <span class="o">=</span> min<span class="p">(</span>canadamapsmall_<span class="p">$</span>y<span class="p">),</span> ymax <span class="o">=</span> max<span class="p">(</span>canadamapsmall_<span class="p">$</span>y<span class="p">))</span>
+insetrect
+</code></pre>
+</div>
+
+
+
+
+<div class="highlight"><pre><code class="text">    xmin   xmax  ymin ymax
+1 -133.1 -90.39 48.05   54
 </code></pre>
 </div>
 
 
 <hr />
 
-<h2>Make the maps</h2>
+<h3>Make the maps</h3>
 
 <div class="highlight"><pre><code class="r"><span class="c1"># The inset map, all of Canada</span>
 a <span class="o">&lt;-</span> ggplot<span class="p">(</span>canadamap<span class="p">)</span> <span class="o">+</span> 
     theme_bw<span class="p">(</span>base_size <span class="o">=</span> <span class="m">22</span><span class="p">)</span> <span class="o">+</span>
     geom_path<span class="p">(</span>data <span class="o">=</span> canadamap<span class="p">,</span> aes<span class="p">(</span>x<span class="p">,</span> y<span class="p">),</span> colour <span class="o">=</span> <span class="s">&quot;black&quot;</span><span class="p">,</span> fill <span class="o">=</span> <span class="s">&quot;white&quot;</span><span class="p">)</span> <span class="o">+</span>
-    scale_size<span class="p">(</span>guide<span class="o">=</span><span class="s">&quot;none&quot;</span><span class="p">)</span> <span class="o">+</span>
+    geom_rect<span class="p">(</span>data <span class="o">=</span> insetrect<span class="p">,</span> aes<span class="p">(</span>xmin <span class="o">=</span> xmin<span class="p">,</span> xmax <span class="o">=</span> xmax<span class="p">,</span> ymin <span class="o">=</span> ymin<span class="p">,</span> ymax <span class="o">=</span> ymax<span class="p">),</span> alpha<span class="o">=</span><span class="m">0</span><span class="p">,</span> colour<span class="o">=</span><span class="s">&quot;blue&quot;</span><span class="p">,</span> size <span class="o">=</span> <span class="m">1</span><span class="p">,</span> linetype<span class="o">=</span><span class="m">1</span><span class="p">)</span> <span class="o">+</span>
     opts<span class="p">(</span>panel.border <span class="o">=</span> theme_rect<span class="p">(</span>colour <span class="o">=</span> <span class="s">&#39;black&#39;</span><span class="p">,</span> size <span class="o">=</span> <span class="m">1</span><span class="p">,</span> linetype<span class="o">=</span><span class="m">1</span><span class="p">),</span>
              panel.grid.major <span class="o">=</span> theme_blank<span class="p">(),</span> panel.grid.minor<span class="o">=</span>theme_blank<span class="p">(),</span>
              panel.background <span class="o">=</span> theme_rect<span class="p">(</span> fill <span class="o">=</span> <span class="s">&#39;white&#39;</span><span class="p">),</span>
@@ -156,9 +189,9 @@ b <span class="o">&lt;-</span> ggplot<span class="p">(</span>dat<span class="p">
 
 <hr />
 
-<h2>Print the two maps together, one an inset of the other</h2>
+<h3>Print the two maps together, one an inset of the other</h3>
 
-<h3>This approach uses the <code>gridExtra</code> package for flexible alignment, etc. of ggplot graphs</h3>
+<h4>This approach uses the <code>gridExtra</code> package for flexible alignment, etc. of ggplot graphs</h4>
 
 <div class="highlight"><pre><code class="r">grid.newpage<span class="p">()</span>
 vpb_ <span class="o">&lt;-</span> viewport<span class="p">(</span>width <span class="o">=</span> <span class="m">1</span><span class="p">,</span> height <span class="o">=</span> <span class="m">1</span><span class="p">,</span> x <span class="o">=</span> <span class="m">0.5</span><span class="p">,</span> y <span class="o">=</span> <span class="m">0.5</span><span class="p">)</span>  <span class="c1"># the larger map</span>
@@ -169,7 +202,11 @@ print<span class="p">(</span>a<span class="p">,</span> vp <span class="o">=</spa
 </div>
 
 
-<p><img src="/img/unnamed-chunk-4.png" alt="center" /></p>
+<p><img src="/img/unnamed-chunk-5.png" alt="center" /></p>
+
+<hr />
+
+<h3>Get the .Rmd file used to create this post <a href="https://github.com/SChamberlain/schamberlain.github.com/blob/master/_drafts/2012-08-22-ggplot-inset-map.Rmd">at my github account</a>.</h3>
 
 <hr />
 
@@ -202,7 +239,7 @@ print<span class="p">(</span>a<span class="p">,</span> vp <span class="o">=</spa
 	<p>Designed and built using <a href="http://twitter.github.com/bootstrap/" target="_blank">Twitter Bootstrap</a>, <a href="http://jekyllrb.com/"  target="_blank">Jekyll</a>, slightly modified by <a href="https://github.com/erjjones" target="_blank">Erjjones</a>, and even more modified by <a href="https://github.com/schamberlain" target="_blank">schamberlain</a>.</p>
 	<p>Code licensed under the <a href="http://www.apache.org/licenses/LICENSE-2.0" target="_blank">Apache License v2.0</a>. Documentation licensed under <a href="http://creativecommons.org/licenses/by/3.0/">CC BY 3.0</a>.</p>
 	<p>Icons from <a href="http://glyphicons.com">Glyphicons Free</a>, licensed under <a href="http://creativecommons.org/licenses/by/3.0/">CC BY 3.0</a>.</p>	
-	<p>Page last generated on August 22, 2012</p>				
+	<p>Page last generated on August 23, 2012</p>				
 </footer>
 	 </div>    
     <script type="text/javascript" src="http://platform.twitter.com/widgets.js"></script>
