@@ -2,7 +2,7 @@
 name: making-matrices
 layout: post
 title: Making matrices with zeros and ones
-date: 2012-08-30
+date: 2012-08-30 08:02:00.00 -08:00
 author: Scott Chamberlain
 tags: 
 - R
