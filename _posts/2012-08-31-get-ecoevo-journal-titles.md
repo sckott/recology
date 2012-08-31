@@ -1,7 +1,7 @@
 ---
 name: get-ecoevo-journal-titles
 layout: post
-title: Getting eoclogy and evolution journal titles from R
+title: Getting ecology and evolution journal titles from R
 date: 2012-08-31
 author: Scott Chamberlain
 tags: 
@@ -111,6 +111,28 @@ length(ecoevotitles)
 [1] 188
 {% endhighlight %}
 
+
+
+{% highlight r %}
+
+# Just the first ten titles
+ecoevotitles[1:10]
+{% endhighlight %}
+
+
+
+{% highlight text %}
+ [1] "Microbial Ecology in Health and Disease"           
+ [2] "Population Ecology"                                
+ [3] "Researches on Population Ecology"                  
+ [4] "Behavioral Ecology and Sociobiology"               
+ [5] "Microbial Ecology"                                 
+ [6] "Biochemical Systematics and Ecology"               
+ [7] "FEMS Microbiology Ecology"                         
+ [8] "Journal of Experimental Marine Biology and Ecology"
+ [9] "Applied Soil Ecology"                              
+[10] "Forest Ecology and Management"                     
+{% endhighlight %}
 
 *********
 
