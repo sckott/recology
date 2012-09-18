@@ -29,7 +29,7 @@ At some point, a scientist wants to ask a question for which they can synthesize
 5. Proof data. 
 6. Analyze data & publish paper. 
 
-This workflow needs revamping, particularly in step number 3 - collecting the data. Having a variety of program option to collect data is a good thing - choice is good. Yet, we can do better.  
+This workflow needs revamping, particularly in step number 3 - collecting the data.  This data remains private, moving from one closed source (original publication) to another (personal computer).  We can surely do better.
 
 ## A solution
 The data collection process (Step 3 above) can make use of modern technology, and be based in the browser. Some benefits of a browser based data collection approach:
