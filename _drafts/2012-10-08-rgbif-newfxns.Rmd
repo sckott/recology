@@ -1,0 +1,75 @@
+`ro warning=FALSE, message=FALSE, comment=NA, cache=FALSE or`
+
+---
+name: rgbif-newfxns
+layout: post
+title: GBIF biodiversity data from R - more functions
+date: 2012-10-08
+author: Scott Chamberlain
+tags: 
+- R
+- open access
+- data
+- GBIF
+- biodiversity
+- macroecology
+---
+
+We have been working on an R package to get GBIF data from R, with the stable version available through CRAN [here](URL), and the development version available on GitHub [here](http://github.com/rgbif). 
+
+We had a Google Summer of code stuent work on the package this summer - you can see his work on the package over at his GitHub page [here]().  We have added some new functionality since his work, and would like to show it off. 
+
+### Lets install rgbif first.
+```{r install } 
+# install_github('rgbif', 'ropensci') # uncomment if not already installed
+library(rgbif); library(plyr); library(XML); library(httr)
+````
+
+### Get taxonomic information on a specific taxon or taxa in GBIF by their taxon concept keys.
+```{r taxonget } 
+( keys <- taxonsearch(scientificname = 'Puma concolor') ) # many matches to this search
+taxonget(keys[[1]]) # let's get the first one - the first row in the data.frame is the one we searched for (51780668)
+````
+
+### The `occurrencedensity` function was renamed to `densitylist` because it is in the `density` API service, not the `occurrence` API service.  You can use `densitylist` to get a data.frame of total occurrence counts by one-degree cell for a single taxon, country, dataset, data publisher or data network.  Just a quick reminder of what the function can do:
+```{r densitylist }
+head( densitylist(originisocountrycode = "CA") )
+````
+
+### Using a related function, `density_spplist`, you can get a species list by one-degree cell as well.
+```{r fig.width=8, fig.height=6, density_spplist } 
+# Get a species list by cell, choosing one at random
+density_spplist(originisocountrycode = "CO", spplist = "random")[1:10]
+# density_spplist(originisocountrycode = "CO", spplist = "r") # can abbreviate the `spplist` argument
+ 
+# Get a species list by cell, choosing the one with the greatest no. of records
+density_spplist(originisocountrycode = "CO", spplist = "great")[1:10] # great is abbreviated from `greatest`
+
+# Can also get a data.frame with counts instead of the species list
+density_spplist(originisocountrycode = "CO", spplist = "great", listcount = "counts")[1:10,]
+````
+
+### You can now map point results, from fxns `occurrencelist` and those from `densitylist`, which plots them as points or as tiles, respectively.  Point map, using output from occurrencelist.
+```{r fig.width=8, fig.height=5, gbifmap1 } 
+out <- occurrencelist(scientificname = 'Puma concolor', coordinatestatus = TRUE, maxresults = 100, latlongdf = T)
+gbifmap(input = out) # make a map, plotting on world map
+````
+
+### Point map, using output from occurrencelist, with many species plotted as different colors
+```{r fig.width=10, fig.height=5, gbifmap2 } 
+splist <- c('Accipiter erythronemius', 'Junco hyemalis', 'Aix sponsa', 'Buteo regalis')
+out <- lapply(splist, function(x) occurrencelist(x, coordinatestatus = T, maxresults = 100, latlongdf = T))
+gbifmap(out)
+```
+
+### Tile map, using output from densitylist, using results in Canada only.
+```{r fig.width=8, fig.height=5, gbifmap3 } 
+out2 <- densitylist(originisocountrycode = "CA") # data for Canada
+gbifmap(out2) # on world map
+gbifmap(out2, "Canada") # on Canada map
+````
+
+*********
+#### Get the .Rmd file used to create this post [at my github account](https://github.com/SChamberlain/schamberlain.github.com/blob/master/_drafts/2012-10-08-rgbif-newfxns.Rmd) - or [.md file](https://github.com/SChamberlain/schamberlain.github.com/tree/master/_posts/2012-10-08-rgbif-newfxns.md).
+
+#### Written in [Markdown](http://daringfireball.net/projects/markdown/), with help from [knitr](http://yihui.name/knitr/).
