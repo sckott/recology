@@ -1,3 +1,5 @@
+
+
 ---
 name: rgbif-newfxns
 layout: post
@@ -12,6 +14,10 @@ tags:
 - biodiversity
 - macroecology
 ---
+
+[UPDATE]: In response to Jarrett's query I laid out a separate use case in which you may want to query by higher taxonomic rankings than species. See below
+
+*****
 
 We have been working on an R package to get GBIF data from R, with the stable version available through CRAN [here](URL), and the development version available on GitHub [here](http://github.com/rgbif). 
 
@@ -94,42 +100,31 @@ density_spplist(originisocountrycode = "CO", spplist = "random")[1:10]
 
 
 {% highlight text %}
- [1] "Globigerina ciperoensis angustiumbilicata"
- [2] "Globigerina ciperoensis ciperoensis"      
- [3] "Globigerina fringa"                       
- [4] "Globigerina nepenthes"                    
- [5] "Globigerina rohri"                        
- [6] "Globigerina selli"                        
- [7] "Globigerina triloculinoides"              
- [8] "Globigerina venezuelana"                  
- [9] "Globigerinatella insueta"                 
-[10] "Globigerinita dissimilis"                 
+ [1] "Argyropelecus"                 "Argyropelecus lychnus lychnus"
+ [3] "Cheilopogon nigricans"         "Cyclothone"                   
+ [5] "Globigerina bulloides"         "Globigerina quinqueloba"      
+ [7] "Globigerina rubescens"         "Globigerinella aequilateralis"
+ [9] "Globigerinita glutinata"       "Globigerinoides conglobatus"  
 {% endhighlight %}
 
 
 
 {% highlight r %}
-# density_spplist(originisocountrycode = 'CO', spplist = 'r') # can
-# abbreviate the `spplist` argument
+# density_spplist(originisocountrycode = 'CO', spplist = 'r') # can abbreviate the `spplist`
+# argument
 
-# Get a species list by cell, choosing the one with the greatest no. of
-# records
+# Get a species list by cell, choosing the one with the greatest no. of records
 density_spplist(originisocountrycode = "CO", spplist = "great")[1:10]  # great is abbreviated from `greatest`
 {% endhighlight %}
 
 
 
 {% highlight text %}
- [1] "Acanthaceae Juss."                
- [2] "Accipitridae sp."                 
- [3] "Accipitriformes/Falconiformes sp."
- [4] "Apodidae sp."                     
- [5] "Apodidae sp. (large swift sp.)"   
- [6] "Apodidae sp. (small swift sp.)"   
- [7] "Arctiinae"                        
- [8] "Asteraceae Bercht. & J. Presl"    
- [9] "Asteraceae sp. 1"                 
-[10] "Asteraceae sp. 6"                 
+ [1] "Acanthaceae Juss."                 "Accipitridae sp."                 
+ [3] "Accipitriformes/Falconiformes sp." "Apodidae sp."                     
+ [5] "Apodidae sp. (large swift sp.)"    "Apodidae sp. (small swift sp.)"   
+ [7] "Arctiinae"                         "Asteraceae Bercht. & J. Presl"    
+ [9] "Asteraceae sp. 1"                  "Asteraceae sp. 6"                 
 {% endhighlight %}
 
 
@@ -137,8 +132,7 @@ density_spplist(originisocountrycode = "CO", spplist = "great")[1:10]  # great i
 {% highlight r %}
 
 # Can also get a data.frame with counts instead of the species list
-density_spplist(originisocountrycode = "CO", spplist = "great", listcount = "counts")[1:10, 
-    ]
+density_spplist(originisocountrycode = "CO", spplist = "great", listcount = "counts")[1:10, ]
 {% endhighlight %}
 
 
@@ -161,8 +155,7 @@ density_spplist(originisocountrycode = "CO", spplist = "great", listcount = "cou
 ### You can now map point results, from fxns `occurrencelist` and those from `densitylist`, which plots them as points or as tiles, respectively.  Point map, using output from occurrencelist.
 
 {% highlight r %}
-out <- occurrencelist(scientificname = "Puma concolor", coordinatestatus = TRUE, 
-    maxresults = 100, latlongdf = T)
+out <- occurrencelist(scientificname = "Puma concolor", coordinatestatus = TRUE, maxresults = 100, latlongdf = T)
 gbifmap(input = out)  # make a map, plotting on world map
 {% endhighlight %}
 
@@ -173,8 +166,7 @@ gbifmap(input = out)  # make a map, plotting on world map
 
 {% highlight r %}
 splist <- c("Accipiter erythronemius", "Junco hyemalis", "Aix sponsa", "Buteo regalis")
-out <- lapply(splist, function(x) occurrencelist(x, coordinatestatus = T, maxresults = 100, 
-    latlongdf = T))
+out <- lapply(splist, function(x) occurrencelist(x, coordinatestatus = T, maxresults = 100, latlongdf = T))
 gbifmap(out)
 {% endhighlight %}
 
@@ -195,6 +187,18 @@ gbifmap(out2, "Canada")  # on Canada map
 {% endhighlight %}
 
 ![NA](/img/gbifmap32.png) 
+
+
+*****
+
+### We can also query by higher taxonomic rankings, and map all lower species within that ranking. Above we queried by scientificname, but we can also query by higher taxonomy. 7071443 is the taxonconceptkey for 'Bacillariophyceae', a Class which includes many lower species. Check out the page for 'Bacillariophyceae' [here](http://data.gbif.org/species/7071443).
+
+{% highlight r %}
+out <- densitylist(taxonconceptKey = 7071443)
+gbifmap(out)
+{% endhighlight %}
+
+![center](/img/gbifmap4.png) 
 
 
 *********
