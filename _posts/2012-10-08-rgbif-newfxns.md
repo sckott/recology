@@ -1,5 +1,3 @@
-
-
 ---
 name: rgbif-newfxns
 layout: post
@@ -15,7 +13,7 @@ tags:
 - macroecology
 ---
 
-[UPDATE]: In response to Jarrett's query I laid out a separate use case in which you may want to query by higher taxonomic rankings than species. See below
+UPDATE: In response to Jarrett's query I laid out a separate use case in which you may want to query by higher taxonomic rankings than species. See below
 
 *****
 
