@@ -17,9 +17,9 @@ UPDATE: In response to Jarrett's query I laid out a separate use case in which y
 
 *****
 
-We have been working on an R package to get GBIF data from R, with the stable version available through CRAN [here](URL), and the development version available on GitHub [here](http://github.com/rgbif). 
+We have been working on an R package to get GBIF data from R, with the stable version available through CRAN [here](http://cran.r-project.org/web/packages/rgbif/index.html), and the development version available on GitHub [here](https://github.com/ropensci/rgbif). 
 
-We had a Google Summer of code stuent work on the package this summer - you can see his work on the package over at his GitHub page [here]().  We have added some new functionality since his work, and would like to show it off. 
+We had a Google Summer of code stuent work on the package this summer - you can see his work on the package over at his GitHub page [here](https://github.com/vijaybarve/rgbif).  We have added some new functionality since his work, and would like to show it off. 
 
 ### Lets install rgbif first.
 
