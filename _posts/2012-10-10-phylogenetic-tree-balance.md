@@ -61,12 +61,12 @@ head(colless_df)
 
 {% highlight text %}
        V1
-1 -0.2561
-2  0.2039
-3 -0.2761
-4  0.8639
-5 -0.5361
-6 -0.7361
+1 -0.1761
+2  0.2839
+3  0.4639
+4  0.9439
+5 -0.6961
+6 -0.1161
 {% endhighlight %}
 
 
@@ -90,7 +90,7 @@ a <- ggplot(colless_df, aes(V1)) +  # plot histogram of distribution of values
 	scale_x_continuous(limits=c(-3,3), breaks=c(-3,-2,-1,0,1,2,3)) + 
 	geom_vline(xintercept = -0.7, colour="red", linetype = "longdash") +
 	geom_vline(xintercept = 0.7, colour="red", linetype = "longdash") +
-	ggtitle(paste0("Distribution of Colless' metric for 1000 trees, cutoffs at -0.7 and 0.7 results in\n ", col_percent_high, "% (", numtrees*(col_percent_high/100), ") 'unbalanced' trees and ", col_percent_low, "% (", numtrees*(col_percent_low/100), ") 'balanced' trees")) + 
+	ggtitle(paste0("Distribution of Colless' metric for 1000 trees, cutoffs at -0.7 and 0.7 results in\n ", col_percent_low, "% (", numtrees*(col_percent_low/100), ") 'balanced' trees (left) and ", col_percent_low, "% (", numtrees*(col_percent_low/100), ") 'unbalanced' trees (right)")) +  
 	labs(x = "Colless' Metric Value", y = "Number of phylogenetic trees") +
 	theme(plot.title  = element_text(size = 16))
 
@@ -144,7 +144,7 @@ a <- ggplot(gamma_df, aes(V1)) +  # plot histogram of distribution of values
 	scale_x_continuous(breaks=c(-3,-2,-1,0,1,2,3)) + 
 	geom_vline(xintercept = -1, colour="red", linetype = "longdash") +
 	geom_vline(xintercept = 1, colour="red", linetype = "longdash") +
-	ggtitle(paste0("Distribution of Gamma metric for 1000 trees, cutoffs at -1 and 1 results in\n ", gam_percent_high, "% (", numtrees*(gam_percent_high/100), ") 'unbalanced' trees and ", gam_percent_low, "% (", numtrees*(gam_percent_low/100), ") 'balanced' trees")) + 
+	ggtitle(paste0("Distribution of Gamma metric for 1000 trees, cutoffs at -1 and 1 results in\n ", gam_percent_low, "% (", numtrees*(gam_percent_low/100), ") trees with deeper nodes (left) and ", gam_percent_high, "% (", numtrees*(gam_percent_high/100), ") trees with shallower nodes (right)")) +  
 	labs(x = "Gamma Metric Value", y = "Number of phylogenetic trees") +
 	theme(plot.title  = element_text(size = 16))
 b <- ggphylo(trees[which.min(gamma_df$V1)], do.plot=F) + theme_myblank()
