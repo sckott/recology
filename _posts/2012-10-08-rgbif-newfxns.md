@@ -11,15 +11,16 @@ tags:
 - GBIF
 - biodiversity
 - macroecology
+- ropensci
 ---
 
 #### UPDATE: In response to Jarrett's query I laid out a separate use case in which you may want to query by higher taxonomic rankings than species. See below.  In addition, added examples of querying by location in reply to comments by seminym. 
 
 *****
 
-We have been working on an R package to get GBIF data from R, with the stable version available through CRAN [here](http://cran.r-project.org/web/packages/rgbif/index.html), and the development version available on GitHub [here](https://github.com/ropensci/rgbif). 
+We have been working on an R package to get GBIF data from R, with the stable version available through CRAN [here](URL), and the development version available on GitHub [here](http://github.com/rgbif). 
 
-We had a Google Summer of code stuent work on the package this summer - you can see his work on the package over at his GitHub page [here](https://github.com/vijaybarve/rgbif).  We have added some new functionality since his work, and would like to show it off. 
+We had a Google Summer of code stuent work on the package this summer - you can see his work on the package over at his GitHub page [here]().  We have added some new functionality since his work, and would like to show it off. 
 
 ### Lets install rgbif first.
 
@@ -29,6 +30,8 @@ library(rgbif)
 library(plyr)
 library(XML)
 library(httr)
+library(maps)
+library(ggplot2)
 {% endhighlight %}
 
 
@@ -55,16 +58,16 @@ taxonget(keys[[1]])  # let's get the first one - the first row in the data.frame
 
 {% highlight text %}
 [[1]]
-                    sciname gbifkeys       rank
-1             Puma concolor 51780668    species
-2                      Puma 51780667      genus
-3                   Felidae 51780651     family
-4                 Carnivora 51780613      order
-5                  Mammalia 51780547      class
-6                  Chordata 51775774     phylum
-7                  Animalia 51775773    kingdom
-8 Puma concolor californica 51780669 subspecies
-9   Puma concolor improcera 51780670 subspecies
+                    sciname taxonconceptkeys       rank
+1             Puma concolor         51780668    species
+2                      Puma         51780667      genus
+3                   Felidae         51780651     family
+4                 Carnivora         51780613      order
+5                  Mammalia         51780547      class
+6                  Chordata         51775774     phylum
+7                  Animalia         51775773    kingdom
+8 Puma concolor californica         51780669 subspecies
+9   Puma concolor improcera         51780670 subspecies
 
 {% endhighlight %}
 
@@ -98,11 +101,16 @@ density_spplist(originisocountrycode = "CO", spplist = "random")[1:10]
 
 
 {% highlight text %}
- [1] "Actinote cf. guatemalena" "Actinote desmiala"       
- [3] "Actinote guatemalena"     "Allogamus chrysus"       
- [5] "Amaranthaceae"            "Amphoropsyche cassius"   
- [7] "Anabolia incertina"       "Aneuraceae"              
- [9] "Annonaceae Juss."         "Anopheles argyritarsis"  
+ [1] "Abarema laeta (Benth.) Barneby & J.W.Grimes"
+ [2] "Abuta grandifolia (Mart.) Sandwith"         
+ [3] "Acalypha cuneata Poepp."                    
+ [4] "Acalypha diversifolia Jacq."                
+ [5] "Acalypha macrostachya Jacq."                
+ [6] "Acalypha stachyura Pax"                     
+ [7] "Acanthoscelio acutus"                       
+ [8] "Accipiter collaris"                         
+ [9] "Actitis macularia"                          
+[10] "Adelobotrys klugii Wurdack"                 
 {% endhighlight %}
 
 
@@ -177,11 +185,7 @@ out <- lapply(splist, function(x) occurrencelist(x, coordinatestatus = T, maxres
 gbifmap(out)
 {% endhighlight %}
 
-
-
-{% highlight text %}
-Error: could not find function "capwords"
-{% endhighlight %}
+![center](/img/gbifmap2.png) 
 
 
 ### Tile map, using output from densitylist, using results in Canada only.
@@ -191,17 +195,13 @@ out2 <- densitylist(originisocountrycode = "CA")  # data for Canada
 gbifmap(out2)  # on world map
 {% endhighlight %}
 
-![center](/img/gbifmap3.png) 
+![center](/img/gbifmap31.png) 
 
 {% highlight r %}
-gbifmap(out2, "Canada")  # on Canada map
+gbifmap(out2, region = "Canada")  # on Canada map
 {% endhighlight %}
 
-
-
-{% highlight text %}
-Error: object 'CanadaMapEnv' not found
-{% endhighlight %}
+![NA](/img/gbifmap32.png) 
 
 
 *****
