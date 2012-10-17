@@ -27,7 +27,7 @@ There are a number of options for resolution of taxonomic names. The [Taxonomic 
 ### Just uncomment the code to use.
 
 
-{% highlight r %}
+{% highlight r linenos %}
 # If you don't have them already
 # install.packages(c('RJSONIO','plyr','devtools')) require(devtools)
 # install_github('taxize_','ropensci')
@@ -41,7 +41,7 @@ library(taxize)
 
 ### Get just id's and names of sources in a data.frame
 
-{% highlight r %}
+{% highlight r linenos %}
 tail(gnr_datasources(todf = T))
 {% endhighlight %}
 
@@ -62,7 +62,7 @@ tail(gnr_datasources(todf = T))
 
 ### Give me the id for EOL (Encyclopedia of Life)
 
-{% highlight r %}
+{% highlight r linenos %}
 out <- gnr_datasources(todf = T)
 out[out$title == "EOL", "id"]
 {% endhighlight %}
@@ -78,7 +78,7 @@ out[out$title == "EOL", "id"]
 
 ### Fuzzy search for sources with the word "zoo"
 
-{% highlight r %}
+{% highlight r linenos %}
 out <- gnr_datasources(todf = T)
 outdf <- out[agrep("zoo", out$title, ignore.case = T), ]
 outdf[1:2, ]
@@ -97,7 +97,7 @@ outdf[1:2, ]
 
 ### Search for _Helianthus annuus_ and _Homo sapiens_, return a data.frame
 
-{% highlight r %}
+{% highlight r linenos %}
 gnr(names = c("Helianthus annuus", "Homo sapiens"), returndf = TRUE)[1:2, ]
 {% endhighlight %}
 
@@ -114,7 +114,7 @@ gnr(names = c("Helianthus annuus", "Homo sapiens"), returndf = TRUE)[1:2, ]
 
 ### Search for the same species, with only using data source 12 (i.e., EOL)
 
-{% highlight r %}
+{% highlight r linenos %}
 gnr(names = c("Helianthus annuus", "Homo sapiens"), data_source_ids = "12", 
     returndf = TRUE)
 {% endhighlight %}
@@ -139,7 +139,7 @@ gnr(names = c("Helianthus annuus", "Homo sapiens"), data_source_ids = "12",
 
 ### I prepared the markdown for this post by:
 
-{% highlight r %}
+{% highlight r linenos %}
 KnitPost <- function(input, base.url = "/") {
     require(knitr)
     opts_knit$set(base.url = base.url)

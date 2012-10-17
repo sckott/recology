@@ -14,7 +14,7 @@ I need to simulate balanced and unbalanced phylogenetic trees for some research 
 
 ### A function to calculate shape metrics, and a custom theme for plottingn phylogenies.
 
-{% highlight r %}
+{% highlight r linenos %}
 foo <- function(x, metric = "colless") {
     if (metric == "colless") {
         xx <- as.treeshape(x)  # convert to apTreeshape format
@@ -38,7 +38,7 @@ theme_myblank <- function() {
 
 ### Simulate some trees
 
-{% highlight r %}
+{% highlight r linenos %}
 library(ape)
 library(phytools)
 
@@ -49,7 +49,7 @@ trees <- pbtree(n = 50, nsim = numtrees, ape = F)  # simulate 500 pure-birth tre
 
 ### Calculate Colless' shape metric on each tree
 
-{% highlight r %}
+{% highlight r linenos %}
 library(plyr)
 library(apTreeshape)
 
@@ -71,7 +71,7 @@ head(colless_df)
 
 
 
-{% highlight r %}
+{% highlight r linenos %}
 
 # Calculate the percent of trees that will fall into the cutoff for balanced and unbalanced trees
 col_percent_low <- round(length(colless_df[colless_df$V1 < -0.7, "V1"])/numtrees, 2) * 100
@@ -81,7 +81,7 @@ col_percent_high <- round(length(colless_df[colless_df$V1 > 0.7, "V1"])/numtrees
 
 ### Create a distribution of the metric values
 
-{% highlight r %}
+{% highlight r linenos %}
 library(ggplot2)
 
 a <- ggplot(colless_df, aes(V1)) +  # plot histogram of distribution of values
@@ -102,7 +102,7 @@ a
 
 ### Create phylogenies representing balanced and unbalanced trees (using the custom theme)
 
-{% highlight r %}
+{% highlight r linenos %}
 library(ggphylo)
 
 b <- ggphylo(trees[which.min(colless_df$V1)], do.plot = F) + theme_myblank()
@@ -116,7 +116,7 @@ b
 
 ### Now, put it all together in one plot using some gridExtra magic.
 
-{% highlight r %}
+{% highlight r linenos %}
 library(gridExtra)
 
 grid.newpage()
@@ -134,7 +134,7 @@ print(c, vp = vpc_)
 
 ### And the same for Gamma stat, which measures the distribution of nodes in time. 
 
-{% highlight r %}
+{% highlight r linenos %}
 gamma_df <- ldply(trees, foo, metric="gamma") # calculate metric for each tree
 gam_percent_low <- round(length(gamma_df[gamma_df$V1 < -1, "V1"])/numtrees, 2)*100
 gam_percent_high <- round(length(gamma_df[gamma_df$V1 > 1, "V1"])/numtrees, 2)*100

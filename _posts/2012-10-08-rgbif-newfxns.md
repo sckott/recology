@@ -24,7 +24,7 @@ We had a Google Summer of code stuent work on the package this summer - you can 
 
 ### Lets install rgbif first.
 
-{% highlight r %}
+{% highlight r linenos %}
 # install_github('rgbif', 'ropensci') # uncomment if not already installed
 library(rgbif)
 library(plyr)
@@ -37,7 +37,7 @@ library(ggplot2)
 
 ### Get taxonomic information on a specific taxon or taxa in GBIF by their taxon concept keys.
 
-{% highlight r %}
+{% highlight r linenos %}
 (keys <- taxonsearch(scientificname = "Puma concolor"))  # many matches to this search
 {% endhighlight %}
 
@@ -50,7 +50,7 @@ library(ggplot2)
 
 
 
-{% highlight r %}
+{% highlight r linenos %}
 taxonget(keys[[1]])  # let's get the first one - the first row in the data.frame is the one we searched for (51780668)
 {% endhighlight %}
 
@@ -74,7 +74,7 @@ taxonget(keys[[1]])  # let's get the first one - the first row in the data.frame
 
 ### The `occurrencedensity` function was renamed to `densitylist` because it is in the `density` API service, not the `occurrence` API service.  You can use `densitylist` to get a data.frame of total occurrence counts by one-degree cell for a single taxon, country, dataset, data publisher or data network.  Just a quick reminder of what the function can do:
 
-{% highlight r %}
+{% highlight r linenos %}
 head(densitylist(originisocountrycode = "CA"))
 {% endhighlight %}
 
@@ -93,7 +93,7 @@ head(densitylist(originisocountrycode = "CA"))
 
 ### Using a related function, `density_spplist`, you can get a species list by one-degree cell as well.
 
-{% highlight r %}
+{% highlight r linenos %}
 # Get a species list by cell, choosing one at random
 density_spplist(originisocountrycode = "CO", spplist = "random")[1:10]
 {% endhighlight %}
@@ -115,7 +115,7 @@ density_spplist(originisocountrycode = "CO", spplist = "random")[1:10]
 
 
 
-{% highlight r %}
+{% highlight r linenos %}
 # density_spplist(originisocountrycode = 'CO', spplist = 'r') # can
 # abbreviate the `spplist` argument
 
@@ -141,7 +141,7 @@ density_spplist(originisocountrycode = "CO", spplist = "great")[1:10]  # great i
 
 
 
-{% highlight r %}
+{% highlight r linenos %}
 
 # Can also get a data.frame with counts instead of the species list
 density_spplist(originisocountrycode = "CO", spplist = "great", listcount = "counts")[1:10, 
@@ -167,7 +167,7 @@ density_spplist(originisocountrycode = "CO", spplist = "great", listcount = "cou
 
 ### You can now map point results, from fxns `occurrencelist` and those from `densitylist`, which plots them as points or as tiles, respectively.  Point map, using output from occurrencelist.
 
-{% highlight r %}
+{% highlight r linenos %}
 out <- occurrencelist(scientificname = "Puma concolor", coordinatestatus = TRUE, 
     maxresults = 100, latlongdf = T)
 gbifmap(input = out)  # make a map, plotting on world map
@@ -178,7 +178,7 @@ gbifmap(input = out)  # make a map, plotting on world map
 
 ### Point map, using output from occurrencelist, with many species plotted as different colors
 
-{% highlight r %}
+{% highlight r linenos %}
 splist <- c("Accipiter erythronemius", "Junco hyemalis", "Aix sponsa", "Buteo regalis")
 out <- lapply(splist, function(x) occurrencelist(x, coordinatestatus = T, maxresults = 100, 
     latlongdf = T))
@@ -190,14 +190,14 @@ gbifmap(out)
 
 ### Tile map, using output from densitylist, using results in Canada only.
 
-{% highlight r %}
+{% highlight r linenos %}
 out2 <- densitylist(originisocountrycode = "CA")  # data for Canada
 gbifmap(out2)  # on world map
 {% endhighlight %}
 
 ![center](/img/gbifmap31.png) 
 
-{% highlight r %}
+{% highlight r linenos %}
 gbifmap(out2, region = "Canada")  # on Canada map
 {% endhighlight %}
 
@@ -208,7 +208,7 @@ gbifmap(out2, region = "Canada")  # on Canada map
 
 ### We can also query by higher taxonomic rankings, and map all lower species within that ranking. Above we queried by scientificname, but we can also query by higher taxonomy. 7071443 is the taxonconceptkey for 'Bacillariophyceae', a Class which includes many lower species. 
 
-{% highlight r %}
+{% highlight r linenos %}
 out <- densitylist(taxonconceptKey = 7071443)
 gbifmap(out)
 {% endhighlight %}
@@ -218,7 +218,7 @@ gbifmap(out)
 
 ### seminym asked about querying by area. You can query by area, though slightly differently for occurrencelist and densitylist functions. For occurrencelist you can search using min and max lat and long values (and min an max altitude, pretty cool, eh).  
 
-{% highlight r %}
+{% highlight r linenos %}
 # Get occurrences or density by area, using min/max lat/long coordinates
 out <- occurrencelist(minlatitude = 30, maxlatitude = 35, minlongitude = -100, 
     maxlongitude = -95, coordinatestatus = T, maxresults = 5000, latlongdf = T)
@@ -229,7 +229,7 @@ gbifmap(out, "state", "texas", geom_point)
 
 ![center](/img/byarea_occurr1.png) 
 
-{% highlight r %}
+{% highlight r linenos %}
 
 # Using geom_jitter to move the points apart from one another
 gbifmap(out, "state", "texas", geom_jitter, position_jitter(width = 0.3, height = 0.3))
@@ -237,7 +237,7 @@ gbifmap(out, "state", "texas", geom_jitter, position_jitter(width = 0.3, height 
 
 ![NA](/img/byarea_occurr2.png) 
 
-{% highlight r %}
+{% highlight r linenos %}
 
 # And move points a lot
 gbifmap(out, "state", "texas", geom_jitter, position_jitter(width = 1, height = 1))
@@ -248,7 +248,7 @@ gbifmap(out, "state", "texas", geom_jitter, position_jitter(width = 1, height = 
 
 ### And you can query by area in `densitylist` by specifying a place using the `originisocountrycode` argument (as done in an above example).  Just showing the head of the data.frame here.  
 
-{% highlight r %}
+{% highlight r linenos %}
 # Get density by place, note that you can't use the lat and long arguments
 # in densitylist
 head(densitylist(originisocountrycode = "CA"))

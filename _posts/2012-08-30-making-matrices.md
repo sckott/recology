@@ -19,7 +19,7 @@ tags:
 
 ### Here is the solution I came up with. See if you can tell why it would be slow.
 
-{% highlight r %}
+{% highlight r linenos %}
 mm <- matrix(0, 10, 5)
 apply(mm, c(1, 2), function(x) sample(c(0, 1), 1))
 {% endhighlight %}
@@ -45,7 +45,7 @@ apply(mm, c(1, 2), function(x) sample(c(0, 1), 1))
 
 ### Ted Hart (@distribecology) replied first with:
 
-{% highlight r %}
+{% highlight r linenos %}
 matrix(rbinom(10 * 5, 1, 0.5), ncol = 5, nrow = 10)
 {% endhighlight %}
 
@@ -71,7 +71,7 @@ matrix(rbinom(10 * 5, 1, 0.5), ncol = 5, nrow = 10)
 
 ### Next, David Smith (@revodavid) and Rafael Maia (@hylospar) came up with about the same solution. 
 
-{% highlight r %}
+{% highlight r linenos %}
 m <- 10
 n <- 5
 matrix(sample(0:1, m * n, replace = TRUE), m, n)
@@ -99,7 +99,7 @@ matrix(sample(0:1, m * n, replace = TRUE), m, n)
 
 ### Then there was the solution by Luis Apiolaza (@zentree).
 
-{% highlight r %}
+{% highlight r linenos %}
 m <- 10
 n <- 5
 round(matrix(runif(m * n), m, n))
@@ -126,7 +126,7 @@ round(matrix(runif(m * n), m, n))
 
 ### Last, a solution was proposed using `RcppArmadillo`, but I couldn't get it to work on my machine, but here is the function anyway if someone can. 
 
-{% highlight r %}
+{% highlight r linenos %}
 library(inline)
 library(RcppArmadillo)
 f <- cxxfunction(body = "return wrap(arma::randu(5,10));", plugin = "RcppArmadillo")
@@ -137,7 +137,7 @@ f <- cxxfunction(body = "return wrap(arma::randu(5,10));", plugin = "RcppArmadil
 
 ### And here is the comparison of system.time for each solution. 
 
-{% highlight r %}
+{% highlight r linenos %}
 mm <- matrix(0, 10, 5)
 m <- 10
 n <- 5
@@ -154,7 +154,7 @@ system.time(replicate(1000, apply(mm, c(1, 2), function(x) sample(c(0, 1), 1))))
 
 
 
-{% highlight r %}
+{% highlight r linenos %}
 system.time(replicate(1000, matrix(rbinom(10 * 5, 1, 0.5), ncol = 5, nrow = 10)))  # @distribecology
 {% endhighlight %}
 
@@ -167,7 +167,7 @@ system.time(replicate(1000, matrix(rbinom(10 * 5, 1, 0.5), ncol = 5, nrow = 10))
 
 
 
-{% highlight r %}
+{% highlight r linenos %}
 system.time(replicate(1000, matrix(sample(0:1, m * n, replace = TRUE), m, n)))  # @revodavid & @hylospar
 {% endhighlight %}
 
@@ -180,7 +180,7 @@ system.time(replicate(1000, matrix(sample(0:1, m * n, replace = TRUE), m, n)))  
 
 
 
-{% highlight r %}
+{% highlight r linenos %}
 system.time(replicate(1000, round(matrix(runif(m * n), m, n)), ))  # @zentree
 {% endhighlight %}
 

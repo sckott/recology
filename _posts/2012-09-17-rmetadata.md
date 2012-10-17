@@ -29,7 +29,7 @@ As a start we are writing functions to hit any metadata services that use the [O
 
 ### Let's install rmetadata first.
 
-{% highlight r %}
+{% highlight r linenos %}
 install_github("rmetadata", "ropensci")
 library(rmetadata)
 {% endhighlight %}
@@ -37,7 +37,7 @@ library(rmetadata)
 
 ### The most basic thing you can do with `OAI-PMH` is identify the data provider, getting their basic information. The `Identify` verb.
 
-{% highlight r %}
+{% highlight r linenos %}
 # one provider
 md_identify(provider = "datacite")
 {% endhighlight %}
@@ -57,7 +57,7 @@ md_identify(provider = "datacite")
 
 
 
-{% highlight r %}
+{% highlight r linenos %}
 
 # many providers
 md_identify(provider = c("datacite", "pensoft"))
@@ -82,7 +82,7 @@ md_identify(provider = c("datacite", "pensoft"))
 
 
 
-{% highlight r %}
+{% highlight r linenos %}
 
 # no match for one, two matches for other
 md_identify(provider = c("harvard", "journal"))
@@ -104,7 +104,7 @@ $journal
 
 
 
-{% highlight r %}
+{% highlight r linenos %}
 
 # let's pick one from the second
 md_identify(provider = "Hrcak")
@@ -126,7 +126,7 @@ md_identify(provider = "Hrcak")
 
 ### There are a variety of metadata formats, depending on the data provider - list them with the `ListMetadataFormats` verb.
 
-{% highlight r %}
+{% highlight r linenos %}
 # List metadata formats for a provider
 md_listmetadataformats(provider = "dryad")
 {% endhighlight %}
@@ -153,7 +153,7 @@ md_listmetadataformats(provider = "dryad")
 
 
 
-{% highlight r %}
+{% highlight r linenos %}
 
 # List metadata formats for a specific identifier for a provider
 md_listmetadataformats(provider = "pensoft", identifier = "10.3897/zookeys.1.10")
@@ -176,7 +176,7 @@ md_listmetadataformats(provider = "pensoft", identifier = "10.3897/zookeys.1.10"
 
 ### The `ListRecords` verb is used to harvest records from a repository
 
-{% highlight r %}
+{% highlight r linenos %}
 head(md_listrecords(provider = "datacite")[[1]][, 2:4])
 {% endhighlight %}
 
@@ -195,7 +195,7 @@ head(md_listrecords(provider = "datacite")[[1]][, 2:4])
 
 ### `ListIdentifiers` is an abbreviated form of `ListRecords`, retrieving only headers rather than records.
 
-{% highlight r %}
+{% highlight r linenos %}
 # Single provider
 md_listidentifiers(provider = "datacite", set = "REFQUALITY")[[1]][1:10]
 {% endhighlight %}
@@ -212,7 +212,7 @@ md_listidentifiers(provider = "datacite", set = "REFQUALITY")[[1]][1:10]
 
 
 
-{% highlight r %}
+{% highlight r linenos %}
 md_listidentifiers(provider = "dryad", from = "2012-07-15")[[1]][1:10]
 {% endhighlight %}
 
@@ -233,7 +233,7 @@ md_listidentifiers(provider = "dryad", from = "2012-07-15")[[1]][1:10]
 
 
 
-{% highlight r %}
+{% highlight r linenos %}
 
 # Many providers
 out <- md_listidentifiers(provider = c("datacite", "pensoft"), from = "2012-08-21")
@@ -262,7 +262,7 @@ llply(out, function(x) x[1:10])  # display just a few of them
 
 ### With `ListSets` you can retrieve the set structure of a repository.
 
-{% highlight r %}
+{% highlight r linenos %}
 # arXiv, returns a data.frame
 head(md_listsets(provider = "arXiv")[[1]])
 {% endhighlight %}
@@ -281,7 +281,7 @@ head(md_listsets(provider = "arXiv")[[1]])
 
 
 
-{% highlight r %}
+{% highlight r linenos %}
 
 # many providers, returns a list
 md_listsets(provider = c("pensoft", "arXiv"))
@@ -330,7 +330,7 @@ md_listsets(provider = c("pensoft", "arXiv"))
 
 ### Retrieve an individual metadata record from a repository using the `GetRecord` verb.
 
-{% highlight r %}
+{% highlight r linenos %}
 # Single provider, one identifier
 md_getrecord(provider = "pensoft", identifier = "10.3897/zookeys.1.10")
 {% endhighlight %}
@@ -360,7 +360,7 @@ md_getrecord(provider = "pensoft", identifier = "10.3897/zookeys.1.10")
 
 
 
-{% highlight r %}
+{% highlight r linenos %}
 
 # Single provider, multiple identifiers
 md_getrecord(provider = "pensoft", identifier = c("10.3897/zookeys.1.10", "10.3897/zookeys.4.57"))

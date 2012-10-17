@@ -32,7 +32,7 @@ Unfortunately, Mendeley's API does not have methods for getting a list of journa
 
 ### I wrote a little while loop to get journal titles from the Crossref OAI-PMH. This takes a while to run, but at least it works on my machine - hopefully yours too!
 
-{% highlight r %}
+{% highlight r linenos %}
 library(XML)
 library(RCurl)
 
@@ -60,7 +60,7 @@ while (is.character(token) == TRUE) {
 
 ### Yay!  Hopefully it worked if you tried it.  Let's see how long the list of journal titles is. 
 
-{% highlight r %}
+{% highlight r linenos %}
 sapply(nameslist, length)  # length of each list
 {% endhighlight %}
 
@@ -75,7 +75,7 @@ sapply(nameslist, length)  # length of each list
 
 
 
-{% highlight r %}
+{% highlight r linenos %}
 allnames <- do.call(c, nameslist)  # combine to list
 length(allnames)
 {% endhighlight %}
@@ -92,7 +92,7 @@ length(allnames)
 
 ### Now, let's use some `regex` to pull out the journal titles that are likely ecology and evolutionary biology journals.  The `^` symbol says "the string must start here". The `\\s` means whitespace.  The `[]` lets you specify a set of letters you are looking for, e.g., `[Ee]` means capital `E` *OR* lowercase `e`.  I threw in titles that had the words systematic and natrualist too.  Tried to trim any whitespace as well using the `stringr` package. 
 
-{% highlight r %}
+{% highlight r linenos %}
 library(stringr)
 
 ecotitles <- as.character(allnames[str_detect(allnames, "^[Ee]cology|\\s[Ee]cology")])
@@ -113,7 +113,7 @@ length(ecoevotitles)
 
 
 
-{% highlight r %}
+{% highlight r linenos %}
 
 # Just the first ten titles
 ecoevotitles[1:10]

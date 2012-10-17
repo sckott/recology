@@ -24,7 +24,7 @@ tags:
 
 ### Install libraries
 
-{% highlight r %}
+{% highlight r linenos %}
 library(ggplot2)
 library(maps)
 library(maptools)
@@ -37,7 +37,7 @@ library(rgeos)
 
 ### Create a data frame
 
-{% highlight r %}
+{% highlight r linenos %}
 dat <- data.frame(ecosystem = rep(c("oak", "steppe", "prairie"), each = 8), 
     lat = rnorm(24, mean = 51, sd = 1), lon = rnorm(24, mean = -113, sd = 5))
 head(dat)
@@ -60,7 +60,7 @@ head(dat)
 
 ### Get maps using the maps library
 
-{% highlight r %}
+{% highlight r linenos %}
 # Get a map of Canada
 canadamap <- data.frame(map("world", "Canada", plot = FALSE)[c("x", "y")])
 
@@ -89,7 +89,7 @@ insetrect
 
 ### Make the maps
 
-{% highlight r %}
+{% highlight r linenos %}
 # The inset map, all of Canada
 a <- ggplot(canadamap) + 
 	theme_bw(base_size = 22) +
@@ -124,7 +124,7 @@ b <- ggplot(dat, aes(lon, lat, colour=ecosystem)) +
 ### Print the two maps together, one an inset of the other
 #### This approach uses the `gridExtra` package for flexible alignment, etc. of ggplot graphs
 
-{% highlight r %}
+{% highlight r linenos %}
 grid.newpage()
 vpb_ <- viewport(width = 1, height = 1, x = 0.5, y = 0.5)  # the larger map
 vpa_ <- viewport(width = 0.4, height = 0.4, x = 0.8, y = 0.8)  # the inset in upper right
