@@ -1,0 +1,115 @@
+`ro warning=FALSE, message=FALSE, comment=NA, cache=FALSE or`
+
+---
+name: taxize
+layout: post
+title: One R package for all your taxonomic needs
+date: 2012-12-06
+author: Scott Chamberlain
+tags: 
+- R
+- open source
+- data
+- taxonomy
+- ropensci
+- ritis
+- taxize
+---
+
+
+Getting taxonomic information for the set of species you are studying can be a pain in the ass. You have to manually type, or paste in, your species one-by-one. Or, if you are lucky, there is a web service in which you can upload a list of species. Encyclopedia of Life (EOL) has a service where you can do this [here](http://gni.globalnames.org/parsers/new). But is this reproducible? No. 
+
+Getting your taxonomic information for your species can now be done programatically in R. Do you want to get taxonomic information from ITIS. We got that. Tropicos? We got that too. uBio? No worries, we got that. What about theplantlist.org? Yep, got that. Encyclopedia of Life? Indeed. What about getting sequence data for a taxon? Oh hell yeah, you can get sequences available for a taxon across all genes, or get all records for a taxon for a specific gene. 
+
+Of course this is all possible because these data providers have open APIs so that we can facilitate your computer talking to their database. Fun! 
+
+Why get your taxonomic data programatically? Because it's 1) faster than by hand in web sites/looking up in books, 2) reproducible, especially if you share your code (damnit!), and 3) you can easily mash up your new taxonomic data to get sequences to build a phylogeny, etc.
+
+I'll give a few examples of using `taxize` based around use cases, that is, stuff someone might actually do instead of what particular functions do.
+
+### Install packages.  You can get from CRAN or GitHub. 
+```{r install } 
+# install_github('ritis', 'ropensci') # uncomment if not already installed
+# install_github('taxize_', 'ropensci') # uncomment if not already installed
+# OR
+# install.packages("taxize")
+library(ritis); library(taxize)
+````
+
+### Attach family names to a list of species. I often have a list of species that I studied and simply want to get their family names to, for example, make a table for the paper I'm writing.
+```{r attachname }
+# For one species
+itis_name(query="Poa annua", get="family")
+
+# For many species
+species <- c("Poa annua", "Abies procera", "Helianthus annuus", "Coffea arabica")
+famnames <- sapply(species, itis_name, get="family", USE.NAMES=F)
+data.frame(species=species, family=famnames)
+````
+
+### Resolve taxonomic names. This is a common use case for ecologists/evolutionary biologists, or at least should be. That is, species names you have for your own data, or when using other's data, could be old names - and if you need the newest names for your species list, how can you make this as painless as possible? You can query taxonomic data from many different sources with `taxize`. 
+```{r resolvenames }
+# The iPlantCollaborative provides access via API to their taxonomic name resolution service (TNRS)
+mynames <- c("shorea robusta", "pandanus patina", "oryza sativa", "durio zibethinus", 
+						 "rubus ulmifolius", "asclepias curassavica", "pistacia lentiscus")
+iplant_tnrsmatch(retrieve = 'all', taxnames = c('helianthus annuus', 'acacia', 'gossypium'), output = 'names')
+
+# The global names resolver is another attempt at this, hitting many different data sources
+gnr_resolve(names = c("Helianthus annuus", "Homo sapiens"), returndf = TRUE)
+
+# We can hit the Plantminer API too
+plants <- c("Myrcia lingua", "Myrcia bella", "Ocotea pulchella","Miconia", "Coffea arabica var. amarella", "Bleh")
+plantminer(plants)
+
+# We made a light wrapper around the Taxonstand package to search Theplantlist.org too
+splist <- c("Heliathus annuus","Abies procera","Poa annua","Platanus occidentalis",
+		"Carex abrupta","Arctostaphylos canescens","Ocimum basilicum","Vicia faba",
+		"Quercus kelloggii","Lactuca serriola")
+tpl_search(taxon = splist)
+````
+
+### I often want the full taxonomic hierarchy for a set of species. That is, give me the family, order, class, etc. for my list of species. There are two different easy ways to do this with `taxize`. The first example uses EOL.
+```{r hierarchy1 }
+# Using EOL. 
+pageid <- eol_search('Quercus douglasii')$id[1] # first need to search for the taxon's page on EOL
+out <- eol_pages(taxonconceptID=pageid) # then we nee to get the taxon ID used by EOL
+
+# Notice that there are multiple different sources you can pull the hierarchy from. Note even that you can get the hierarchy from the ITIS service via this EOL API.
+out
+
+# Then the hierarchy!
+eol_hierarchy(out[out$nameAccordingTo == "Species 2000 & ITIS Catalogue of Life: May 2012", "identifier"])
+eol_hierarchy(out[out$nameAccordingTo == "Integrated Taxonomic Information System (ITIS)", "identifier"]) # and from ITIS, slightly different than ITIS output below, which includes taxa all the way down.
+````
+
+## And getting a taxonomic hierarchy using ITIS.
+```{r hierarchy2 }
+# First, get the taxonomic serial number (TSN) that ITIS uses
+mytsn <- get_tsn("Quercus douglasii", "sciname")
+
+# Get the full taxonomic hierarchy for a taxon from the TSN
+itis(mytsn, "getfullhierarchyfromtsn")
+
+# But this can be even easier!
+classification(get_tsn("Quercus douglasii")) # Boom!
+
+# You can also do this easy-peasy route to a taxonomic hierarchy using uBio
+classification(get_uid("Ornithorhynchus anatinus"))
+````
+
+### While you are at doing taxonomic stuff, you often wonder "hmmm, I wonder if there are any sequence data available for my species?" So, you can use `get_seqs` to search for specific genes for a species, and `get_genes_avail` to find out what genes are available for a certain species.
+```{r X }
+# Get sequences (sequence is provied in output, but hiding here for brevity). What's nice about this is that it gets the longest sequence avaialable for the gene you searched for, and if there isn't anything available, it lets you get a sequence from a congener if you set getrelated=TRUE. The last column in the output data.frame also tells you what species the sequence is from.
+out <- get_seqs(taxon_name="Acipenser brevirostrum", gene = c("5S rRNA"),
+		seqrange = "1:3000", getrelated=T, writetodf=F)
+out[,!names(out) %in% "sequence"]
+
+# Search for available sequences
+out <- get_genes_avail(taxon_name="Umbra limi", seqrange = "1:2000", getrelated=F)
+out[grep("RAG1", out$genesavail, ignore.case=T),] # does the string 'RAG1' exist in any of the gene names
+````
+
+*********
+#### Get the .Rmd file used to create this post [at my github account](https://github.com/SChamberlain/schamberlain.github.com/blob/master/_drafts/2012-11-06-taxize.Rmd) - or [.md file](https://github.com/SChamberlain/schamberlain.github.com/tree/master/_posts/2012-11-06-taxize.md).
+
+#### Written in [Markdown](http://daringfireball.net/projects/markdown/), with help from [knitr](http://yihui.name/knitr/).
