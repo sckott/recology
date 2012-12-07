@@ -87,26 +87,159 @@
 <p>Changes in version 2:</p>
 
 <ul>
-  <li>You have one of three options: use an igraph object, a matrix, or a dataframe (matrices will be converted to data frames within the function)</li>
-  <li>If you have data on food webs similar to that provided in the Takapoto dataset provided in the NetIndices package, you can set trophic = &ldquo;TRUE&rdquo;, and gggraph will use the function TrophInd to assign trophic levels (the y axis value) to each vertex/node. You have to provide additional information along with this option such as what the imports and exports are, see NetIndices documentation.</li>
-  <li>I added some simple error checking.</li>
-  <li>if using method=&rdquo;df&rdquo; and trophic=&rdquo;FALSE&rdquo;, x axis placement of vertices is now done using the function degreex (see inside the fxn), which sorts vertices according to their degree (so the least connected species are on the left of the graph; note that species with the same degree are not stacked on the y-axis because e.g., two vertices of degree=5 would get x=3 then x=4).</li>
+<li>You have one of three options: use an igraph object, a matrix, or a dataframe (matrices will be converted to data frames within the function)</li>
+<li>If you have data on food webs similar to that provided in the Takapoto dataset provided in the NetIndices package, you can set trophic = "TRUE", and gggraph will use the function TrophInd to assign trophic levels (the y axis value) to each vertex/node. You have to provide additional information along with this option such as what the imports and exports are, see NetIndices documentation.</li>
+<li>I added some simple error checking.</li>
+<li>if using method="df" and trophic="FALSE", x axis placement of vertices is now done using the function degreex (see inside the fxn), which sorts vertices according to their degree (so the least connected species are on the left of the graph; note that species with the same degree are not stacked on the y-axis because e.g., two vertices of degree=5 would get x=3 then x=4).</li>
 </ul>
+
 
 <hr />
 
-<p>Liquid error: Invalid command name</p>
+<div class="highlight"><pre><code class="r"><span class="c1"># ggraph Version 2</span>
+require<span class="p">(</span>bipartite<span class="p">)</span>
+require<span class="p">(</span>igraph<span class="p">)</span>
+require<span class="p">(</span>ggplot2<span class="p">)</span>
+</code></pre>
+</div>
 
-<p>Liquid error: Invalid command name</p>
 
-<p>Liquid error: Invalid command name</p>
 
-<p><img src="/img/gggraph1.png" alt="center" /> </p>
 
-<p>Liquid error: Invalid command name</p>
+<div class="highlight"><pre><code class="r"><span class="c1"># gggraph, version 3 g = an igraph graph object, a matrix, or data frame</span>
+<span class="c1"># vplace = type of vertex placement assignment, one of rnorm, runif, etc.</span>
+<span class="c1"># method = one of &#39;df&#39; for data frame, &#39;mat&#39; for matrix or &#39;igraph&#39; for an</span>
+<span class="c1"># igraph graph object trophic = TRUE or FALSE for using Netindices</span>
+<span class="c1"># function TrophInd to determine trophic level (y value in graph)</span>
+<span class="c1"># trophinames = columns in matrix or dataframe to use for calculating</span>
+<span class="c1"># trophic level import = named or refereced by col# columns of matrix or</span>
+<span class="c1"># dataframe to use for import argument of TrophInd export = named or</span>
+<span class="c1"># refereced by col# columns of matrix or dataframe to use for export</span>
+<span class="c1"># argument of TrophInd dead = named or refereced by col# columns of matrix</span>
+<span class="c1"># or dataframe to use for dead argument of TrophInd</span>
 
-<p><img src="/img/gggraph2.png" alt="center" /> </p>
+gggraph <span class="o">&lt;-</span> <span class="kr">function</span><span class="p">(</span>g<span class="p">,</span> vplace <span class="o">=</span> rnorm<span class="p">,</span> method<span class="p">,</span> trophic <span class="o">=</span> <span class="s">&quot;FALSE&quot;</span><span class="p">,</span> trophinames<span class="p">,</span> 
+    import<span class="p">,</span> export<span class="p">)</span> <span class="p">{</span>
+    degreex <span class="o">&lt;-</span> <span class="kr">function</span><span class="p">(</span>x<span class="p">)</span> <span class="p">{</span>
+        degreecol <span class="o">&lt;-</span> apply<span class="p">(</span>x<span class="p">,</span> <span class="m">2</span><span class="p">,</span> <span class="kr">function</span><span class="p">(</span>y<span class="p">)</span> length<span class="p">(</span>y<span class="p">[</span>y <span class="o">&gt;</span> <span class="m">0</span><span class="p">]))</span>
+        degreerow <span class="o">&lt;-</span> apply<span class="p">(</span>x<span class="p">,</span> <span class="m">1</span><span class="p">,</span> <span class="kr">function</span><span class="p">(</span>y<span class="p">)</span> length<span class="p">(</span>y<span class="p">[</span>y <span class="o">&gt;</span> <span class="m">0</span><span class="p">]))</span>
+        degrees <span class="o">&lt;-</span> sort<span class="p">(</span>c<span class="p">(</span>degreecol<span class="p">,</span> degreerow<span class="p">))</span>
+        df <span class="o">&lt;-</span> data.frame<span class="p">(</span>degrees<span class="p">,</span> x <span class="o">=</span> seq<span class="p">(</span><span class="m">1</span><span class="p">,</span> length<span class="p">(</span>degrees<span class="p">),</span> <span class="m">1</span><span class="p">))</span>
+        df<span class="p">$</span>value <span class="o">&lt;-</span> rownames<span class="p">(</span>df<span class="p">)</span>
+        df
+    <span class="p">}</span>
+    <span class="c1"># require igraph</span>
+    <span class="kr">if</span> <span class="p">(</span>!require<span class="p">(</span>igraph<span class="p">))</span> 
+        stop<span class="p">(</span><span class="s">&quot;must first install &#39;igraph&#39; package.&quot;</span><span class="p">)</span>
+    <span class="c1"># require ggplot2</span>
+    <span class="kr">if</span> <span class="p">(</span>!require<span class="p">(</span>ggplot2<span class="p">))</span> 
+        stop<span class="p">(</span><span class="s">&quot;must first install &#39;ggplot2&#39; package.&quot;</span><span class="p">)</span>
+    
+    <span class="kr">if</span> <span class="p">(</span>method <span class="o">==</span> <span class="s">&quot;df&quot;</span><span class="p">)</span> <span class="p">{</span>
+        <span class="kr">if</span> <span class="p">(</span>class<span class="p">(</span>g<span class="p">)</span> <span class="o">==</span> <span class="s">&quot;matrix&quot;</span><span class="p">)</span> <span class="p">{</span>
+            g <span class="o">&lt;-</span> as.data.frame<span class="p">(</span>g<span class="p">)</span>
+        <span class="p">}</span>
+        <span class="kr">if</span> <span class="p">(</span>class<span class="p">(</span>g<span class="p">)</span> <span class="o">!=</span> <span class="s">&quot;data.frame&quot;</span><span class="p">)</span> 
+            stop<span class="p">(</span><span class="s">&quot;object must be of class &#39;data.frame.&#39;&quot;</span><span class="p">)</span>
+        <span class="kr">if</span> <span class="p">(</span>trophic <span class="o">==</span> <span class="s">&quot;FALSE&quot;</span><span class="p">)</span> <span class="p">{</span>
+            <span class="c1"># data preparation from adjacency matrix</span>
+            temp <span class="o">&lt;-</span> data.frame<span class="p">(</span>expand.grid<span class="p">(</span>dimnames<span class="p">(</span>g<span class="p">))[</span><span class="m">1</span>:<span class="m">2</span><span class="p">],</span> as.vector<span class="p">(</span>as.matrix<span class="p">(</span>g<span class="p">)))</span>
+            temp <span class="o">&lt;-</span> temp<span class="p">[(</span>temp<span class="p">[,</span> <span class="m">3</span><span class="p">]</span> <span class="o">&gt;</span> <span class="m">0</span><span class="p">)</span> <span class="o">&amp;</span> !is.na<span class="p">(</span>temp<span class="p">[,</span> <span class="m">3</span><span class="p">]),</span> <span class="p">]</span>
+            temp <span class="o">&lt;-</span> temp<span class="p">[</span>sort.list<span class="p">(</span>temp<span class="p">[,</span> <span class="m">1</span><span class="p">]),</span> <span class="p">]</span>
+            g_df <span class="o">&lt;-</span> data.frame<span class="p">(</span>rows <span class="o">=</span> temp<span class="p">[,</span> <span class="m">1</span><span class="p">],</span> cols <span class="o">=</span> temp<span class="p">[,</span> <span class="m">2</span><span class="p">],</span> freqint <span class="o">=</span> temp<span class="p">[,</span> 
+                <span class="m">3</span><span class="p">])</span>
+            
+            g_df<span class="p">$</span>id <span class="o">&lt;-</span> <span class="m">1</span>:length<span class="p">(</span>g_df<span class="p">[,</span> <span class="m">1</span><span class="p">])</span>
+            g_df <span class="o">&lt;-</span> data.frame<span class="p">(</span>id <span class="o">=</span> g_df<span class="p">[,</span> <span class="m">4</span><span class="p">],</span> rows <span class="o">=</span> g_df<span class="p">[,</span> <span class="m">1</span><span class="p">],</span> cols <span class="o">=</span> g_df<span class="p">[,</span> 
+                <span class="m">2</span><span class="p">],</span> freqint <span class="o">=</span> g_df<span class="p">[,</span> <span class="m">3</span><span class="p">])</span>
+            g_df_ <span class="o">&lt;-</span> melt<span class="p">(</span>g_df<span class="p">,</span> id <span class="o">=</span> c<span class="p">(</span><span class="m">1</span><span class="p">,</span> <span class="m">4</span><span class="p">))</span>
+            
+            xy_s <span class="o">&lt;-</span> data.frame<span class="p">(</span>degreex<span class="p">(</span>g<span class="p">),</span> y <span class="o">=</span> rnorm<span class="p">(</span>length<span class="p">(</span>unique<span class="p">(</span>g_df_<span class="p">$</span>value<span class="p">))))</span>
+            g_df_2 <span class="o">&lt;-</span> merge<span class="p">(</span>g_df_<span class="p">,</span> xy_s<span class="p">,</span> by <span class="o">=</span> <span class="s">&quot;value&quot;</span><span class="p">)</span>
+        <span class="p">}</span> <span class="kr">else</span> <span class="kr">if</span> <span class="p">(</span>trophic <span class="o">==</span> <span class="s">&quot;TRUE&quot;</span><span class="p">)</span> <span class="p">{</span>
+            <span class="c1"># require NetIndices</span>
+            <span class="kr">if</span> <span class="p">(</span>!require<span class="p">(</span>NetIndices<span class="p">))</span> 
+                stop<span class="p">(</span><span class="s">&quot;must first install &#39;NetIndices&#39; package.&quot;</span><span class="p">)</span>
+            <span class="c1"># data preparation from adjacency matrix</span>
+            temp <span class="o">&lt;-</span> data.frame<span class="p">(</span>expand.grid<span class="p">(</span>dimnames<span class="p">(</span>g<span class="p">[</span><span class="o">-</span>trophinames<span class="p">,</span> <span class="o">-</span>trophinames<span class="p">]))[</span><span class="m">1</span>:<span class="m">2</span><span class="p">],</span> 
+                as.vector<span class="p">(</span>as.matrix<span class="p">(</span>g<span class="p">[</span><span class="o">-</span>trophinames<span class="p">,</span> <span class="o">-</span>trophinames<span class="p">])))</span>
+            temp <span class="o">&lt;-</span> temp<span class="p">[(</span>temp<span class="p">[,</span> <span class="m">3</span><span class="p">]</span> <span class="o">&gt;</span> <span class="m">0</span><span class="p">)</span> <span class="o">&amp;</span> !is.na<span class="p">(</span>temp<span class="p">[,</span> <span class="m">3</span><span class="p">]),</span> <span class="p">]</span>
+            temp <span class="o">&lt;-</span> temp<span class="p">[</span>sort.list<span class="p">(</span>temp<span class="p">[,</span> <span class="m">1</span><span class="p">]),</span> <span class="p">]</span>
+            g_df <span class="o">&lt;-</span> data.frame<span class="p">(</span>rows <span class="o">=</span> temp<span class="p">[,</span> <span class="m">1</span><span class="p">],</span> cols <span class="o">=</span> temp<span class="p">[,</span> <span class="m">2</span><span class="p">],</span> freqint <span class="o">=</span> temp<span class="p">[,</span> 
+                <span class="m">3</span><span class="p">])</span>
+            
+            g_df<span class="p">$</span>id <span class="o">&lt;-</span> <span class="m">1</span>:length<span class="p">(</span>g_df<span class="p">[,</span> <span class="m">1</span><span class="p">])</span>
+            g_df <span class="o">&lt;-</span> data.frame<span class="p">(</span>id <span class="o">=</span> g_df<span class="p">[,</span> <span class="m">4</span><span class="p">],</span> rows <span class="o">=</span> g_df<span class="p">[,</span> <span class="m">1</span><span class="p">],</span> cols <span class="o">=</span> g_df<span class="p">[,</span> 
+                <span class="m">2</span><span class="p">],</span> freqint <span class="o">=</span> g_df<span class="p">[,</span> <span class="m">3</span><span class="p">])</span>
+            g_df_ <span class="o">&lt;-</span> melt<span class="p">(</span>g_df<span class="p">,</span> id <span class="o">=</span> c<span class="p">(</span><span class="m">1</span><span class="p">,</span> <span class="m">4</span><span class="p">))</span>
+            
+            xy_s <span class="o">&lt;-</span> data.frame<span class="p">(</span>value <span class="o">=</span> unique<span class="p">(</span>g_df_<span class="p">$</span>value<span class="p">),</span> x <span class="o">=</span> rnorm<span class="p">(</span>length<span class="p">(</span>unique<span class="p">(</span>g_df_<span class="p">$</span>value<span class="p">))),</span> 
+                y <span class="o">=</span> TrophInd<span class="p">(</span>g<span class="p">,</span> Import <span class="o">=</span> import<span class="p">,</span> Export <span class="o">=</span> export<span class="p">)[,</span> <span class="m">1</span><span class="p">])</span>
+            g_df_2 <span class="o">&lt;-</span> merge<span class="p">(</span>g_df_<span class="p">,</span> xy_s<span class="p">,</span> by <span class="o">=</span> <span class="s">&quot;value&quot;</span><span class="p">)</span>
+        <span class="p">}</span>
+        <span class="c1"># plotting</span>
+        p <span class="o">&lt;-</span> ggplot<span class="p">(</span>g_df_2<span class="p">,</span> aes<span class="p">(</span>x<span class="p">,</span> y<span class="p">))</span> <span class="o">+</span> geom_point<span class="p">(</span>size <span class="o">=</span> <span class="m">5</span><span class="p">)</span> <span class="o">+</span> geom_line<span class="p">(</span>aes<span class="p">(</span>size <span class="o">=</span> freqint<span class="p">,</span> 
+            group <span class="o">=</span> id<span class="p">))</span> <span class="o">+</span> geom_text<span class="p">(</span>size <span class="o">=</span> <span class="m">3</span><span class="p">,</span> hjust <span class="o">=</span> <span class="m">1.5</span><span class="p">,</span> aes<span class="p">(</span>label <span class="o">=</span> value<span class="p">))</span> <span class="o">+</span> 
+            theme_bw<span class="p">()</span> <span class="o">+</span> opts<span class="p">(</span>panel.grid.major <span class="o">=</span> theme_blank<span class="p">(),</span> panel.grid.minor <span class="o">=</span> theme_blank<span class="p">(),</span> 
+            axis.text.x <span class="o">=</span> theme_blank<span class="p">(),</span> axis.text.y <span class="o">=</span> theme_blank<span class="p">(),</span> axis.title.x <span class="o">=</span> theme_blank<span class="p">(),</span> 
+            axis.title.y <span class="o">=</span> theme_blank<span class="p">(),</span> axis.ticks <span class="o">=</span> theme_blank<span class="p">(),</span> panel.border <span class="o">=</span> theme_blank<span class="p">(),</span> 
+            legend.position <span class="o">=</span> <span class="s">&quot;none&quot;</span><span class="p">)</span>
+        
+        p  <span class="c1"># return graph</span>
+    <span class="p">}</span> <span class="kr">else</span> <span class="kr">if</span> <span class="p">(</span>method <span class="o">==</span> <span class="s">&quot;igraph&quot;</span><span class="p">)</span> <span class="p">{</span>
+        <span class="kr">if</span> <span class="p">(</span>class<span class="p">(</span>g<span class="p">)</span> <span class="o">!=</span> <span class="s">&quot;igraph&quot;</span><span class="p">)</span> 
+            stop<span class="p">(</span><span class="s">&quot;object must be of class &#39;igraph.&#39;&quot;</span><span class="p">)</span>
+        <span class="c1"># data preparation from igraph object</span>
+        g_ <span class="o">&lt;-</span> get.edgelist<span class="p">(</span>g<span class="p">)</span>
+        g_df <span class="o">&lt;-</span> as.data.frame<span class="p">(</span>g_<span class="p">)</span>
+        g_df<span class="p">$</span>id <span class="o">&lt;-</span> <span class="m">1</span>:length<span class="p">(</span>g_df<span class="p">[,</span> <span class="m">1</span><span class="p">])</span>
+        g_df <span class="o">&lt;-</span> melt<span class="p">(</span>g_df<span class="p">,</span> id <span class="o">=</span> <span class="m">3</span><span class="p">)</span>
+        xy_s <span class="o">&lt;-</span> data.frame<span class="p">(</span>value <span class="o">=</span> unique<span class="p">(</span>g_df<span class="p">$</span>value<span class="p">),</span> x <span class="o">=</span> vplace<span class="p">(</span>length<span class="p">(</span>unique<span class="p">(</span>g_df<span class="p">$</span>value<span class="p">))),</span> 
+            y <span class="o">=</span> vplace<span class="p">(</span>length<span class="p">(</span>unique<span class="p">(</span>g_df<span class="p">$</span>value<span class="p">))))</span>
+        g_df2 <span class="o">&lt;-</span> merge<span class="p">(</span>g_df<span class="p">,</span> xy_s<span class="p">,</span> by <span class="o">=</span> <span class="s">&quot;value&quot;</span><span class="p">)</span>
+        
+        <span class="c1"># plotting</span>
+        p <span class="o">&lt;-</span> ggplot<span class="p">(</span>g_df2<span class="p">,</span> aes<span class="p">(</span>x<span class="p">,</span> y<span class="p">))</span> <span class="o">+</span> geom_point<span class="p">(</span>size <span class="o">=</span> <span class="m">2</span><span class="p">)</span> <span class="o">+</span> geom_line<span class="p">(</span>size <span class="o">=</span> <span class="m">0.3</span><span class="p">,</span> 
+            aes<span class="p">(</span>group <span class="o">=</span> id<span class="p">,</span> linetype <span class="o">=</span> id<span class="p">))</span> <span class="o">+</span> geom_text<span class="p">(</span>size <span class="o">=</span> <span class="m">3</span><span class="p">,</span> hjust <span class="o">=</span> <span class="m">1.5</span><span class="p">,</span> 
+            aes<span class="p">(</span>label <span class="o">=</span> value<span class="p">))</span> <span class="o">+</span> theme_bw<span class="p">()</span> <span class="o">+</span> opts<span class="p">(</span>panel.grid.major <span class="o">=</span> theme_blank<span class="p">(),</span> 
+            panel.grid.minor <span class="o">=</span> theme_blank<span class="p">(),</span> axis.text.x <span class="o">=</span> theme_blank<span class="p">(),</span> axis.text.y <span class="o">=</span> theme_blank<span class="p">(),</span> 
+            axis.title.x <span class="o">=</span> theme_blank<span class="p">(),</span> axis.title.y <span class="o">=</span> theme_blank<span class="p">(),</span> axis.ticks <span class="o">=</span> theme_blank<span class="p">(),</span> 
+            panel.border <span class="o">=</span> theme_blank<span class="p">(),</span> legend.position <span class="o">=</span> <span class="s">&quot;none&quot;</span><span class="p">)</span>
+        
+        p  <span class="c1"># return graph</span>
+    <span class="p">}</span> <span class="kr">else</span> stop<span class="p">(</span>paste<span class="p">(</span><span class="s">&quot;do not recognize method = \&quot;&quot;, method, &quot;</span>\<span class="s">&quot;;\nmethods are \&quot;</span>df\<span class="s">&quot; and \&quot;</span>igraph\<span class="s">&quot;&quot;</span><span class="p">,</span> 
+        sep <span class="o">=</span> <span class="s">&quot;&quot;</span><span class="p">))</span>
+<span class="p">}</span>
+</code></pre>
+</div>
 
+
+
+
+<div class="highlight"><pre><code class="r"><span class="c1"># Eg</span>
+library<span class="p">(</span>NetIndices<span class="p">)</span>
+data<span class="p">(</span>Takapoto<span class="p">)</span>
+gggraph<span class="p">(</span>Takapoto<span class="p">,</span> vplace <span class="o">=</span> rnorm<span class="p">,</span> method <span class="o">=</span> <span class="s">&quot;df&quot;</span><span class="p">,</span> trophic <span class="o">=</span> <span class="s">&quot;TRUE&quot;</span><span class="p">,</span> trophinames <span class="o">=</span> c<span class="p">(</span><span class="m">8</span>:<span class="m">10</span><span class="p">),</span> 
+    import <span class="o">=</span> <span class="s">&quot;CO2&quot;</span><span class="p">,</span> export <span class="o">=</span> c<span class="p">(</span><span class="s">&quot;CO2&quot;</span><span class="p">,</span> <span class="s">&quot;Sedimentation&quot;</span><span class="p">,</span> <span class="s">&quot;Grazing&quot;</span><span class="p">))</span>
+</code></pre>
+</div>
+
+
+<p><img src="/img/gggraph1.png" alt="center" /></p>
+
+<div class="highlight"><pre><code class="r">plants <span class="o">&lt;-</span> round<span class="p">(</span>rlnorm<span class="p">(</span>n <span class="o">=</span> <span class="m">5</span><span class="p">,</span> meanlog <span class="o">=</span> <span class="m">2</span><span class="p">,</span> sdlog <span class="o">=</span> <span class="m">1</span><span class="p">))</span>
+animals <span class="o">&lt;-</span> round<span class="p">(</span>rlnorm<span class="p">(</span>n <span class="o">=</span> <span class="m">5</span><span class="p">,</span> meanlog <span class="o">=</span> <span class="m">2</span><span class="p">,</span> sdlog <span class="o">=</span> <span class="m">1</span><span class="p">))</span>
+plants <span class="o">&lt;-</span> plants <span class="o">*</span> <span class="p">(</span><span class="m">100</span><span class="o">/</span>sum<span class="p">(</span>plants<span class="p">))</span>
+animals <span class="o">&lt;-</span> animals <span class="o">*</span> <span class="p">(</span><span class="m">100</span><span class="o">/</span>sum<span class="p">(</span>animals<span class="p">))</span>
+z <span class="o">&lt;-</span> r2dtable<span class="p">(</span><span class="m">1</span><span class="p">,</span> animals<span class="p">,</span> plants<span class="p">)</span>  <span class="c1"># if errors, rerun again until no error</span>
+z <span class="o">&lt;-</span> as.data.frame<span class="p">(</span>z<span class="p">[[</span><span class="m">1</span><span class="p">]])</span>
+rownames<span class="p">(</span>z<span class="p">)</span> <span class="o">&lt;-</span> c<span class="p">(</span><span class="s">&quot;a&quot;</span><span class="p">,</span> <span class="s">&quot;b&quot;</span><span class="p">,</span> <span class="s">&quot;c&quot;</span><span class="p">,</span> <span class="s">&quot;d&quot;</span><span class="p">,</span> <span class="s">&quot;e&quot;</span><span class="p">)</span>
+gggraph<span class="p">(</span>z<span class="p">,</span> vplace <span class="o">=</span> rnorm<span class="p">,</span> method <span class="o">=</span> <span class="s">&quot;df&quot;</span><span class="p">,</span> trophic <span class="o">=</span> <span class="s">&quot;FALSE&quot;</span><span class="p">)</span>
+</code></pre>
+</div>
+
+
+<p><img src="/img/gggraph2.png" alt="center" /></p>
 
 </div>
     
