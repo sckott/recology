@@ -1,9 +1,3 @@
-opts_chunk$set(warning=FALSE, message=FALSE, comment=NA, cache=FALSE)
-
-```{r  echo=FALSE, warning=FALSE	}
-require(knitcitations); cleanbib()
-````
-
 ---
 name: open-science-challenge
 layout: post
@@ -17,9 +11,11 @@ tags:
 
 ![center](https://raw.github.com/SChamberlain/schamberlain.github.com/master/img/ropensci_challenge.png)
 
+***************
+
 ### __Open Science__
 
-Science is becoming more open in many areas: publishing, data sharing, lab notebooks, and software. There are many benefits to open science. For example, sharing research data alongside your publications leads to increased citation rate `r citep("10.1371/journal.pone.0000308")`. In addition, data is becoming easier to share and reuse thanks to efforts like [FigShare](http://figshare.com/) and [Dryad](http://datadryad.org/). 
+Science is becoming more open in many areas: publishing, data sharing, lab notebooks, and software. There are many benefits to open science. For example, sharing research data alongside your publications leads to increased citation rate (Piwowar _et. al._ 2007). In addition, data is becoming easier to share and reuse thanks to efforts like [FigShare](http://figshare.com/) and [Dryad](http://datadryad.org/). 
 
 If you don't understand the problem we are currently facing due to lack of open science, watch this video:
 
@@ -66,6 +62,8 @@ January 31, 2013
 ***************
 
 #### References
-```{r results="asis", echo=FALSE }
-bibliography(style="html")
-````
+<p>Piwowar HA, Day RS, Fridsma DB and Ioannidis J (2007).
+&ldquo;Sharing Detailed Research Data is Associated With Increased Citation Rate.&rdquo;
+<EM>Plos One</EM>, <B>2</B>.
+<a href="http://dx.doi.org/10.1371/journal.pone.0000308">http://dx.doi.org/10.1371/journal.pone.0000308</a>.
+
