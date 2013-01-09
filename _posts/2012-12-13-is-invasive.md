@@ -1,5 +1,3 @@
-opts_chunk$set(warning=FALSE, message=FALSE, comment=NA, cache=FALSE)
-
 ---
 name: is-invasive
 layout: post
