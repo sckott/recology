@@ -48,7 +48,6 @@ tpl_get(dir_ = "~/foo2", family = "Scrophulariaceae")
 
 
 {% highlight r %}
-## Read the data in to R
 dat <- read.csv("~/foo2/Scrophulariaceae.csv")
 {% endhighlight %}
 
@@ -60,17 +59,6 @@ dat <- read.csv("~/foo2/Scrophulariaceae.csv")
 {% highlight r %}
 species <- as.character(ddply(dat[, c("Genus", "Species")], .(), transform, 
     gen_sp = as.factor(paste(Genus, Species, sep = " ")))[, 4])
-{% endhighlight %}
-
-
-***************
-
-#### 
-
-{% highlight r %}
-# Install taxize install_github('taxize_', 'ropensci') # install the
-# GitHub version, not the CRAN version
-library(taxize)
 {% endhighlight %}
 
 
@@ -100,18 +88,19 @@ out <- llply(species_split, function(x) tnrs_safe(x, getpost = "POST", sleep = 3
 
 
 {% highlight text %}
-Calling http://taxosaurus.org/retrieve/5372a666f6a480dc320a6474f05c3f57
-Calling http://taxosaurus.org/retrieve/5680849a8b8eeb6f3d4278dea08c731a
-Calling http://taxosaurus.org/retrieve/c5cdb585fa7676ef62890ecfbaa3d3b7
-Calling http://taxosaurus.org/retrieve/136bdd353302b4526de8ea84ac7a3795
-Calling http://taxosaurus.org/retrieve/dfc193ca59f79e83addd609e9df43fce
-Calling http://taxosaurus.org/retrieve/22e5e96767e3f07fde23dccd2ecc58d3
-Calling http://taxosaurus.org/retrieve/a19be9a33fd1fd7ec5af5bc1ffe9be0b
-Calling http://taxosaurus.org/retrieve/229dba385f4c7137cf508a04b6aa0fe3
-Calling http://taxosaurus.org/retrieve/faf7b2844e6a12059ae7a9c556c75e2a
-Calling http://taxosaurus.org/retrieve/6dc5d9d36080fb5553a6768621caab7f
-Calling http://taxosaurus.org/retrieve/46ed3ef3912a1b0982cfe5d5faa9b265
+Calling http://taxosaurus.org/retrieve/90fcd9ae425ad7c6103b06dd9fd78ae2
+Calling http://taxosaurus.org/retrieve/223f73b83fcddcb8b6187966963660a8
+Calling http://taxosaurus.org/retrieve/72bacdbb8938316e321d4c709c8cdd09
+Calling http://taxosaurus.org/retrieve/979ce9cc4dec376710f61de162e1294e
+Calling http://taxosaurus.org/retrieve/03a39a124561fec2fdfc0f483d9fb607
+Calling http://taxosaurus.org/retrieve/d4bf4e5a1403f45a1be1ca3dd87785d7
+Calling http://taxosaurus.org/retrieve/a9a9bdde6fda7e325d80120e27ccb480
+Calling http://taxosaurus.org/retrieve/215ccdcf2b00362278bf19d1942e1395
+Calling http://taxosaurus.org/retrieve/9d43c0b99b4dfb5ea1b435adab17b980
+Calling http://taxosaurus.org/retrieve/42e166f8e43f1fb349e36459cd5938b3
+Calling http://taxosaurus.org/retrieve/2c42e4b5227c5464f9bfeeafcdf0651d
 {% endhighlight %}
+
 
 
 {% highlight r %}
@@ -204,6 +193,70 @@ head(outdf)
 5 http://www.tropicos.org/Name/50089700
 6
 {% endhighlight %}
+
+
+Note that there are multiple names for some species because data sources have different names for the same species (resulting in more than one row in the data.frame 'outdf' for a species). We are leaving this up to the user to decide which to use. For example, for the species _Buddleja montana_ there are two names for in the output
+
+{% highlight r %}
+data <- ddply(outdf, .(submittedName), summarize, length(submittedName))
+outdf[outdf$submittedName %in% as.character(data[data$..1 > 1, ][6, "submittedName"]), 
+    ]
+{% endhighlight %}
+
+
+
+{% highlight text %}
+       submittedName     acceptedName    sourceId score      matchedName
+123 Buddleja montana Buddleja montana iPlant_TNRS     1 Buddleja montana
+124 Buddleja montana          Montana        NCBI     1 Buddleja montana
+         annotations                                         uri
+123 Britton ex Rusby       http://www.tropicos.org/Name/19000601
+124             none http://www.ncbi.nlm.nih.gov/taxonomy/441235
+{% endhighlight %}
+
+
+The source iPlant matched the name, but NCBI actually gave back a genus of cricket (follow the link under the column uri for _Montana_). If you look at the page for _Buddleja_ on NCBI [here](http://www.ncbi.nlm.nih.gov/Taxonomy/Browser/wwwtax.cgi?id=26473) there is no _Buddleja montana_ at all. 
+
+Another thing we could do is look at the score that is returned. Let's look at those that are less than 1 (i.e., )
+
+{% highlight r %}
+outdf[outdf$score < 1, ]
+{% endhighlight %}
+
+
+
+{% highlight text %}
+                        submittedName           acceptedName    sourceId
+94   Buddleja pichinchensis x bullata Buddleja pichinchensis iPlant_TNRS
+340                Diascia ellaphieae                        iPlant_TNRS
+495              Eremophila decipiens                        iPlant_TNRS
+500            Eremophila grandiflora             Eremophila iPlant_TNRS
+808           Jamesbrittneia hilliard                        iPlant_TNRS
+1051                 Verbascum patris              Verbascum iPlant_TNRS
+1081             Verbascum barnadesii              Verbascum iPlant_TNRS
+1097              Verbascum calycosum              Verbascum iPlant_TNRS
+     score            matchedName annotations
+94    0.90 Buddleja pichinchensis       Kunth
+340   0.98      Diascia ellaphiae            
+495   0.98  Eremophila decipiense            
+500   0.50             Eremophila      R. Br.
+808   0.50         Jamesbrittenia            
+1051  0.50              Verbascum          L.
+1081  0.50              Verbascum          L.
+1097  0.50              Verbascum          L.
+                                       uri
+94   http://www.tropicos.org/Name/19000333
+340                                       
+495                                       
+500  http://www.tropicos.org/Name/40004761
+808                                       
+1051 http://www.tropicos.org/Name/40023766
+1081 http://www.tropicos.org/Name/40023766
+1097 http://www.tropicos.org/Name/40023766
+{% endhighlight %}
+
+
+As we got this speies list from [theplantlist.org](http://www.theplantlist.org/), there aren't that many mistakes, but if it was my species list you know there would be many :)
 
 
 ***************
