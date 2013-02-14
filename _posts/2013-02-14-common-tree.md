@@ -1,5 +1,3 @@
-opts_chunk$set(warning=FALSE, message=FALSE, comment=NA, cache=FALSE)
-
 ---
 name: common-tree
 layout: post
