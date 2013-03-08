@@ -6,6 +6,130 @@
 		<link>http://schamberlain.github.com</link>
 		
 			<item>
+				<title>Visualizing rOpenSci collaboration</title>
+				<description>&lt;p&gt;We (&lt;a href=&quot;http://ropensci.org/&quot;&gt;rOpenSci&lt;/a&gt;) have been writing code for R packages for a couple years, so it is time to take a look back at the data. What data you ask? The commits data from GitHub ~ data that records who did what and when.&lt;/p&gt;
+
+&lt;p&gt;Using the &lt;a href=&quot;http://developer.github.com/v3/repos/commits/&quot;&gt;Github commits API&lt;/a&gt; we can gather data on who commited code to a Github repository, and when they did it. Then we can visualize this hitorical record.&lt;/p&gt;
+
+&lt;hr /&gt;
+
+&lt;h3&gt;Install some functions for interacting with the Github API via R&lt;/h3&gt;
+
+&lt;div class=&quot;highlight&quot;&gt;&lt;pre&gt;&lt;code class=&quot;r&quot;&gt;install_github&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;s&quot;&gt;&amp;#39;sandbox&amp;#39;&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt; &lt;span class=&quot;s&quot;&gt;&amp;#39;ropensci&amp;#39;&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt; 
+
+library&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;sandbox&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt;
+library&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;httr&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt;
+library&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;ggplot2&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt;
+library&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;scales&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt;
+library&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;reshape2&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt;
+library&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;bipartite&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt;
+library&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;doMC&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt;
+library&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;plyr&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt;
+library&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;ggthemes&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt;
+library&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;picante&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt;
+
+&lt;span class=&quot;c1&quot;&gt;# And authenticate - pops open a page in your default browser, then tells &lt;/span&gt;
+&lt;span class=&quot;c1&quot;&gt;# you authentication was successful&lt;/span&gt;
+github_auth&lt;span class=&quot;p&quot;&gt;()&lt;/span&gt;
+&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;
+
+
+&lt;hr /&gt;
+
+&lt;h3&gt;Get all repos for an organization, here ropensci of course&lt;/h3&gt;
+
+&lt;div class=&quot;highlight&quot;&gt;&lt;pre&gt;&lt;code class=&quot;r&quot;&gt;ropensci_repos &lt;span class=&quot;o&quot;&gt;&amp;lt;-&lt;/span&gt; github_allrepos&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;userorg &lt;span class=&quot;o&quot;&gt;=&lt;/span&gt; &lt;span class=&quot;s&quot;&gt;&amp;quot;ropensci&amp;quot;&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt;
+&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;
+
+
+&lt;hr /&gt;
+
+&lt;h3&gt;Get commits broken down in to additions and deletions, though below we just collapse them to all commits&lt;/h3&gt;
+
+&lt;div class=&quot;highlight&quot;&gt;&lt;pre&gt;&lt;code class=&quot;r&quot;&gt;registerDoMC&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;cores &lt;span class=&quot;o&quot;&gt;=&lt;/span&gt; &lt;span class=&quot;m&quot;&gt;4&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt;
+github_commits_safe &lt;span class=&quot;o&quot;&gt;&amp;lt;-&lt;/span&gt; plyr&lt;span class=&quot;o&quot;&gt;::&lt;/span&gt;failwith&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;kc&quot;&gt;NULL&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt; github_commits&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt;
+out &lt;span class=&quot;o&quot;&gt;&amp;lt;-&lt;/span&gt; llply&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;ropensci_repos&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt; &lt;span class=&quot;kr&quot;&gt;function&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;x&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt; github_commits_safe&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;s&quot;&gt;&amp;quot;ropensci&amp;quot;&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt; x&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt; 
+    since &lt;span class=&quot;o&quot;&gt;=&lt;/span&gt; &lt;span class=&quot;s&quot;&gt;&amp;quot;2009-01-01T&amp;quot;&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt; limit &lt;span class=&quot;o&quot;&gt;=&lt;/span&gt; &lt;span class=&quot;m&quot;&gt;500&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;),&lt;/span&gt; .parallel &lt;span class=&quot;o&quot;&gt;=&lt;/span&gt; &lt;span class=&quot;kc&quot;&gt;TRUE&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt;
+names&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;out&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;&amp;lt;-&lt;/span&gt; ropensci_repos
+out2 &lt;span class=&quot;o&quot;&gt;&amp;lt;-&lt;/span&gt; compact&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;out&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt;
+outdf &lt;span class=&quot;o&quot;&gt;&amp;lt;-&lt;/span&gt; ldply&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;out2&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt;
+&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;
+
+
+&lt;hr /&gt;
+
+&lt;h3&gt;Plot commits by date and repo&lt;/h3&gt;
+
+&lt;div class=&quot;highlight&quot;&gt;&lt;pre&gt;&lt;code class=&quot;r&quot;&gt;outdf_subset &lt;span class=&quot;o&quot;&gt;&amp;lt;-&lt;/span&gt; outdf&lt;span class=&quot;p&quot;&gt;[&lt;/span&gt;&lt;span class=&quot;o&quot;&gt;!&lt;/span&gt;outdf&lt;span class=&quot;o&quot;&gt;$&lt;/span&gt;.id &lt;span class=&quot;o&quot;&gt;%in%&lt;/span&gt; c&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;s&quot;&gt;&amp;quot;citeulike&amp;quot;&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt; &lt;span class=&quot;s&quot;&gt;&amp;quot;challenge&amp;quot;&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt; &lt;span class=&quot;s&quot;&gt;&amp;quot;docs&amp;quot;&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt; &lt;span class=&quot;s&quot;&gt;&amp;quot;ropensci-book&amp;quot;&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt; 
+    &lt;span class=&quot;s&quot;&gt;&amp;quot;usecases&amp;quot;&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt; &lt;span class=&quot;s&quot;&gt;&amp;quot;textmine&amp;quot;&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt; &lt;span class=&quot;s&quot;&gt;&amp;quot;usgs&amp;quot;&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt; &lt;span class=&quot;s&quot;&gt;&amp;quot;ropenscitoolkit&amp;quot;&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt; &lt;span class=&quot;s&quot;&gt;&amp;quot;neotoma&amp;quot;&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt; &lt;span class=&quot;s&quot;&gt;&amp;quot;rEWDB&amp;quot;&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt; &lt;span class=&quot;s&quot;&gt;&amp;quot;rgauges&amp;quot;&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt; 
+    &lt;span class=&quot;s&quot;&gt;&amp;quot;rodash&amp;quot;&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt; &lt;span class=&quot;s&quot;&gt;&amp;quot;ropensci.github.com&amp;quot;&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt; &lt;span class=&quot;s&quot;&gt;&amp;quot;ROAuth&amp;quot;&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;),&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;]&lt;/span&gt;
+outdf_subset&lt;span class=&quot;o&quot;&gt;$&lt;/span&gt;.id &lt;span class=&quot;o&quot;&gt;&amp;lt;-&lt;/span&gt; tolower&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;outdf_subset&lt;span class=&quot;o&quot;&gt;$&lt;/span&gt;.id&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt;
+outdf_subset &lt;span class=&quot;o&quot;&gt;&amp;lt;-&lt;/span&gt; ddply&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;outdf_subset&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt; .&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;.id&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt; date&lt;span class=&quot;p&quot;&gt;),&lt;/span&gt; summarise&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt; value &lt;span class=&quot;o&quot;&gt;=&lt;/span&gt; sum&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;value&lt;span class=&quot;p&quot;&gt;))&lt;/span&gt;
+
+mindates &lt;span class=&quot;o&quot;&gt;&amp;lt;-&lt;/span&gt; llply&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;unique&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;outdf_subset&lt;span class=&quot;o&quot;&gt;$&lt;/span&gt;.id&lt;span class=&quot;p&quot;&gt;),&lt;/span&gt; &lt;span class=&quot;kr&quot;&gt;function&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;x&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt; min&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;outdf_subset&lt;span class=&quot;p&quot;&gt;[&lt;/span&gt;outdf_subset&lt;span class=&quot;o&quot;&gt;$&lt;/span&gt;.id &lt;span class=&quot;o&quot;&gt;==&lt;/span&gt; 
+    x&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt; &lt;span class=&quot;s&quot;&gt;&amp;quot;date&amp;quot;&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;]))&lt;/span&gt;
+names&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;mindates&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;&amp;lt;-&lt;/span&gt; unique&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;outdf_subset&lt;span class=&quot;o&quot;&gt;$&lt;/span&gt;.id&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt;
+mindates &lt;span class=&quot;o&quot;&gt;&amp;lt;-&lt;/span&gt; sort&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;do.call&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;c&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt; mindates&lt;span class=&quot;p&quot;&gt;))&lt;/span&gt;
+outdf_subset&lt;span class=&quot;o&quot;&gt;$&lt;/span&gt;.id &lt;span class=&quot;o&quot;&gt;&amp;lt;-&lt;/span&gt; factor&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;outdf_subset&lt;span class=&quot;o&quot;&gt;$&lt;/span&gt;.id&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt; levels &lt;span class=&quot;o&quot;&gt;=&lt;/span&gt; names&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;mindates&lt;span class=&quot;p&quot;&gt;))&lt;/span&gt;
+
+ggplot&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;outdf_subset&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt; aes&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;date&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt; value&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt; fill &lt;span class=&quot;o&quot;&gt;=&lt;/span&gt; .id&lt;span class=&quot;p&quot;&gt;))&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;+&lt;/span&gt; 
+    geom_bar&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;stat &lt;span class=&quot;o&quot;&gt;=&lt;/span&gt; &lt;span class=&quot;s&quot;&gt;&amp;quot;identity&amp;quot;&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt; width &lt;span class=&quot;o&quot;&gt;=&lt;/span&gt; &lt;span class=&quot;m&quot;&gt;0.5&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;+&lt;/span&gt; 
+    geom_rangeframe&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;sides &lt;span class=&quot;o&quot;&gt;=&lt;/span&gt; &lt;span class=&quot;s&quot;&gt;&amp;quot;b&amp;quot;&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt; colour &lt;span class=&quot;o&quot;&gt;=&lt;/span&gt; &lt;span class=&quot;s&quot;&gt;&amp;quot;grey&amp;quot;&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;+&lt;/span&gt; 
+    theme_bw&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;base_size &lt;span class=&quot;o&quot;&gt;=&lt;/span&gt; &lt;span class=&quot;m&quot;&gt;9&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;+&lt;/span&gt; 
+    scale_x_date&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;labels &lt;span class=&quot;o&quot;&gt;=&lt;/span&gt; date_format&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;s&quot;&gt;&amp;quot;%Y&amp;quot;&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;),&lt;/span&gt; breaks &lt;span class=&quot;o&quot;&gt;=&lt;/span&gt; date_breaks&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;s&quot;&gt;&amp;quot;year&amp;quot;&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;))&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;+&lt;/span&gt; 
+    scale_y_log10&lt;span class=&quot;p&quot;&gt;()&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;+&lt;/span&gt; 
+    facet_grid&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;.id &lt;span class=&quot;o&quot;&gt;~&lt;/span&gt; .&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;+&lt;/span&gt; 
+    labs&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;x &lt;span class=&quot;o&quot;&gt;=&lt;/span&gt; &lt;span class=&quot;s&quot;&gt;&amp;quot;&amp;quot;&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt; y &lt;span class=&quot;o&quot;&gt;=&lt;/span&gt; &lt;span class=&quot;s&quot;&gt;&amp;quot;&amp;quot;&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;+&lt;/span&gt; 
+    theme&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;axis.text.y &lt;span class=&quot;o&quot;&gt;=&lt;/span&gt; element_blank&lt;span class=&quot;p&quot;&gt;(),&lt;/span&gt; 
+        axis.text.x &lt;span class=&quot;o&quot;&gt;=&lt;/span&gt; element_text&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;colour &lt;span class=&quot;o&quot;&gt;=&lt;/span&gt; &lt;span class=&quot;s&quot;&gt;&amp;quot;black&amp;quot;&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;),&lt;/span&gt; 
+        axis.ticks.y &lt;span class=&quot;o&quot;&gt;=&lt;/span&gt; element_blank&lt;span class=&quot;p&quot;&gt;(),&lt;/span&gt; 
+        strip.text.y &lt;span class=&quot;o&quot;&gt;=&lt;/span&gt; element_text&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;angle &lt;span class=&quot;o&quot;&gt;=&lt;/span&gt; &lt;span class=&quot;m&quot;&gt;0&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt; size &lt;span class=&quot;o&quot;&gt;=&lt;/span&gt; &lt;span class=&quot;m&quot;&gt;8&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;),&lt;/span&gt; 
+        strip.background &lt;span class=&quot;o&quot;&gt;=&lt;/span&gt; element_rect&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;size &lt;span class=&quot;o&quot;&gt;=&lt;/span&gt; &lt;span class=&quot;m&quot;&gt;0&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;),&lt;/span&gt; 
+        panel.grid.major &lt;span class=&quot;o&quot;&gt;=&lt;/span&gt; element_blank&lt;span class=&quot;p&quot;&gt;(),&lt;/span&gt; 
+        panel.grid.minor &lt;span class=&quot;o&quot;&gt;=&lt;/span&gt; element_blank&lt;span class=&quot;p&quot;&gt;(),&lt;/span&gt; 
+        legend.text &lt;span class=&quot;o&quot;&gt;=&lt;/span&gt; element_text&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;size &lt;span class=&quot;o&quot;&gt;=&lt;/span&gt; &lt;span class=&quot;m&quot;&gt;8&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;),&lt;/span&gt; 
+        legend.position &lt;span class=&quot;o&quot;&gt;=&lt;/span&gt; &lt;span class=&quot;s&quot;&gt;&amp;quot;none&amp;quot;&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt; 
+        panel.border &lt;span class=&quot;o&quot;&gt;=&lt;/span&gt; element_blank&lt;span class=&quot;p&quot;&gt;())&lt;/span&gt;
+&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;
+
+
+&lt;p&gt;&lt;img src=&quot;/img/commitsbydate.png&quot; alt=&quot;center&quot; /&gt;&lt;/p&gt;
+
+&lt;p&gt;The plot above plots the sum of additions+deletions, and is sorted by the first commit date of reach repo, with the first being &lt;a href=&quot;https://github.com/ropensci/treeBASE&quot;&gt;treebase&lt;/a&gt;, which wraps the &lt;a href=&quot;http://treebase.org/treebase-web/urlAPI.html&quot;&gt;Treebase API&lt;/a&gt;, and the most recent being &lt;a href=&quot;https://github.com/ropensci/rWBclimate&quot;&gt;rwbclimate&lt;/a&gt;, which wraps the &lt;a href=&quot;http://data.worldbank.org/developers/climate-data-api&quot;&gt;World Blank climate data API&lt;/a&gt;.&lt;/p&gt;
+
+&lt;p&gt;You can see that some repos have recieved commits more or less consistently over their life time, while others have seen a little development here and there.&lt;/p&gt;
+
+&lt;hr /&gt;
+
+&lt;h3&gt;In addition, there are quite a few people that have committed code now to rOpenSci repos, calling for a network vizualization of course.&lt;/h3&gt;
+
+&lt;div class=&quot;highlight&quot;&gt;&lt;pre&gt;&lt;code class=&quot;r&quot;&gt;outdf_network &lt;span class=&quot;o&quot;&gt;&amp;lt;-&lt;/span&gt; droplevels&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;outdf&lt;span class=&quot;p&quot;&gt;[&lt;/span&gt;&lt;span class=&quot;o&quot;&gt;!&lt;/span&gt;outdf&lt;span class=&quot;o&quot;&gt;$&lt;/span&gt;.id &lt;span class=&quot;o&quot;&gt;%in%&lt;/span&gt; c&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;s&quot;&gt;&amp;quot;citeulike&amp;quot;&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt; &lt;span class=&quot;s&quot;&gt;&amp;quot;challenge&amp;quot;&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt; 
+    &lt;span class=&quot;s&quot;&gt;&amp;quot;docs&amp;quot;&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt; &lt;span class=&quot;s&quot;&gt;&amp;quot;ropensci-book&amp;quot;&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt; &lt;span class=&quot;s&quot;&gt;&amp;quot;usecases&amp;quot;&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt; &lt;span class=&quot;s&quot;&gt;&amp;quot;textmine&amp;quot;&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt; &lt;span class=&quot;s&quot;&gt;&amp;quot;usgs&amp;quot;&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt; &lt;span class=&quot;s&quot;&gt;&amp;quot;ropenscitoolkit&amp;quot;&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt; 
+    &lt;span class=&quot;s&quot;&gt;&amp;quot;retriever&amp;quot;&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt; &lt;span class=&quot;s&quot;&gt;&amp;quot;rodash&amp;quot;&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt; &lt;span class=&quot;s&quot;&gt;&amp;quot;ropensci.github.com&amp;quot;&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt; &lt;span class=&quot;s&quot;&gt;&amp;quot;ROAuth&amp;quot;&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt; &lt;span class=&quot;s&quot;&gt;&amp;quot;rgauges&amp;quot;&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt; &lt;span class=&quot;s&quot;&gt;&amp;quot;sandbox&amp;quot;&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt; 
+    &lt;span class=&quot;s&quot;&gt;&amp;quot;rfna&amp;quot;&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt; &lt;span class=&quot;s&quot;&gt;&amp;quot;rmetadata&amp;quot;&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt; &lt;span class=&quot;s&quot;&gt;&amp;quot;rhindawi&amp;quot;&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt; &lt;span class=&quot;s&quot;&gt;&amp;quot;rpmc&amp;quot;&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt; &lt;span class=&quot;s&quot;&gt;&amp;quot;rpensoft&amp;quot;&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt; &lt;span class=&quot;s&quot;&gt;&amp;quot;ritis&amp;quot;&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;),&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;])&lt;/span&gt;
+casted &lt;span class=&quot;o&quot;&gt;&amp;lt;-&lt;/span&gt; dcast&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;outdf_network&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt; .id &lt;span class=&quot;o&quot;&gt;+&lt;/span&gt; date &lt;span class=&quot;o&quot;&gt;+&lt;/span&gt; name &lt;span class=&quot;o&quot;&gt;~&lt;/span&gt; variable&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt; fun.aggregate &lt;span class=&quot;o&quot;&gt;=&lt;/span&gt; length&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt; 
+    value.var &lt;span class=&quot;o&quot;&gt;=&lt;/span&gt; &lt;span class=&quot;s&quot;&gt;&amp;quot;value&amp;quot;&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt;
+names&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;casted&lt;span class=&quot;p&quot;&gt;)[&lt;/span&gt;&lt;span class=&quot;m&quot;&gt;1&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;]&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;&amp;lt;-&lt;/span&gt; &lt;span class=&quot;s&quot;&gt;&amp;quot;repo&amp;quot;&lt;/span&gt;
+casted2 &lt;span class=&quot;o&quot;&gt;&amp;lt;-&lt;/span&gt; ddply&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;casted&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt; .&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;repo&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt; name&lt;span class=&quot;p&quot;&gt;),&lt;/span&gt; summarise&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt; commits &lt;span class=&quot;o&quot;&gt;=&lt;/span&gt; sum&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;additions&lt;span class=&quot;p&quot;&gt;))&lt;/span&gt;
+casted2 &lt;span class=&quot;o&quot;&gt;&amp;lt;-&lt;/span&gt; data.frame&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;repo &lt;span class=&quot;o&quot;&gt;=&lt;/span&gt; casted2&lt;span class=&quot;o&quot;&gt;$&lt;/span&gt;repo&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt; weight &lt;span class=&quot;o&quot;&gt;=&lt;/span&gt; casted2&lt;span class=&quot;o&quot;&gt;$&lt;/span&gt;commits&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt; name &lt;span class=&quot;o&quot;&gt;=&lt;/span&gt; casted2&lt;span class=&quot;o&quot;&gt;$&lt;/span&gt;name&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt;
+mat &lt;span class=&quot;o&quot;&gt;&amp;lt;-&lt;/span&gt; sample2matrix&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;casted2&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt;
+plotweb&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;sortweb&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;mat&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt; sort.order &lt;span class=&quot;o&quot;&gt;=&lt;/span&gt; &lt;span class=&quot;s&quot;&gt;&amp;quot;dec&amp;quot;&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;),&lt;/span&gt; method &lt;span class=&quot;o&quot;&gt;=&lt;/span&gt; &lt;span class=&quot;s&quot;&gt;&amp;quot;normal&amp;quot;&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt; text.rot &lt;span class=&quot;o&quot;&gt;=&lt;/span&gt; &lt;span class=&quot;m&quot;&gt;90&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt; 
+    adj.high &lt;span class=&quot;o&quot;&gt;=&lt;/span&gt; c&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;m&quot;&gt;-0.3&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt; &lt;span class=&quot;m&quot;&gt;0&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;),&lt;/span&gt; adj.low &lt;span class=&quot;o&quot;&gt;=&lt;/span&gt; c&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;m&quot;&gt;1&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt; &lt;span class=&quot;m&quot;&gt;-0.3&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;),&lt;/span&gt; y.width.low &lt;span class=&quot;o&quot;&gt;=&lt;/span&gt; &lt;span class=&quot;m&quot;&gt;0.05&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt; y.width.high &lt;span class=&quot;o&quot;&gt;=&lt;/span&gt; &lt;span class=&quot;m&quot;&gt;0.05&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt; 
+    ybig &lt;span class=&quot;o&quot;&gt;=&lt;/span&gt; &lt;span class=&quot;m&quot;&gt;0.09&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt; labsize &lt;span class=&quot;o&quot;&gt;=&lt;/span&gt; &lt;span class=&quot;m&quot;&gt;0.7&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt;
+&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;
+
+
+&lt;p&gt;&lt;img src=&quot;/img/collabnetwork.png&quot; alt=&quot;center&quot; /&gt;&lt;/p&gt;
+
+&lt;p&gt;The plot above shows repos on one side and contributors on the other. Some folks (the core rOpenSci team: cboettig, karthikram, emhart, and schamberlain) have committed quite a lot to many packages. We also have amny awesome contributors to our packages (some contributors and repos have been removed for clarity).&lt;/p&gt;
+
+&lt;p&gt;rOpenSci is truly a collaborative effort to develop tools for open science, so thanks to all our contributors - keep on forking, pull requesting, and commiting.&lt;/p&gt;
+</description>
+				<published>2013-03-08 00:00:00 -0800</published>
+				<link>http://schamberlain.github.com/2013/03/ropensci-collaboration/</link>
+			</item>
+		
+			<item>
 				<title>Getting a simple tree via NCBI</title>
 				<description>&lt;p&gt;I was just at the &lt;a href=&quot;http://www.evoio.org/wiki/Phylotastic&quot;&gt;Phylotastic hackathon&lt;/a&gt; in Tucson, AZ at the &lt;a href=&quot;http://www.iplantcollaborative.org/&quot;&gt;iPlant&lt;/a&gt; facilities at the UofA.&lt;/p&gt;
 
@@ -1379,163 +1503,6 @@ downstream&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;m&q
 </description>
 				<published>2012-10-16 00:00:00 -0700</published>
 				<link>http://schamberlain.github.com/2012/10/get-taxa-downstream/</link>
-			</item>
-		
-			<item>
-				<title>Exploring phylogenetic tree balance metrics</title>
-				<description>&lt;p&gt;I need to simulate balanced and unbalanced phylogenetic trees for some research I am doing.  In order to do this, I do rejection sampling: simulate a tree -&gt; measure tree shape -&gt; reject if not balanced or unbalanced &lt;strong&gt;enough&lt;/strong&gt;.  But what is enough?  We need to define some cutoff value to determine what will be our set of balanced and unbalanced trees.&lt;/p&gt;
-
-&lt;h3&gt;A function to calculate shape metrics, and a custom theme for plottingn phylogenies.&lt;/h3&gt;
-
-&lt;div class=&quot;highlight&quot;&gt;&lt;pre&gt;&lt;code class=&quot;r&quot;&gt;foo &lt;span class=&quot;o&quot;&gt;&amp;lt;-&lt;/span&gt; &lt;span class=&quot;kr&quot;&gt;function&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;x&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt; metric &lt;span class=&quot;o&quot;&gt;=&lt;/span&gt; &lt;span class=&quot;s&quot;&gt;&amp;quot;colless&amp;quot;&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;{&lt;/span&gt;
-    &lt;span class=&quot;kr&quot;&gt;if&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;metric &lt;span class=&quot;o&quot;&gt;==&lt;/span&gt; &lt;span class=&quot;s&quot;&gt;&amp;quot;colless&amp;quot;&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;{&lt;/span&gt;
-        xx &lt;span class=&quot;o&quot;&gt;&amp;lt;-&lt;/span&gt; as.treeshape&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;x&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt;  &lt;span class=&quot;c1&quot;&gt;# convert to apTreeshape format&lt;/span&gt;
-        colless&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;xx&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt; &lt;span class=&quot;s&quot;&gt;&amp;quot;yule&amp;quot;&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt;  &lt;span class=&quot;c1&quot;&gt;# calculate colless&amp;#39; metric&lt;/span&gt;
-    &lt;span class=&quot;p&quot;&gt;}&lt;/span&gt; &lt;span class=&quot;kr&quot;&gt;else&lt;/span&gt; &lt;span class=&quot;kr&quot;&gt;if&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;metric &lt;span class=&quot;o&quot;&gt;==&lt;/span&gt; &lt;span class=&quot;s&quot;&gt;&amp;quot;gamma&amp;quot;&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;{&lt;/span&gt;
-        gammaStat&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;x&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt;
-    &lt;span class=&quot;p&quot;&gt;}&lt;/span&gt; &lt;span class=&quot;kr&quot;&gt;else&lt;/span&gt; stop&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;s&quot;&gt;&amp;quot;metric should be one of colless or gamma&amp;quot;&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt;
-&lt;span class=&quot;p&quot;&gt;}&lt;/span&gt;
-
-theme_myblank &lt;span class=&quot;o&quot;&gt;&amp;lt;-&lt;/span&gt; &lt;span class=&quot;kr&quot;&gt;function&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;()&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;{&lt;/span&gt;
-    stopifnot&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;require&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;ggplot2&lt;span class=&quot;p&quot;&gt;))&lt;/span&gt;
-    theme_blank &lt;span class=&quot;o&quot;&gt;&amp;lt;-&lt;/span&gt; ggplot2&lt;span class=&quot;o&quot;&gt;::&lt;/span&gt;theme_blank
-    ggplot2&lt;span class=&quot;o&quot;&gt;::&lt;/span&gt;theme&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;panel.grid.major &lt;span class=&quot;o&quot;&gt;=&lt;/span&gt; element_blank&lt;span class=&quot;p&quot;&gt;(),&lt;/span&gt; panel.grid.minor &lt;span class=&quot;o&quot;&gt;=&lt;/span&gt; element_blank&lt;span class=&quot;p&quot;&gt;(),&lt;/span&gt; 
-        panel.background &lt;span class=&quot;o&quot;&gt;=&lt;/span&gt; element_blank&lt;span class=&quot;p&quot;&gt;(),&lt;/span&gt; plot.background &lt;span class=&quot;o&quot;&gt;=&lt;/span&gt; element_blank&lt;span class=&quot;p&quot;&gt;(),&lt;/span&gt; 
-        axis.title.x &lt;span class=&quot;o&quot;&gt;=&lt;/span&gt; element_text&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;colour &lt;span class=&quot;o&quot;&gt;=&lt;/span&gt; &lt;span class=&quot;kc&quot;&gt;NA&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;),&lt;/span&gt; axis.title.y &lt;span class=&quot;o&quot;&gt;=&lt;/span&gt; element_blank&lt;span class=&quot;p&quot;&gt;(),&lt;/span&gt; 
-        axis.text.x &lt;span class=&quot;o&quot;&gt;=&lt;/span&gt; element_blank&lt;span class=&quot;p&quot;&gt;(),&lt;/span&gt; axis.text.y &lt;span class=&quot;o&quot;&gt;=&lt;/span&gt; element_blank&lt;span class=&quot;p&quot;&gt;(),&lt;/span&gt; axis.line &lt;span class=&quot;o&quot;&gt;=&lt;/span&gt; element_blank&lt;span class=&quot;p&quot;&gt;(),&lt;/span&gt; 
-        axis.ticks &lt;span class=&quot;o&quot;&gt;=&lt;/span&gt; element_blank&lt;span class=&quot;p&quot;&gt;())&lt;/span&gt;
-&lt;span class=&quot;p&quot;&gt;}&lt;/span&gt;
-&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;
-
-
-&lt;h3&gt;Simulate some trees&lt;/h3&gt;
-
-&lt;div class=&quot;highlight&quot;&gt;&lt;pre&gt;&lt;code class=&quot;r&quot;&gt;library&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;ape&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt;
-library&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;phytools&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt;
-
-numtrees &lt;span class=&quot;o&quot;&gt;&amp;lt;-&lt;/span&gt; &lt;span class=&quot;m&quot;&gt;1000&lt;/span&gt;  &lt;span class=&quot;c1&quot;&gt;# lets simulate 1000 trees&lt;/span&gt;
-trees &lt;span class=&quot;o&quot;&gt;&amp;lt;-&lt;/span&gt; pbtree&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;n &lt;span class=&quot;o&quot;&gt;=&lt;/span&gt; &lt;span class=&quot;m&quot;&gt;50&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt; nsim &lt;span class=&quot;o&quot;&gt;=&lt;/span&gt; numtrees&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt; ape &lt;span class=&quot;o&quot;&gt;=&lt;/span&gt; &lt;span class=&quot;k-Variable&quot;&gt;F&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt;  &lt;span class=&quot;c1&quot;&gt;# simulate 500 pure-birth trees with 100 spp each, ape = F makes it run faster&lt;/span&gt;
-&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;
-
-
-&lt;h3&gt;Calculate Colless' shape metric on each tree&lt;/h3&gt;
-
-&lt;div class=&quot;highlight&quot;&gt;&lt;pre&gt;&lt;code class=&quot;r&quot;&gt;library&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;plyr&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt;
-library&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;apTreeshape&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt;
-
-colless_df &lt;span class=&quot;o&quot;&gt;&amp;lt;-&lt;/span&gt; ldply&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;trees&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt; foo&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt; metric &lt;span class=&quot;o&quot;&gt;=&lt;/span&gt; &lt;span class=&quot;s&quot;&gt;&amp;quot;colless&amp;quot;&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt;  &lt;span class=&quot;c1&quot;&gt;# calculate metric for each tree&lt;/span&gt;
-head&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;colless_df&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt;
-&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;
-
-
-
-
-&lt;div class=&quot;highlight&quot;&gt;&lt;pre&gt;&lt;code class=&quot;text&quot;&gt;       V1
-1 -0.1761
-2  0.2839
-3  0.4639
-4  0.9439
-5 -0.6961
-6 -0.1161
-&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;
-
-
-
-
-&lt;div class=&quot;highlight&quot;&gt;&lt;pre&gt;&lt;code class=&quot;r&quot;&gt;&lt;span class=&quot;c1&quot;&gt;# Calculate the percent of trees that will fall into the cutoff for balanced and unbalanced trees&lt;/span&gt;
-col_percent_low &lt;span class=&quot;o&quot;&gt;&amp;lt;-&lt;/span&gt; round&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;length&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;colless_df&lt;span class=&quot;p&quot;&gt;[&lt;/span&gt;colless_df&lt;span class=&quot;o&quot;&gt;$&lt;/span&gt;V1 &lt;span class=&quot;o&quot;&gt;&amp;lt;&lt;/span&gt; &lt;span class=&quot;m&quot;&gt;-0.7&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt; &lt;span class=&quot;s&quot;&gt;&amp;quot;V1&amp;quot;&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;])&lt;/span&gt;&lt;span class=&quot;o&quot;&gt;/&lt;/span&gt;numtrees&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt; &lt;span class=&quot;m&quot;&gt;2&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;*&lt;/span&gt; &lt;span class=&quot;m&quot;&gt;100&lt;/span&gt;
-col_percent_high &lt;span class=&quot;o&quot;&gt;&amp;lt;-&lt;/span&gt; round&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;length&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;colless_df&lt;span class=&quot;p&quot;&gt;[&lt;/span&gt;colless_df&lt;span class=&quot;o&quot;&gt;$&lt;/span&gt;V1 &lt;span class=&quot;o&quot;&gt;&amp;gt;&lt;/span&gt; &lt;span class=&quot;m&quot;&gt;0.7&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt; &lt;span class=&quot;s&quot;&gt;&amp;quot;V1&amp;quot;&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;])&lt;/span&gt;&lt;span class=&quot;o&quot;&gt;/&lt;/span&gt;numtrees&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt; &lt;span class=&quot;m&quot;&gt;2&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;*&lt;/span&gt; &lt;span class=&quot;m&quot;&gt;100&lt;/span&gt;
-&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;
-
-
-&lt;h3&gt;Create a distribution of the metric values&lt;/h3&gt;
-
-&lt;div class=&quot;highlight&quot;&gt;&lt;pre&gt;&lt;code class=&quot;r&quot;&gt;library&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;ggplot2&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt;
-
-a &lt;span class=&quot;o&quot;&gt;&amp;lt;-&lt;/span&gt; ggplot&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;colless_df&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt; aes&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;V1&lt;span class=&quot;p&quot;&gt;))&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;+&lt;/span&gt;  &lt;span class=&quot;c1&quot;&gt;# plot histogram of distribution of values&lt;/span&gt;
-    geom_histogram&lt;span class=&quot;p&quot;&gt;()&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;+&lt;/span&gt; 
-    theme_bw&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;base_size&lt;span class=&quot;o&quot;&gt;=&lt;/span&gt;&lt;span class=&quot;m&quot;&gt;18&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;+&lt;/span&gt; 
-    scale_x_continuous&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;limits&lt;span class=&quot;o&quot;&gt;=&lt;/span&gt;c&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;m&quot;&gt;-3&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt;&lt;span class=&quot;m&quot;&gt;3&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;),&lt;/span&gt; breaks&lt;span class=&quot;o&quot;&gt;=&lt;/span&gt;c&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;m&quot;&gt;-3&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt;&lt;span class=&quot;m&quot;&gt;-2&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt;&lt;span class=&quot;m&quot;&gt;-1&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt;&lt;span class=&quot;m&quot;&gt;0&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt;&lt;span class=&quot;m&quot;&gt;1&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt;&lt;span class=&quot;m&quot;&gt;2&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt;&lt;span class=&quot;m&quot;&gt;3&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;))&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;+&lt;/span&gt; 
-    geom_vline&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;xintercept &lt;span class=&quot;o&quot;&gt;=&lt;/span&gt; &lt;span class=&quot;m&quot;&gt;-0.7&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt; colour&lt;span class=&quot;o&quot;&gt;=&lt;/span&gt;&lt;span class=&quot;s&quot;&gt;&amp;quot;red&amp;quot;&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt; linetype &lt;span class=&quot;o&quot;&gt;=&lt;/span&gt; &lt;span class=&quot;s&quot;&gt;&amp;quot;longdash&amp;quot;&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;+&lt;/span&gt;
-    geom_vline&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;xintercept &lt;span class=&quot;o&quot;&gt;=&lt;/span&gt; &lt;span class=&quot;m&quot;&gt;0.7&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt; colour&lt;span class=&quot;o&quot;&gt;=&lt;/span&gt;&lt;span class=&quot;s&quot;&gt;&amp;quot;red&amp;quot;&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt; linetype &lt;span class=&quot;o&quot;&gt;=&lt;/span&gt; &lt;span class=&quot;s&quot;&gt;&amp;quot;longdash&amp;quot;&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;+&lt;/span&gt;
-    ggtitle&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;paste0&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;s&quot;&gt;&amp;quot;Distribution of Colless&amp;#39; metric for 1000 trees, cutoffs at -0.7 and 0.7 results in\n &amp;quot;&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt; col_percent_low&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt; &lt;span class=&quot;s&quot;&gt;&amp;quot;% (&amp;quot;&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt; numtrees&lt;span class=&quot;o&quot;&gt;*&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;col_percent_low&lt;span class=&quot;o&quot;&gt;/&lt;/span&gt;&lt;span class=&quot;m&quot;&gt;100&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;),&lt;/span&gt; &lt;span class=&quot;s&quot;&gt;&amp;quot;) &amp;#39;balanced&amp;#39; trees (left) and &amp;quot;&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt; col_percent_low&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt; &lt;span class=&quot;s&quot;&gt;&amp;quot;% (&amp;quot;&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt; numtrees&lt;span class=&quot;o&quot;&gt;*&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;col_percent_low&lt;span class=&quot;o&quot;&gt;/&lt;/span&gt;&lt;span class=&quot;m&quot;&gt;100&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;),&lt;/span&gt; &lt;span class=&quot;s&quot;&gt;&amp;quot;) &amp;#39;unbalanced&amp;#39; trees (right)&amp;quot;&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;))&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;+&lt;/span&gt;  
-    labs&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;x &lt;span class=&quot;o&quot;&gt;=&lt;/span&gt; &lt;span class=&quot;s&quot;&gt;&amp;quot;Colless&amp;#39; Metric Value&amp;quot;&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt; y &lt;span class=&quot;o&quot;&gt;=&lt;/span&gt; &lt;span class=&quot;s&quot;&gt;&amp;quot;Number of phylogenetic trees&amp;quot;&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;+&lt;/span&gt;
-    theme&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;plot.title  &lt;span class=&quot;o&quot;&gt;=&lt;/span&gt; element_text&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;size &lt;span class=&quot;o&quot;&gt;=&lt;/span&gt; &lt;span class=&quot;m&quot;&gt;16&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;))&lt;/span&gt;
-
-a
-&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;
-
-
-&lt;p&gt;&lt;img src=&quot;/img/collesshist.png&quot; alt=&quot;center&quot; /&gt;&lt;/p&gt;
-
-&lt;h3&gt;Create phylogenies representing balanced and unbalanced trees (using the custom theme)&lt;/h3&gt;
-
-&lt;div class=&quot;highlight&quot;&gt;&lt;pre&gt;&lt;code class=&quot;r&quot;&gt;library&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;ggphylo&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt;
-
-b &lt;span class=&quot;o&quot;&gt;&amp;lt;-&lt;/span&gt; ggphylo&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;trees&lt;span class=&quot;p&quot;&gt;[&lt;/span&gt;which.min&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;colless_df&lt;span class=&quot;o&quot;&gt;$&lt;/span&gt;V1&lt;span class=&quot;p&quot;&gt;)],&lt;/span&gt; do.plot &lt;span class=&quot;o&quot;&gt;=&lt;/span&gt; &lt;span class=&quot;k-Variable&quot;&gt;F&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;+&lt;/span&gt; theme_myblank&lt;span class=&quot;p&quot;&gt;()&lt;/span&gt;
-c &lt;span class=&quot;o&quot;&gt;&amp;lt;-&lt;/span&gt; ggphylo&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;trees&lt;span class=&quot;p&quot;&gt;[&lt;/span&gt;which.max&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;colless_df&lt;span class=&quot;o&quot;&gt;$&lt;/span&gt;V1&lt;span class=&quot;p&quot;&gt;)],&lt;/span&gt; do.plot &lt;span class=&quot;o&quot;&gt;=&lt;/span&gt; &lt;span class=&quot;k-Variable&quot;&gt;F&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;+&lt;/span&gt; theme_myblank&lt;span class=&quot;p&quot;&gt;()&lt;/span&gt;
-
-b
-&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;
-
-
-&lt;p&gt;&lt;img src=&quot;/img/collessphylog.png&quot; alt=&quot;center&quot; /&gt;&lt;/p&gt;
-
-&lt;h3&gt;Now, put it all together in one plot using some gridExtra magic.&lt;/h3&gt;
-
-&lt;div class=&quot;highlight&quot;&gt;&lt;pre&gt;&lt;code class=&quot;r&quot;&gt;library&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;gridExtra&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt;
-
-grid.newpage&lt;span class=&quot;p&quot;&gt;()&lt;/span&gt;
-pushViewport&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;viewport&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;layout &lt;span class=&quot;o&quot;&gt;=&lt;/span&gt; grid.layout&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;m&quot;&gt;1&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt; &lt;span class=&quot;m&quot;&gt;1&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;)))&lt;/span&gt;
-vpa_ &lt;span class=&quot;o&quot;&gt;&amp;lt;-&lt;/span&gt; viewport&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;width &lt;span class=&quot;o&quot;&gt;=&lt;/span&gt; &lt;span class=&quot;m&quot;&gt;1&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt; height &lt;span class=&quot;o&quot;&gt;=&lt;/span&gt; &lt;span class=&quot;m&quot;&gt;1&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt; x &lt;span class=&quot;o&quot;&gt;=&lt;/span&gt; &lt;span class=&quot;m&quot;&gt;0.5&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt; y &lt;span class=&quot;o&quot;&gt;=&lt;/span&gt; &lt;span class=&quot;m&quot;&gt;0.49&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt;
-vpb_ &lt;span class=&quot;o&quot;&gt;&amp;lt;-&lt;/span&gt; viewport&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;width &lt;span class=&quot;o&quot;&gt;=&lt;/span&gt; &lt;span class=&quot;m&quot;&gt;0.35&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt; height &lt;span class=&quot;o&quot;&gt;=&lt;/span&gt; &lt;span class=&quot;m&quot;&gt;0.35&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt; x &lt;span class=&quot;o&quot;&gt;=&lt;/span&gt; &lt;span class=&quot;m&quot;&gt;0.23&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt; y &lt;span class=&quot;o&quot;&gt;=&lt;/span&gt; &lt;span class=&quot;m&quot;&gt;0.7&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt;
-vpc_ &lt;span class=&quot;o&quot;&gt;&amp;lt;-&lt;/span&gt; viewport&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;width &lt;span class=&quot;o&quot;&gt;=&lt;/span&gt; &lt;span class=&quot;m&quot;&gt;0.35&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt; height &lt;span class=&quot;o&quot;&gt;=&lt;/span&gt; &lt;span class=&quot;m&quot;&gt;0.35&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt; x &lt;span class=&quot;o&quot;&gt;=&lt;/span&gt; &lt;span class=&quot;m&quot;&gt;0.82&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt; y &lt;span class=&quot;o&quot;&gt;=&lt;/span&gt; &lt;span class=&quot;m&quot;&gt;0.7&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt;
-print&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;a&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt; vp &lt;span class=&quot;o&quot;&gt;=&lt;/span&gt; vpa_&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt;
-print&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;b&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt; vp &lt;span class=&quot;o&quot;&gt;=&lt;/span&gt; vpb_&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt;
-print&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;c&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt; vp &lt;span class=&quot;o&quot;&gt;=&lt;/span&gt; vpc_&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt;
-&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;
-
-
-&lt;p&gt;&lt;img src=&quot;/img/collessall.png&quot; alt=&quot;center&quot; /&gt;&lt;/p&gt;
-
-&lt;h3&gt;And the same for Gamma stat, which measures the distribution of nodes in time.&lt;/h3&gt;
-
-&lt;div class=&quot;highlight&quot;&gt;&lt;pre&gt;&lt;code class=&quot;r&quot;&gt;gamma_df &lt;span class=&quot;o&quot;&gt;&amp;lt;-&lt;/span&gt; ldply&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;trees&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt; foo&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt; metric&lt;span class=&quot;o&quot;&gt;=&lt;/span&gt;&lt;span class=&quot;s&quot;&gt;&amp;quot;gamma&amp;quot;&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt; &lt;span class=&quot;c1&quot;&gt;# calculate metric for each tree&lt;/span&gt;
-gam_percent_low &lt;span class=&quot;o&quot;&gt;&amp;lt;-&lt;/span&gt; round&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;length&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;gamma_df&lt;span class=&quot;p&quot;&gt;[&lt;/span&gt;gamma_df&lt;span class=&quot;o&quot;&gt;$&lt;/span&gt;V1 &lt;span class=&quot;o&quot;&gt;&amp;lt;&lt;/span&gt; &lt;span class=&quot;m&quot;&gt;-1&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt; &lt;span class=&quot;s&quot;&gt;&amp;quot;V1&amp;quot;&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;])&lt;/span&gt;&lt;span class=&quot;o&quot;&gt;/&lt;/span&gt;numtrees&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt; &lt;span class=&quot;m&quot;&gt;2&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt;&lt;span class=&quot;o&quot;&gt;*&lt;/span&gt;&lt;span class=&quot;m&quot;&gt;100&lt;/span&gt;
-gam_percent_high &lt;span class=&quot;o&quot;&gt;&amp;lt;-&lt;/span&gt; round&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;length&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;gamma_df&lt;span class=&quot;p&quot;&gt;[&lt;/span&gt;gamma_df&lt;span class=&quot;o&quot;&gt;$&lt;/span&gt;V1 &lt;span class=&quot;o&quot;&gt;&amp;gt;&lt;/span&gt; &lt;span class=&quot;m&quot;&gt;1&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt; &lt;span class=&quot;s&quot;&gt;&amp;quot;V1&amp;quot;&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;])&lt;/span&gt;&lt;span class=&quot;o&quot;&gt;/&lt;/span&gt;numtrees&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt; &lt;span class=&quot;m&quot;&gt;2&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt;&lt;span class=&quot;o&quot;&gt;*&lt;/span&gt;&lt;span class=&quot;m&quot;&gt;100&lt;/span&gt;
-a &lt;span class=&quot;o&quot;&gt;&amp;lt;-&lt;/span&gt; ggplot&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;gamma_df&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt; aes&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;V1&lt;span class=&quot;p&quot;&gt;))&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;+&lt;/span&gt;  &lt;span class=&quot;c1&quot;&gt;# plot histogram of distribution of values&lt;/span&gt;
-    geom_histogram&lt;span class=&quot;p&quot;&gt;()&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;+&lt;/span&gt; 
-    theme_bw&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;base_size&lt;span class=&quot;o&quot;&gt;=&lt;/span&gt;&lt;span class=&quot;m&quot;&gt;18&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;+&lt;/span&gt; 
-    scale_x_continuous&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;breaks&lt;span class=&quot;o&quot;&gt;=&lt;/span&gt;c&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;m&quot;&gt;-3&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt;&lt;span class=&quot;m&quot;&gt;-2&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt;&lt;span class=&quot;m&quot;&gt;-1&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt;&lt;span class=&quot;m&quot;&gt;0&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt;&lt;span class=&quot;m&quot;&gt;1&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt;&lt;span class=&quot;m&quot;&gt;2&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt;&lt;span class=&quot;m&quot;&gt;3&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;))&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;+&lt;/span&gt; 
-    geom_vline&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;xintercept &lt;span class=&quot;o&quot;&gt;=&lt;/span&gt; &lt;span class=&quot;m&quot;&gt;-1&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt; colour&lt;span class=&quot;o&quot;&gt;=&lt;/span&gt;&lt;span class=&quot;s&quot;&gt;&amp;quot;red&amp;quot;&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt; linetype &lt;span class=&quot;o&quot;&gt;=&lt;/span&gt; &lt;span class=&quot;s&quot;&gt;&amp;quot;longdash&amp;quot;&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;+&lt;/span&gt;
-    geom_vline&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;xintercept &lt;span class=&quot;o&quot;&gt;=&lt;/span&gt; &lt;span class=&quot;m&quot;&gt;1&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt; colour&lt;span class=&quot;o&quot;&gt;=&lt;/span&gt;&lt;span class=&quot;s&quot;&gt;&amp;quot;red&amp;quot;&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt; linetype &lt;span class=&quot;o&quot;&gt;=&lt;/span&gt; &lt;span class=&quot;s&quot;&gt;&amp;quot;longdash&amp;quot;&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;+&lt;/span&gt;
-    ggtitle&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;paste0&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;s&quot;&gt;&amp;quot;Distribution of Gamma metric for 1000 trees, cutoffs at -1 and 1 results in\n &amp;quot;&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt; gam_percent_low&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt; &lt;span class=&quot;s&quot;&gt;&amp;quot;% (&amp;quot;&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt; numtrees&lt;span class=&quot;o&quot;&gt;*&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;gam_percent_low&lt;span class=&quot;o&quot;&gt;/&lt;/span&gt;&lt;span class=&quot;m&quot;&gt;100&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;),&lt;/span&gt; &lt;span class=&quot;s&quot;&gt;&amp;quot;) trees with deeper nodes (left) and &amp;quot;&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt; gam_percent_high&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt; &lt;span class=&quot;s&quot;&gt;&amp;quot;% (&amp;quot;&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt; numtrees&lt;span class=&quot;o&quot;&gt;*&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;gam_percent_high&lt;span class=&quot;o&quot;&gt;/&lt;/span&gt;&lt;span class=&quot;m&quot;&gt;100&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;),&lt;/span&gt; &lt;span class=&quot;s&quot;&gt;&amp;quot;) trees with shallower nodes (right)&amp;quot;&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;))&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;+&lt;/span&gt;  
-    labs&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;x &lt;span class=&quot;o&quot;&gt;=&lt;/span&gt; &lt;span class=&quot;s&quot;&gt;&amp;quot;Gamma Metric Value&amp;quot;&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt; y &lt;span class=&quot;o&quot;&gt;=&lt;/span&gt; &lt;span class=&quot;s&quot;&gt;&amp;quot;Number of phylogenetic trees&amp;quot;&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;+&lt;/span&gt;
-    theme&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;plot.title  &lt;span class=&quot;o&quot;&gt;=&lt;/span&gt; element_text&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;size &lt;span class=&quot;o&quot;&gt;=&lt;/span&gt; &lt;span class=&quot;m&quot;&gt;16&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;))&lt;/span&gt;
-b &lt;span class=&quot;o&quot;&gt;&amp;lt;-&lt;/span&gt; ggphylo&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;trees&lt;span class=&quot;p&quot;&gt;[&lt;/span&gt;which.min&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;gamma_df&lt;span class=&quot;o&quot;&gt;$&lt;/span&gt;V1&lt;span class=&quot;p&quot;&gt;)],&lt;/span&gt; do.plot&lt;span class=&quot;o&quot;&gt;=&lt;/span&gt;&lt;span class=&quot;k-Variable&quot;&gt;F&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;+&lt;/span&gt; theme_myblank&lt;span class=&quot;p&quot;&gt;()&lt;/span&gt;
-c &lt;span class=&quot;o&quot;&gt;&amp;lt;-&lt;/span&gt; ggphylo&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;trees&lt;span class=&quot;p&quot;&gt;[&lt;/span&gt;which.max&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;gamma_df&lt;span class=&quot;o&quot;&gt;$&lt;/span&gt;V1&lt;span class=&quot;p&quot;&gt;)],&lt;/span&gt; do.plot&lt;span class=&quot;o&quot;&gt;=&lt;/span&gt;&lt;span class=&quot;k-Variable&quot;&gt;F&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;+&lt;/span&gt; theme_myblank&lt;span class=&quot;p&quot;&gt;()&lt;/span&gt;
-
-grid.newpage&lt;span class=&quot;p&quot;&gt;()&lt;/span&gt;
-pushViewport&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;viewport&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;layout &lt;span class=&quot;o&quot;&gt;=&lt;/span&gt; grid.layout&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;m&quot;&gt;1&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt;&lt;span class=&quot;m&quot;&gt;1&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;)))&lt;/span&gt;
-vpa_ &lt;span class=&quot;o&quot;&gt;&amp;lt;-&lt;/span&gt; viewport&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;width &lt;span class=&quot;o&quot;&gt;=&lt;/span&gt; &lt;span class=&quot;m&quot;&gt;1&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt; height &lt;span class=&quot;o&quot;&gt;=&lt;/span&gt; &lt;span class=&quot;m&quot;&gt;1&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt; x &lt;span class=&quot;o&quot;&gt;=&lt;/span&gt; &lt;span class=&quot;m&quot;&gt;0.5&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt; y &lt;span class=&quot;o&quot;&gt;=&lt;/span&gt; &lt;span class=&quot;m&quot;&gt;0.49&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt;
-vpb_ &lt;span class=&quot;o&quot;&gt;&amp;lt;-&lt;/span&gt; viewport&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;width &lt;span class=&quot;o&quot;&gt;=&lt;/span&gt; &lt;span class=&quot;m&quot;&gt;0.35&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt; height &lt;span class=&quot;o&quot;&gt;=&lt;/span&gt; &lt;span class=&quot;m&quot;&gt;0.35&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt; x &lt;span class=&quot;o&quot;&gt;=&lt;/span&gt; &lt;span class=&quot;m&quot;&gt;0.23&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt; y &lt;span class=&quot;o&quot;&gt;=&lt;/span&gt; &lt;span class=&quot;m&quot;&gt;0.7&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt;
-vpc_ &lt;span class=&quot;o&quot;&gt;&amp;lt;-&lt;/span&gt; viewport&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;width &lt;span class=&quot;o&quot;&gt;=&lt;/span&gt; &lt;span class=&quot;m&quot;&gt;0.35&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt; height &lt;span class=&quot;o&quot;&gt;=&lt;/span&gt; &lt;span class=&quot;m&quot;&gt;0.35&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt; x &lt;span class=&quot;o&quot;&gt;=&lt;/span&gt; &lt;span class=&quot;m&quot;&gt;0.82&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt; y &lt;span class=&quot;o&quot;&gt;=&lt;/span&gt; &lt;span class=&quot;m&quot;&gt;0.7&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt;
-print&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;a&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt; vp &lt;span class=&quot;o&quot;&gt;=&lt;/span&gt; vpa_&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt;
-print&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;b&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt; vp &lt;span class=&quot;o&quot;&gt;=&lt;/span&gt; vpb_&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt;
-print&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;c&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt; vp &lt;span class=&quot;o&quot;&gt;=&lt;/span&gt; vpc_&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt;
-&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;
-
-
-&lt;p&gt;&lt;img src=&quot;/img/gammaall.png&quot; alt=&quot;center&quot; /&gt;&lt;/p&gt;
-
-&lt;hr /&gt;
-
-&lt;h4&gt;Get the .Rmd file used to create this post &lt;a href=&quot;https://github.com/SChamberlain/schamberlain.github.com/blob/master/_drafts/2012-10-10-phylogenetic-tree-balance.Rmd&quot;&gt;at my github account&lt;/a&gt; - or &lt;a href=&quot;https://github.com/SChamberlain/schamberlain.github.com/tree/master/_posts/2012-10-10-phylogenetic-tree-balance.md&quot;&gt;.md file&lt;/a&gt;.&lt;/h4&gt;
-
-&lt;h4&gt;Written in &lt;a href=&quot;http://daringfireball.net/projects/markdown/&quot;&gt;Markdown&lt;/a&gt;, with help from &lt;a href=&quot;http://yihui.name/knitr/&quot;&gt;knitr&lt;/a&gt;.&lt;/h4&gt;
-</description>
-				<published>2012-10-10 00:00:00 -0700</published>
-				<link>http://schamberlain.github.com/2012/10/phylogenetic-tree-balance/</link>
 			</item>
 		
 	</channel>

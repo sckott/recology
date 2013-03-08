@@ -6,6 +6,130 @@
 		<link>http://schamberlain.github.com</link>
 		
 			<item>
+				<title>Visualizing rOpenSci collaboration</title>
+				<description>&lt;p&gt;We (&lt;a href=&quot;http://ropensci.org/&quot;&gt;rOpenSci&lt;/a&gt;) have been writing code for R packages for a couple years, so it is time to take a look back at the data. What data you ask? The commits data from GitHub ~ data that records who did what and when.&lt;/p&gt;
+
+&lt;p&gt;Using the &lt;a href=&quot;http://developer.github.com/v3/repos/commits/&quot;&gt;Github commits API&lt;/a&gt; we can gather data on who commited code to a Github repository, and when they did it. Then we can visualize this hitorical record.&lt;/p&gt;
+
+&lt;hr /&gt;
+
+&lt;h3&gt;Install some functions for interacting with the Github API via R&lt;/h3&gt;
+
+&lt;div class=&quot;highlight&quot;&gt;&lt;pre&gt;&lt;code class=&quot;r&quot;&gt;install_github&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;s&quot;&gt;&amp;#39;sandbox&amp;#39;&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt; &lt;span class=&quot;s&quot;&gt;&amp;#39;ropensci&amp;#39;&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt; 
+
+library&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;sandbox&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt;
+library&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;httr&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt;
+library&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;ggplot2&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt;
+library&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;scales&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt;
+library&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;reshape2&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt;
+library&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;bipartite&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt;
+library&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;doMC&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt;
+library&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;plyr&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt;
+library&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;ggthemes&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt;
+library&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;picante&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt;
+
+&lt;span class=&quot;c1&quot;&gt;# And authenticate - pops open a page in your default browser, then tells &lt;/span&gt;
+&lt;span class=&quot;c1&quot;&gt;# you authentication was successful&lt;/span&gt;
+github_auth&lt;span class=&quot;p&quot;&gt;()&lt;/span&gt;
+&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;
+
+
+&lt;hr /&gt;
+
+&lt;h3&gt;Get all repos for an organization, here ropensci of course&lt;/h3&gt;
+
+&lt;div class=&quot;highlight&quot;&gt;&lt;pre&gt;&lt;code class=&quot;r&quot;&gt;ropensci_repos &lt;span class=&quot;o&quot;&gt;&amp;lt;-&lt;/span&gt; github_allrepos&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;userorg &lt;span class=&quot;o&quot;&gt;=&lt;/span&gt; &lt;span class=&quot;s&quot;&gt;&amp;quot;ropensci&amp;quot;&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt;
+&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;
+
+
+&lt;hr /&gt;
+
+&lt;h3&gt;Get commits broken down in to additions and deletions, though below we just collapse them to all commits&lt;/h3&gt;
+
+&lt;div class=&quot;highlight&quot;&gt;&lt;pre&gt;&lt;code class=&quot;r&quot;&gt;registerDoMC&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;cores &lt;span class=&quot;o&quot;&gt;=&lt;/span&gt; &lt;span class=&quot;m&quot;&gt;4&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt;
+github_commits_safe &lt;span class=&quot;o&quot;&gt;&amp;lt;-&lt;/span&gt; plyr&lt;span class=&quot;o&quot;&gt;::&lt;/span&gt;failwith&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;kc&quot;&gt;NULL&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt; github_commits&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt;
+out &lt;span class=&quot;o&quot;&gt;&amp;lt;-&lt;/span&gt; llply&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;ropensci_repos&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt; &lt;span class=&quot;kr&quot;&gt;function&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;x&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt; github_commits_safe&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;s&quot;&gt;&amp;quot;ropensci&amp;quot;&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt; x&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt; 
+    since &lt;span class=&quot;o&quot;&gt;=&lt;/span&gt; &lt;span class=&quot;s&quot;&gt;&amp;quot;2009-01-01T&amp;quot;&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt; limit &lt;span class=&quot;o&quot;&gt;=&lt;/span&gt; &lt;span class=&quot;m&quot;&gt;500&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;),&lt;/span&gt; .parallel &lt;span class=&quot;o&quot;&gt;=&lt;/span&gt; &lt;span class=&quot;kc&quot;&gt;TRUE&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt;
+names&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;out&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;&amp;lt;-&lt;/span&gt; ropensci_repos
+out2 &lt;span class=&quot;o&quot;&gt;&amp;lt;-&lt;/span&gt; compact&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;out&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt;
+outdf &lt;span class=&quot;o&quot;&gt;&amp;lt;-&lt;/span&gt; ldply&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;out2&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt;
+&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;
+
+
+&lt;hr /&gt;
+
+&lt;h3&gt;Plot commits by date and repo&lt;/h3&gt;
+
+&lt;div class=&quot;highlight&quot;&gt;&lt;pre&gt;&lt;code class=&quot;r&quot;&gt;outdf_subset &lt;span class=&quot;o&quot;&gt;&amp;lt;-&lt;/span&gt; outdf&lt;span class=&quot;p&quot;&gt;[&lt;/span&gt;&lt;span class=&quot;o&quot;&gt;!&lt;/span&gt;outdf&lt;span class=&quot;o&quot;&gt;$&lt;/span&gt;.id &lt;span class=&quot;o&quot;&gt;%in%&lt;/span&gt; c&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;s&quot;&gt;&amp;quot;citeulike&amp;quot;&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt; &lt;span class=&quot;s&quot;&gt;&amp;quot;challenge&amp;quot;&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt; &lt;span class=&quot;s&quot;&gt;&amp;quot;docs&amp;quot;&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt; &lt;span class=&quot;s&quot;&gt;&amp;quot;ropensci-book&amp;quot;&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt; 
+    &lt;span class=&quot;s&quot;&gt;&amp;quot;usecases&amp;quot;&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt; &lt;span class=&quot;s&quot;&gt;&amp;quot;textmine&amp;quot;&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt; &lt;span class=&quot;s&quot;&gt;&amp;quot;usgs&amp;quot;&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt; &lt;span class=&quot;s&quot;&gt;&amp;quot;ropenscitoolkit&amp;quot;&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt; &lt;span class=&quot;s&quot;&gt;&amp;quot;neotoma&amp;quot;&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt; &lt;span class=&quot;s&quot;&gt;&amp;quot;rEWDB&amp;quot;&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt; &lt;span class=&quot;s&quot;&gt;&amp;quot;rgauges&amp;quot;&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt; 
+    &lt;span class=&quot;s&quot;&gt;&amp;quot;rodash&amp;quot;&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt; &lt;span class=&quot;s&quot;&gt;&amp;quot;ropensci.github.com&amp;quot;&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt; &lt;span class=&quot;s&quot;&gt;&amp;quot;ROAuth&amp;quot;&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;),&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;]&lt;/span&gt;
+outdf_subset&lt;span class=&quot;o&quot;&gt;$&lt;/span&gt;.id &lt;span class=&quot;o&quot;&gt;&amp;lt;-&lt;/span&gt; tolower&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;outdf_subset&lt;span class=&quot;o&quot;&gt;$&lt;/span&gt;.id&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt;
+outdf_subset &lt;span class=&quot;o&quot;&gt;&amp;lt;-&lt;/span&gt; ddply&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;outdf_subset&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt; .&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;.id&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt; date&lt;span class=&quot;p&quot;&gt;),&lt;/span&gt; summarise&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt; value &lt;span class=&quot;o&quot;&gt;=&lt;/span&gt; sum&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;value&lt;span class=&quot;p&quot;&gt;))&lt;/span&gt;
+
+mindates &lt;span class=&quot;o&quot;&gt;&amp;lt;-&lt;/span&gt; llply&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;unique&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;outdf_subset&lt;span class=&quot;o&quot;&gt;$&lt;/span&gt;.id&lt;span class=&quot;p&quot;&gt;),&lt;/span&gt; &lt;span class=&quot;kr&quot;&gt;function&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;x&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt; min&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;outdf_subset&lt;span class=&quot;p&quot;&gt;[&lt;/span&gt;outdf_subset&lt;span class=&quot;o&quot;&gt;$&lt;/span&gt;.id &lt;span class=&quot;o&quot;&gt;==&lt;/span&gt; 
+    x&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt; &lt;span class=&quot;s&quot;&gt;&amp;quot;date&amp;quot;&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;]))&lt;/span&gt;
+names&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;mindates&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;&amp;lt;-&lt;/span&gt; unique&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;outdf_subset&lt;span class=&quot;o&quot;&gt;$&lt;/span&gt;.id&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt;
+mindates &lt;span class=&quot;o&quot;&gt;&amp;lt;-&lt;/span&gt; sort&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;do.call&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;c&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt; mindates&lt;span class=&quot;p&quot;&gt;))&lt;/span&gt;
+outdf_subset&lt;span class=&quot;o&quot;&gt;$&lt;/span&gt;.id &lt;span class=&quot;o&quot;&gt;&amp;lt;-&lt;/span&gt; factor&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;outdf_subset&lt;span class=&quot;o&quot;&gt;$&lt;/span&gt;.id&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt; levels &lt;span class=&quot;o&quot;&gt;=&lt;/span&gt; names&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;mindates&lt;span class=&quot;p&quot;&gt;))&lt;/span&gt;
+
+ggplot&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;outdf_subset&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt; aes&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;date&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt; value&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt; fill &lt;span class=&quot;o&quot;&gt;=&lt;/span&gt; .id&lt;span class=&quot;p&quot;&gt;))&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;+&lt;/span&gt; 
+    geom_bar&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;stat &lt;span class=&quot;o&quot;&gt;=&lt;/span&gt; &lt;span class=&quot;s&quot;&gt;&amp;quot;identity&amp;quot;&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt; width &lt;span class=&quot;o&quot;&gt;=&lt;/span&gt; &lt;span class=&quot;m&quot;&gt;0.5&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;+&lt;/span&gt; 
+    geom_rangeframe&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;sides &lt;span class=&quot;o&quot;&gt;=&lt;/span&gt; &lt;span class=&quot;s&quot;&gt;&amp;quot;b&amp;quot;&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt; colour &lt;span class=&quot;o&quot;&gt;=&lt;/span&gt; &lt;span class=&quot;s&quot;&gt;&amp;quot;grey&amp;quot;&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;+&lt;/span&gt; 
+    theme_bw&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;base_size &lt;span class=&quot;o&quot;&gt;=&lt;/span&gt; &lt;span class=&quot;m&quot;&gt;9&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;+&lt;/span&gt; 
+    scale_x_date&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;labels &lt;span class=&quot;o&quot;&gt;=&lt;/span&gt; date_format&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;s&quot;&gt;&amp;quot;%Y&amp;quot;&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;),&lt;/span&gt; breaks &lt;span class=&quot;o&quot;&gt;=&lt;/span&gt; date_breaks&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;s&quot;&gt;&amp;quot;year&amp;quot;&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;))&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;+&lt;/span&gt; 
+    scale_y_log10&lt;span class=&quot;p&quot;&gt;()&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;+&lt;/span&gt; 
+    facet_grid&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;.id &lt;span class=&quot;o&quot;&gt;~&lt;/span&gt; .&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;+&lt;/span&gt; 
+    labs&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;x &lt;span class=&quot;o&quot;&gt;=&lt;/span&gt; &lt;span class=&quot;s&quot;&gt;&amp;quot;&amp;quot;&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt; y &lt;span class=&quot;o&quot;&gt;=&lt;/span&gt; &lt;span class=&quot;s&quot;&gt;&amp;quot;&amp;quot;&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;+&lt;/span&gt; 
+    theme&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;axis.text.y &lt;span class=&quot;o&quot;&gt;=&lt;/span&gt; element_blank&lt;span class=&quot;p&quot;&gt;(),&lt;/span&gt; 
+        axis.text.x &lt;span class=&quot;o&quot;&gt;=&lt;/span&gt; element_text&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;colour &lt;span class=&quot;o&quot;&gt;=&lt;/span&gt; &lt;span class=&quot;s&quot;&gt;&amp;quot;black&amp;quot;&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;),&lt;/span&gt; 
+        axis.ticks.y &lt;span class=&quot;o&quot;&gt;=&lt;/span&gt; element_blank&lt;span class=&quot;p&quot;&gt;(),&lt;/span&gt; 
+        strip.text.y &lt;span class=&quot;o&quot;&gt;=&lt;/span&gt; element_text&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;angle &lt;span class=&quot;o&quot;&gt;=&lt;/span&gt; &lt;span class=&quot;m&quot;&gt;0&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt; size &lt;span class=&quot;o&quot;&gt;=&lt;/span&gt; &lt;span class=&quot;m&quot;&gt;8&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;),&lt;/span&gt; 
+        strip.background &lt;span class=&quot;o&quot;&gt;=&lt;/span&gt; element_rect&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;size &lt;span class=&quot;o&quot;&gt;=&lt;/span&gt; &lt;span class=&quot;m&quot;&gt;0&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;),&lt;/span&gt; 
+        panel.grid.major &lt;span class=&quot;o&quot;&gt;=&lt;/span&gt; element_blank&lt;span class=&quot;p&quot;&gt;(),&lt;/span&gt; 
+        panel.grid.minor &lt;span class=&quot;o&quot;&gt;=&lt;/span&gt; element_blank&lt;span class=&quot;p&quot;&gt;(),&lt;/span&gt; 
+        legend.text &lt;span class=&quot;o&quot;&gt;=&lt;/span&gt; element_text&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;size &lt;span class=&quot;o&quot;&gt;=&lt;/span&gt; &lt;span class=&quot;m&quot;&gt;8&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;),&lt;/span&gt; 
+        legend.position &lt;span class=&quot;o&quot;&gt;=&lt;/span&gt; &lt;span class=&quot;s&quot;&gt;&amp;quot;none&amp;quot;&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt; 
+        panel.border &lt;span class=&quot;o&quot;&gt;=&lt;/span&gt; element_blank&lt;span class=&quot;p&quot;&gt;())&lt;/span&gt;
+&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;
+
+
+&lt;p&gt;&lt;img src=&quot;/img/commitsbydate.png&quot; alt=&quot;center&quot; /&gt;&lt;/p&gt;
+
+&lt;p&gt;The plot above plots the sum of additions+deletions, and is sorted by the first commit date of reach repo, with the first being &lt;a href=&quot;https://github.com/ropensci/treeBASE&quot;&gt;treebase&lt;/a&gt;, which wraps the &lt;a href=&quot;http://treebase.org/treebase-web/urlAPI.html&quot;&gt;Treebase API&lt;/a&gt;, and the most recent being &lt;a href=&quot;https://github.com/ropensci/rWBclimate&quot;&gt;rwbclimate&lt;/a&gt;, which wraps the &lt;a href=&quot;http://data.worldbank.org/developers/climate-data-api&quot;&gt;World Blank climate data API&lt;/a&gt;.&lt;/p&gt;
+
+&lt;p&gt;You can see that some repos have recieved commits more or less consistently over their life time, while others have seen a little development here and there.&lt;/p&gt;
+
+&lt;hr /&gt;
+
+&lt;h3&gt;In addition, there are quite a few people that have committed code now to rOpenSci repos, calling for a network vizualization of course.&lt;/h3&gt;
+
+&lt;div class=&quot;highlight&quot;&gt;&lt;pre&gt;&lt;code class=&quot;r&quot;&gt;outdf_network &lt;span class=&quot;o&quot;&gt;&amp;lt;-&lt;/span&gt; droplevels&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;outdf&lt;span class=&quot;p&quot;&gt;[&lt;/span&gt;&lt;span class=&quot;o&quot;&gt;!&lt;/span&gt;outdf&lt;span class=&quot;o&quot;&gt;$&lt;/span&gt;.id &lt;span class=&quot;o&quot;&gt;%in%&lt;/span&gt; c&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;s&quot;&gt;&amp;quot;citeulike&amp;quot;&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt; &lt;span class=&quot;s&quot;&gt;&amp;quot;challenge&amp;quot;&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt; 
+    &lt;span class=&quot;s&quot;&gt;&amp;quot;docs&amp;quot;&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt; &lt;span class=&quot;s&quot;&gt;&amp;quot;ropensci-book&amp;quot;&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt; &lt;span class=&quot;s&quot;&gt;&amp;quot;usecases&amp;quot;&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt; &lt;span class=&quot;s&quot;&gt;&amp;quot;textmine&amp;quot;&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt; &lt;span class=&quot;s&quot;&gt;&amp;quot;usgs&amp;quot;&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt; &lt;span class=&quot;s&quot;&gt;&amp;quot;ropenscitoolkit&amp;quot;&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt; 
+    &lt;span class=&quot;s&quot;&gt;&amp;quot;retriever&amp;quot;&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt; &lt;span class=&quot;s&quot;&gt;&amp;quot;rodash&amp;quot;&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt; &lt;span class=&quot;s&quot;&gt;&amp;quot;ropensci.github.com&amp;quot;&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt; &lt;span class=&quot;s&quot;&gt;&amp;quot;ROAuth&amp;quot;&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt; &lt;span class=&quot;s&quot;&gt;&amp;quot;rgauges&amp;quot;&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt; &lt;span class=&quot;s&quot;&gt;&amp;quot;sandbox&amp;quot;&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt; 
+    &lt;span class=&quot;s&quot;&gt;&amp;quot;rfna&amp;quot;&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt; &lt;span class=&quot;s&quot;&gt;&amp;quot;rmetadata&amp;quot;&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt; &lt;span class=&quot;s&quot;&gt;&amp;quot;rhindawi&amp;quot;&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt; &lt;span class=&quot;s&quot;&gt;&amp;quot;rpmc&amp;quot;&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt; &lt;span class=&quot;s&quot;&gt;&amp;quot;rpensoft&amp;quot;&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt; &lt;span class=&quot;s&quot;&gt;&amp;quot;ritis&amp;quot;&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;),&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;])&lt;/span&gt;
+casted &lt;span class=&quot;o&quot;&gt;&amp;lt;-&lt;/span&gt; dcast&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;outdf_network&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt; .id &lt;span class=&quot;o&quot;&gt;+&lt;/span&gt; date &lt;span class=&quot;o&quot;&gt;+&lt;/span&gt; name &lt;span class=&quot;o&quot;&gt;~&lt;/span&gt; variable&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt; fun.aggregate &lt;span class=&quot;o&quot;&gt;=&lt;/span&gt; length&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt; 
+    value.var &lt;span class=&quot;o&quot;&gt;=&lt;/span&gt; &lt;span class=&quot;s&quot;&gt;&amp;quot;value&amp;quot;&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt;
+names&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;casted&lt;span class=&quot;p&quot;&gt;)[&lt;/span&gt;&lt;span class=&quot;m&quot;&gt;1&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;]&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;&amp;lt;-&lt;/span&gt; &lt;span class=&quot;s&quot;&gt;&amp;quot;repo&amp;quot;&lt;/span&gt;
+casted2 &lt;span class=&quot;o&quot;&gt;&amp;lt;-&lt;/span&gt; ddply&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;casted&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt; .&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;repo&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt; name&lt;span class=&quot;p&quot;&gt;),&lt;/span&gt; summarise&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt; commits &lt;span class=&quot;o&quot;&gt;=&lt;/span&gt; sum&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;additions&lt;span class=&quot;p&quot;&gt;))&lt;/span&gt;
+casted2 &lt;span class=&quot;o&quot;&gt;&amp;lt;-&lt;/span&gt; data.frame&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;repo &lt;span class=&quot;o&quot;&gt;=&lt;/span&gt; casted2&lt;span class=&quot;o&quot;&gt;$&lt;/span&gt;repo&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt; weight &lt;span class=&quot;o&quot;&gt;=&lt;/span&gt; casted2&lt;span class=&quot;o&quot;&gt;$&lt;/span&gt;commits&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt; name &lt;span class=&quot;o&quot;&gt;=&lt;/span&gt; casted2&lt;span class=&quot;o&quot;&gt;$&lt;/span&gt;name&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt;
+mat &lt;span class=&quot;o&quot;&gt;&amp;lt;-&lt;/span&gt; sample2matrix&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;casted2&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt;
+plotweb&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;sortweb&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;mat&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt; sort.order &lt;span class=&quot;o&quot;&gt;=&lt;/span&gt; &lt;span class=&quot;s&quot;&gt;&amp;quot;dec&amp;quot;&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;),&lt;/span&gt; method &lt;span class=&quot;o&quot;&gt;=&lt;/span&gt; &lt;span class=&quot;s&quot;&gt;&amp;quot;normal&amp;quot;&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt; text.rot &lt;span class=&quot;o&quot;&gt;=&lt;/span&gt; &lt;span class=&quot;m&quot;&gt;90&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt; 
+    adj.high &lt;span class=&quot;o&quot;&gt;=&lt;/span&gt; c&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;m&quot;&gt;-0.3&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt; &lt;span class=&quot;m&quot;&gt;0&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;),&lt;/span&gt; adj.low &lt;span class=&quot;o&quot;&gt;=&lt;/span&gt; c&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;m&quot;&gt;1&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt; &lt;span class=&quot;m&quot;&gt;-0.3&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;),&lt;/span&gt; y.width.low &lt;span class=&quot;o&quot;&gt;=&lt;/span&gt; &lt;span class=&quot;m&quot;&gt;0.05&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt; y.width.high &lt;span class=&quot;o&quot;&gt;=&lt;/span&gt; &lt;span class=&quot;m&quot;&gt;0.05&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt; 
+    ybig &lt;span class=&quot;o&quot;&gt;=&lt;/span&gt; &lt;span class=&quot;m&quot;&gt;0.09&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt; labsize &lt;span class=&quot;o&quot;&gt;=&lt;/span&gt; &lt;span class=&quot;m&quot;&gt;0.7&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt;
+&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;
+
+
+&lt;p&gt;&lt;img src=&quot;/img/collabnetwork.png&quot; alt=&quot;center&quot; /&gt;&lt;/p&gt;
+
+&lt;p&gt;The plot above shows repos on one side and contributors on the other. Some folks (the core rOpenSci team: cboettig, karthikram, emhart, and schamberlain) have committed quite a lot to many packages. We also have amny awesome contributors to our packages (some contributors and repos have been removed for clarity).&lt;/p&gt;
+
+&lt;p&gt;rOpenSci is truly a collaborative effort to develop tools for open science, so thanks to all our contributors - keep on forking, pull requesting, and commiting.&lt;/p&gt;
+</description>
+				<published>2013-03-08 00:00:00 -0800</published>
+				<link>http://schamberlain.github.com/2013/03/ropensci-collaboration/</link>
+			</item>
+		
+			<item>
 				<title>Academia reboot</title>
 				<description>&lt;h2&gt;Reboot&lt;/h2&gt;
 
@@ -1213,86 +1337,6 @@ out&lt;span class=&quot;p&quot;&gt;[&lt;/span&gt;grep&lt;span class=&quot;p&quot
 </description>
 				<published>2012-12-06 00:00:00 -0800</published>
 				<link>http://schamberlain.github.com/2012/12/taxize/</link>
-			</item>
-		
-			<item>
-				<title>Altecology, a call to unconference action</title>
-				<description>&lt;p&gt;Note: This post is cross-posted on Sandra Chung's blog &lt;a href=&quot;http://sandrachung.com/&quot;&gt;here&lt;/a&gt;.&lt;/p&gt;
-
-&lt;hr /&gt;
-
-&lt;h3&gt;The rise of the unconference&lt;/h3&gt;
-
-&lt;p&gt;The Ecological Society of America meeting is holding its &lt;a href=&quot;http://www.esa.org/minneapolis/&quot;&gt;98th annual meeting&lt;/a&gt; next year in Minneapolis, MN. Several thousand students and professionals in ecological science and education will gather to hear and read the latest work and ideas in ecology in the familiar poster and lecture formats that are the core of every major scientific conference. But a subset of these people will get a taste of something a little bit different: an unconference within the conference.&lt;/p&gt;
-
-&lt;p&gt;The most important difference between traditional science conferences and the unconference format is that it prioritizes human interaction. Often the best and most important parts of science meetings are the interactions between talks, next to posters, and at the end of the day over drinks. These connections pave the way for collaborations and friendships that nourish our professional and personal lives with shared opportunities, camaraderie and support.&lt;/p&gt;
-
-&lt;p&gt;In recognition of the increasing relative importance of the “meeting” part of a science meeting, the unconference format emphasizes interaction over presentation. It attempts to engage participants to the maximum extent reasonable in discussion and doing. &lt;a href=&quot;http://scienceonline.com/&quot;&gt;Science Online&lt;/a&gt; is a good example of this unconference format, in which the session topics are typically decided on democratically by the conference attendees (partly before arrival, partly on arrival), and you vote with your feet by going to and leaving sessions as you desire.&lt;/p&gt;
-
-&lt;hr /&gt;
-
-&lt;h3&gt;Ecology is changing&lt;/h3&gt;
-
-&lt;p&gt;Ecology is now adopting some of the same online and social tools that are already accelerating innovation in computing and other science disciplines. Ecologists, ecology students and educators are asking many of the same basic questions they have always asked: What should we be doing? How do we do it better and faster? Social media, open source software, open science, altmetrics, crowdsourcing, crowdfunding, data visualization, data sharing, alternative peer review, and an increasing emphasis on more and better communication and collaboration are just some of the newer tools being put forth to help address those questions in the 21st century.&lt;/p&gt;
-
-&lt;p&gt;Social media is rapidly becoming more common in ecologists’ toolkits to disseminate news of their new papers, communicate about research and research tools, and even filter the deluge of publications. Tools like blogs, Twitter and Facebook are filling the communication gaps between annual meetings and adding a new layer of conversation and connection to conferences and classrooms.&lt;/p&gt;
-
-&lt;p&gt;Social media, in turn, is connecting scientists directly to people besides their immediate colleagues who appreciate the impact of their work and want it to continue. The crowdfunding movement - exemplified by Kickstarter - has spurred similar alternative science funding projects such as SciFund. #SciFund project has shown that social media engagement increases donations to crowdfunded research (&lt;a href=&quot;http://jecology.libsyn.com/interview-with-jarrett-byrnes-on-science-crowdfunding&quot;&gt;interview with Jarrett Byrnes&lt;/a&gt;).&lt;/p&gt;
-
-&lt;p&gt;In addition, we are in the era of big data, and &lt;a href=&quot;http://www.neoninc.org/news/big-data-part-i&quot;&gt;this includes ecology&lt;/a&gt;. To deal with this “data deluge”, ecologists increasingly want to learn how to manage, share, retrieve, use, and visualize data. There are new tools for all of these tasks - we need to aid each other in learning them. Online and offline communities are coalescing around the development and dissemination of these tools for the benefit of ecological science, and they are meeting face-to-face at our ecological unconference.&lt;/p&gt;
-
-&lt;p&gt;Science in general is becoming increasingly complex and calling for larger and larger collaborations. This growth in turn is spurring a drive toward more openness and transparency within the culture of science. The more collaborative and complex scientific study becomes, the more scientists depend upon each other to do good work that we can all build upon with confidence. The often unstated assumption about ecology, and all of science, is that research findings are reproducible; but that assumption is quite shaky given the increasing number of retractions (see the &lt;a href=&quot;http://retractionwatch.wordpress.com/&quot;&gt;Retraction Watch blog&lt;/a&gt;) and findings that much research is not reproducible (see media coverage &lt;a href=&quot;http://www.nature.com/nature/journal/v483/n7391/full/483531a.html&quot;&gt;here&lt;/a&gt; and &lt;a href=&quot;http://www.reuters.com/article/2012/03/28/us-science-cancer-idUSBRE82R12P20120328&quot;&gt;here&lt;/a&gt;).&lt;/p&gt;
-
-&lt;p&gt;A recent initiative seeks to facilitate attempts to reproduce research: &lt;a href=&quot;https://www.scienceexchange.com/reproducibility&quot;&gt;The Reproducibility Initiative&lt;/a&gt;. Jarrett Byrnes &lt;a href=&quot;http://www.slideshare.net/JarrettByrnes/taking-the-ecological-conversation-online&quot;&gt;spoke at #ESA2012&lt;/a&gt; of how transparent, online discourse enhances our ability to discuss and improve our work and the work of our peers, both before and after publication.&lt;/p&gt;
-
-&lt;p&gt;Much of the ecological science community shares one or both of these goals: to do the best possible science, and to do it in a way that is most useful and accessible to colleagues and to society at large. The goal of this year’s ecological unconference is to introduce as many people as possible to resources - both tools and people - that can help all of us achieve those goals, on our own, or together.&lt;/p&gt;
-
-&lt;p&gt;One way we as ecologists can quickly make our research more reproducible is the way we write. By simply using tools that make reproducing what we have done easy to do, we can avoid retracted papers, failed drugs, and ruined careers.&lt;/p&gt;
-
-&lt;hr /&gt;
-
-&lt;h3&gt;What are you proposing?&lt;/h3&gt;
-
-&lt;p&gt;We originally thought about a separate event from ESA itself, modeled after &lt;a href=&quot;http://scienceonline.com/&quot;&gt;Science Online&lt;/a&gt;, incorporating a variety of topics. However, we thought testing the waters for this sort of non-traditional unconference format would be better in 2013. We are gathering ideas from the community (see “How do I make my voice heard?” below). The ideas on the wiki that get the most traction, and have 1-2 champions that are willing to see the idea through and lead the workshop at ESA will be turned in to proposals for ESA workshops. In addition, we will be submitting a proposal for an Ignite session at ESA. To summarise, we will be running:&lt;/p&gt;
-
-&lt;ul&gt;
-&lt;li&gt;A few workshops (at lunch hours, and half-day). Topics may include:
-
-&lt;ul&gt;
-&lt;li&gt;Data sharing&lt;/li&gt;
-&lt;li&gt;Data visualization&lt;/li&gt;
-&lt;li&gt;Data management&lt;/li&gt;
-&lt;li&gt;Alternatives to academia&lt;/li&gt;
-&lt;li&gt;Blogging&lt;/li&gt;
-&lt;li&gt;Social media&lt;/li&gt;
-&lt;li&gt;Reproducible science writing&lt;/li&gt;
-&lt;/ul&gt;
-&lt;/li&gt;
-&lt;li&gt;One Ignite session on “Tools for better/faster science”. See more about Ignite sessions &lt;a href=&quot;http://www.esa.org/minneapolis/ignite.php&quot;&gt;here&lt;/a&gt;.&lt;/li&gt;
-&lt;li&gt;A “tweetup” event to socialize in a more relaxed atmosphere&lt;/li&gt;
-&lt;/ul&gt;
-
-
-&lt;p&gt;These will all be loosely aggregated under the &lt;a href=&quot;https://twitter.com/search/realtime?q=%23AltEcology&quot;&gt;#AltEcology&lt;/a&gt; hashtag.&lt;/p&gt;
-
-&lt;hr /&gt;
-
-&lt;h3&gt;How do I make my voice heard?&lt;/h3&gt;
-
-&lt;p&gt;We have set up a wiki in which anyone can contribute. Please share your ideas and voice your support for existing ones at the wiki &lt;a href=&quot;http://ecologyunconference.wikispaces.com/&quot;&gt;here&lt;/a&gt;.  You can just throw ideas out there, or even propose new workshops and nominate people to lead them. We’re currently moving to transform existing ideas into ESA workshop and Ignite proposals to meet the &lt;a href=&quot;http://www.esa.org/minneapolis/workshop.php&quot;&gt;November 29 deadline&lt;/a&gt;, but we’ll be incorporating input from the wiki right up to the meeting itself in August 2013.&lt;/p&gt;
-
-&lt;hr /&gt;
-
-&lt;h3&gt;Get in touch&lt;/h3&gt;
-
-&lt;p&gt;If you have any questions/comments, let us know in the comments section below, tweet us (Sandra: &lt;a href=&quot;https://twitter.com/sandramchung&quot;&gt;@sandramchung&lt;/a&gt;, Scott: &lt;a href=&quot;https://twitter.com/recology_&quot;&gt;@recology_&lt;/a&gt;), or email (&lt;a href=&quot;mailto:sandra.m.chung@gmail.com&quot;&gt;Sandra&lt;/a&gt;, &lt;a href=&quot;mailto:myrmecocystus@gmail.com&quot;&gt;Scott&lt;/a&gt;).&lt;/p&gt;
-
-&lt;hr /&gt;
-
-&lt;h4&gt;Get the .md file used to create this post &lt;a href=&quot;https://github.com/SChamberlain/schamberlain.github.com/tree/master/_posts/2012-11-15-altecology.md&quot;&gt;at my github account&lt;/a&gt;.  Written in &lt;a href=&quot;http://daringfireball.net/projects/markdown/&quot;&gt;Markdown&lt;/a&gt;, with help from &lt;a href=&quot;http://yihui.name/knitr/&quot;&gt;knitr&lt;/a&gt;.&lt;/h4&gt;
-</description>
-				<published>2012-11-15 00:00:00 -0800</published>
-				<link>http://schamberlain.github.com/2012/11/altecology/</link>
 			</item>
 		
 	</channel>
