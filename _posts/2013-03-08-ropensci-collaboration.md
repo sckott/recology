@@ -110,7 +110,7 @@ The plot above plots the sum of additions+deletions, and is sorted by the first 
 You can see that some repos have recieved commits more or less consistently over their life time, while others have seen a little development here and there. 
 
 ***************
-
+w
 ### In addition, there are quite a few people that have committed code now to rOpenSci repos, calling for a network vizualization of course.
 
 {% highlight r %}
