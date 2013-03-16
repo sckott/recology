@@ -32,7 +32,7 @@ How do I get involved? Go to the wiki and start contributing: [http://ecologyunc
 
 *********
 
-### Get the .Rmd file used to create this post [at my github account](https://github.com/SChamberlain/schamberlain.github.com/blob/master/_drafts/2012-08-30-making-matrices.Rmd).
+### Get the .Rmd file used to create this post [at my github account](https://github.com/SChamberlain/schamberlain.github.com/tree/master/_drafts/2012-08-30-making-matrices.Rmd).
 
 *********
 

@@ -196,7 +196,7 @@ system.time(replicate(1000, round(matrix(runif(m * n), m, n)), ))  # @zentree
 
 *********
 
-### Get the .Rmd file used to create this post [at my github account](https://github.com/SChamberlain/schamberlain.github.com/blob/master/_drafts/2012-08-30-making-matrices.Rmd).
+### Get the .Rmd file used to create this post [at my github account](https://github.com/SChamberlain/schamberlain.github.com/tree/master/_drafts/2012-08-30-making-matrices.Rmd).
 
 *********
 

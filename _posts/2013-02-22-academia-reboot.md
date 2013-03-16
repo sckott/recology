@@ -38,7 +38,7 @@ The skills issue will likely be addressed in time, and vary among schools for su
 
 ***************
 
-#### Get the .Rmd file used to create this post [at my github account](https://github.com/SChamberlain/scott/blob/gh-pages/_drafts/2013-02-22-academia-reboot.Rmd) - or [.md file](https://github.com/SChamberlain/scott/blob/gh-pages/_posts/2013-02-22-academia-reboot.md).
+#### Get the .Rmd file used to create this post [at my github account](https://github.com/SChamberlain/schamberlain.github.com/tree/master/_drafts/2013-02-22-academia-reboot.Rmd) - or [.md file](https://github.com/SChamberlain/schamberlain.github.com/tree/master/_posts/2013-02-22-academia-reboot.md).
 
 #### Written in [Markdown](http://daringfireball.net/projects/markdown/), with help from [knitr](http://yihui.name/knitr/), and [knitcitations](https://github.com/cboettig/knitcitations).
 

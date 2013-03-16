@@ -402,6 +402,6 @@ md_getrecord(provider = "pensoft", identifier = c("10.3897/zookeys.1.10", "10.38
 Cool, so I hope people find this post and package useful.  Let me know what you think in comments below, or if you have code specific comments or additions, go to [the GitHub repo for `rmetadata`](https://github.com/ropensci/rmetadata).  In a upcoming post I will show an example  of what you can do with `rmetadata` in terms of an actual research question.  
 
 *********
-#### Get the .Rmd file used to create this post [at my github account](https://github.com/SChamberlain/schamberlain.github.com/blob/master/_drafts/2012-09-15-rmetadata.Rmd) - or [.md file](https://github.com/SChamberlain/schamberlain.github.com/blob/master/_posts/2012-09-17-rmetadata.md).
+#### Get the .Rmd file used to create this post [at my github account](https://github.com/SChamberlain/schamberlain.github.com/tree/master/_drafts/2012-09-15-rmetadata.Rmd) - or [.md file](https://github.com/SChamberlain/schamberlain.github.com/tree/master/_posts/2012-09-17-rmetadata.md).
 
 #### Written in [Markdown](http://daringfireball.net/projects/markdown/), with help from [knitr](http://yihui.name/knitr/), and nice knitr highlighting/etc. in in [RStudio](http://rstudio.org/).
