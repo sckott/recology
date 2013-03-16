@@ -2,7 +2,7 @@
 name: r-metadata
 layout: post
 title: Scholarly metadata in R
-date: 2013-03-14
+date: 2013-03-16
 author: Scott Chamberlain
 tags: 
 - R
