@@ -6,25 +6,347 @@
 		<link>http://schamberlain.github.io</link>
 		
 			<item>
-				<title>BISON USGS species occurrence data</title>
-				<description>&lt;p&gt;The USGS recently released a way to search for and get species occurrence records for the USA. The service is called &lt;a href=&quot;http://bison.usgs.ornl.gov/&quot;&gt;BISON&lt;/a&gt; (Biodiversity Information Serving Our Nation). The service has &lt;a href=&quot;http://bison.usgs.ornl.gov/&quot;&gt;a web interface&lt;/a&gt; for human interaction in a browser, and &lt;a href=&quot;http://bison.usgs.ornl.gov/services.html&quot;&gt;two APIs&lt;/a&gt; (application programming interface) to allow machines to interact with their database. One of the APIs allows you to search and retrieve data, and the other gives back maps as either a heatmap or a species occurrence map. The latter is more appropriate for working in a browser, so I'll leave that to the web app folks.&lt;/p&gt;
+				<title>Couch, apis and all that</title>
+				<description>&lt;p&gt;It is getting easier to get data directly into R from the web. Often R packages that retrieve data from the web return useful R data structures like a data.frame or plot. This is a good thing of course to make things user friendly.&lt;/p&gt;
+&lt;p&gt;However, what if you want to drill down into the data that’s returned from a query to a database in R? What if you want to get that nice data.frame in R, but you think you may want to look at the raw data later? The raw data from web queries are often JSON or XML data. This type of data, especially JSON, can be easily stored in schemaless so-called NoSQL databases, and queried later.&lt;/p&gt;
+&lt;p&gt;So here’s the use case, or workflow:&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;Query a database on the web, and choose to write the raw data to a local database.&lt;/li&gt;
+&lt;li&gt;Do whatever you want with the output R object - analyze, visualize, etc.&lt;/li&gt;
+&lt;li&gt;Now you want to go back and search through some of the raw data. But, that query took an hour. Since you wrote it to a local database, you can search the data.&lt;/li&gt;
+&lt;li&gt;If you hadn’t written it locally, you would have to make a new web call.&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;I’ve started an R package to interact with the NoSQL database &lt;a href=&quot;http://couchdb.apache.org/&quot;&gt;CouchDB&lt;/a&gt;. This is a schemaless database that speaks JSON, so you can store JSON and get back JSON (no worries about XML, we can just wrap it in JSON). What’s especially cool is you can interact with CouchDB via &lt;a href=&quot;http://docs.couchdb.org/en/latest/api-basics.html&quot;&gt;a RESTful API&lt;/a&gt;. CouchDB doesn’t have full text search built in (though you can build map-reduce &lt;em&gt;Views&lt;/em&gt;, basically preset queries on the database), so I added functions (and docs to help) to interact with the &lt;a href=&quot;https://github.com/elasticsearch/elasticsearch-river-couchdb/blob/master/README.md&quot;&gt;CouchDB River plugin&lt;/a&gt; for &lt;a href=&quot;http://www.elasticsearch.org/&quot;&gt;Elasticsearch&lt;/a&gt;, which provides powerful full text search via an API interface. But nevermind the tech details - all this just means you can search on the full text of your stored data.&lt;/p&gt;
+&lt;p&gt;Is this for the casual R user? Probably not. But, I imagine there are R users out there that want some more flexibility when it comes to interacting with web data in R. It is nice and tidy to get back an R data.frame from a web call, but having the raw data at your fingertips could be super powerful.&lt;/p&gt;
+&lt;p&gt;I’ll describe using an R package to interat with a web database with sofa baked in, and discuss a bit about the functions within sofa.&lt;/p&gt;
+&lt;p&gt;I would be remiss if I did not point out that there was another R package to interact with CouchDB before sofa: &lt;a href=&quot;&quot; title=&quot;https://github.com/wactbprot/R4CouchDB&quot;&gt;R4couchdb&lt;/a&gt;.&lt;/p&gt;
+&lt;hr /&gt;
+&lt;h3 id=&quot;first-start-couchdb-in-your-terminal&quot;&gt;First start CouchDB in your terminal&lt;/h3&gt;
+&lt;p&gt;You can do this from anywhere in your directory. See &lt;a href=&quot;http://couchdb.apache.org/&quot;&gt;here&lt;/a&gt; for instructions on how to install CouchDB.&lt;/p&gt;
+&lt;pre class=&quot;sourceCode bash&quot;&gt;&lt;code class=&quot;sourceCode bash&quot;&gt;&lt;span class=&quot;kw&quot;&gt;couchdb&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;
+&lt;h3 id=&quot;then-start-elasticsearch-in-your-terminal&quot;&gt;Then start elasticsearch in your terminal&lt;/h3&gt;
+&lt;p&gt;See &lt;a href=&quot;https://github.com/schamberlain/sofa&quot;&gt;here&lt;/a&gt; for instructions on how to install Elasticsearch and the River CouchDB plugin.&lt;/p&gt;
+&lt;pre class=&quot;sourceCode bash&quot;&gt;&lt;code class=&quot;sourceCode bash&quot;&gt;&lt;span class=&quot;kw&quot;&gt;cd&lt;/span&gt; /usr/local/elasticsearch
+&lt;span class=&quot;kw&quot;&gt;bin/elasticsearch&lt;/span&gt; -f&lt;/code&gt;&lt;/pre&gt;
+&lt;hr /&gt;
+&lt;h3 id=&quot;install-sofa&quot;&gt;Install sofa&lt;/h3&gt;
+&lt;div class=&quot;highlight&quot;&gt;&lt;pre&gt;&lt;code class=&quot;r&quot;&gt;&lt;span class=&quot;c1&quot;&gt;# Uncomment these lines if you don&amp;#39;t have these packages installed&lt;/span&gt;
+&lt;span class=&quot;c1&quot;&gt;# install.packages(&amp;#39;devtools&amp;#39;) library(devtools) install_github(&amp;#39;sofa&amp;#39;,&lt;/span&gt;
+&lt;span class=&quot;c1&quot;&gt;# &amp;#39;ropensci&amp;#39;) install_github(&amp;#39;alm&amp;#39;, &amp;#39;ropensci&amp;#39;, ref=&amp;#39;couch&amp;#39;)&lt;/span&gt;
+library&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;sofa&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt;
+library&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;alm&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt;
+&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;
 
-&lt;p&gt;The Core Science Analytics and Synthesis (CSAS) program of the US Geological Survey are responsible for BISON, and are the US node of the Global Biodiversity Information Facility (GBIF). BISON data is nested within that of GBIF, but has (or wil have?) additional data not in GBIF, as described on their &lt;em&gt;About&lt;/em&gt; page:&lt;/p&gt;
 
-&lt;blockquote&gt;&lt;p&gt;BISON has been initiated with the 110 million records GBIF makes available from the U.S. and is integrating millions more records from other sources each year&lt;/p&gt;&lt;/blockquote&gt;
-
-&lt;p&gt;Have a look at their &lt;em&gt;Data providers&lt;/em&gt; and &lt;em&gt;Statistics&lt;/em&gt; tabs on the BISON website, which list where data comes from and how many searches and downloads have been done on each data provider.&lt;/p&gt;
-
-&lt;p&gt;We (rOpenSci) started an R package to interact with the BISON search API &gt;&gt; &lt;code&gt;rbison&lt;/code&gt;. You may be thinking, but if the data in BISON is also in GBIF, why both making another R package for BISON? Good question. As I just said, BISON will have some data GBIF won't have. Also, the services (search API and map service) are different than those of GBIF.&lt;/p&gt;
-
-&lt;p&gt;Check out the package on GitHub here &lt;a href=&quot;https://github.com/ropensci/rbison&quot;&gt;https://github.com/ropensci/rbison&lt;/a&gt;.&lt;/p&gt;
-
-&lt;p&gt;Here is a quick run through of some things you can do with &lt;code&gt;rbison&lt;/code&gt;.&lt;/p&gt;
 
 &lt;hr /&gt;
+&lt;h3 id=&quot;simultaneously-write-data-to-couchdb-along-with-api-calls-using-the-alm-package-to-get-altmetrics-data-on-plos-papers.-ping-to-make-sure-couchdb-is-on&quot;&gt;Simultaneously write data to CouchDB along with API calls using the alm package to get altmetrics data on PLoS papers. Ping to make sure CouchDB is on&lt;/h3&gt;
+&lt;div class=&quot;highlight&quot;&gt;&lt;pre&gt;&lt;code class=&quot;r&quot;&gt;sofa_ping&lt;span class=&quot;p&quot;&gt;()&lt;/span&gt;
+&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;
 
-&lt;h3&gt;Install ribson&lt;/h3&gt;
 
+
+
+
+&lt;div class=&quot;highlight&quot;&gt;&lt;pre&gt;&lt;code class=&quot;text&quot;&gt;  couchdb   version 
+&amp;quot;Welcome&amp;quot;   &amp;quot;1.2.1&amp;quot; 
+&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;
+
+
+&lt;hr /&gt;
+&lt;h3 id=&quot;create-a-new-database&quot;&gt;Create a new database&lt;/h3&gt;
+&lt;div class=&quot;highlight&quot;&gt;&lt;pre&gt;&lt;code class=&quot;r&quot;&gt;sofa_createdb&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;dbname &lt;span class=&quot;o&quot;&gt;=&lt;/span&gt; &lt;span class=&quot;s&quot;&gt;&amp;quot;alm_db&amp;quot;&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt;
+&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;
+
+
+
+
+
+&lt;div class=&quot;highlight&quot;&gt;&lt;pre&gt;&lt;code class=&quot;text&quot;&gt;  ok 
+TRUE 
+&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;
+
+
+&lt;hr /&gt;
+&lt;h3 id=&quot;write-couchdb-database-name-to-options&quot;&gt;Write couchdb database name to options&lt;/h3&gt;
+&lt;div class=&quot;highlight&quot;&gt;&lt;pre&gt;&lt;code class=&quot;r&quot;&gt;options&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;couch_db_name &lt;span class=&quot;o&quot;&gt;=&lt;/span&gt; &lt;span class=&quot;s&quot;&gt;&amp;quot;alm_db&amp;quot;&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt;
+&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;
+
+
+
+&lt;hr /&gt;
+&lt;h3 id=&quot;list-the-databases&quot;&gt;List the databases&lt;/h3&gt;
+&lt;div class=&quot;highlight&quot;&gt;&lt;pre&gt;&lt;code class=&quot;r&quot;&gt;sofa_listdbs&lt;span class=&quot;p&quot;&gt;()&lt;/span&gt;
+&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;
+
+
+
+
+
+&lt;div class=&quot;highlight&quot;&gt;&lt;pre&gt;&lt;code class=&quot;text&quot;&gt; [1] &amp;quot;_replicator&amp;quot;                &amp;quot;_users&amp;quot;                    
+ [3] &amp;quot;alm_couchdb&amp;quot;                &amp;quot;alm_db&amp;quot;                    
+ [5] &amp;quot;dudedb&amp;quot;                     &amp;quot;example&amp;quot;                   
+ [7] &amp;quot;poop&amp;quot;                       &amp;quot;rplos_db&amp;quot;                  
+ [9] &amp;quot;shit&amp;quot;                       &amp;quot;shitty&amp;quot;                    
+[11] &amp;quot;shitty2&amp;quot;                    &amp;quot;test_suite_db&amp;quot;             
+[13] &amp;quot;test_suite_db/with_slashes&amp;quot; &amp;quot;test_suite_reports&amp;quot;        
+[15] &amp;quot;testr2couch&amp;quot;                &amp;quot;twitter_db&amp;quot;                
+&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;
+
+
+&lt;hr /&gt;
+&lt;h3 id=&quot;search-for-altmetrics-normally-wo-writing-to-a-database&quot;&gt;Search for altmetrics normally, w/o writing to a database&lt;/h3&gt;
+&lt;div class=&quot;highlight&quot;&gt;&lt;pre&gt;&lt;code class=&quot;r&quot;&gt;head&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;alm&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;doi &lt;span class=&quot;o&quot;&gt;=&lt;/span&gt; &lt;span class=&quot;s&quot;&gt;&amp;quot;10.1371/journal.pone.0029797&amp;quot;&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;))&lt;/span&gt;
+&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;
+
+
+
+
+
+&lt;div class=&quot;highlight&quot;&gt;&lt;pre&gt;&lt;code class=&quot;text&quot;&gt;          .id pdf html shares groups comments likes citations total
+1   bloglines  NA   NA     NA     NA       NA    NA         0     0
+2   citeulike  NA   NA      1     NA       NA    NA        NA     1
+3    connotea  NA   NA     NA     NA       NA    NA         0     0
+4    crossref  NA   NA     NA     NA       NA    NA         4     4
+5      nature  NA   NA     NA     NA       NA    NA         4     4
+6 postgenomic  NA   NA     NA     NA       NA    NA         0     0
+&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;
+
+
+
+&lt;hr /&gt;
+&lt;h3 id=&quot;search-for-altmetrics-normally-while-writing-to-a-database&quot;&gt;Search for altmetrics normally, while writing to a database&lt;/h3&gt;
+&lt;div class=&quot;highlight&quot;&gt;&lt;pre&gt;&lt;code class=&quot;r&quot;&gt;head&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;alm&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;doi &lt;span class=&quot;o&quot;&gt;=&lt;/span&gt; &lt;span class=&quot;s&quot;&gt;&amp;quot;10.1371/journal.pone.0029797&amp;quot;&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt; write2couch &lt;span class=&quot;o&quot;&gt;=&lt;/span&gt; &lt;span class=&quot;kc&quot;&gt;TRUE&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;))&lt;/span&gt;
+&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;
+
+
+
+
+
+&lt;div class=&quot;highlight&quot;&gt;&lt;pre&gt;&lt;code class=&quot;text&quot;&gt;          .id pdf html shares groups comments likes citations total
+1   bloglines  NA   NA     NA     NA       NA    NA         0     0
+2   citeulike  NA   NA      1     NA       NA    NA        NA     1
+3    connotea  NA   NA     NA     NA       NA    NA         0     0
+4    crossref  NA   NA     NA     NA       NA    NA         4     4
+5      nature  NA   NA     NA     NA       NA    NA         4     4
+6 postgenomic  NA   NA     NA     NA       NA    NA         0     0
+&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;
+
+
+
+&lt;hr /&gt;
+&lt;h3 id=&quot;make-lots-of-calls-and-write-them-simultaneously&quot;&gt;Make lots of calls, and write them simultaneously&lt;/h3&gt;
+&lt;div class=&quot;highlight&quot;&gt;&lt;pre&gt;&lt;code class=&quot;r&quot;&gt;&lt;span class=&quot;c1&quot;&gt;# install_github(&amp;#39;rplos&amp;#39;, &amp;#39;ropensci&amp;#39;)&lt;/span&gt;
+library&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;rplos&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt;
+dois &lt;span class=&quot;o&quot;&gt;&amp;lt;-&lt;/span&gt; searchplos&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;terms &lt;span class=&quot;o&quot;&gt;=&lt;/span&gt; &lt;span class=&quot;s&quot;&gt;&amp;quot;evolution&amp;quot;&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt; fields &lt;span class=&quot;o&quot;&gt;=&lt;/span&gt; &lt;span class=&quot;s&quot;&gt;&amp;quot;id&amp;quot;&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt; limit &lt;span class=&quot;o&quot;&gt;=&lt;/span&gt; &lt;span class=&quot;m&quot;&gt;100&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt;
+out &lt;span class=&quot;o&quot;&gt;&amp;lt;-&lt;/span&gt; alm&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;doi &lt;span class=&quot;o&quot;&gt;=&lt;/span&gt; as.character&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;dois&lt;span class=&quot;p&quot;&gt;[,&lt;/span&gt; &lt;span class=&quot;m&quot;&gt;1&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;]),&lt;/span&gt; write2couch &lt;span class=&quot;o&quot;&gt;=&lt;/span&gt; &lt;span class=&quot;kc&quot;&gt;TRUE&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt;
+lapply&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;out&lt;span class=&quot;p&quot;&gt;[&lt;/span&gt;&lt;span class=&quot;m&quot;&gt;1&lt;/span&gt;&lt;span class=&quot;o&quot;&gt;:&lt;/span&gt;&lt;span class=&quot;m&quot;&gt;2&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;],&lt;/span&gt; head&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt;
+&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;
+
+
+
+
+
+&lt;div class=&quot;highlight&quot;&gt;&lt;pre&gt;&lt;code class=&quot;text&quot;&gt;$`01`
+          .id pdf html shares groups comments likes citations total
+1   bloglines  NA   NA     NA     NA       NA    NA         0     0
+2   citeulike  NA   NA      0     NA       NA    NA        NA     0
+3    connotea  NA   NA     NA     NA       NA    NA         0     0
+4    crossref  NA   NA     NA     NA       NA    NA         0     0
+5      nature  NA   NA     NA     NA       NA    NA         0     0
+6 postgenomic  NA   NA     NA     NA       NA    NA         0     0
+
+$`02`
+          .id pdf html shares groups comments likes citations total
+1   bloglines  NA   NA     NA     NA       NA    NA         0     0
+2   citeulike  NA   NA      1     NA       NA    NA        NA     1
+3    connotea  NA   NA     NA     NA       NA    NA         0     0
+4    crossref  NA   NA     NA     NA       NA    NA         2     2
+5      nature  NA   NA     NA     NA       NA    NA         0     0
+6 postgenomic  NA   NA     NA     NA       NA    NA         0     0
+&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;
+
+
+
+&lt;hr /&gt;
+&lt;h3 id=&quot;writing-data-to-couchdb-does-take-a-bit-longer&quot;&gt;Writing data to CouchDB does take a bit longer&lt;/h3&gt;
+&lt;div class=&quot;highlight&quot;&gt;&lt;pre&gt;&lt;code class=&quot;r&quot;&gt;system.time&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;alm&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;doi &lt;span class=&quot;o&quot;&gt;=&lt;/span&gt; as.character&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;dois&lt;span class=&quot;p&quot;&gt;[,&lt;/span&gt; &lt;span class=&quot;m&quot;&gt;1&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;])[&lt;/span&gt;&lt;span class=&quot;m&quot;&gt;1&lt;/span&gt;&lt;span class=&quot;o&quot;&gt;:&lt;/span&gt;&lt;span class=&quot;m&quot;&gt;60&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;],&lt;/span&gt; write2couch &lt;span class=&quot;o&quot;&gt;=&lt;/span&gt; &lt;span class=&quot;kc&quot;&gt;FALSE&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;))&lt;/span&gt;
+&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;
+
+
+
+
+
+&lt;div class=&quot;highlight&quot;&gt;&lt;pre&gt;&lt;code class=&quot;text&quot;&gt;   user  system elapsed 
+  2.646   0.020   4.464 
+&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;
+
+
+
+
+
+&lt;div class=&quot;highlight&quot;&gt;&lt;pre&gt;&lt;code class=&quot;r&quot;&gt;system.time&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;alm&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;doi &lt;span class=&quot;o&quot;&gt;=&lt;/span&gt; as.character&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;dois&lt;span class=&quot;p&quot;&gt;[,&lt;/span&gt; &lt;span class=&quot;m&quot;&gt;1&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;])[&lt;/span&gt;&lt;span class=&quot;m&quot;&gt;1&lt;/span&gt;&lt;span class=&quot;o&quot;&gt;:&lt;/span&gt;&lt;span class=&quot;m&quot;&gt;60&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;],&lt;/span&gt; write2couch &lt;span class=&quot;o&quot;&gt;=&lt;/span&gt; &lt;span class=&quot;kc&quot;&gt;TRUE&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;))&lt;/span&gt;
+&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;
+
+
+
+
+
+&lt;div class=&quot;highlight&quot;&gt;&lt;pre&gt;&lt;code class=&quot;text&quot;&gt;   user  system elapsed 
+  4.692   0.086   7.022 
+&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;
+
+
+
+&lt;hr /&gt;
+&lt;h3 id=&quot;search-using-elasticsearch&quot;&gt;Search using elasticsearch&lt;/h3&gt;
+&lt;h4 id=&quot;tell-elasticsearch-to-start-indexing-your-database&quot;&gt;tell elasticsearch to start indexing your database&lt;/h4&gt;
+&lt;div class=&quot;highlight&quot;&gt;&lt;pre&gt;&lt;code class=&quot;r&quot;&gt;elastic_start&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;dbname &lt;span class=&quot;o&quot;&gt;=&lt;/span&gt; &lt;span class=&quot;s&quot;&gt;&amp;quot;alm_db&amp;quot;&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt;
+&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;
+
+
+
+
+
+&lt;div class=&quot;highlight&quot;&gt;&lt;pre&gt;&lt;code class=&quot;text&quot;&gt;$ok
+[1] TRUE
+&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;
+
+
+
+&lt;hr /&gt;
+&lt;h4 id=&quot;search-your-database&quot;&gt;Search your database&lt;/h4&gt;
+&lt;div class=&quot;highlight&quot;&gt;&lt;pre&gt;&lt;code class=&quot;r&quot;&gt;out &lt;span class=&quot;o&quot;&gt;&amp;lt;-&lt;/span&gt; elastic_search&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;dbname &lt;span class=&quot;o&quot;&gt;=&lt;/span&gt; &lt;span class=&quot;s&quot;&gt;&amp;quot;alm_db&amp;quot;&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt; q &lt;span class=&quot;o&quot;&gt;=&lt;/span&gt; &lt;span class=&quot;s&quot;&gt;&amp;quot;twitter&amp;quot;&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt; parse_ &lt;span class=&quot;o&quot;&gt;=&lt;/span&gt; &lt;span class=&quot;kc&quot;&gt;TRUE&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt;
+out&lt;span class=&quot;o&quot;&gt;$&lt;/span&gt;hits&lt;span class=&quot;o&quot;&gt;$&lt;/span&gt;total
+&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;
+
+
+
+
+
+&lt;div class=&quot;highlight&quot;&gt;&lt;pre&gt;&lt;code class=&quot;text&quot;&gt;[1] 549
+&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;
+
+
+
+&lt;hr /&gt;
+&lt;h3 id=&quot;using-views&quot;&gt;Using views&lt;/h3&gt;
+&lt;h4 id=&quot;write-a-view---here-letting-key-be-the-default-of-null&quot;&gt;Write a view - here letting key be the default of null&lt;/h4&gt;
+&lt;div class=&quot;highlight&quot;&gt;&lt;pre&gt;&lt;code class=&quot;r&quot;&gt;sofa_view_put&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;dbname &lt;span class=&quot;o&quot;&gt;=&lt;/span&gt; &lt;span class=&quot;s&quot;&gt;&amp;quot;alm_db&amp;quot;&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt; design_name &lt;span class=&quot;o&quot;&gt;=&lt;/span&gt; &lt;span class=&quot;s&quot;&gt;&amp;quot;myview&amp;quot;&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt; value &lt;span class=&quot;o&quot;&gt;=&lt;/span&gt; &lt;span class=&quot;s&quot;&gt;&amp;quot;doc.baseurl&amp;quot;&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt;
+&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;
+
+
+
+
+
+&lt;div class=&quot;highlight&quot;&gt;&lt;pre&gt;&lt;code class=&quot;text&quot;&gt;$ok
+[1] TRUE
+
+$id
+[1] &amp;quot;_design/myview&amp;quot;
+
+$rev
+[1] &amp;quot;1-e7c17cff1b96e4595c3781da53e16ad8&amp;quot;
+&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;
+
+
+
+&lt;hr /&gt;
+&lt;h4 id=&quot;get-info-on-your-new-view&quot;&gt;Get info on your new view&lt;/h4&gt;
+&lt;div class=&quot;highlight&quot;&gt;&lt;pre&gt;&lt;code class=&quot;r&quot;&gt;sofa_view_get&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;dbname &lt;span class=&quot;o&quot;&gt;=&lt;/span&gt; &lt;span class=&quot;s&quot;&gt;&amp;quot;alm_db&amp;quot;&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt; design_name &lt;span class=&quot;o&quot;&gt;=&lt;/span&gt; &lt;span class=&quot;s&quot;&gt;&amp;quot;myview&amp;quot;&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt;
+&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;
+
+
+
+
+
+&lt;div class=&quot;highlight&quot;&gt;&lt;pre&gt;&lt;code class=&quot;text&quot;&gt;$`_id`
+[1] &amp;quot;_design/myview&amp;quot;
+
+$`_rev`
+[1] &amp;quot;1-e7c17cff1b96e4595c3781da53e16ad8&amp;quot;
+
+$views
+$views$foo
+                                    map 
+&amp;quot;function(doc){emit(null,doc.baseurl)}&amp;quot; 
+&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;
+
+
+
+&lt;hr /&gt;
+&lt;h4 id=&quot;get-data-using-a-view&quot;&gt;Get data using a view&lt;/h4&gt;
+&lt;div class=&quot;highlight&quot;&gt;&lt;pre&gt;&lt;code class=&quot;r&quot;&gt;out &lt;span class=&quot;o&quot;&gt;&amp;lt;-&lt;/span&gt; sofa_view_search&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;dbname &lt;span class=&quot;o&quot;&gt;=&lt;/span&gt; &lt;span class=&quot;s&quot;&gt;&amp;quot;alm_db&amp;quot;&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt; design_name &lt;span class=&quot;o&quot;&gt;=&lt;/span&gt; &lt;span class=&quot;s&quot;&gt;&amp;quot;myview&amp;quot;&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt;
+length&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;out&lt;span class=&quot;o&quot;&gt;$&lt;/span&gt;rows&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt;  &lt;span class=&quot;c1&quot;&gt;# 160 results&lt;/span&gt;
+&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;
+
+
+
+
+
+&lt;div class=&quot;highlight&quot;&gt;&lt;pre&gt;&lt;code class=&quot;text&quot;&gt;[1] 161
+&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;
+
+
+
+
+
+&lt;div class=&quot;highlight&quot;&gt;&lt;pre&gt;&lt;code class=&quot;r&quot;&gt;sapply&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;out&lt;span class=&quot;o&quot;&gt;$&lt;/span&gt;rows&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt; &lt;span class=&quot;kr&quot;&gt;function&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;x&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt; x&lt;span class=&quot;o&quot;&gt;$&lt;/span&gt;value&lt;span class=&quot;p&quot;&gt;)[&lt;/span&gt;&lt;span class=&quot;m&quot;&gt;1&lt;/span&gt;&lt;span class=&quot;o&quot;&gt;:&lt;/span&gt;&lt;span class=&quot;m&quot;&gt;5&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;]&lt;/span&gt;  &lt;span class=&quot;c1&quot;&gt;# the values, just the API call URLs&lt;/span&gt;
+&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;
+
+
+
+
+
+&lt;div class=&quot;highlight&quot;&gt;&lt;pre&gt;&lt;code class=&quot;text&quot;&gt;[1] &amp;quot;http://alm.plos.org/api/v3/articles&amp;quot;
+[2] &amp;quot;http://alm.plos.org/api/v3/articles&amp;quot;
+[3] &amp;quot;http://alm.plos.org/api/v3/articles&amp;quot;
+[4] &amp;quot;http://alm.plos.org/api/v3/articles&amp;quot;
+[5] &amp;quot;http://alm.plos.org/api/v3/articles&amp;quot;
+&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;
+
+
+
+&lt;hr /&gt;
+&lt;h4 id=&quot;delete-the-view&quot;&gt;Delete the view&lt;/h4&gt;
+&lt;div class=&quot;highlight&quot;&gt;&lt;pre&gt;&lt;code class=&quot;r&quot;&gt;sofa_view_del&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;dbname &lt;span class=&quot;o&quot;&gt;=&lt;/span&gt; &lt;span class=&quot;s&quot;&gt;&amp;quot;alm_db&amp;quot;&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt; design_name &lt;span class=&quot;o&quot;&gt;=&lt;/span&gt; &lt;span class=&quot;s&quot;&gt;&amp;quot;myview&amp;quot;&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt;
+&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;
+
+
+
+
+
+&lt;div class=&quot;highlight&quot;&gt;&lt;pre&gt;&lt;code class=&quot;text&quot;&gt;[1] &amp;quot;&amp;quot;
+&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;
+
+
+
+&lt;hr /&gt;
+&lt;h2 id=&quot;what-happens-now&quot;&gt;What happens now?&lt;/h2&gt;
+&lt;p&gt;Well, if no one uses this, then probably nothing. Though, if people think this could be useful, then…&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;It would be cool to make easy hooks into any package making web calls to allow users to write data to CouchDB if they choose to, sort of like the example above with rplos.&lt;/li&gt;
+&lt;li&gt;Perhaps automate some of the setup for CouchDB for users, making system calls so they don’t have to.&lt;/li&gt;
+&lt;li&gt;???&lt;/li&gt;
+&lt;/ul&gt;
+</description>
+				<published>2013-05-30 00:00:00 -0700</published>
+				<link>http://schamberlain.github.io/2013/05/couch/</link>
+			</item>
+		
+			<item>
+				<title>BISON USGS species occurrence data</title>
+				<description>&lt;p&gt;The USGS recently released a way to search for and get species occurrence records for the USA. The service is called &lt;a href=&quot;http://bison.usgs.ornl.gov/&quot;&gt;BISON&lt;/a&gt; (Biodiversity Information Serving Our Nation). The service has &lt;a href=&quot;http://bison.usgs.ornl.gov/&quot;&gt;a web interface&lt;/a&gt; for human interaction in a browser, and &lt;a href=&quot;http://bison.usgs.ornl.gov/services.html&quot;&gt;two APIs&lt;/a&gt; (application programming interface) to allow machines to interact with their database. One of the APIs allows you to search and retrieve data, and the other gives back maps as either a heatmap or a species occurrence map. The latter is more appropriate for working in a browser, so I’ll leave that to the web app folks.&lt;/p&gt;
+&lt;p&gt;The Core Science Analytics and Synthesis (CSAS) program of the US Geological Survey are responsible for BISON, and are the US node of the Global Biodiversity Information Facility (GBIF). BISON data is nested within that of GBIF, but has (or wil have?) additional data not in GBIF, as described on their &lt;em&gt;About&lt;/em&gt; page:&lt;/p&gt;
+&lt;blockquote&gt;
+&lt;p&gt;BISON has been initiated with the 110 million records GBIF makes available from the U.S. and is integrating millions more records from other sources each year&lt;/p&gt;
+&lt;/blockquote&gt;
+&lt;p&gt;Have a look at their &lt;em&gt;Data providers&lt;/em&gt; and &lt;em&gt;Statistics&lt;/em&gt; tabs on the BISON website, which list where data comes from and how many searches and downloads have been done on each data provider.&lt;/p&gt;
+&lt;p&gt;We (rOpenSci) started an R package to interact with the BISON search API &amp;gt;&amp;gt; &lt;code&gt;rbison&lt;/code&gt;. You may be thinking, but if the data in BISON is also in GBIF, why both making another R package for BISON? Good question. As I just said, BISON will have some data GBIF won’t have. Also, the services (search API and map service) are different than those of GBIF.&lt;/p&gt;
+&lt;p&gt;Check out the package on GitHub here &lt;a href=&quot;https://github.com/ropensci/rbison&quot;&gt;https://github.com/ropensci/rbison&lt;/a&gt;.&lt;/p&gt;
+&lt;p&gt;Here is a quick run through of some things you can do with &lt;code&gt;rbison&lt;/code&gt;.&lt;/p&gt;
+&lt;hr /&gt;
+&lt;h3 id=&quot;install-ribson&quot;&gt;Install ribson&lt;/h3&gt;
 &lt;div class=&quot;highlight&quot;&gt;&lt;pre&gt;&lt;code class=&quot;r&quot;&gt;&lt;span class=&quot;c1&quot;&gt;# Install rbison from GitHub using devtools, uncomment to install&lt;/span&gt;
 &lt;span class=&quot;c1&quot;&gt;# install.packages(&amp;#39;devtools&amp;#39;) library(devtools) install_github(&amp;#39;rbison&amp;#39;,&lt;/span&gt;
 &lt;span class=&quot;c1&quot;&gt;# &amp;#39;ropensci&amp;#39;)&lt;/span&gt;
@@ -32,10 +354,9 @@ library&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;rbison&lt;span class=&quot;
 &lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;
 
 
+
 &lt;hr /&gt;
-
-&lt;h3&gt;Search the BISON database for, of course, bison&lt;/h3&gt;
-
+&lt;h3 id=&quot;search-the-bison-database-for-of-course-bison&quot;&gt;Search the BISON database for, of course, bison&lt;/h3&gt;
 &lt;div class=&quot;highlight&quot;&gt;&lt;pre&gt;&lt;code class=&quot;r&quot;&gt;&lt;span class=&quot;c1&quot;&gt;# Do the search&lt;/span&gt;
 out &lt;span class=&quot;o&quot;&gt;&amp;lt;-&lt;/span&gt; bison&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;species &lt;span class=&quot;o&quot;&gt;=&lt;/span&gt; &lt;span class=&quot;s&quot;&gt;&amp;quot;Bison bison&amp;quot;&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt; type &lt;span class=&quot;o&quot;&gt;=&lt;/span&gt; &lt;span class=&quot;s&quot;&gt;&amp;quot;scientific_name&amp;quot;&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt; start &lt;span class=&quot;o&quot;&gt;=&lt;/span&gt; &lt;span class=&quot;m&quot;&gt;0&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt; count &lt;span class=&quot;o&quot;&gt;=&lt;/span&gt; &lt;span class=&quot;m&quot;&gt;10&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt;
 
@@ -46,14 +367,16 @@ class&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;out&lt;span class=&quot;p&quo
 
 
 
+
 &lt;div class=&quot;highlight&quot;&gt;&lt;pre&gt;&lt;code class=&quot;text&quot;&gt;[1] &amp;quot;bison&amp;quot;
 &lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;
 
 
-&lt;h4&gt;Get a summary of the data&lt;/h4&gt;
 
+&lt;h4 id=&quot;get-a-summary-of-the-data&quot;&gt;Get a summary of the data&lt;/h4&gt;
 &lt;div class=&quot;highlight&quot;&gt;&lt;pre&gt;&lt;code class=&quot;r&quot;&gt;bison_data&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;out&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt;
 &lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;
+
 
 
 
@@ -63,10 +386,11 @@ class&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;out&lt;span class=&quot;p&quo
 &lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;
 
 
-&lt;h4&gt;Summary by counties (just the first 6 rows)&lt;/h4&gt;
 
+&lt;h4 id=&quot;summary-by-counties-just-the-first-6-rows&quot;&gt;Summary by counties (just the first 6 rows)&lt;/h4&gt;
 &lt;div class=&quot;highlight&quot;&gt;&lt;pre&gt;&lt;code class=&quot;r&quot;&gt;head&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;bison_data&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;input &lt;span class=&quot;o&quot;&gt;=&lt;/span&gt; out&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt; datatype &lt;span class=&quot;o&quot;&gt;=&lt;/span&gt; &lt;span class=&quot;s&quot;&gt;&amp;quot;counties&amp;quot;&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;))&lt;/span&gt;
 &lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;
+
 
 
 
@@ -81,10 +405,11 @@ class&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;out&lt;span class=&quot;p&quo
 &lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;
 
 
-&lt;h4&gt;Summary of states&lt;/h4&gt;
 
+&lt;h4 id=&quot;summary-of-states&quot;&gt;Summary of states&lt;/h4&gt;
 &lt;div class=&quot;highlight&quot;&gt;&lt;pre&gt;&lt;code class=&quot;r&quot;&gt;bison_data&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;input &lt;span class=&quot;o&quot;&gt;=&lt;/span&gt; out&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt; datatype &lt;span class=&quot;o&quot;&gt;=&lt;/span&gt; &lt;span class=&quot;s&quot;&gt;&amp;quot;states&amp;quot;&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt;
 &lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;
+
 
 
 
@@ -108,10 +433,9 @@ class&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;out&lt;span class=&quot;p&quo
 &lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;
 
 
+
 &lt;hr /&gt;
-
-&lt;h3&gt;Map the results&lt;/h3&gt;
-
+&lt;h3 id=&quot;map-the-results&quot;&gt;Map the results&lt;/h3&gt;
 &lt;div class=&quot;highlight&quot;&gt;&lt;pre&gt;&lt;code class=&quot;r&quot;&gt;&lt;span class=&quot;c1&quot;&gt;# Search for Ursus americanus (american black bear)&lt;/span&gt;
 out &lt;span class=&quot;o&quot;&gt;&amp;lt;-&lt;/span&gt; bison&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;species &lt;span class=&quot;o&quot;&gt;=&lt;/span&gt; &lt;span class=&quot;s&quot;&gt;&amp;quot;Ursus americanus&amp;quot;&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt; type &lt;span class=&quot;o&quot;&gt;=&lt;/span&gt; &lt;span class=&quot;s&quot;&gt;&amp;quot;scientific_name&amp;quot;&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt; start &lt;span class=&quot;o&quot;&gt;=&lt;/span&gt; &lt;span class=&quot;m&quot;&gt;0&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt; 
     count &lt;span class=&quot;o&quot;&gt;=&lt;/span&gt; &lt;span class=&quot;m&quot;&gt;200&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt;
@@ -123,27 +447,30 @@ bison_data&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;out&lt;span class=&quot;
 
 
 
+
 &lt;div class=&quot;highlight&quot;&gt;&lt;pre&gt;&lt;code class=&quot;text&quot;&gt;  total observation fossil specimen literature unknown centroid
 1  3792          59    125     3522         47      39       78
 &lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;
 
 
-&lt;h3&gt;Make some maps! Note that right now the county and state maps just plot the conterminous lower 48. The map of individual occurrences shows the lower 48 + Alaska&lt;/h3&gt;
 
+&lt;h3 id=&quot;make-some-maps-note-that-right-now-the-county-and-state-maps-just-plot-the-conterminous-lower-48.-the-map-of-individual-occurrences-shows-the-lower-48-alaska&quot;&gt;Make some maps! Note that right now the county and state maps just plot the conterminous lower 48. The map of individual occurrences shows the lower 48 + Alaska&lt;/h3&gt;
 &lt;div class=&quot;highlight&quot;&gt;&lt;pre&gt;&lt;code class=&quot;r&quot;&gt;&lt;span class=&quot;c1&quot;&gt;# By county&lt;/span&gt;
 bisonmap&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;out&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt; tomap &lt;span class=&quot;o&quot;&gt;=&lt;/span&gt; &lt;span class=&quot;s&quot;&gt;&amp;quot;county&amp;quot;&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt;
 &lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;
 
 
-&lt;p&gt;&lt;img src=&quot;/img/2013-05-25-rbison/map11.png&quot; alt=&quot;center&quot; /&gt;&lt;/p&gt;
-
+&lt;figure&gt;
+&lt;img src=&quot;/img/2013-05-25-rbison/map11.png&quot; alt=&quot;center&quot; /&gt;&lt;figcaption&gt;center&lt;/figcaption&gt;
+&lt;/figure&gt;
 &lt;div class=&quot;highlight&quot;&gt;&lt;pre&gt;&lt;code class=&quot;r&quot;&gt;&lt;span class=&quot;c1&quot;&gt;# By state&lt;/span&gt;
 bisonmap&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;out&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt; tomap &lt;span class=&quot;o&quot;&gt;=&lt;/span&gt; &lt;span class=&quot;s&quot;&gt;&amp;quot;state&amp;quot;&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt;
 &lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;
 
 
-&lt;p&gt;&lt;img src=&quot;/img/2013-05-25-rbison/map12.png&quot; alt=&quot;center&quot; /&gt;&lt;/p&gt;
-
+&lt;figure&gt;
+&lt;img src=&quot;/img/2013-05-25-rbison/map12.png&quot; alt=&quot;center&quot; /&gt;&lt;figcaption&gt;center&lt;/figcaption&gt;
+&lt;/figure&gt;
 &lt;div class=&quot;highlight&quot;&gt;&lt;pre&gt;&lt;code class=&quot;r&quot;&gt;&lt;span class=&quot;c1&quot;&gt;# Individual locations&lt;/span&gt;
 bisonmap&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;out&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt;
 &lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;
@@ -151,32 +478,32 @@ bisonmap&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;out&lt;span class=&quot;p&
 
 
 
+
 &lt;div class=&quot;highlight&quot;&gt;&lt;pre&gt;&lt;code class=&quot;text&quot;&gt;## Rendering map...plotting 199 points
 &lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;
 
 
-&lt;p&gt;&lt;img src=&quot;/img/2013-05-25-rbison/map13.png&quot; alt=&quot;center&quot; /&gt;&lt;/p&gt;
-
+&lt;figure&gt;
+&lt;img src=&quot;/img/2013-05-25-rbison/map13.png&quot; alt=&quot;center&quot; /&gt;&lt;figcaption&gt;center&lt;/figcaption&gt;
+&lt;/figure&gt;
 &lt;hr /&gt;
-
-&lt;h3&gt;When plotting occurrences, you can pass additional arguments into the &lt;code&gt;bisonmap&lt;/code&gt; function.&lt;/h3&gt;
-
-&lt;h4&gt;For example, you can jitter the points&lt;/h4&gt;
-
+&lt;h3 id=&quot;when-plotting-occurrences-you-can-pass-additional-arguments-into-the-bisonmap-function.&quot;&gt;When plotting occurrences, you can pass additional arguments into the &lt;code&gt;bisonmap&lt;/code&gt; function.&lt;/h3&gt;
+&lt;h4 id=&quot;for-example-you-can-jitter-the-points&quot;&gt;For example, you can jitter the points&lt;/h4&gt;
 &lt;div class=&quot;highlight&quot;&gt;&lt;pre&gt;&lt;code class=&quot;r&quot;&gt;bisonmap&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;input &lt;span class=&quot;o&quot;&gt;=&lt;/span&gt; out&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt; geom &lt;span class=&quot;o&quot;&gt;=&lt;/span&gt; geom_jitter&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt;
 &lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;
 
 
 
 
+
 &lt;div class=&quot;highlight&quot;&gt;&lt;pre&gt;&lt;code class=&quot;text&quot;&gt;## Rendering map...plotting 199 points
 &lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;
 
 
-&lt;p&gt;&lt;img src=&quot;/img/2013-05-25-rbison/map2.png&quot; alt=&quot;center&quot; /&gt;&lt;/p&gt;
-
-&lt;h4&gt;And you can specify by how much you want the points to jitter (here an extreme example to make it obvious)&lt;/h4&gt;
-
+&lt;figure&gt;
+&lt;img src=&quot;/img/2013-05-25-rbison/map2.png&quot; alt=&quot;center&quot; /&gt;&lt;figcaption&gt;center&lt;/figcaption&gt;
+&lt;/figure&gt;
+&lt;h4 id=&quot;and-you-can-specify-by-how-much-you-want-the-points-to-jitter-here-an-extreme-example-to-make-it-obvious&quot;&gt;And you can specify by how much you want the points to jitter (here an extreme example to make it obvious)&lt;/h4&gt;
 &lt;div class=&quot;highlight&quot;&gt;&lt;pre&gt;&lt;code class=&quot;r&quot;&gt;library&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;ggplot2&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt;
 bisonmap&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;input &lt;span class=&quot;o&quot;&gt;=&lt;/span&gt; out&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt; geom &lt;span class=&quot;o&quot;&gt;=&lt;/span&gt; geom_jitter&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt; jitter &lt;span class=&quot;o&quot;&gt;=&lt;/span&gt; position_jitter&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;width &lt;span class=&quot;o&quot;&gt;=&lt;/span&gt; &lt;span class=&quot;m&quot;&gt;5&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;))&lt;/span&gt;
 &lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;
@@ -184,15 +511,16 @@ bisonmap&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;input &lt;span class=&quot
 
 
 
+
 &lt;div class=&quot;highlight&quot;&gt;&lt;pre&gt;&lt;code class=&quot;text&quot;&gt;## Rendering map...plotting 199 points
 &lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;
 
 
-&lt;p&gt;&lt;img src=&quot;/img/2013-05-25-rbison/map3.png&quot; alt=&quot;center&quot; /&gt;&lt;/p&gt;
-
+&lt;figure&gt;
+&lt;img src=&quot;/img/2013-05-25-rbison/map3.png&quot; alt=&quot;center&quot; /&gt;&lt;figcaption&gt;center&lt;/figcaption&gt;
+&lt;/figure&gt;
 &lt;hr /&gt;
-
-&lt;h4&gt;Let us know if you have any feature requests or find bugs at &lt;a href=&quot;https://github.com/ropensci/rbison/issues&quot;&gt;our GitHub Issues page&lt;/a&gt;.&lt;/h4&gt;
+&lt;h4 id=&quot;let-us-know-if-you-have-any-feature-requests-or-find-bugs-at-our-github-issues-page.&quot;&gt;Let us know if you have any feature requests or find bugs at &lt;a href=&quot;https://github.com/ropensci/rbison/issues&quot;&gt;our GitHub Issues page&lt;/a&gt;.&lt;/h4&gt;
 </description>
 				<published>2013-05-27 00:00:00 -0700</published>
 				<link>http://schamberlain.github.io/2013/05/rbison/</link>
@@ -200,51 +528,35 @@ bisonmap&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;input &lt;span class=&quot
 		
 			<item>
 				<title>Scholarly metadata in R</title>
-				<description>&lt;p&gt;Scholarly metadata - the meta-information surrounding articles - can be super useful.  Although metadata does not contain the full content of articles, it contains a lot of useful information, including title, authors, abstract, URL to the article, etc.&lt;/p&gt;
-
+				<description>&lt;p&gt;Scholarly metadata - the meta-information surrounding articles - can be super useful. Although metadata does not contain the full content of articles, it contains a lot of useful information, including title, authors, abstract, URL to the article, etc.&lt;/p&gt;
 &lt;p&gt;One of the largest sources of metadata is provided via the Open Archives Initiative Protocol for Metadata Harvesting or &lt;a href=&quot;http://www.openarchives.org/OAI/openarchivesprotocol.html&quot;&gt;OAI-PMH&lt;/a&gt;. Many publishers, provide their metadata through their own endpoint, and implement the standard OAI-PMH methods: &lt;a href=&quot;http://www.openarchives.org/OAI/openarchivesprotocol.html#GetRecord&quot;&gt;GetRecord&lt;/a&gt;, &lt;a href=&quot;http://www.openarchives.org/OAI/openarchivesprotocol.html#Identify&quot;&gt;Identify&lt;/a&gt;, &lt;a href=&quot;http://www.openarchives.org/OAI/openarchivesprotocol.html#ListIdentifiers&quot;&gt;ListIdentifiers&lt;/a&gt;, &lt;a href=&quot;http://www.openarchives.org/OAI/openarchivesprotocol.html#ListMetadataFormats&quot;&gt;ListMetadataFormats&lt;/a&gt;, &lt;a href=&quot;http://www.openarchives.org/OAI/openarchivesprotocol.html#ListRecords&quot;&gt;ListRecords&lt;/a&gt;, and &lt;a href=&quot;http://www.openarchives.org/OAI/openarchivesprotocol.html#ListSets&quot;&gt;ListSets&lt;/a&gt;. Many providers use OAI-PMH, including &lt;a href=&quot;http://oai.datacite.org/&quot;&gt;DataCite&lt;/a&gt;, &lt;a href=&quot;http://wiki.datadryad.org/Data_Access#OAI-PMH&quot;&gt;Dryad&lt;/a&gt;, and &lt;a href=&quot;http://www.ncbi.nlm.nih.gov/pmc/tools/oai/&quot;&gt;PubMed&lt;/a&gt;.&lt;/p&gt;
-
 &lt;p&gt;Some data-/article-providers provide their metadata via their own APIs. For example, Nature Publishing Group provides their own metadata API &lt;a href=&quot;http://developers.nature.com/docs&quot;&gt;here&lt;/a&gt; in non OAI-PMH format; you can get PLoS metadata through their &lt;a href=&quot;http://api.plos.org/&quot;&gt;search API&lt;/a&gt;, and the BHL (see below) provides their own custom metadata service.&lt;/p&gt;
-
 &lt;p&gt;In addition, CrossRef provides a number of metadata search services: &lt;a href=&quot;http://search.labs.crossref.org/help/api&quot;&gt;metadata search&lt;/a&gt; and &lt;a href=&quot;http://labs.crossref.org/openurl/&quot;&gt;openurl&lt;/a&gt;.&lt;/p&gt;
-
-&lt;p&gt;What about the other publishers? (please tell me if I'm wrong about these three)&lt;/p&gt;
-
+&lt;p&gt;What about the other publishers? (please tell me if I’m wrong about these three)&lt;/p&gt;
 &lt;ul&gt;
-&lt;li&gt;Springer has &lt;a href=&quot;http://dev.springer.com/docs&quot;&gt;a metadata API&lt;/a&gt;, but it is terrible, soooo...&lt;/li&gt;
+&lt;li&gt;Springer has &lt;a href=&quot;http://dev.springer.com/docs&quot;&gt;a metadata API&lt;/a&gt;, but it is terrible, soooo…&lt;/li&gt;
 &lt;li&gt;Elsevier, are you kidding? Well, they do have some sort of API service, but its a pain in the ass.&lt;/li&gt;
 &lt;li&gt;Wiley, no better than Elsevier.&lt;/li&gt;
 &lt;/ul&gt;
-
-
 &lt;p&gt;Note that metadata can live in other places:&lt;/p&gt;
-
 &lt;ul&gt;
 &lt;li&gt;Another package being developed by David Springate, &lt;a href=&quot;https://github.com/ropensci/rpubmed&quot;&gt;rpubmed&lt;/a&gt; can get PubMed metadata.&lt;/li&gt;
-&lt;li&gt;Our wrapper to the Mendeley API, &lt;a href=&quot;https://github.com/ropensci/rmendeley&quot;&gt;RMendeley&lt;/a&gt;, gets article metadata via Mendeley's database.&lt;/li&gt;
+&lt;li&gt;Our wrapper to the Mendeley API, &lt;a href=&quot;https://github.com/ropensci/rmendeley&quot;&gt;RMendeley&lt;/a&gt;, gets article metadata via Mendeley’s database.&lt;/li&gt;
 &lt;li&gt;Our wrapper to the Biodiversity Heritage Library API &lt;a href=&quot;http://www.biodiversitylibrary.org/api2/docs/docs.html&quot;&gt;here&lt;/a&gt; gets their metadata.&lt;/li&gt;
 &lt;/ul&gt;
-
-
-&lt;p&gt;No, you can't get metadata via Google Scholar - the don't allow scraping, and don't have expose their data via an API.&lt;/p&gt;
-
+&lt;p&gt;No, you can’t get metadata via Google Scholar - the don’t allow scraping, and don’t have expose their data via an API.&lt;/p&gt;
 &lt;p&gt;I have discussed this package &lt;a href=&quot;http://schamberlain.github.com/2012/09/rmetadata/&quot;&gt;in a previous blog post&lt;/a&gt;, but have since worked on the code a bit, and thought it deserved a new post.&lt;/p&gt;
-
 &lt;p&gt;You can see a tutorial for this package &lt;a href=&quot;http://ropensci.github.com/rmetadata/&quot;&gt;here&lt;/a&gt;, and contribute to the code &lt;a href=&quot;https://github.com/ropensci/rmetadata&quot;&gt;here&lt;/a&gt;.&lt;/p&gt;
-
 &lt;hr /&gt;
-
-&lt;h3&gt;Install rmetadata&lt;/h3&gt;
-
+&lt;h3 id=&quot;install-rmetadata&quot;&gt;Install rmetadata&lt;/h3&gt;
 &lt;div class=&quot;highlight&quot;&gt;&lt;pre&gt;&lt;code class=&quot;r&quot;&gt;&lt;span class=&quot;c1&quot;&gt;# install_github(&amp;#39;rmetadata&amp;#39;, &amp;#39;ropensci&amp;#39;) # uncomment to install&lt;/span&gt;
 library&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;rmetadata&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt;
 &lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;
 
 
+
 &lt;hr /&gt;
-
-&lt;h3&gt;Count OAI-PMH identifiers for a data provider.&lt;/h3&gt;
-
+&lt;h3 id=&quot;count-oai-pmh-identifiers-for-a-data-provider.&quot;&gt;Count OAI-PMH identifiers for a data provider.&lt;/h3&gt;
 &lt;div class=&quot;highlight&quot;&gt;&lt;pre&gt;&lt;code class=&quot;r&quot;&gt;&lt;span class=&quot;c1&quot;&gt;# For DataCite.&lt;/span&gt;
 count_identifiers&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;s&quot;&gt;&amp;quot;datacite&amp;quot;&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt;
 
@@ -253,12 +565,10 @@ count_identifiers&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&q
 &lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;
 
 
+
 &lt;hr /&gt;
-
-&lt;h3&gt;Lookup article info via CrossRef with DOI and get a citation.&lt;/h3&gt;
-
-&lt;h4&gt;As Bibtex&lt;/h4&gt;
-
+&lt;h3 id=&quot;lookup-article-info-via-crossref-with-doi-and-get-a-citation.&quot;&gt;Lookup article info via CrossRef with DOI and get a citation.&lt;/h3&gt;
+&lt;h4 id=&quot;as-bibtex&quot;&gt;As Bibtex&lt;/h4&gt;
 &lt;div class=&quot;highlight&quot;&gt;&lt;pre&gt;&lt;code class=&quot;r&quot;&gt;print&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;crossref_citation&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;s&quot;&gt;&amp;quot;10.3998/3336451.0009.101&amp;quot;&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;),&lt;/span&gt; style &lt;span class=&quot;o&quot;&gt;=&lt;/span&gt; &lt;span class=&quot;s&quot;&gt;&amp;quot;Bibtex&amp;quot;&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt;
 
 &lt;span class=&quot;o&quot;&gt;@&lt;/span&gt;Article&lt;span class=&quot;p&quot;&gt;{,&lt;/span&gt;
@@ -273,8 +583,8 @@ count_identifiers&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&q
 &lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;
 
 
-&lt;h4&gt;As regular text&lt;/h4&gt;
 
+&lt;h4 id=&quot;as-regular-text&quot;&gt;As regular text&lt;/h4&gt;
 &lt;div class=&quot;highlight&quot;&gt;&lt;pre&gt;&lt;code class=&quot;r&quot;&gt;print&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;crossref_citation&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;s&quot;&gt;&amp;quot;10.3998/3336451.0009.101&amp;quot;&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;),&lt;/span&gt; style &lt;span class=&quot;o&quot;&gt;=&lt;/span&gt; &lt;span class=&quot;s&quot;&gt;&amp;quot;text&amp;quot;&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt;
 
 Bilder G &lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;m&quot;&gt;2006&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt;. &lt;span class=&quot;s&quot;&gt;&amp;quot;In Google We Trust?&amp;quot;&lt;/span&gt; _The Journal of Electronic
@@ -283,12 +593,10 @@ http&lt;span class=&quot;o&quot;&gt;://&lt;/span&gt;dx.doi.org&lt;span class=&qu
 &lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;
 
 
+
 &lt;hr /&gt;
-
-&lt;h3&gt;Search the CrossRef Metatdata for DOIs using free form references.&lt;/h3&gt;
-
-&lt;h4&gt;Search with title, author, year, and journal&lt;/h4&gt;
-
+&lt;h3 id=&quot;search-the-crossref-metatdata-for-dois-using-free-form-references.&quot;&gt;Search the CrossRef Metatdata for DOIs using free form references.&lt;/h3&gt;
+&lt;h4 id=&quot;search-with-title-author-year-and-journal&quot;&gt;Search with title, author, year, and journal&lt;/h4&gt;
 &lt;div class=&quot;highlight&quot;&gt;&lt;pre&gt;&lt;code class=&quot;r&quot;&gt;crossref_search_free&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;query &lt;span class=&quot;o&quot;&gt;=&lt;/span&gt; &lt;span class=&quot;s&quot;&gt;&amp;quot;Piwowar Sharing Detailed Research Data Is Associated with Increased Citation Rate PLOS one 2007&amp;quot;&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt;
 
                                                                                              text
@@ -298,8 +606,8 @@ http&lt;span class=&quot;o&quot;&gt;://&lt;/span&gt;dx.doi.org&lt;span class=&qu
 &lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;
 
 
-&lt;h4&gt;Get a DOI and get the citation using \code{crossref_search}&lt;/h4&gt;
 
+&lt;h4 id=&quot;get-a-doi-and-get-the-citation-using&quot;&gt;Get a DOI and get the citation using &lt;/h4&gt;
 &lt;div class=&quot;highlight&quot;&gt;&lt;pre&gt;&lt;code class=&quot;r&quot;&gt;&lt;span class=&quot;c1&quot;&gt;# Get a DOI for a paper&lt;/span&gt;
 doi &lt;span class=&quot;o&quot;&gt;&amp;lt;-&lt;/span&gt; crossref_search_free&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;query &lt;span class=&quot;o&quot;&gt;=&lt;/span&gt; &lt;span class=&quot;s&quot;&gt;&amp;quot;Piwowar sharing data PLOS one&amp;quot;&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt;&lt;span class=&quot;o&quot;&gt;$&lt;/span&gt;doi
 
@@ -311,10 +619,9 @@ crossref_search&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;doi &lt;span class=
 &lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;
 
 
+
 &lt;hr /&gt;
-
-&lt;h3&gt;Get a random set of DOI's through CrossRef.&lt;/h3&gt;
-
+&lt;h3 id=&quot;get-a-random-set-of-dois-through-crossref.&quot;&gt;Get a random set of DOI’s through CrossRef.&lt;/h3&gt;
 &lt;div class=&quot;highlight&quot;&gt;&lt;pre&gt;&lt;code class=&quot;r&quot;&gt;&lt;span class=&quot;c1&quot;&gt;# Default search gets 20 random DOIs&lt;/span&gt;
 crossref_r&lt;span class=&quot;p&quot;&gt;()&lt;/span&gt;
 
@@ -339,6 +646,7 @@ crossref_r&lt;span class=&quot;p&quot;&gt;()&lt;/span&gt;
 &lt;span class=&quot;p&quot;&gt;[&lt;/span&gt;&lt;span class=&quot;m&quot;&gt;19&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;]&lt;/span&gt; &lt;span class=&quot;s&quot;&gt;&amp;quot;10.1007/s12262-012-0724-0&amp;quot;&lt;/span&gt;                 
 &lt;span class=&quot;p&quot;&gt;[&lt;/span&gt;&lt;span class=&quot;m&quot;&gt;20&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;]&lt;/span&gt; &lt;span class=&quot;s&quot;&gt;&amp;quot;10.1007/bf02192860&amp;quot;&lt;/span&gt;
 &lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;
+
 
 
 
@@ -369,10 +677,9 @@ crossref_r&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;type &lt;span class=&quo
 &lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;
 
 
+
 &lt;hr /&gt;
-
-&lt;h3&gt;Search the CrossRef Metatdata API.&lt;/h3&gt;
-
+&lt;h3 id=&quot;search-the-crossref-metatdata-api.&quot;&gt;Search the CrossRef Metatdata API.&lt;/h3&gt;
 &lt;div class=&quot;highlight&quot;&gt;&lt;pre&gt;&lt;code class=&quot;r&quot;&gt;&lt;span class=&quot;c1&quot;&gt;# Search for two different query terms&lt;/span&gt;
 crossref_search&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;query &lt;span class=&quot;o&quot;&gt;=&lt;/span&gt; c&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;s&quot;&gt;&amp;quot;renear&amp;quot;&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt; &lt;span class=&quot;s&quot;&gt;&amp;quot;palmer&amp;quot;&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;),&lt;/span&gt; rows &lt;span class=&quot;o&quot;&gt;=&lt;/span&gt; &lt;span class=&quot;m&quot;&gt;4&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;)[,&lt;/span&gt; &lt;span class=&quot;m&quot;&gt;1&lt;/span&gt;&lt;span class=&quot;o&quot;&gt;:&lt;/span&gt;&lt;span class=&quot;m&quot;&gt;3&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;]&lt;/span&gt;
 
@@ -382,6 +689,7 @@ crossref_search&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;query &lt;span clas
 &lt;span class=&quot;m&quot;&gt;3&lt;/span&gt; &lt;span class=&quot;m&quot;&gt;10.4242&lt;/span&gt;&lt;span class=&quot;o&quot;&gt;/&lt;/span&gt;BalisageVol3.Renear01 &lt;span class=&quot;m&quot;&gt;2.102&lt;/span&gt;              &lt;span class=&quot;m&quot;&gt;64&lt;/span&gt;
 &lt;span class=&quot;m&quot;&gt;4&lt;/span&gt; &lt;span class=&quot;m&quot;&gt;10.4242&lt;/span&gt;&lt;span class=&quot;o&quot;&gt;/&lt;/span&gt;BalisageVol5.Renear01 &lt;span class=&quot;m&quot;&gt;2.102&lt;/span&gt;              &lt;span class=&quot;m&quot;&gt;64&lt;/span&gt;
 &lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;
+
 
 
 
@@ -413,15 +721,15 @@ crossref_search&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;query &lt;span clas
 &lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;
 
 
+
 &lt;hr /&gt;
-
-&lt;h3&gt;Get a short DOI from shortdoi.org.&lt;/h3&gt;
-
+&lt;h3 id=&quot;get-a-short-doi-from-shortdoi.org.&quot;&gt;Get a short DOI from shortdoi.org.&lt;/h3&gt;
 &lt;div class=&quot;highlight&quot;&gt;&lt;pre&gt;&lt;code class=&quot;r&quot;&gt;&lt;span class=&quot;c1&quot;&gt;# Geta a short DOI, just the short DOI returned&lt;/span&gt;
 short_doi&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;doi &lt;span class=&quot;o&quot;&gt;=&lt;/span&gt; &lt;span class=&quot;s&quot;&gt;&amp;quot;10.1371/journal.pone.0042793&amp;quot;&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt;
 
 &lt;span class=&quot;p&quot;&gt;[&lt;/span&gt;&lt;span class=&quot;m&quot;&gt;1&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;]&lt;/span&gt; &lt;span class=&quot;s&quot;&gt;&amp;quot;10/f2bfz9&amp;quot;&lt;/span&gt;
 &lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;
+
 
 
 
@@ -440,10 +748,9 @@ short_doi&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;doi &lt;span class=&quot;
 &lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;
 
 
+
 &lt;hr /&gt;
-
-&lt;h3&gt;Get a record from a OAI-PMH data provider.&lt;/h3&gt;
-
+&lt;h3 id=&quot;get-a-record-from-a-oai-pmh-data-provider.&quot;&gt;Get a record from a OAI-PMH data provider.&lt;/h3&gt;
 &lt;div class=&quot;highlight&quot;&gt;&lt;pre&gt;&lt;code class=&quot;r&quot;&gt;&lt;span class=&quot;c1&quot;&gt;# Single provider, one identifier&lt;/span&gt;
 md_getrecord&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;provider &lt;span class=&quot;o&quot;&gt;=&lt;/span&gt; &lt;span class=&quot;s&quot;&gt;&amp;quot;pensoft&amp;quot;&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt; identifier &lt;span class=&quot;o&quot;&gt;=&lt;/span&gt; &lt;span class=&quot;s&quot;&gt;&amp;quot;10.3897/zookeys.1.10&amp;quot;&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt;
 
@@ -452,6 +759,7 @@ md_getrecord&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;provider &lt;span clas
       creator date             type
 &lt;span class=&quot;m&quot;&gt;1&lt;/span&gt; Jocqué&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt;Rudy &lt;span class=&quot;m&quot;&gt;2008&lt;/span&gt; Research Article
 &lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;
+
 
 
 
@@ -468,10 +776,9 @@ md_getrecord&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;provider &lt;span clas
 &lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;
 
 
+
 &lt;hr /&gt;
-
-&lt;h3&gt;List available metadata formats from various providers.&lt;/h3&gt;
-
+&lt;h3 id=&quot;list-available-metadata-formats-from-various-providers.&quot;&gt;List available metadata formats from various providers.&lt;/h3&gt;
 &lt;div class=&quot;highlight&quot;&gt;&lt;pre&gt;&lt;code class=&quot;r&quot;&gt;&lt;span class=&quot;c1&quot;&gt;# List metadata formats for a provider&lt;/span&gt;
 md_listmetadataformats&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;provider &lt;span class=&quot;o&quot;&gt;=&lt;/span&gt; &lt;span class=&quot;s&quot;&gt;&amp;quot;dryad&amp;quot;&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt;
 
@@ -495,6 +802,7 @@ md_listmetadataformats&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;provider &lt
 
 
 
+
 &lt;div class=&quot;highlight&quot;&gt;&lt;pre&gt;&lt;code class=&quot;r&quot;&gt;&lt;span class=&quot;c1&quot;&gt;# List metadata formats for a specific identifier for a provider&lt;/span&gt;
 md_listmetadataformats&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;provider &lt;span class=&quot;o&quot;&gt;=&lt;/span&gt; &lt;span class=&quot;s&quot;&gt;&amp;quot;pensoft&amp;quot;&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt; identifier &lt;span class=&quot;o&quot;&gt;=&lt;/span&gt; &lt;span class=&quot;s&quot;&gt;&amp;quot;10.3897/zookeys.1.10&amp;quot;&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt;
 
@@ -510,12 +818,10 @@ md_listmetadataformats&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;provider &lt
 &lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;
 
 
+
 &lt;hr /&gt;
-
-&lt;h3&gt;Some plotting - mean number of authors per paper&lt;/h3&gt;
-
-&lt;p&gt;Okay, so this isn't a super useful visualization, but you can surely think of something better.&lt;/p&gt;
-
+&lt;h3 id=&quot;some-plotting---mean-number-of-authors-per-paper&quot;&gt;Some plotting - mean number of authors per paper&lt;/h3&gt;
+&lt;p&gt;Okay, so this isn’t a super useful visualization, but you can surely think of something better.&lt;/p&gt;
 &lt;div class=&quot;highlight&quot;&gt;&lt;pre&gt;&lt;code class=&quot;r&quot;&gt;library&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;ggplot2&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt;
 library&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;ggthemes&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt;
 library&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;reshape&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt;
@@ -534,13 +840,12 @@ ggplot&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;toplot_&lt;span class=&quot;
 &lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;
 
 
-&lt;p&gt;&lt;img src=&quot;/img/someplotting.png&quot; alt=&quot;center&quot; /&gt;&lt;/p&gt;
-
+&lt;figure&gt;
+&lt;img src=&quot;/img/someplotting.png&quot; alt=&quot;center&quot; /&gt;&lt;figcaption&gt;center&lt;/figcaption&gt;
+&lt;/figure&gt;
 &lt;hr /&gt;
-
-&lt;h4&gt;Get the .Rmd file used to create this post &lt;a href=&quot;https://github.com/SChamberlain/schamberlain.github.com/tree/master/_drafts/2013-03-16-r-metadata.Rmd&quot;&gt;at my github account&lt;/a&gt; - or &lt;a href=&quot;https://github.com/SChamberlain/schamberlain.github.com/tree/master/_posts/2013-03-16-r-metadata.md&quot;&gt;.md file&lt;/a&gt;.&lt;/h4&gt;
-
-&lt;h4&gt;Written in &lt;a href=&quot;http://daringfireball.net/projects/markdown/&quot;&gt;Markdown&lt;/a&gt;, with help from &lt;a href=&quot;http://yihui.name/knitr/&quot;&gt;knitr&lt;/a&gt;, and &lt;a href=&quot;https://github.com/cboettig/knitcitations&quot;&gt;knitcitations&lt;/a&gt;.&lt;/h4&gt;
+&lt;h4 id=&quot;get-the-.rmd-file-used-to-create-this-post-at-my-github-account---or-.md-file.&quot;&gt;Get the .Rmd file used to create this post &lt;a href=&quot;https://github.com/SChamberlain/schamberlain.github.com/tree/master/_drafts/2013-03-16-r-metadata.Rmd&quot;&gt;at my github account&lt;/a&gt; - or &lt;a href=&quot;https://github.com/SChamberlain/schamberlain.github.com/tree/master/_posts/2013-03-16-r-metadata.md&quot;&gt;.md file&lt;/a&gt;.&lt;/h4&gt;
+&lt;h4 id=&quot;written-in-markdown-with-help-from-knitr-and-knitcitations.&quot;&gt;Written in &lt;a href=&quot;http://daringfireball.net/projects/markdown/&quot;&gt;Markdown&lt;/a&gt;, with help from &lt;a href=&quot;http://yihui.name/knitr/&quot;&gt;knitr&lt;/a&gt;, and &lt;a href=&quot;https://github.com/cboettig/knitcitations&quot;&gt;knitcitations&lt;/a&gt;.&lt;/h4&gt;
 </description>
 				<published>2013-03-16 00:00:00 -0700</published>
 				<link>http://schamberlain.github.io/2013/03/r-metadata/</link>
@@ -549,13 +854,9 @@ ggplot&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;toplot_&lt;span class=&quot;
 			<item>
 				<title>Visualizing rOpenSci collaboration</title>
 				<description>&lt;p&gt;We (&lt;a href=&quot;http://ropensci.org/&quot;&gt;rOpenSci&lt;/a&gt;) have been writing code for R packages for a couple years, so it is time to take a look back at the data. What data you ask? The commits data from GitHub ~ data that records who did what and when.&lt;/p&gt;
-
 &lt;p&gt;Using the &lt;a href=&quot;http://developer.github.com/v3/repos/commits/&quot;&gt;Github commits API&lt;/a&gt; we can gather data on who commited code to a Github repository, and when they did it. Then we can visualize this hitorical record.&lt;/p&gt;
-
 &lt;hr /&gt;
-
-&lt;h3&gt;Install some functions for interacting with the Github API via R&lt;/h3&gt;
-
+&lt;h3 id=&quot;install-some-functions-for-interacting-with-the-github-api-via-r&quot;&gt;Install some functions for interacting with the Github API via R&lt;/h3&gt;
 &lt;div class=&quot;highlight&quot;&gt;&lt;pre&gt;&lt;code class=&quot;r&quot;&gt;install_github&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;s&quot;&gt;&amp;#39;sandbox&amp;#39;&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt; &lt;span class=&quot;s&quot;&gt;&amp;#39;ropensci&amp;#39;&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt; 
 
 library&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;sandbox&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt;
@@ -575,18 +876,16 @@ github_auth&lt;span class=&quot;p&quot;&gt;()&lt;/span&gt;
 &lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;
 
 
+
 &lt;hr /&gt;
-
-&lt;h3&gt;Get all repos for an organization, here ropensci of course&lt;/h3&gt;
-
+&lt;h3 id=&quot;get-all-repos-for-an-organization-here-ropensci-of-course&quot;&gt;Get all repos for an organization, here ropensci of course&lt;/h3&gt;
 &lt;div class=&quot;highlight&quot;&gt;&lt;pre&gt;&lt;code class=&quot;r&quot;&gt;ropensci_repos &lt;span class=&quot;o&quot;&gt;&amp;lt;-&lt;/span&gt; github_allrepos&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;userorg &lt;span class=&quot;o&quot;&gt;=&lt;/span&gt; &lt;span class=&quot;s&quot;&gt;&amp;quot;ropensci&amp;quot;&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt;
 &lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;
 
 
+
 &lt;hr /&gt;
-
-&lt;h3&gt;Get commits broken down in to additions and deletions, though below we just collapse them to all commits&lt;/h3&gt;
-
+&lt;h3 id=&quot;get-commits-broken-down-in-to-additions-and-deletions-though-below-we-just-collapse-them-to-all-commits&quot;&gt;Get commits broken down in to additions and deletions, though below we just collapse them to all commits&lt;/h3&gt;
 &lt;div class=&quot;highlight&quot;&gt;&lt;pre&gt;&lt;code class=&quot;r&quot;&gt;registerDoMC&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;cores &lt;span class=&quot;o&quot;&gt;=&lt;/span&gt; &lt;span class=&quot;m&quot;&gt;4&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt;
 github_commits_safe &lt;span class=&quot;o&quot;&gt;&amp;lt;-&lt;/span&gt; plyr&lt;span class=&quot;o&quot;&gt;::&lt;/span&gt;failwith&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;kc&quot;&gt;NULL&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt; github_commits&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt;
 out &lt;span class=&quot;o&quot;&gt;&amp;lt;-&lt;/span&gt; llply&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;ropensci_repos&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt; &lt;span class=&quot;kr&quot;&gt;function&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;x&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt; github_commits_safe&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;s&quot;&gt;&amp;quot;ropensci&amp;quot;&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt; x&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt; 
@@ -597,10 +896,9 @@ outdf &lt;span class=&quot;o&quot;&gt;&amp;lt;-&lt;/span&gt; ldply&lt;span class
 &lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;
 
 
+
 &lt;hr /&gt;
-
-&lt;h3&gt;Plot commits by date and repo&lt;/h3&gt;
-
+&lt;h3 id=&quot;plot-commits-by-date-and-repo&quot;&gt;Plot commits by date and repo&lt;/h3&gt;
 &lt;div class=&quot;highlight&quot;&gt;&lt;pre&gt;&lt;code class=&quot;r&quot;&gt;outdf_subset &lt;span class=&quot;o&quot;&gt;&amp;lt;-&lt;/span&gt; outdf&lt;span class=&quot;p&quot;&gt;[&lt;/span&gt;&lt;span class=&quot;o&quot;&gt;!&lt;/span&gt;outdf&lt;span class=&quot;o&quot;&gt;$&lt;/span&gt;.id &lt;span class=&quot;o&quot;&gt;%in%&lt;/span&gt; c&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;s&quot;&gt;&amp;quot;citeulike&amp;quot;&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt; &lt;span class=&quot;s&quot;&gt;&amp;quot;challenge&amp;quot;&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt; &lt;span class=&quot;s&quot;&gt;&amp;quot;docs&amp;quot;&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt; &lt;span class=&quot;s&quot;&gt;&amp;quot;ropensci-book&amp;quot;&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt; 
     &lt;span class=&quot;s&quot;&gt;&amp;quot;usecases&amp;quot;&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt; &lt;span class=&quot;s&quot;&gt;&amp;quot;textmine&amp;quot;&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt; &lt;span class=&quot;s&quot;&gt;&amp;quot;usgs&amp;quot;&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt; &lt;span class=&quot;s&quot;&gt;&amp;quot;ropenscitoolkit&amp;quot;&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt; &lt;span class=&quot;s&quot;&gt;&amp;quot;neotoma&amp;quot;&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt; &lt;span class=&quot;s&quot;&gt;&amp;quot;rEWDB&amp;quot;&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt; &lt;span class=&quot;s&quot;&gt;&amp;quot;rgauges&amp;quot;&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt; 
     &lt;span class=&quot;s&quot;&gt;&amp;quot;rodash&amp;quot;&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt; &lt;span class=&quot;s&quot;&gt;&amp;quot;ropensci.github.com&amp;quot;&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt; &lt;span class=&quot;s&quot;&gt;&amp;quot;ROAuth&amp;quot;&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;),&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;]&lt;/span&gt;
@@ -634,18 +932,14 @@ ggplot&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;outdf_subset&lt;span class=&
 &lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;
 
 
-&lt;p&gt;&lt;img src=&quot;/img/commitsbydate.png&quot; alt=&quot;center&quot; /&gt;&lt;/p&gt;
 
+&lt;figure&gt;
+&lt;img src=&quot;/img/commitsbydate.png&quot; alt=&quot;center&quot; /&gt;&lt;figcaption&gt;center&lt;/figcaption&gt;
+&lt;/figure&gt;
 &lt;p&gt;The plot above plots the sum of additions+deletions, and is sorted by the first commit date of reach repo, with the first being &lt;a href=&quot;https://github.com/ropensci/treeBASE&quot;&gt;treebase&lt;/a&gt;, which wraps the &lt;a href=&quot;http://treebase.org/treebase-web/urlAPI.html&quot;&gt;Treebase API&lt;/a&gt;, and the most recent being &lt;a href=&quot;https://github.com/ropensci/rWBclimate&quot;&gt;rwbclimate&lt;/a&gt;, which wraps the &lt;a href=&quot;http://data.worldbank.org/developers/climate-data-api&quot;&gt;World Blank climate data API&lt;/a&gt;.&lt;/p&gt;
-
 &lt;p&gt;You can see that some repos have recieved commits more or less consistently over their life time, while others have seen a little development here and there.&lt;/p&gt;
-
 &lt;hr /&gt;
-
-&lt;p&gt;w&lt;/p&gt;
-
-&lt;h3&gt;In addition, there are quite a few people that have committed code now to rOpenSci repos, calling for a network vizualization of course.&lt;/h3&gt;
-
+&lt;p&gt;w ### In addition, there are quite a few people that have committed code now to rOpenSci repos, calling for a network vizualization of course.&lt;/p&gt;
 &lt;div class=&quot;highlight&quot;&gt;&lt;pre&gt;&lt;code class=&quot;r&quot;&gt;outdf_network &lt;span class=&quot;o&quot;&gt;&amp;lt;-&lt;/span&gt; droplevels&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;outdf&lt;span class=&quot;p&quot;&gt;[&lt;/span&gt;&lt;span class=&quot;o&quot;&gt;!&lt;/span&gt;outdf&lt;span class=&quot;o&quot;&gt;$&lt;/span&gt;.id &lt;span class=&quot;o&quot;&gt;%in%&lt;/span&gt; c&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;s&quot;&gt;&amp;quot;citeulike&amp;quot;&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt; &lt;span class=&quot;s&quot;&gt;&amp;quot;challenge&amp;quot;&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt; 
     &lt;span class=&quot;s&quot;&gt;&amp;quot;docs&amp;quot;&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt; &lt;span class=&quot;s&quot;&gt;&amp;quot;ropensci-book&amp;quot;&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt; &lt;span class=&quot;s&quot;&gt;&amp;quot;usecases&amp;quot;&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt; &lt;span class=&quot;s&quot;&gt;&amp;quot;textmine&amp;quot;&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt; &lt;span class=&quot;s&quot;&gt;&amp;quot;usgs&amp;quot;&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt; &lt;span class=&quot;s&quot;&gt;&amp;quot;ropenscitoolkit&amp;quot;&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt; 
     &lt;span class=&quot;s&quot;&gt;&amp;quot;retriever&amp;quot;&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt; &lt;span class=&quot;s&quot;&gt;&amp;quot;rodash&amp;quot;&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt; &lt;span class=&quot;s&quot;&gt;&amp;quot;ropensci.github.com&amp;quot;&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt; &lt;span class=&quot;s&quot;&gt;&amp;quot;ROAuth&amp;quot;&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt; &lt;span class=&quot;s&quot;&gt;&amp;quot;rgauges&amp;quot;&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt; &lt;span class=&quot;s&quot;&gt;&amp;quot;sandbox&amp;quot;&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt; 
@@ -662,10 +956,10 @@ plotweb&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;sortweb&lt;span class=&quot
 &lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;
 
 
-&lt;p&gt;&lt;img src=&quot;/img/collabnetwork.png&quot; alt=&quot;center&quot; /&gt;&lt;/p&gt;
-
+&lt;figure&gt;
+&lt;img src=&quot;/img/collabnetwork.png&quot; alt=&quot;center&quot; /&gt;&lt;figcaption&gt;center&lt;/figcaption&gt;
+&lt;/figure&gt;
 &lt;p&gt;The plot above shows repos on one side and contributors on the other. Some folks (the core rOpenSci team: cboettig, karthikram, emhart, and schamberlain) have committed quite a lot to many packages. We also have amny awesome contributors to our packages (some contributors and repos have been removed for clarity).&lt;/p&gt;
-
 &lt;p&gt;rOpenSci is truly a collaborative effort to develop tools for open science, so thanks to all our contributors - keep on forking, pull requesting, and commiting.&lt;/p&gt;
 </description>
 				<published>2013-03-08 00:00:00 -0800</published>
@@ -674,51 +968,30 @@ plotweb&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;sortweb&lt;span class=&quot
 		
 			<item>
 				<title>Academia reboot</title>
-				<description>&lt;h2&gt;Reboot&lt;/h2&gt;
-
+				<description>&lt;h2 id=&quot;reboot&quot;&gt;Reboot&lt;/h2&gt;
 &lt;p&gt;We need to reboot academia, at least for graduate training. I am speaking from the point of view of ecology/evolution (EEB). Why you ask? Because of the following line of reasoning:&lt;/p&gt;
-
 &lt;ul&gt;
-&lt;li&gt;&lt;p&gt;First, the most important factor for me comes down to supply and demand. We have too much supply (=graduate students) and not enough demand (=faculty positions, etc.) - see &lt;a href=&quot;http://www.phdcomics.com/comics/archive.php?comicid=911&quot;&gt;this comic at PhDComics&lt;/a&gt; for proof. This seems especially apparent when you hear from your fellow postdoc friends that there were hundreds of other people with Ph.D.'s applying for the same position.&lt;/p&gt;&lt;/li&gt;
+&lt;li&gt;&lt;p&gt;First, the most important factor for me comes down to supply and demand. We have too much supply (=graduate students) and not enough demand (=faculty positions, etc.) - see &lt;a href=&quot;http://www.phdcomics.com/comics/archive.php?comicid=911&quot;&gt;this comic at PhDComics&lt;/a&gt; for proof. This seems especially apparent when you hear from your fellow postdoc friends that there were hundreds of other people with Ph.D.’s applying for the same position.&lt;/p&gt;&lt;/li&gt;
 &lt;li&gt;&lt;p&gt;Second, funding is getting thin. I have never received funding from a competitive grant, despite having 12 published papers to my name. Recent cuts to the NSF, NIH, and other federal agencies mean that getting a grant will be harder and harder. Furthermore, the mean age of a first time NIH grant recipient in 2008 was 51 according to a recent study in PLoS One (Matthews &lt;em&gt;et. al.&lt;/em&gt; 2011).&lt;/p&gt;&lt;/li&gt;
-&lt;li&gt;&lt;p&gt;Third, we don't learn the skills we really need. This is many fold. First, we don't learn the appropriate mathematical and statistical techniques in undergraduate and grad school - a forthcoming paper found that in a survey of nearly 1000 ecology and evolution graduate students, most thought they were unprepared wrt to math and stats (interview with author in Soundcloud widget below). Second, we don't learn enough computational skills. Digital data (not on your physical clipboard, but your digital one) is more and more important, requiring knowing how to leverage and keep track of data. Yet, we aren't taught these skills, at least in my experience. The need for training in computation/coding is evident from the sold out &lt;a href=&quot;http://software-carpentry.org/&quot;&gt;Software Carpentry workshops&lt;/a&gt;. Third, reproducibility is not something we are taught. Well, we are taught to check over everything in detail (read: proof your data), but there is often no way to reproduce analyses when we use 10 different expensive software programs to do an analysis (read: MS Word, JMP, SAS, SigmaPlot, etc.). And isn't reproduciblity important?&lt;/p&gt;&lt;/li&gt;
+&lt;li&gt;&lt;p&gt;Third, we don’t learn the skills we really need. This is many fold. First, we don’t learn the appropriate mathematical and statistical techniques in undergraduate and grad school - a forthcoming paper found that in a survey of nearly 1000 ecology and evolution graduate students, most thought they were unprepared wrt to math and stats (interview with author in Soundcloud widget below). Second, we don’t learn enough computational skills. Digital data (not on your physical clipboard, but your digital one) is more and more important, requiring knowing how to leverage and keep track of data. Yet, we aren’t taught these skills, at least in my experience. The need for training in computation/coding is evident from the sold out &lt;a href=&quot;http://software-carpentry.org/&quot;&gt;Software Carpentry workshops&lt;/a&gt;. Third, reproducibility is not something we are taught. Well, we are taught to check over everything in detail (read: proof your data), but there is often no way to reproduce analyses when we use 10 different expensive software programs to do an analysis (read: MS Word, JMP, SAS, SigmaPlot, etc.). And isn’t reproduciblity important?&lt;/p&gt;&lt;/li&gt;
 &lt;/ul&gt;
-
-
 &lt;hr /&gt;
-
 &lt;iframe width=&quot;30%&quot; height=&quot;140&quot; scrolling=&quot;no&quot; frameborder=&quot;no&quot; src=&quot;https://w.soundcloud.com/player/?url=http%3A%2F%2Fapi.soundcloud.com%2Ftracks%2F78215101&amp;amp;color=ff6600&amp;amp;auto_play=false&amp;amp;show_artwork=false&quot;&gt;&lt;/iframe&gt;
 
-
 &lt;hr /&gt;
-
-&lt;h2&gt;What do we do?&lt;/h2&gt;
-
-&lt;p&gt;To address the supply/demand issue, I think we need fewer graduate students, period. I think this will work for a few reasons. If there are fewer graduate students, those that get in will be of higher quality because profs can be more selective, they may get payed more (hopefully) since there are few students, and they should in theory get more attention from their advisers (if they want it). In addition, there would be less competition for the very few grants out there for grad students.  This would then lead to fewer postdocs, and less competition for faculty positions. I think the supply/demand issue in EEB is particularly problematic. That is, in EEB there doesn't seem to be the large quantity of private sector jobs as there is for Ph.D. graduates in engineering, physics, etc.&lt;/p&gt;
-
+&lt;h2 id=&quot;what-do-we-do&quot;&gt;What do we do?&lt;/h2&gt;
+&lt;p&gt;To address the supply/demand issue, I think we need fewer graduate students, period. I think this will work for a few reasons. If there are fewer graduate students, those that get in will be of higher quality because profs can be more selective, they may get payed more (hopefully) since there are few students, and they should in theory get more attention from their advisers (if they want it). In addition, there would be less competition for the very few grants out there for grad students. This would then lead to fewer postdocs, and less competition for faculty positions. I think the supply/demand issue in EEB is particularly problematic. That is, in EEB there doesn’t seem to be the large quantity of private sector jobs as there is for Ph.D. graduates in engineering, physics, etc.&lt;/p&gt;
 &lt;p&gt;The funding situation is beyond me, but definitely makes me want to leave academia. Crowdfunding, especially &lt;a href=&quot;http://scifundchallenge.org/&quot;&gt;#SciFund&lt;/a&gt;, is an option for scientists, but mostly only on a small financial scale. Any thoughts?&lt;/p&gt;
-
-&lt;p&gt;The skills issue will likely be addressed in time, and vary among schools for sure. Some schools will focus on natural history, which is good (that's where I did my undergrad and it was great), and some schools will incorporate more of these science 2.0 skills (advanced stats, better math training, and computer science).&lt;/p&gt;
-
+&lt;p&gt;The skills issue will likely be addressed in time, and vary among schools for sure. Some schools will focus on natural history, which is good (that’s where I did my undergrad and it was great), and some schools will incorporate more of these science 2.0 skills (advanced stats, better math training, and computer science).&lt;/p&gt;
 &lt;hr /&gt;
-
-&lt;h2&gt;&lt;em&gt;Thoughts?&lt;/em&gt;&lt;/h2&gt;
-
+&lt;h2 id=&quot;thoughts&quot;&gt;&lt;em&gt;Thoughts?&lt;/em&gt;&lt;/h2&gt;
 &lt;hr /&gt;
-
-&lt;h4&gt;Get the .Rmd file used to create this post &lt;a href=&quot;https://github.com/SChamberlain/schamberlain.github.com/tree/master/_drafts/2013-02-22-academia-reboot.Rmd&quot;&gt;at my github account&lt;/a&gt; - or &lt;a href=&quot;https://github.com/SChamberlain/schamberlain.github.com/tree/master/_posts/2013-02-22-academia-reboot.md&quot;&gt;.md file&lt;/a&gt;.&lt;/h4&gt;
-
-&lt;h4&gt;Written in &lt;a href=&quot;http://daringfireball.net/projects/markdown/&quot;&gt;Markdown&lt;/a&gt;, with help from &lt;a href=&quot;http://yihui.name/knitr/&quot;&gt;knitr&lt;/a&gt;, and &lt;a href=&quot;https://github.com/cboettig/knitcitations&quot;&gt;knitcitations&lt;/a&gt;.&lt;/h4&gt;
-
+&lt;h4 id=&quot;get-the-.rmd-file-used-to-create-this-post-at-my-github-account---or-.md-file.&quot;&gt;Get the .Rmd file used to create this post &lt;a href=&quot;https://github.com/SChamberlain/schamberlain.github.com/tree/master/_drafts/2013-02-22-academia-reboot.Rmd&quot;&gt;at my github account&lt;/a&gt; - or &lt;a href=&quot;https://github.com/SChamberlain/schamberlain.github.com/tree/master/_posts/2013-02-22-academia-reboot.md&quot;&gt;.md file&lt;/a&gt;.&lt;/h4&gt;
+&lt;h4 id=&quot;written-in-markdown-with-help-from-knitr-and-knitcitations.&quot;&gt;Written in &lt;a href=&quot;http://daringfireball.net/projects/markdown/&quot;&gt;Markdown&lt;/a&gt;, with help from &lt;a href=&quot;http://yihui.name/knitr/&quot;&gt;knitr&lt;/a&gt;, and &lt;a href=&quot;https://github.com/cboettig/knitcitations&quot;&gt;knitcitations&lt;/a&gt;.&lt;/h4&gt;
 &lt;hr /&gt;
-
-&lt;h4&gt;References&lt;/h4&gt;
-
-&lt;p&gt;Matthews KRW, Calhoun KM, lo N, ho V and Germano G (2011).
-&amp;ldquo;The Aging of Biomedical Research in The United States.&amp;rdquo;
-&lt;EM&gt;Plos One&lt;/EM&gt;, &lt;B&gt;6&lt;/B&gt;.
-&lt;a href=&quot;http://dx.doi.org/10.1371/journal.pone.0029738&quot;&gt;http://dx.doi.org/10.1371/journal.pone.0029738&lt;/a&gt;.
-
+&lt;h4 id=&quot;references&quot;&gt;References&lt;/h4&gt;
+&lt;p&gt;
+&lt;p&gt;Matthews KRW, Calhoun KM, lo N, ho V and Germano G (2011). “The Aging of Biomedical Research in The United States.” &lt;EM&gt;Plos One&lt;/EM&gt;, &lt;B&gt;6&lt;/B&gt;. &lt;a href=&quot;http://dx.doi.org/10.1371/journal.pone.0029738&quot;&gt;http://dx.doi.org/10.1371/journal.pone.0029738&lt;/a&gt;.&lt;/p&gt;
 </description>
 				<published>2013-02-22 00:00:00 -0800</published>
 				<link>http://schamberlain.github.io/2013/02/academia-reboot/</link>
@@ -727,43 +1000,28 @@ plotweb&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;sortweb&lt;span class=&quot
 			<item>
 				<title>Getting a simple tree via NCBI</title>
 				<description>&lt;p&gt;I was just at the &lt;a href=&quot;http://www.evoio.org/wiki/Phylotastic&quot;&gt;Phylotastic hackathon&lt;/a&gt; in Tucson, AZ at the &lt;a href=&quot;http://www.iplantcollaborative.org/&quot;&gt;iPlant&lt;/a&gt; facilities at the UofA.&lt;/p&gt;
-
 &lt;p&gt;A problem that needs to be solved is getting the incrasingly vast phylogenetic information to folks not comfortable building their own phylogenies. &lt;a href=&quot;http://phylodiversity.net/phylomatic/&quot;&gt;Phylomatic&lt;/a&gt; has made this super easy for people that want plant phylogenies (at least 250 or so papers have used and cited Phylomatic in their papers) - however, there are few options for those that want phylogenies for other taxonomic groups.&lt;/p&gt;
-
-&lt;p&gt;One cool tool that was brought up was the &lt;a href=&quot;http://www.ncbi.nlm.nih.gov/Taxonomy/CommonTree/wwwcmt.cgi&quot;&gt;Common Tree&lt;/a&gt; service provided by NCBI. &lt;a href=&quot;http://www.ncbi.nlm.nih.gov/Taxonomy/CommonTree/cmthelp.html&quot;&gt;Here's&lt;/a&gt; some help on the service. Unlike Phylomatic, Common Tree is purely based off of taxonomic relationships (A and B are both in the C family, so are sisters), not an actual phylogeny as Phylomatic is based on.&lt;/p&gt;
-
+&lt;p&gt;One cool tool that was brought up was the &lt;a href=&quot;http://www.ncbi.nlm.nih.gov/Taxonomy/CommonTree/wwwcmt.cgi&quot;&gt;Common Tree&lt;/a&gt; service provided by NCBI. &lt;a href=&quot;http://www.ncbi.nlm.nih.gov/Taxonomy/CommonTree/cmthelp.html&quot;&gt;Here’s&lt;/a&gt; some help on the service. Unlike Phylomatic, Common Tree is purely based off of taxonomic relationships (A and B are both in the C family, so are sisters), not an actual phylogeny as Phylomatic is based on.&lt;/p&gt;
 &lt;p&gt;But how do you use Common Tree?&lt;/p&gt;
-
 &lt;hr /&gt;
-
-&lt;h3&gt;Get a species list&lt;/h3&gt;
-
+&lt;h3 id=&quot;get-a-species-list&quot;&gt;Get a species list&lt;/h3&gt;
 &lt;p&gt;Grab the taxon list from my github account &lt;a href=&quot;https://raw.github.com/SChamberlain/schamberlain.github.com/master/img/species.txt&quot;&gt;here&lt;/a&gt;&lt;/p&gt;
-
-&lt;h3&gt;Go to the site&lt;/h3&gt;
-
+&lt;h3 id=&quot;go-to-the-site&quot;&gt;Go to the site&lt;/h3&gt;
 &lt;p&gt;Go to the Common Tree site &lt;a href=&quot;http://www.ncbi.nlm.nih.gov/Taxonomy/CommonTree/wwwcmt.cgi&quot;&gt;here&lt;/a&gt;&lt;/p&gt;
-
-&lt;h3&gt;Choose file&lt;/h3&gt;
-
-&lt;p&gt;Hit the &quot;choose file&quot; button, then select the &lt;code&gt;species.txt&lt;/code&gt; file you downloaded in the first step.&lt;/p&gt;
-
-&lt;h3&gt;Add the species list to make the tree&lt;/h3&gt;
-
-&lt;p&gt;Then hit &quot;add from file&quot;, and you got a &quot;tree&quot;&lt;/p&gt;
-
-&lt;p&gt;&lt;img src=&quot;https://raw.github.com/SChamberlain/schamberlain.github.com/master/img/ncbi.png&quot; alt=&quot;image&quot; /&gt;&lt;/p&gt;
-
-&lt;h2&gt;Download&lt;/h2&gt;
-
+&lt;h3 id=&quot;choose-file&quot;&gt;Choose file&lt;/h3&gt;
+&lt;p&gt;Hit the “choose file” button, then select the &lt;code&gt;species.txt&lt;/code&gt; file you downloaded in the first step.&lt;/p&gt;
+&lt;h3 id=&quot;add-the-species-list-to-make-the-tree&quot;&gt;Add the species list to make the tree&lt;/h3&gt;
+&lt;p&gt;Then hit “add from file”, and you got a “tree”&lt;/p&gt;
+&lt;figure&gt;
+&lt;img src=&quot;https://raw.github.com/SChamberlain/schamberlain.github.com/master/img/ncbi.png&quot; alt=&quot;image&quot; /&gt;&lt;figcaption&gt;image&lt;/figcaption&gt;
+&lt;/figure&gt;
+&lt;h2 id=&quot;download&quot;&gt;Download&lt;/h2&gt;
 &lt;p&gt;You can download the tree in a variety of formats, including a .phy file&lt;/p&gt;
-
-&lt;p&gt;&lt;img src=&quot;https://raw.github.com/SChamberlain/schamberlain.github.com/master/img/ncbi2.png&quot; alt=&quot;image&quot; /&gt;&lt;/p&gt;
-
-&lt;h2&gt;Plot the tree on your machine&lt;/h2&gt;
-
+&lt;figure&gt;
+&lt;img src=&quot;https://raw.github.com/SChamberlain/schamberlain.github.com/master/img/ncbi2.png&quot; alt=&quot;image&quot; /&gt;&lt;figcaption&gt;image&lt;/figcaption&gt;
+&lt;/figure&gt;
+&lt;h2 id=&quot;plot-the-tree-on-your-machine&quot;&gt;Plot the tree on your machine&lt;/h2&gt;
 &lt;p&gt;Make a tree, in R for me&lt;/p&gt;
-
 &lt;div class=&quot;highlight&quot;&gt;&lt;pre&gt;&lt;code class=&quot;r&quot;&gt;&lt;span class=&quot;c1&quot;&gt;# install.packages(&amp;#39;ape&amp;#39;) # install if you don&amp;#39;t have ape&lt;/span&gt;
 library&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;ape&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt;
 
@@ -779,19 +1037,16 @@ plot&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;tree2&lt;span class=&quot;p&qu
 &lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;
 
 
-&lt;h3&gt;w00p, there it is...&lt;/h3&gt;
 
-&lt;p&gt;&lt;img src=&quot;https://raw.github.com/SChamberlain/schamberlain.github.com/master/img/ncbi_tree.png&quot; alt=&quot;image4&quot; /&gt;&lt;/p&gt;
-
+&lt;h3 id=&quot;w00p-there-it-is&quot;&gt;w00p, there it is…&lt;/h3&gt;
+&lt;figure&gt;
+&lt;img src=&quot;https://raw.github.com/SChamberlain/schamberlain.github.com/master/img/ncbi_tree.png&quot; alt=&quot;image4&quot; /&gt;&lt;figcaption&gt;image4&lt;/figcaption&gt;
+&lt;/figure&gt;
 &lt;hr /&gt;
-
-&lt;h3&gt;And the answer is &lt;em&gt;NO&lt;/em&gt; to the question: Is there an API for Common Tree?&lt;/h3&gt;
-
+&lt;h3 id=&quot;and-the-answer-is-no-to-the-question-is-there-an-api-for-common-tree&quot;&gt;And the answer is &lt;em&gt;NO&lt;/em&gt; to the question: Is there an API for Common Tree?&lt;/h3&gt;
 &lt;hr /&gt;
-
-&lt;h4&gt;Get the .Rmd file used to create this post &lt;a href=&quot;https://github.com/SChamberlain/schamberlain.github.com/tree/master/_drafts/2013-02-14-common-tree.Rmd&quot;&gt;at my github account&lt;/a&gt; - or &lt;a href=&quot;https://github.com/SChamberlain/schamberlain.github.com/tree/master/_posts/2013-02-14-common-tree.md&quot;&gt;.md file&lt;/a&gt;.&lt;/h4&gt;
-
-&lt;h4&gt;Written in &lt;a href=&quot;http://daringfireball.net/projects/markdown/&quot;&gt;Markdown&lt;/a&gt;, with help from &lt;a href=&quot;http://yihui.name/knitr/&quot;&gt;knitr&lt;/a&gt;.&lt;/h4&gt;
+&lt;h4 id=&quot;get-the-.rmd-file-used-to-create-this-post-at-my-github-account---or-.md-file.&quot;&gt;Get the .Rmd file used to create this post &lt;a href=&quot;https://github.com/SChamberlain/schamberlain.github.com/tree/master/_drafts/2013-02-14-common-tree.Rmd&quot;&gt;at my github account&lt;/a&gt; - or &lt;a href=&quot;https://github.com/SChamberlain/schamberlain.github.com/tree/master/_posts/2013-02-14-common-tree.md&quot;&gt;.md file&lt;/a&gt;.&lt;/h4&gt;
+&lt;h4 id=&quot;written-in-markdown-with-help-from-knitr.&quot;&gt;Written in &lt;a href=&quot;http://daringfireball.net/projects/markdown/&quot;&gt;Markdown&lt;/a&gt;, with help from &lt;a href=&quot;http://yihui.name/knitr/&quot;&gt;knitr&lt;/a&gt;.&lt;/h4&gt;
 </description>
 				<published>2013-02-14 00:00:00 -0800</published>
 				<link>http://schamberlain.github.io/2013/02/common-tree/</link>
@@ -807,18 +1062,12 @@ plot&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;tree2&lt;span class=&quot;p&qu
 		
 			<item>
 				<title>Waiting for an API request to complete</title>
-				<description>&lt;h3&gt;Dealing with API tokens in R&lt;/h3&gt;
-
-&lt;p&gt;In &lt;a href=&quot;http://schamberlain.github.com/2013/01/tnrs-use-case/&quot;&gt;my previous post&lt;/a&gt; I showed an example of calling the Phylotastic taxonomic name resolution API &lt;code&gt;Taxosaurus&lt;/code&gt; &lt;a href=&quot;http://api.phylotastic.org/tnrs&quot;&gt;here&lt;/a&gt;.  When you query their API they give you a token which you use later to retrieve the result (see examples on their page above). However, you don't know when the query will be done, so how do we know when to send the query to rerieve the data?&lt;/p&gt;
-
+				<description>&lt;h3 id=&quot;dealing-with-api-tokens-in-r&quot;&gt;Dealing with API tokens in R&lt;/h3&gt;
+&lt;p&gt;In &lt;a href=&quot;http://schamberlain.github.com/2013/01/tnrs-use-case/&quot;&gt;my previous post&lt;/a&gt; I showed an example of calling the Phylotastic taxonomic name resolution API &lt;code&gt;Taxosaurus&lt;/code&gt; &lt;a href=&quot;http://api.phylotastic.org/tnrs&quot;&gt;here&lt;/a&gt;. When you query their API they give you a token which you use later to retrieve the result (see examples on their page above). However, you don’t know when the query will be done, so how do we know when to send the query to rerieve the data?&lt;/p&gt;
 &lt;hr /&gt;
-
-&lt;p&gt;As the time this takes depends on how big the query is and other things, we don't know when we can get the result. I struggled with this for a bit, but then settled on using a while loop.&lt;/p&gt;
-
+&lt;p&gt;As the time this takes depends on how big the query is and other things, we don’t know when we can get the result. I struggled with this for a bit, but then settled on using a while loop.&lt;/p&gt;
 &lt;hr /&gt;
-
-&lt;p&gt;So what does this look like?  Basically we just keep sending the request for data until we get it.&lt;/p&gt;
-
+&lt;p&gt;So what does this look like? Basically we just keep sending the request for data until we get it.&lt;/p&gt;
 &lt;div class=&quot;highlight&quot;&gt;&lt;pre&gt;&lt;code class=&quot;r&quot;&gt;iter &lt;span class=&quot;o&quot;&gt;&amp;lt;-&lt;/span&gt; &lt;span class=&quot;m&quot;&gt;0&lt;/span&gt;  &lt;span class=&quot;c1&quot;&gt;# make an iterator so each time we call&lt;/span&gt;
 output &lt;span class=&quot;o&quot;&gt;&amp;lt;-&lt;/span&gt; list&lt;span class=&quot;p&quot;&gt;()&lt;/span&gt;  &lt;span class=&quot;c1&quot;&gt;# make an empty list to put data into&lt;/span&gt;
 timeout &lt;span class=&quot;o&quot;&gt;&amp;lt;-&lt;/span&gt; &lt;span class=&quot;s&quot;&gt;&amp;quot;wait&amp;quot;&lt;/span&gt;
@@ -835,11 +1084,10 @@ timeout &lt;span class=&quot;o&quot;&gt;&amp;lt;-&lt;/span&gt; &lt;span class=&q
 &lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;
 
 
+
 &lt;hr /&gt;
-
-&lt;h4&gt;Get the .Rmd file used to create this post &lt;a href=&quot;https://github.com/SChamberlain/schamberlain.github.com/tree/master/_drafts/2013-01-26-api-token.Rmd&quot;&gt;at my github account&lt;/a&gt; - or &lt;a href=&quot;https://github.com/SChamberlain/schamberlain.github.com/tree/master/_posts/2013-01-26-api-token.md&quot;&gt;.md file&lt;/a&gt;.&lt;/h4&gt;
-
-&lt;h4&gt;Written in &lt;a href=&quot;http://daringfireball.net/projects/markdown/&quot;&gt;Markdown&lt;/a&gt;, with help from &lt;a href=&quot;http://yihui.name/knitr/&quot;&gt;knitr&lt;/a&gt;.&lt;/h4&gt;
+&lt;h4 id=&quot;get-the-.rmd-file-used-to-create-this-post-at-my-github-account---or-.md-file.&quot;&gt;Get the .Rmd file used to create this post &lt;a href=&quot;https://github.com/SChamberlain/schamberlain.github.com/tree/master/_drafts/2013-01-26-api-token.Rmd&quot;&gt;at my github account&lt;/a&gt; - or &lt;a href=&quot;https://github.com/SChamberlain/schamberlain.github.com/tree/master/_posts/2013-01-26-api-token.md&quot;&gt;.md file&lt;/a&gt;.&lt;/h4&gt;
+&lt;h4 id=&quot;written-in-markdown-with-help-from-knitr.&quot;&gt;Written in &lt;a href=&quot;http://daringfireball.net/projects/markdown/&quot;&gt;Markdown&lt;/a&gt;, with help from &lt;a href=&quot;http://yihui.name/knitr/&quot;&gt;knitr&lt;/a&gt;.&lt;/h4&gt;
 </description>
 				<published>2013-01-26 00:00:00 -0800</published>
 				<link>http://schamberlain.github.io/2013/01/api-token/</link>
@@ -847,32 +1095,25 @@ timeout &lt;span class=&quot;o&quot;&gt;&amp;lt;-&lt;/span&gt; &lt;span class=&q
 		
 			<item>
 				<title>Resolving species names when you have a lot of them</title>
-				<description>&lt;h3&gt;&lt;strong&gt;taxize use case: Resolving species names when you have a lot of them&lt;/strong&gt;&lt;/h3&gt;
-
-&lt;p&gt;Species names can be a pain in the ass, especially if you are an ecologist. We ecologists aren't trained in taxonomy, yet we often end up with huge species lists.  Of course we want to correct any spelling errors in the names, and get the newest names for our species, resolve any synonyms, etc.&lt;/p&gt;
-
+				<description>&lt;h3 id=&quot;taxize-use-case-resolving-species-names-when-you-have-a-lot-of-them&quot;&gt;&lt;strong&gt;taxize use case: Resolving species names when you have a lot of them&lt;/strong&gt;&lt;/h3&gt;
+&lt;p&gt;Species names can be a pain in the ass, especially if you are an ecologist. We ecologists aren’t trained in taxonomy, yet we often end up with huge species lists. Of course we want to correct any spelling errors in the names, and get the newest names for our species, resolve any synonyms, etc.&lt;/p&gt;
 &lt;p&gt;We are building tools into our R package &lt;a href=&quot;http://ropensci.github.com/taxize_/&quot;&gt;&lt;code&gt;taxize&lt;/code&gt;&lt;/a&gt;, that will let you check your species names to make sure they are correct.&lt;/p&gt;
-
 &lt;p&gt;An important use case is when you have a lot of species. Someone wrote to us recently, saying that they had thousands of species, and they wanted to know how to check their species names efficiently in R.&lt;/p&gt;
-
 &lt;p&gt;Below is an example of how to do this.&lt;/p&gt;
-
 &lt;hr /&gt;
-
-&lt;h4&gt;Install taxize&lt;/h4&gt;
-
+&lt;h4 id=&quot;install-taxize&quot;&gt;Install taxize&lt;/h4&gt;
 &lt;div class=&quot;highlight&quot;&gt;&lt;pre&gt;&lt;code class=&quot;r&quot;&gt;&lt;span class=&quot;c1&quot;&gt;# install_github(&amp;#39;taxize_&amp;#39;, &amp;#39;ropensci&amp;#39;) # install the GitHub version, not&lt;/span&gt;
 &lt;span class=&quot;c1&quot;&gt;# the CRAN version, uncomment if you don&amp;#39;t have it installed&lt;/span&gt;
 library&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;taxize&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt;
 &lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;
 
 
+
 &lt;hr /&gt;
-
-&lt;h4&gt;Get some species, in this case all species in the Scrophulariaceae family from theplantlist.org&lt;/h4&gt;
-
+&lt;h4 id=&quot;get-some-species-in-this-case-all-species-in-the-scrophulariaceae-family-from-theplantlist.org&quot;&gt;Get some species, in this case all species in the Scrophulariaceae family from theplantlist.org&lt;/h4&gt;
 &lt;div class=&quot;highlight&quot;&gt;&lt;pre&gt;&lt;code class=&quot;r&quot;&gt;tpl_get&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;dir_ &lt;span class=&quot;o&quot;&gt;=&lt;/span&gt; &lt;span class=&quot;s&quot;&gt;&amp;quot;~/foo2&amp;quot;&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt; family &lt;span class=&quot;o&quot;&gt;=&lt;/span&gt; &lt;span class=&quot;s&quot;&gt;&amp;quot;Scrophulariaceae&amp;quot;&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt;
 &lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;
+
 
 
 
@@ -887,19 +1128,17 @@ library&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;taxize&lt;span class=&quot;
 &lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;
 
 
+
 &lt;hr /&gt;
-
-&lt;h4&gt;Lets grab the species and concatenate to genus_species&lt;/h4&gt;
-
+&lt;h4 id=&quot;lets-grab-the-species-and-concatenate-to-genus_species&quot;&gt;Lets grab the species and concatenate to genus_species&lt;/h4&gt;
 &lt;div class=&quot;highlight&quot;&gt;&lt;pre&gt;&lt;code class=&quot;r&quot;&gt;species &lt;span class=&quot;o&quot;&gt;&amp;lt;-&lt;/span&gt; as.character&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;ddply&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;dat&lt;span class=&quot;p&quot;&gt;[,&lt;/span&gt; c&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;s&quot;&gt;&amp;quot;Genus&amp;quot;&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt; &lt;span class=&quot;s&quot;&gt;&amp;quot;Species&amp;quot;&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;)],&lt;/span&gt; .&lt;span class=&quot;p&quot;&gt;(),&lt;/span&gt; transform&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt; 
     gen_sp &lt;span class=&quot;o&quot;&gt;=&lt;/span&gt; as.factor&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;paste&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;Genus&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt; Species&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt; sep &lt;span class=&quot;o&quot;&gt;=&lt;/span&gt; &lt;span class=&quot;s&quot;&gt;&amp;quot; &amp;quot;&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;)))[,&lt;/span&gt; &lt;span class=&quot;m&quot;&gt;4&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;])&lt;/span&gt;
 &lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;
 
 
+
 &lt;hr /&gt;
-
-&lt;h4&gt;It's better to do many smaller calls to a web API instead of few big ones to be nice to the database maintainers.&lt;/h4&gt;
-
+&lt;h4 id=&quot;its-better-to-do-many-smaller-calls-to-a-web-api-instead-of-few-big-ones-to-be-nice-to-the-database-maintainers.&quot;&gt;It’s better to do many smaller calls to a web API instead of few big ones to be nice to the database maintainers.&lt;/h4&gt;
 &lt;div class=&quot;highlight&quot;&gt;&lt;pre&gt;&lt;code class=&quot;r&quot;&gt;&lt;span class=&quot;c1&quot;&gt;## Define function to split up your species list into useable chuncks&lt;/span&gt;
 slice &lt;span class=&quot;o&quot;&gt;&amp;lt;-&lt;/span&gt; &lt;span class=&quot;kr&quot;&gt;function&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;input&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt; by &lt;span class=&quot;o&quot;&gt;=&lt;/span&gt; &lt;span class=&quot;m&quot;&gt;2&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;{&lt;/span&gt;
     starts &lt;span class=&quot;o&quot;&gt;&amp;lt;-&lt;/span&gt; seq&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;m&quot;&gt;1&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt; length&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;input&lt;span class=&quot;p&quot;&gt;),&lt;/span&gt; by&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt;
@@ -910,10 +1149,9 @@ species_split &lt;span class=&quot;o&quot;&gt;&amp;lt;-&lt;/span&gt; slice&lt;sp
 &lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;
 
 
+
 &lt;hr /&gt;
-
-&lt;h4&gt;Query for your large species list with pauses between calls, with 3 seconds in between calls to not hit the web service too hard. Using POST method here instead of GET - required when you have a lot of species.&lt;/h4&gt;
-
+&lt;h4 id=&quot;query-for-your-large-species-list-with-pauses-between-calls-with-3-seconds-in-between-calls-to-not-hit-the-web-service-too-hard.-using-post-method-here-instead-of-get---required-when-you-have-a-lot-of-species.&quot;&gt;Query for your large species list with pauses between calls, with 3 seconds in between calls to not hit the web service too hard. Using POST method here instead of GET - required when you have a lot of species.&lt;/h4&gt;
 &lt;div class=&quot;highlight&quot;&gt;&lt;pre&gt;&lt;code class=&quot;r&quot;&gt;tnrs_safe &lt;span class=&quot;o&quot;&gt;&amp;lt;-&lt;/span&gt; failwith&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;kc&quot;&gt;NULL&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt; tnrs&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt;  &lt;span class=&quot;c1&quot;&gt;# in case some calls fail, will continue&lt;/span&gt;
 out &lt;span class=&quot;o&quot;&gt;&amp;lt;-&lt;/span&gt; llply&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;species_split&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt; &lt;span class=&quot;kr&quot;&gt;function&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;x&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt; tnrs_safe&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;x&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt; getpost &lt;span class=&quot;o&quot;&gt;=&lt;/span&gt; &lt;span class=&quot;s&quot;&gt;&amp;quot;POST&amp;quot;&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt; sleep &lt;span class=&quot;o&quot;&gt;=&lt;/span&gt; &lt;span class=&quot;m&quot;&gt;3&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;))&lt;/span&gt;
 &lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;
@@ -937,9 +1175,11 @@ Calling http://taxosaurus.org/retrieve/2c42e4b5227c5464f9bfeeafcdf0651d
 
 
 
+
 &lt;div class=&quot;highlight&quot;&gt;&lt;pre&gt;&lt;code class=&quot;r&quot;&gt;&lt;span class=&quot;c1&quot;&gt;# Looks like we got some data back for each element of our species list&lt;/span&gt;
 lapply&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;out&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt; head&lt;span class=&quot;p&quot;&gt;)[&lt;/span&gt;&lt;span class=&quot;m&quot;&gt;1&lt;/span&gt;&lt;span class=&quot;o&quot;&gt;:&lt;/span&gt;&lt;span class=&quot;m&quot;&gt;2&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;]&lt;/span&gt;  &lt;span class=&quot;c1&quot;&gt;# just look at the first two&lt;/span&gt;
 &lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;
+
 
 
 
@@ -994,10 +1234,12 @@ lapply&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;out&lt;span class=&quot;p&qu
 
 
 
+
 &lt;div class=&quot;highlight&quot;&gt;&lt;pre&gt;&lt;code class=&quot;r&quot;&gt;&lt;span class=&quot;c1&quot;&gt;# Now we can put them back together as so into one data.frame if you like&lt;/span&gt;
 outdf &lt;span class=&quot;o&quot;&gt;&amp;lt;-&lt;/span&gt; ldply&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;out&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt;
 head&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;outdf&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt;
 &lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;
+
 
 
 
@@ -1026,12 +1268,13 @@ head&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;outdf&lt;span class=&quot;p&qu
 &lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;
 
 
-&lt;p&gt;Note that there are multiple names for some species because data sources have different names for the same species (resulting in more than one row in the data.frame 'outdf' for a species). We are leaving this up to the user to decide which to use. For example, for the species &lt;em&gt;Buddleja montana&lt;/em&gt; there are two names for in the output&lt;/p&gt;
 
+&lt;p&gt;Note that there are multiple names for some species because data sources have different names for the same species (resulting in more than one row in the data.frame ‘outdf’ for a species). We are leaving this up to the user to decide which to use. For example, for the species &lt;em&gt;Buddleja montana&lt;/em&gt; there are two names for in the output&lt;/p&gt;
 &lt;div class=&quot;highlight&quot;&gt;&lt;pre&gt;&lt;code class=&quot;r&quot;&gt;data &lt;span class=&quot;o&quot;&gt;&amp;lt;-&lt;/span&gt; ddply&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;outdf&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt; .&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;submittedName&lt;span class=&quot;p&quot;&gt;),&lt;/span&gt; summarize&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt; length&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;submittedName&lt;span class=&quot;p&quot;&gt;))&lt;/span&gt;
 outdf&lt;span class=&quot;p&quot;&gt;[&lt;/span&gt;outdf&lt;span class=&quot;o&quot;&gt;$&lt;/span&gt;submittedName &lt;span class=&quot;o&quot;&gt;%in%&lt;/span&gt; as.character&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;data&lt;span class=&quot;p&quot;&gt;[&lt;/span&gt;data&lt;span class=&quot;o&quot;&gt;$&lt;/span&gt;&lt;span class=&quot;kc&quot;&gt;..1&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;&amp;gt;&lt;/span&gt; &lt;span class=&quot;m&quot;&gt;1&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;][&lt;/span&gt;&lt;span class=&quot;m&quot;&gt;6&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt; &lt;span class=&quot;s&quot;&gt;&amp;quot;submittedName&amp;quot;&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;]),&lt;/span&gt; 
     &lt;span class=&quot;p&quot;&gt;]&lt;/span&gt;
 &lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;
+
 
 
 
@@ -1045,12 +1288,12 @@ outdf&lt;span class=&quot;p&quot;&gt;[&lt;/span&gt;outdf&lt;span class=&quot;o&q
 &lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;
 
 
+
 &lt;p&gt;The source iPlant matched the name, but NCBI actually gave back a genus of cricket (follow the link under the column uri for &lt;em&gt;Montana&lt;/em&gt;). If you look at the page for &lt;em&gt;Buddleja&lt;/em&gt; on NCBI &lt;a href=&quot;http://www.ncbi.nlm.nih.gov/Taxonomy/Browser/wwwtax.cgi?id=26473&quot;&gt;here&lt;/a&gt; there is no &lt;em&gt;Buddleja montana&lt;/em&gt; at all.&lt;/p&gt;
-
-&lt;p&gt;Another thing we could do is look at the score that is returned. Let's look at those that are less than 1 (i.e., )&lt;/p&gt;
-
+&lt;p&gt;Another thing we could do is look at the score that is returned. Let’s look at those that are less than 1 (i.e., )&lt;/p&gt;
 &lt;div class=&quot;highlight&quot;&gt;&lt;pre&gt;&lt;code class=&quot;r&quot;&gt;outdf&lt;span class=&quot;p&quot;&gt;[&lt;/span&gt;outdf&lt;span class=&quot;o&quot;&gt;$&lt;/span&gt;score &lt;span class=&quot;o&quot;&gt;&amp;lt;&lt;/span&gt; &lt;span class=&quot;m&quot;&gt;1&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;]&lt;/span&gt;
 &lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;
+
 
 
 
@@ -1085,17 +1328,18 @@ outdf&lt;span class=&quot;p&quot;&gt;[&lt;/span&gt;outdf&lt;span class=&quot;o&q
 &lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;
 
 
-&lt;p&gt;As we got this speies list from &lt;a href=&quot;http://www.theplantlist.org/&quot;&gt;theplantlist.org&lt;/a&gt;, there aren't that many mistakes, but if it was my species list you know there would be many :)&lt;/p&gt;
 
+&lt;p&gt;As we got this speies list from &lt;a href=&quot;http://www.theplantlist.org/&quot;&gt;theplantlist.org&lt;/a&gt;, there aren’t that many mistakes, but if it was my species list you know there would be many :)&lt;/p&gt;
 &lt;hr /&gt;
-
-&lt;h3&gt;That's it.  Try it out and let us know if you have any questions at &lt;a href=&quot;mailto:info@ropensci.org&quot;&gt;info@ropensci.org&lt;/a&gt;, or &lt;a href=&quot;https://github.com/ropensci/taxize_/issues&quot;&gt;ask questions/report problems at GitHub&lt;/a&gt;.&lt;/h3&gt;
-
+&lt;h3 id=&quot;thats-it.-try-it-out-and-let-us-know-if-you-have-any-questions-at-inforopensci.org-or-ask-questionsreport-problems-at-github.&quot;&gt;That’s it. Try it out and let us know if you have any questions at &lt;script type=&quot;text/javascript&quot;&gt;
+&lt;!--
+h='&amp;#114;&amp;#x6f;&amp;#112;&amp;#x65;&amp;#110;&amp;#x73;&amp;#x63;&amp;#x69;&amp;#46;&amp;#x6f;&amp;#114;&amp;#x67;';a='&amp;#64;';n='&amp;#x69;&amp;#110;&amp;#102;&amp;#x6f;';e=n+a+h;
+document.write('&lt;a h'+'ref'+'=&quot;ma'+'ilto'+':'+e+'&quot;&gt;'+e+'&lt;\/'+'a'+'&gt;');
+// --&gt;
+&lt;/script&gt;&lt;noscript&gt;&amp;#x69;&amp;#110;&amp;#102;&amp;#x6f;&amp;#32;&amp;#x61;&amp;#116;&amp;#32;&amp;#114;&amp;#x6f;&amp;#112;&amp;#x65;&amp;#110;&amp;#x73;&amp;#x63;&amp;#x69;&amp;#32;&amp;#100;&amp;#x6f;&amp;#116;&amp;#32;&amp;#x6f;&amp;#114;&amp;#x67;&lt;/noscript&gt;, or &lt;a href=&quot;https://github.com/ropensci/taxize_/issues&quot;&gt;ask questions/report problems at GitHub&lt;/a&gt;.&lt;/h3&gt;
 &lt;hr /&gt;
-
-&lt;h4&gt;Get the .Rmd file used to create this post &lt;a href=&quot;https://github.com/SChamberlain/schamberlain.github.com/tree/master/2013-01-25-tnrs-use-case.Rmd&quot;&gt;at my github account&lt;/a&gt; - or &lt;a href=&quot;https://github.com/SChamberlain/schamberlain.github.com/tree/master/_posts/2013-01-25-tnrs-use-case.md&quot;&gt;.md file&lt;/a&gt;.&lt;/h4&gt;
-
-&lt;h4&gt;Written in &lt;a href=&quot;http://daringfireball.net/projects/markdown/&quot;&gt;Markdown&lt;/a&gt;, with help from &lt;a href=&quot;http://yihui.name/knitr/&quot;&gt;knitr&lt;/a&gt;.&lt;/h4&gt;
+&lt;h4 id=&quot;get-the-.rmd-file-used-to-create-this-post-at-my-github-account---or-.md-file.&quot;&gt;Get the .Rmd file used to create this post &lt;a href=&quot;https://github.com/SChamberlain/schamberlain.github.com/tree/master/2013-01-25-tnrs-use-case.Rmd&quot;&gt;at my github account&lt;/a&gt; - or &lt;a href=&quot;https://github.com/SChamberlain/schamberlain.github.com/tree/master/_posts/2013-01-25-tnrs-use-case.md&quot;&gt;.md file&lt;/a&gt;.&lt;/h4&gt;
+&lt;h4 id=&quot;written-in-markdown-with-help-from-knitr.&quot;&gt;Written in &lt;a href=&quot;http://daringfireball.net/projects/markdown/&quot;&gt;Markdown&lt;/a&gt;, with help from &lt;a href=&quot;http://yihui.name/knitr/&quot;&gt;knitr&lt;/a&gt;.&lt;/h4&gt;
 </description>
 				<published>2013-01-25 00:00:00 -0800</published>
 				<link>http://schamberlain.github.io/2013/01/tnrs-use-case/</link>
@@ -1103,164 +1347,46 @@ outdf&lt;span class=&quot;p&quot;&gt;[&lt;/span&gt;outdf&lt;span class=&quot;o&q
 		
 			<item>
 				<title>Open Science Challenge</title>
-				<description>&lt;p&gt;&lt;img src=&quot;https://raw.github.com/SChamberlain/schamberlain.github.com/master/img/ropensci_challenge.png&quot; alt=&quot;center&quot; /&gt;&lt;/p&gt;
-
+				<description>&lt;figure&gt;
+&lt;img src=&quot;https://raw.github.com/SChamberlain/schamberlain.github.com/master/img/ropensci_challenge.png&quot; alt=&quot;center&quot; /&gt;&lt;figcaption&gt;center&lt;/figcaption&gt;
+&lt;/figure&gt;
 &lt;hr /&gt;
-
-&lt;h3&gt;&lt;strong&gt;Open Science&lt;/strong&gt;&lt;/h3&gt;
-
+&lt;h3 id=&quot;open-science&quot;&gt;&lt;strong&gt;Open Science&lt;/strong&gt;&lt;/h3&gt;
 &lt;p&gt;Science is becoming more open in many areas: publishing, data sharing, lab notebooks, and software. There are many benefits to open science. For example, sharing research data alongside your publications leads to increased citation rate (Piwowar &lt;em&gt;et. al.&lt;/em&gt; 2007). In addition, data is becoming easier to share and reuse thanks to efforts like &lt;a href=&quot;http://figshare.com/&quot;&gt;FigShare&lt;/a&gt; and &lt;a href=&quot;http://datadryad.org/&quot;&gt;Dryad&lt;/a&gt;.&lt;/p&gt;
-
-&lt;p&gt;If you don't understand the problem we are currently facing due to lack of open science, watch this video:&lt;/p&gt;
-
+&lt;p&gt;If you don’t understand the problem we are currently facing due to lack of open science, watch this video:&lt;/p&gt;
 &lt;iframe width=&quot;560&quot; height=&quot;315&quot; src=&quot;http://www.youtube.com/embed/N2zK3sAtr-4&quot; frameborder=&quot;0&quot; allowfullscreen&gt;&lt;/iframe&gt;
 
-
 &lt;hr /&gt;
-
-&lt;h3&gt;&lt;strong&gt;I just want Data&lt;/strong&gt;&lt;/h3&gt;
-
+&lt;h3 id=&quot;i-just-want-data&quot;&gt;&lt;strong&gt;I just want Data&lt;/strong&gt;&lt;/h3&gt;
 &lt;p&gt;Another way to look at this challenge is to think about how you can get data more easily. Right now you probably go to a website that has an interface to a database. You do a search, and then download a .csv file perhaps. Then you open it in Excel, and do some pivot tables to get the data in the right format. Only then will you bring the data in to R.&lt;/p&gt;
-
 &lt;p&gt;The advantage of using our packages is that they allow you to do that data collection part in a few lines of code. Therefore, you can easily do all those steps in the above paragraph using a few lines of code in one R file. Why does this matter? You can more easily reproduce your own work months later after that summer vacation. In addition, others can reproduce your research more easily.&lt;/p&gt;
-
 &lt;hr /&gt;
-
-&lt;h3&gt;&lt;strong&gt;The challenge&lt;/strong&gt;&lt;/h3&gt;
-
-&lt;p&gt;We (&lt;a href=&quot;http://ropensci.org/&quot;&gt;ropensci&lt;/a&gt;) have just kicked off the &lt;a href=&quot;http://ropensci.org/open-science-challenge/&quot;&gt;rOpenSci Open Science Challenge&lt;/a&gt;. If you aren't familiar with rOpenSci, it is a software collective connecting scientists to open science data on the web. Since R is the most popular programming language for life scientists, it made sense to do this in R (instead of Python e.g.).&lt;/p&gt;
-
+&lt;h3 id=&quot;the-challenge&quot;&gt;&lt;strong&gt;The challenge&lt;/strong&gt;&lt;/h3&gt;
+&lt;p&gt;We (&lt;a href=&quot;http://ropensci.org/&quot;&gt;ropensci&lt;/a&gt;) have just kicked off the &lt;a href=&quot;http://ropensci.org/open-science-challenge/&quot;&gt;rOpenSci Open Science Challenge&lt;/a&gt;. If you aren’t familiar with rOpenSci, it is a software collective connecting scientists to open science data on the web. Since R is the most popular programming language for life scientists, it made sense to do this in R (instead of Python e.g.).&lt;/p&gt;
 &lt;hr /&gt;
-
-&lt;h3&gt;&lt;strong&gt;What is the challenge about?&lt;/strong&gt;&lt;/h3&gt;
-
+&lt;h3 id=&quot;what-is-the-challenge-about&quot;&gt;&lt;strong&gt;What is the challenge about?&lt;/strong&gt;&lt;/h3&gt;
 &lt;p&gt;At rOpenSci, we create R software to make getting open source text from publications and open source data easy. An important result of this is that we are facilitating open science. Why? Because R is an open source programming language, and all of our software is open source. . This challenge asks you to propose a project using one or more of our packages - or perhaps you want to propose a new dataset to connect to R. The rOpenSci core developer team will help you with any problems using our packages, and attempt to modify packages according to feedback from participants. Do you use one or more of our R packages? If you do, great. If not, check out our packages &lt;a href=&quot;http://ropensci.org/packages/index.html&quot;&gt;here&lt;/a&gt;.&lt;/p&gt;
-
 &lt;hr /&gt;
-
-&lt;h3&gt;&lt;strong&gt;How to apply&lt;/strong&gt;&lt;/h3&gt;
-
-&lt;p&gt;Just send an email to &lt;a href=&quot;mailto:info@ropensci.org?subject=rOpenSci%20Open%20Science%20Challenge&quot;&gt;info@ropensci.org&lt;/a&gt;.&lt;/p&gt;
-
+&lt;h3 id=&quot;how-to-apply&quot;&gt;&lt;strong&gt;How to apply&lt;/strong&gt;&lt;/h3&gt;
+&lt;p&gt;Just send an email to &lt;script type=&quot;text/javascript&quot;&gt;
+&lt;!--
+h='&amp;#114;&amp;#x6f;&amp;#112;&amp;#x65;&amp;#110;&amp;#x73;&amp;#x63;&amp;#x69;&amp;#46;&amp;#x6f;&amp;#114;&amp;#x67;&amp;#x3f;&amp;#x73;&amp;#x75;&amp;#98;&amp;#106;&amp;#x65;&amp;#x63;&amp;#116;&amp;#x3d;&amp;#114;&amp;#x6f;&amp;#112;&amp;#x65;&amp;#110;&amp;#x73;&amp;#x63;&amp;#x69;&amp;#x25;&amp;#50;&amp;#48;&amp;#x6f;&amp;#112;&amp;#x65;&amp;#110;&amp;#x25;&amp;#50;&amp;#48;&amp;#x73;&amp;#x63;&amp;#x69;&amp;#x65;&amp;#110;&amp;#x63;&amp;#x65;&amp;#x25;&amp;#50;&amp;#48;&amp;#x63;&amp;#104;&amp;#x61;&amp;#108;&amp;#108;&amp;#x65;&amp;#110;&amp;#x67;&amp;#x65;';a='&amp;#64;';n='&amp;#x69;&amp;#110;&amp;#102;&amp;#x6f;';e=n+a+h;
+document.write('&lt;a h'+'ref'+'=&quot;ma'+'ilto'+':'+e+'&quot;&gt;'+'info@ropensci.org'+'&lt;\/'+'a'+'&gt;');
+// --&gt;
+&lt;/script&gt;&lt;noscript&gt;&amp;#x69;&amp;#110;&amp;#102;&amp;#x6f;&amp;#64;&amp;#114;&amp;#x6f;&amp;#112;&amp;#x65;&amp;#110;&amp;#x73;&amp;#x63;&amp;#x69;&amp;#46;&amp;#x6f;&amp;#114;&amp;#x67;&amp;#32;&amp;#40;&amp;#x69;&amp;#110;&amp;#102;&amp;#x6f;&amp;#32;&amp;#x61;&amp;#116;&amp;#32;&amp;#114;&amp;#x6f;&amp;#112;&amp;#x65;&amp;#110;&amp;#x73;&amp;#x63;&amp;#x69;&amp;#32;&amp;#100;&amp;#x6f;&amp;#116;&amp;#32;&amp;#x6f;&amp;#114;&amp;#x67;&amp;#x3f;&amp;#x73;&amp;#x75;&amp;#98;&amp;#106;&amp;#x65;&amp;#x63;&amp;#116;&amp;#x3d;&amp;#114;&amp;#x6f;&amp;#112;&amp;#x65;&amp;#110;&amp;#x73;&amp;#x63;&amp;#x69;&amp;#x25;&amp;#50;&amp;#48;&amp;#x6f;&amp;#112;&amp;#x65;&amp;#110;&amp;#x25;&amp;#50;&amp;#48;&amp;#x73;&amp;#x63;&amp;#x69;&amp;#x65;&amp;#110;&amp;#x63;&amp;#x65;&amp;#x25;&amp;#50;&amp;#48;&amp;#x63;&amp;#104;&amp;#x61;&amp;#108;&amp;#108;&amp;#x65;&amp;#110;&amp;#x67;&amp;#x65;&amp;#x29;&lt;/noscript&gt;.&lt;/p&gt;
 &lt;hr /&gt;
-
-&lt;h3&gt;&lt;strong&gt;The deadline&lt;/strong&gt;&lt;/h3&gt;
-
+&lt;h3 id=&quot;the-deadline&quot;&gt;&lt;strong&gt;The deadline&lt;/strong&gt;&lt;/h3&gt;
 &lt;p&gt;January 31, 2013&lt;/p&gt;
-
 &lt;hr /&gt;
-
-&lt;h4&gt;Get the .Rmd file used to create this post &lt;a href=&quot;https://github.com/SChamberlain/schamberlain.github.com/tree/master/_drafts/2013-01-08-open-science-challenge.Rmd&quot;&gt;at my github account&lt;/a&gt; - or &lt;a href=&quot;https://github.com/SChamberlain/schamberlain.github.com/tree/master/_posts/2013-01-08-open-science-challenge.md&quot;&gt;.md file&lt;/a&gt;.&lt;/h4&gt;
-
-&lt;h4&gt;Written in &lt;a href=&quot;http://daringfireball.net/projects/markdown/&quot;&gt;Markdown&lt;/a&gt;, with help from &lt;a href=&quot;http://yihui.name/knitr/&quot;&gt;knitr&lt;/a&gt;, and &lt;a href=&quot;https://github.com/cboettig/knitcitations&quot;&gt;knitcitations&lt;/a&gt; from &lt;a href=&quot;http://www.carlboettiger.info/&quot;&gt;Carl Boettiger&lt;/a&gt;.&lt;/h4&gt;
-
+&lt;h4 id=&quot;get-the-.rmd-file-used-to-create-this-post-at-my-github-account---or-.md-file.&quot;&gt;Get the .Rmd file used to create this post &lt;a href=&quot;https://github.com/SChamberlain/schamberlain.github.com/tree/master/_drafts/2013-01-08-open-science-challenge.Rmd&quot;&gt;at my github account&lt;/a&gt; - or &lt;a href=&quot;https://github.com/SChamberlain/schamberlain.github.com/tree/master/_posts/2013-01-08-open-science-challenge.md&quot;&gt;.md file&lt;/a&gt;.&lt;/h4&gt;
+&lt;h4 id=&quot;written-in-markdown-with-help-from-knitr-and-knitcitations-from-carl-boettiger.&quot;&gt;Written in &lt;a href=&quot;http://daringfireball.net/projects/markdown/&quot;&gt;Markdown&lt;/a&gt;, with help from &lt;a href=&quot;http://yihui.name/knitr/&quot;&gt;knitr&lt;/a&gt;, and &lt;a href=&quot;https://github.com/cboettig/knitcitations&quot;&gt;knitcitations&lt;/a&gt; from &lt;a href=&quot;http://www.carlboettiger.info/&quot;&gt;Carl Boettiger&lt;/a&gt;.&lt;/h4&gt;
 &lt;hr /&gt;
-
-&lt;h4&gt;References&lt;/h4&gt;
-
-&lt;p&gt;Piwowar HA, Day RS, Fridsma DB and Ioannidis J (2007).
-&amp;ldquo;Sharing Detailed Research Data is Associated With Increased Citation Rate.&amp;rdquo;
-&lt;EM&gt;Plos One&lt;/EM&gt;, &lt;B&gt;2&lt;/B&gt;.
-&lt;a href=&quot;http://dx.doi.org/10.1371/journal.pone.0000308&quot;&gt;http://dx.doi.org/10.1371/journal.pone.0000308&lt;/a&gt;.
-
+&lt;h4 id=&quot;references&quot;&gt;References&lt;/h4&gt;
+&lt;p&gt;
+&lt;p&gt;Piwowar HA, Day RS, Fridsma DB and Ioannidis J (2007). “Sharing Detailed Research Data is Associated With Increased Citation Rate.” &lt;EM&gt;Plos One&lt;/EM&gt;, &lt;B&gt;2&lt;/B&gt;. &lt;a href=&quot;http://dx.doi.org/10.1371/journal.pone.0000308&quot;&gt;http://dx.doi.org/10.1371/journal.pone.0000308&lt;/a&gt;.&lt;/p&gt;
 </description>
 				<published>2013-01-08 00:00:00 -0800</published>
 				<link>http://schamberlain.github.io/2013/01/open-science-challenge/</link>
-			</item>
-		
-			<item>
-				<title>Is invasive?</title>
-				<description>&lt;p&gt;The Global Invasive Species Database (GISD) (see their website for more info &lt;a href=&quot;http://www.issg.org/database/welcome/&quot;&gt;here&lt;/a&gt;) has data on the invasiveness status of many species. From &lt;code&gt;taxize&lt;/code&gt; you can now query the GISD database.&lt;/p&gt;
-
-&lt;p&gt;Introducing the function &lt;code&gt;gisd_isinvasive&lt;/code&gt;. This function was contributed to &lt;code&gt;taxize&lt;/code&gt; by &lt;a href=&quot;http://www.bartomeus.cat/es/ignasi/&quot;&gt;Ignasi Bartomeus&lt;/a&gt;, a postdoc at the Swedish University Agricultural Sciences.&lt;/p&gt;
-
-&lt;p&gt;There are two possible outputs from using &lt;code&gt;gisd_isinvasive&lt;/code&gt;: &quot;Invasive&quot; or &quot;Not in GISD&quot;. If you use &lt;code&gt;simplify=TRUE&lt;/code&gt; in the function you get &quot;Invasive&quot; or &quot;Not in GISD&quot;, but if you use &lt;code&gt;simplify=FALSE&lt;/code&gt; you get verbose description of the invasive species instead of just &quot;Invasive&quot; (and you still just get &quot;Not in GISD&quot;).&lt;/p&gt;
-
-&lt;hr /&gt;
-
-&lt;p&gt;&lt;img src=&quot;http://schamberlain.github.com/img/gisd_small.png&quot; alt=&quot;center&quot; /&gt;&lt;/p&gt;
-
-&lt;hr /&gt;
-
-&lt;h3&gt;Install taxize from GitHub&lt;/h3&gt;
-
-&lt;div class=&quot;highlight&quot;&gt;&lt;pre&gt;&lt;code class=&quot;r&quot;&gt;&lt;span class=&quot;c1&quot;&gt;# install_github(&amp;#39;taxize_&amp;#39;, &amp;#39;ropensci&amp;#39;) # install if you don&amp;#39;t already&lt;/span&gt;
-&lt;span class=&quot;c1&quot;&gt;# have the GitHub version&lt;/span&gt;
-library&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;taxize&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt;
-&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;
-
-
-&lt;hr /&gt;
-
-&lt;h3&gt;Make a vector of species&lt;/h3&gt;
-
-&lt;div class=&quot;highlight&quot;&gt;&lt;pre&gt;&lt;code class=&quot;r&quot;&gt;sp &lt;span class=&quot;o&quot;&gt;&amp;lt;-&lt;/span&gt; c&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;s&quot;&gt;&amp;quot;Carpobrotus edulis&amp;quot;&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt; &lt;span class=&quot;s&quot;&gt;&amp;quot;Rosmarinus officinalis&amp;quot;&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt; &lt;span class=&quot;s&quot;&gt;&amp;quot;Nasua nasua&amp;quot;&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt; &lt;span class=&quot;s&quot;&gt;&amp;quot;Martes melampus&amp;quot;&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt; 
-    &lt;span class=&quot;s&quot;&gt;&amp;quot;Centaurea solstitialis&amp;quot;&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt;
-&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;
-
-
-&lt;h3&gt;Using the function &lt;code&gt;gisd_isinvasive&lt;/code&gt; you can query the GISD database for the invasiveness status of your species, at least according to GISD. Calling &lt;code&gt;gisd_isinvasive&lt;/code&gt; with the second parameter set to default &lt;code&gt;simplify=FALSE&lt;/code&gt;, you get verbose output, with details on the species.&lt;/h3&gt;
-
-&lt;div class=&quot;highlight&quot;&gt;&lt;pre&gt;&lt;code class=&quot;r&quot;&gt;gisd_isinvasive&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;sp&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt;
-&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;
-
-
-
-
-&lt;div class=&quot;highlight&quot;&gt;&lt;pre&gt;&lt;code class=&quot;text&quot;&gt;Checking species 1
-Checking species 2
-Checking species 3
-Checking species 4
-Checking species 5
-Done
-
-                 species
-1     Carpobrotus edulis
-2 Rosmarinus officinalis
-3            Nasua nasua
-4        Martes melampus
-5 Centaurea solstitialis
-                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                               status
-1                                                                                                                                                                                                                                                  You searched for invasive species named Carpobrotus edulis:     1.  Carpobrotus edulis (succulent)        Carpobrotus edulis is a mat-forming succulent native to South Africa which is invasive primarily in coastal habitats in many parts of the world. It was often introduced as an ornamental plant or used for planting along roadsides, from which it has spread to become invasive. Its main impacts are smothering, reduced regeneration of native flora and changes to soil pH and nutrient regimes.\r\nCommon Names: balsamo, Cape fig, figue marine, freeway iceplant, ghaukum, ghoenavy, highway ice plant, higo del Cabo, higo marino, Hottentosvy, hottentot fig, Hottentottenfeige, iceplant, ikhambi-lamabulawo, Kaapsevy, patata frita, perdevy, pigface, rankvy, sea fig, sour fig, suurvy, umgongozi, vyerank\r\nSynonyms: Mesembryanthemum edule L., Mesembryanthemum edulis
-2                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         Not in GISD
-3                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            You searched for invasive species named Nasua nasua:1.  Nasua nasua (mammal)             Interim profile, incomplete informationCommon Names: Achuni, Coatí, South American Coati, Tejón
-4                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                       You searched for invasive species named Martes melampus:1.  Martes melampus (mammal)             Interim profile, incomplete informationCommon Names: Japanese Marten, Tsushima Island Marten
-5 You searched for invasive species named Centaurea solstitialis:     1.  Centaurea solstitialis (herb)        Centaurea solstitialis is a winter annual that can form dense impenetrable stands that displace desirable vegetation in natural areas, rangelands, and other places. It is best adapted to open grasslands with deep, well-drained soils and an annual precipitation range of 25 to 150cm per year. It is intolerant of shade. Although populations can occur at elevations as high as 2,400 m, most large infestations are found below 1,500 m. Human activities are the primary mechanisms for the long distance movement of C. solstitialis seed. The short, stiff, pappus bristles are covered with barbs that readily adhere to clothing, hair, and fur.  The movement of contaminated hay and uncertified seed are also important long distance transportation mechanisms. Wind disperses seeds over short distances.\r\nCommon Names: geeldissel, golden star thistle, sonnwend-Flockenblume, St. Barnaby&amp;#39;s thistle, yellow centaury, yellow cockspur, yellow star thistle\r\nSynonyms: Leucantha solstitialis (L.) A.&amp;amp; D. Löve
-&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;
-
-
-&lt;h3&gt;Simpler output, just the invasive status.&lt;/h3&gt;
-
-&lt;div class=&quot;highlight&quot;&gt;&lt;pre&gt;&lt;code class=&quot;r&quot;&gt;gisd_isinvasive&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;sp&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt; simplify &lt;span class=&quot;o&quot;&gt;=&lt;/span&gt; &lt;span class=&quot;kc&quot;&gt;TRUE&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt;
-&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;
-
-
-
-
-&lt;div class=&quot;highlight&quot;&gt;&lt;pre&gt;&lt;code class=&quot;text&quot;&gt;Checking species 1
-Checking species 2
-Checking species 3
-Checking species 4
-Checking species 5
-Done
-
-                 species      status
-1     Carpobrotus edulis    Invasive
-2 Rosmarinus officinalis Not in GISD
-3            Nasua nasua    Invasive
-4        Martes melampus    Invasive
-5 Centaurea solstitialis    Invasive
-&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;
-
-
-&lt;hr /&gt;
-
-&lt;h4&gt;Get the .Rmd file used to create this post &lt;a href=&quot;https://github.com/SChamberlain/schamberlain.github.com/tree/master/_drafts/2012-12-13-is-invasive.Rmd&quot;&gt;at my github account&lt;/a&gt; - or &lt;a href=&quot;https://github.com/SChamberlain/schamberlain.github.com/tree/master/_posts/2012-12-13-is-invasive.md&quot;&gt;.md file&lt;/a&gt;.&lt;/h4&gt;
-
-&lt;h4&gt;Written in &lt;a href=&quot;http://daringfireball.net/projects/markdown/&quot;&gt;Markdown&lt;/a&gt;, with help from &lt;a href=&quot;http://yihui.name/knitr/&quot;&gt;knitr&lt;/a&gt;.&lt;/h4&gt;
-</description>
-				<published>2012-12-13 00:00:00 -0800</published>
-				<link>http://schamberlain.github.io/2012/12/is-invasive/</link>
 			</item>
 		
 	</channel>
