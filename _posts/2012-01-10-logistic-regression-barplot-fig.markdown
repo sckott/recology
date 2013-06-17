@@ -22,14 +22,14 @@ Here's a few examples using datasets provided with the ggplot2 package:
 loghistplot(mtcars[,c("mpg","vs")])
 {% endhighlight %}
 
-![mtcars plot](/images/posts/mtcarsplot.png)
+![mtcars plot](/img/mtcarsplot.png)
 
 
 {% highlight r %}
 loghistplot(movies[,c("rating","Action")])
 {% endhighlight %}
 
-![movies plot](/images/posts/moviesplot.png)
+![movies plot](/img/moviesplot.png)
 
 
 And two examples of the logpointplot function:
@@ -38,14 +38,14 @@ And two examples of the logpointplot function:
 logpointplot(mtcars[,c("mpg","vs")])
 {% endhighlight %}
 
-![mtcars point plot](/images/posts/logpointplot1.png)
+![mtcars point plot](/img/logpointplot1.png)
 
 
 {% highlight r %}
 logpointplot(movies[,c("rating","Action")])
 {% endhighlight %}
 
-![movies point plot](/images/posts/logpointplot2.png)
+![movies point plot](/img/logpointplot2.png)
 
 
 [here]: http://esapubs.org/bulletin/backissues/085-3/bulletinjuly2004_2column.htm#tools1
