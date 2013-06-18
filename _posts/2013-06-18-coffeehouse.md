@@ -26,19 +26,25 @@ The blogs already added to Coffeehouse:
 <i class="icon-coffee"></i> <a href="http://researchremix.wordpress.com/" target="_blank">Research Remix</a><br>
 <i class="icon-coffee"></i> <a href="http://blogs.loc.gov/digitalpreservation/" target="_blank">The Signal: Digital Preservation</a>
 
-
 ********************
 
-The details:
+The tech/styling details:
 
 + As is obvious we are using Wordpress.org, with the Magazine Basic theme.
 + We don't accept comments - when someone clicks on the comments button it sends them back to the original post. This is on purpose so that the authors of the post get the comments on their own site.
 + On the top of each post there is an alert to tell you the post is syndicated, and gives a link to the original post. You can close this alert if it's annoying to you.
-+ Style - we have strived to use clean and simple styling to make for a nice reading experience. A cluttered website makes reading painful.
-+ FontAwesome icons - because they look awesome. See the [FontAwesome Wordpress Plugin][fawp] if you want to do the same.
++ Style - we have strived to use clean and simple styling to make for a nice reading experience. A cluttered website makes reading painful. And using the [Twitter Bootstrap WP plugin][boot]
++ Icons: done using the [FontAwesome Wordpress Plugin][fawp].
++ Aggregating posts is done using the [FeedWordPress plugin][fwp].
++ The add your blog form: using the [Nina forms plugin][ninja]
++ Analytics: using the [Gauges WP plugin][gauges]
 
 That's it. Let us know if you have any thoughts/comments.
 
 [coffee]: https://coffeehouse.dataone.org/
 [fawp]: https://github.com/rachelbaker/Font-Awesome-WordPress-Plugin
 [addblog]: https://coffeehouse.dataone.org/add-your-blog/
+[fwp]: http://feedwordpress.radgeek.com/
+[ninja]: http://wpninjas.com/ninja-forms/
+[boot]: http://www.icontrolwp.com/our-wordpress-plugins/wordpress-twitter-bootstrap-css-plugin-home/
+[gauges]: http://wordpress.org/plugins/gauges/
