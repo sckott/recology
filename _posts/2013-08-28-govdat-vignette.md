@@ -11,9 +11,13 @@ tags:
 - transparency
 ---
 
-I started an R package a while back, and a few people have show interest, so I thought it was time to revist the code. govdat is an interface to various APIs for government data: currently the Sunlight Labs APIs, and the New York Times congress API. Returned objects from functions are simple lists. In future versions of govdat, I may change how data is returned. The following are examples (which is also the package vignette) of using the Sunlight Labs API. I will add examples of using the New York Times Congress API once their site is up again; I'm doing this on 2013-08-28, just after the takedown of their site.
+I started an R package a while back, and a few people have shown interest, so I thought it was time to revist the code. govdat is an interface to various APIs for government data: currently the Sunlight Labs APIs, and the New York Times congress API. Returned objects from functions are simple lists. In future versions of govdat, I may change how data is returned. The following are examples (which is also the package vignette) of using the Sunlight Labs API. I will add examples of using the New York Times Congress API once their site is up again; I'm doing this on 2013-08-28, just after the takedown of their site.
 
 I show just a bit of each data object returned for brevity. And yes, I realize this is not related at all to ecology. 
+
+You will need an API key to use both Sunlight Labs APIs and the New York Times APIs. Get your API key at Sunlight Labs [here](http://sunlightfoundation.com/api/) and NYT [here](http://developer.nytimes.com/docs/congress_api). You can pass in your key within each function or you can put the key in your .Rprofile file on your machine (which is read from the default R working directory) and the key will be read in automatically inside the function. I recommend the latter option. 
+
+Do let me know of bugs or feature requests over at the Github issues page [here](https://github.com/schamberlain/govdat/issues).
 
 ********************
 
@@ -29,7 +33,7 @@ install_github("govdat", "schamberlain")
 
 ********************
 
-#### Load govdat and other dependency libraries
+#### Load govdat
 
 
 {% highlight r %}
