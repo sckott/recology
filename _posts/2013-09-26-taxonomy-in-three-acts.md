@@ -13,10 +13,25 @@ tags:
 
 Eduard Szöcs and I started developing a taxonomic toolbelt for the R language a while back , which lets you interact with a multitude of taxonomic databases on the web. We have a paper in F1000Research if you want to find out more (see [here](http://f1000research.com/articles/2-191/v1)).
 
-I thought it would be fun to rewrite some of taxize in other languages to learn more languages. Ruby and Python made the most sense to try. I did try others (Julia, Node), but gave up on those. 
+I thought it would be fun to rewrite some of taxize in other languages to learn more languages. Ruby and Python made the most sense to try. I did try others (Julia, Node), but gave up on those for now. The goal here isn't to port taxize to Python and Ruby right now - it's for me to learn myself some coding.
 
 Anyway, here's use of the same function in three languages: R, Ruby, and Python. The function searches the [Global Names Index](http://gni.globalnames.org/), but is named slightly differently in R (`gni_search`) vs. Ruby/Python (`gniSearch`). (yes, I realize the package names aren't consistent)
 
+Note that there are only a few functions available in the Ruby and Python versions:
+
+* itisPing 
+* gnrResolve
+* gniParse
+* gniSearch
+* gniDetails
+* colChildren (Python, not Ruby)
+
+And the behavior of these functions does not necessarily match that in the R version.
+
+One thing I have learned is that packaging in R is much harder than in Python or Ruby. [devtools](cran.r-project.org/web/packages/devtools/index.html) does make R packaging easier, but still...
+
+
+<br><br>
 ### R
 
 Code [here](https://github.com/ropensci/taxize_)
