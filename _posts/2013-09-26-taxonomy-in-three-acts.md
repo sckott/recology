@@ -66,7 +66,8 @@ Code [here](https://github.com/SChamberlain/tacksize)
 {% highlight bash %}
 git clone https://github.com/SChamberlain/tacksize.git
 cd tacksize
-gem install tacksize
+gem build tacksize.gemspec
+gem install ./tacksize-0.0.1.gem
 {% endhighlight %}
 
 In a Ruby repl, like `irb`, search for a taxonomic name
@@ -89,7 +90,7 @@ Code [here](https://github.com/SChamberlain/pytaxize)
 {% highlight bash %}
 git clone https://github.com/SChamberlain/pytaxize.git
 cd pytaxize
-python setup.py
+python setup.py install
 {% endhighlight %}
 
 In a Python repl, like `ipython`, search for a taxonomic name
