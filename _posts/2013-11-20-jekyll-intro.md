@@ -14,7 +14,9 @@ tags:
 I started using Jekyll when I didn't really know HTML, CSS, or Ruby - so I've had to learn a lot - but using Jekyll has been a great learning experience for all those languages. 
 
 I've tried to boil down steps to building a Jekyll site or blog to the minimal steps:
-<br>
+
+<br><br>
+
 ### Install Jekyll
 
 + Mac/Linux/Unix: 
@@ -24,7 +26,9 @@ I've tried to boil down steps to building a Jekyll site or blog to the minimal s
 	+ Install Jekyll using RubyGems `gem install jekyll` (you may need to do `sudo...`)
 	+ If you're having trouble installing, see the [troubleshooting page](http://jekyllrb.com/docs/troubleshooting/).
 + Windows: Jekyll doesn't officially support installation on Windows - follow [these steps](http://www.madhur.co.in/blog/2011/09/01/runningjekyllwindows.html) for a Windows install. 
-<br>
+
+<br><br>
+
 ### Make a site
 
 The easiest way to get started is by using the command `jekyll new SITENAME` - let's replace `SITENAME` with `foobar` for this example.
@@ -57,7 +61,9 @@ Which gives you the files and directories:
 Then point your browser to [http://localhost:4000/](http://localhost:4000/). And you should see the following:
 
 ![](http://f.cl.ly/items/2q322a2P3f2m2A3a3l0O/Screen%20Shot%202013-11-20%20at%209.54.21%20AM.png)
-<br>
+
+<br><br>
+
 ### Write a new blog post
 
 We'll add a new file to the _posts folder. 
@@ -74,7 +80,9 @@ My second blog post!
 {% endhighlight %}
 
 Paste this in to a new file in the `_posts` folder, save as today's date ({{ page.date | date: "%Y-%m-%d" }}) plus the post name, which gives us {{ page.date | date: "%Y-%m-%d" }}-second-post.md.
-<br>
+
+<br><br>
+
 ### Deploying
 
 An obvious option given that Jekyll was built by Github, is to put it up on Github. Github has some instructions [here](http://jekyllrb.com/docs/github-pages/). Here is my attempt at instructions: 
@@ -92,7 +100,9 @@ An obvious option given that Jekyll was built by Github, is to put it up on Gith
 Github gives you one repo that you can name `<yourgithubusername>.github.io` that will be viewable at the URL `http://<yourgithubusername>.github.io`. You can have your blog/website on the master branch, and you don't need to create a `gh-pages` branch. But if you have your site in any other named repo, you will need the `gh-pages` branch. If you don't use a `<yourgithubusername>.github.io` repo, your site will be viewable at `<yourgithubusername>.github.io/<reponame>`, in this case `<yourgithubusername>.github.io/foobar`. 
 
 *Beginners take note:* Instead of the command line, you could use a Git GUI, from Github ([OSX](http://mac.github.com/), [Windows](http://windows.github.com/)), or others, e.g., [GitBox](http://gitboxapp.com/).
-<br>
+
+<br><br>
+
 ### Other info 
 
 That's the basics of how to get started. Inevitably, you'll run into problems with various dependencies. The [Jekyll site](http://jekyllrb.com/) has a lot of documntation now, so go there for help - and see a roundup of links below. 
