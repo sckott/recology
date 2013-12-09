@@ -33,7 +33,7 @@ Note that metadata can live in other places:
 
 No, you can't get metadata via Google Scholar - the don't allow scraping, and don't have expose their data via an API.
 
-I have discussed this package [in a previous blog post](http://schamberlain.github.com/2012/09/rmetadata/), but have since worked on the code a bit, and thought it deserved a new post. 
+I have discussed this package [in a previous blog post](http://sckott.github.io/2012/09/rmetadata/), but have since worked on the code a bit, and thought it deserved a new post. 
 
 You can see a tutorial for this package [here](http://ropensci.github.com/rmetadata/), and contribute to the code [here](https://github.com/ropensci/rmetadata).
 
@@ -370,6 +370,6 @@ ggplot(toplot_, aes(articletype, authors)) + theme_tufte(base_size = 16) + geom_
 
 ***************
 
-#### Get the .Rmd file used to create this post [at my github account](https://github.com/SChamberlain/schamberlain.github.com/tree/master/_drafts/2013-03-16-r-metadata.Rmd) - or [.md file](https://github.com/SChamberlain/schamberlain.github.com/tree/master/_posts/2013-03-16-r-metadata.md).
+#### Get the .Rmd file used to create this post [at my github account](https://github.com/sckott/sckott.github.io/tree/master/_drafts/2013-03-16-r-metadata.Rmd) - or [.md file](https://github.com/sckott/sckott.github.io/tree/master/_posts/2013-03-16-r-metadata.md).
 
 #### Written in [Markdown](http://daringfireball.net/projects/markdown/), with help from [knitr](http://yihui.name/knitr/), and [knitcitations](https://github.com/cboettig/knitcitations).

@@ -77,7 +77,7 @@ Once there are a lot of people collecting data we can get many data points for e
 Is this idea totally insane?  Is it do-able?  Is it worth doing?
 
 *********
-#### Get the .Rmd file used to create this post [at my github account](https://github.com/SChamberlain/schamberlain.github.com/tree/master/_drafts/2012-09-18-getting-data.Rmd) - or [.md file](https://github.com/SChamberlain/schamberlain.github.com/tree/master/_posts/2012-09-18-getting-data.md).
+#### Get the .Rmd file used to create this post [at my github account](https://github.com/sckott/sckott.github.io/tree/master/_drafts/2012-09-18-getting-data.Rmd) - or [.md file](https://github.com/sckott/sckott.github.io/tree/master/_posts/2012-09-18-getting-data.md).
 
 #### Written in [Markdown](http://daringfireball.net/projects/markdown/), with help from [knitr](http://yihui.name/knitr/), and nice knitr highlighting/etc. in in [RStudio](http://rstudio.org/).
 

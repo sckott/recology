@@ -288,4 +288,4 @@ sort(ecoevotitles)
 
 *********
 
-### Get the .Rmd file used to create this post [at my github account](https://github.com/SChamberlain/schamberlain.github.com/blob/master/_drafts/2012-08-30-get-ecoevo-journal-titles.Rmd).
+### Get the .Rmd file used to create this post [at my github account](https://github.com/sckott/sckott.github.io/blob/master/_drafts/2012-08-30-get-ecoevo-journal-titles.Rmd).

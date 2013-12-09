@@ -61,10 +61,10 @@ out[1,]
 <br><br>
 ### Ruby
 
-Code [here](https://github.com/SChamberlain/tacksize)
+Code [here](https://github.com/sckott/tacksize)
 
 {% highlight bash %}
-git clone https://github.com/SChamberlain/tacksize.git
+git clone https://github.com/sckott/tacksize.git
 cd tacksize
 gem build tacksize.gemspec
 gem install ./tacksize-0.0.1.gem
@@ -85,10 +85,10 @@ out[0]
 <br><br>
 ### Python
 
-Code [here](https://github.com/SChamberlain/pytaxize)
+Code [here](https://github.com/sckott/pytaxize)
 
 {% highlight bash %}
-git clone https://github.com/SChamberlain/pytaxize.git
+git clone https://github.com/sckott/pytaxize.git
 cd pytaxize
 python setup.py install
 {% endhighlight %}

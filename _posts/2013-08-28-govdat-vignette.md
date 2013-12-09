@@ -17,7 +17,7 @@ I show just a bit of each data object returned for brevity. And yes, I realize t
 
 You will need an API key to use both Sunlight Labs APIs and the New York Times APIs. Get your API key at Sunlight Labs [here](http://sunlightfoundation.com/api/) and NYT [here](http://developer.nytimes.com/docs/congress_api). You can pass in your key within each function or you can put the key in your .Rprofile file on your machine (which is read from the default R working directory) and the key will be read in automatically inside the function. I recommend the latter option. 
 
-Do let me know of bugs or feature requests over at the Github issues page [here](https://github.com/schamberlain/govdat/issues).
+Do let me know of bugs or feature requests over at the Github issues page [here](https://github.com/sckott/govdat/issues).
 
 ********************
 
@@ -27,7 +27,7 @@ Do let me know of bugs or feature requests over at the Github issues page [here]
 {% highlight r %}
 install.packages("devtools")
 library(devtools)
-install_github("govdat", "schamberlain")
+install_github("govdat", "sckott")
 {% endhighlight %}
 
 

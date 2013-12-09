@@ -71,4 +71,4 @@ We have set up a wiki in which anyone can contribute. Please share your ideas an
 If you have any questions/comments, let us know in the comments section below, tweet us (Sandra: [@sandramchung](https://twitter.com/sandramchung), Scott: [@recology_](https://twitter.com/recology_)), or email ([Sandra](mailto:sandra.m.chung@gmail.com), [Scott](mailto:myrmecocystus@gmail.com)). 
 
 *********
-#### Get the .md file used to create this post [at my github account](https://github.com/SChamberlain/schamberlain.github.com/tree/master/_posts/2012-11-15-altecology.md).  Written in [Markdown](http://daringfireball.net/projects/markdown/), with help from [knitr](http://yihui.name/knitr/).
+#### Get the .md file used to create this post [at my github account](https://github.com/sckott/sckott.github.io/tree/master/_posts/2012-11-15-altecology.md).  Written in [Markdown](http://daringfireball.net/projects/markdown/), with help from [knitr](http://yihui.name/knitr/).

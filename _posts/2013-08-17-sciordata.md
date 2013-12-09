@@ -47,7 +47,7 @@ Check out the output [here][rchartsout]. If you like you can take the source cod
 
 {% highlight r %}
 library(devtools)
-install_github("govdat", "schamberlain")
+install_github("govdat", "sckott")
 install_github("rnoaa", "ropensci")
 install_github("rWBclimate", "ropensci")
 install_github("rnpn", "ropensci")
@@ -188,11 +188,11 @@ Surely there are other sources of climate data out there that you want to use in
 
 [sciocweb]: http://scioclimate.wikispaces.com
 [sciox]: https://twitter.com/#sciox
-[rchartsout]: http://schamberlain.github.io/vis/nvd3_eg.html
+[rchartsout]: http://recology.info/vis/nvd3_eg.html
 [rcharts]: https://github.com/ramnathv/rCharts
 [sciordata]: http://scioclimate.wikispaces.com/3W.+Working+With+Science+Data+From+Around+The+Web
 [d3]: http://d3js.org/
-[govdat]: https://github.com/SChamberlain/govdat
+[govdat]: https://github.com/sckott/govdat
 [rnoaa]: https://github.com/ropensci/rnoaa
 [rWBclimate]: https://github.com/ropensci/rWBclimate
 [rnpn]: https://github.com/ropensci/rnpn

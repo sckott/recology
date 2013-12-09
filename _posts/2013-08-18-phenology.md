@@ -29,7 +29,7 @@ Non-scientists along with scientists are collecting vast amounts of data on obse
 
 Empowering the general public to do their own science may bring the vague notion of climate change into stark relief - thereby movivating some to take action with their elected representatives, or to at least get curious to find out more. 
 
-[tags]: https://gist.github.com/SChamberlain/6213308
+[tags]: https://gist.github.com/sckott/6213308
 [usnpn]: https://www.usanpn.org/
 [inat]: http://www.inaturalist.org/
 [gbif]: http://www.gbif.org/

@@ -19,7 +19,7 @@ There are two possible outputs from using `gisd_isinvasive`: "Invasive" or "Not 
 
 ***************
 
-![center](http://schamberlain.github.com/img/gisd_small.png) 
+![center](http://sckott.github.io/img/gisd_small.png) 
 
 ***************
 
@@ -100,6 +100,6 @@ Done
 
 *********
 
-#### Get the .Rmd file used to create this post [at my github account](https://github.com/SChamberlain/schamberlain.github.com/tree/master/_drafts/2012-12-13-is-invasive.Rmd) - or [.md file](https://github.com/SChamberlain/schamberlain.github.com/tree/master/_posts/2012-12-13-is-invasive.md).
+#### Get the .Rmd file used to create this post [at my github account](https://github.com/sckott/sckott.github.io/tree/master/_drafts/2012-12-13-is-invasive.Rmd) - or [.md file](https://github.com/sckott/sckott.github.io/tree/master/_posts/2012-12-13-is-invasive.md).
 
 #### Written in [Markdown](http://daringfireball.net/projects/markdown/), with help from [knitr](http://yihui.name/knitr/).

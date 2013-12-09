@@ -30,9 +30,9 @@ That said, if the [New York Times][nytimes] can do it, so can we.  We should not
 [dthree]: http://vis.stanford.edu/files/2011-D3-InfoVis.pdf
 [R]: http://www.r-project.org/
 [Matlab]: http://www.mathworks.com/products/matlab/
-[Scott]: http://schamberlain.github.com/recologyabout.html
+[Scott]: http://sckott.github.io/recologyabout.html
 [Science]: http://www.sciencemag.org/
 [Nature]: http://wwww.nature.com
-[Recology]: http://schamberlain.github.com/
+[Recology]: http://sckott.github.io/
 
 <small>* Whether the lack of dynamic data visualization on these journals' websites is due to the authors not submitting such material or due to restrictions from the journals themselves, I do not know. I suspect the burden falls more on the authors' shoulders at this point than the journals'.</small>

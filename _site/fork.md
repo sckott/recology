@@ -1,7 +1,7 @@
 ### Clone the site source-code from github:
 
 ```bash
-git clone https://github.com/SChamberlain/schamberlain.github.com.git
+git clone https://github.com/sckott/sckott.github.io.git
 ```
 
 ### Install Ruby version >= 1.9
