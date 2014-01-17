@@ -1,0 +1,179 @@
+---
+name: rgauges-hourly
+layout: post
+title: rgauges - fun with hourly web site analytics
+date: 2014-01-17
+author: Scott Chamberlain
+tags:
+- r
+- API
+---
+
+[Gaug.es](http://get.gaug.es/) is a really nice looking analytics platform as an alternative to Google Analytics. It is a paid service, but not that expensive really. 
+
+We've made an R package to interact with the Gaug.es API called `rgauges`. Find it [on Github](https://github.com/ropensci/rgauges) and [on CRAN](http://cran.r-project.org/web/packages/rgauges/index.html).
+
+Although working with the Gaug.es API is nice and easy, they don't keep hourly visit stats and provide those via the API, so that you have to continually collect them yourself if you want them. That's what I have done for my own website. 
+
+It took a few steps to get this data:
+
+* I wrote a little Ruby script using [Twelve gem](http://rubygems.org/gems/twelve) to collect data from the Gaug.es API every day at the same time, which just gets the patst 24 hours of data. This script makes a call to the Gaug.es API and sends the data to a [CouchDB](http://couchdb.apache.org/) database hosted on [Cloudant](https://cloudant.com/). In reality, the script is is embeded in a rack app as I don't think you can throw up a standalone script to Heroku. Here's the script:
+
+```ruby
+class MyApp
+  require 'couchrest'
+  require 'twelve'
+  require 'date'
+  require 'time'
+  
+  def self.getgaugesdata_scott
+    bfg = Twelve.new('<gaugeskey>')
+    out = bfg.gauges('<gaugeskey>')['recent_hours']
+    yip = { "from_url"=> "http://sckott.github.io/", "coll_date"=> Date.today.to_s, "coll_time"=> Time.now.utc.localtime.to_s, "recent_hours"=> out }
+    @db = CouchRest.database!("https://app16517180.heroku:<key>@app16517180.heroku.cloudant.com/gaugesdb_scott")
+    @db.save_doc(yip)
+
+  def call env
+    [200, {"Content-Type" => "text/html"}, ["no output printed here"]] 
+  end
+end
+```
+
+* One little catch though: I run the Ruby script on Heroku, so I don't have to do it locally, but Heroku free instance goes down unless it's doing something. So I used a little service called [UptimeRobot](http://uptimerobot.com/) to ping the Heroku app every 5 minutes. UptimeRobot also is giving you uptime stats too on your app, which I don't really need, but is a cool feature. 
+
+* And that's it. Now the data is stored from each day's collection of visitor stats to a free Cloudant CouchDB database. 
+
+## Regular Gaug.es data
+
+First, let's look at what you can do with data that Gaug.es does give to you, using the `rgauges` R package.
+
+********************
+
+### Install rgauges
+
+```{r install, eval=FALSE, echo=TRUE}
+install.packages("devtools")
+library(devtools)
+install_github("rgauges", "ropensci")
+```
+
+### Load rgauges and other dependency libraries
+
+```{r load, warning=FALSE, message=FALSE}
+library(rgauges)
+library(ggplot2)
+```
+
+### Your info
+
+```{r}
+gs_me()
+```
+
+#### Traffic
+
+```{r}
+gs_traffic(id='4efd83a6f5a1f5158a000004')
+```
+
+### Screen/browser information
+
+```{r}
+gs_reso(id='4efd83a6f5a1f5158a000004')
+```
+
+### Visualize traffic data
+
+You'll need to load ggplot2 
+
+```{r}
+library(ggplot2)
+out <- gs_gauge_detail(id='4efd83a6f5a1f5158a000004')
+vis_gauge(out)
+```
+
+********************
+********************
+
+## Historic hourly Gaug.es data
+
+Now let's play with the hourly data. To do that we aren't going to use `rgauges`, but rather call the Cloudant API. CouchDB provides a RESTful API out of the box, so we can do a call like `https://app16517180.heroku.cloudant.com/gaugesdb_scott/_all_docs?limit=20` to get metadata (or other calls to get the documents themselves). (note: that url won't work for you since you don't have my login info) 
+
+### Get some data
+
+```{r installsofa, eval=FALSE}
+library(devtools)
+install_github("sckott/sofa") # or install_github("sofa", "sckott")
+```
+
+
+```{r}
+library(sofa)
+cloudant_name <- 'app16517180.heroku'
+cloudant_pwd <- getOption("sofa_cloudant_heroku")[[2]]
+cushion(sofa_cloudant=c(cloudant_name, cloudant_pwd))
+dat <- sofa_alldocs(cushion="sofa_cloudant", dbname="gaugesdb_scott", include_docs='true')
+```
+
+### Manipulate and visualize
+
+```{r}
+library(plyr)
+dates <- ldply(dat$rows, function(x) x$doc$coll_date)
+min(dates$V1); max(dates$V1); length(dates$V1)
+```
+
+So we've got 198 days of data, first collected near end of June, and most recent yesterday. Now get actual visits data
+
+```{r}
+df <- ldply(dat$rows, function(x){
+  y <- do.call(rbind, lapply(x$doc$recent_hours, data.frame))
+  data.frame(date=x$doc$coll_date, y)
+})
+df$date <- as.Date(df$date)
+df$hour <- as.numeric(df$hour)
+
+library(reshape2)
+df_melt <- melt(df, id.vars=c("date","hour"))
+head(df_melt)
+```
+
+We need to combine the date and hour in to one date time string:
+
+```{r datetime}
+df_melt <- transform(df_melt, 
+                     datetime = as.POSIXct(paste(date, sprintf("%s:00:00", hour))))
+head(df_melt)
+```
+
+Now plot all data
+
+```{r tidy=FALSE}
+library(ggplot2); library(scales)
+
+gauge_theme <- function(){
+  list(theme(panel.grid.major = element_blank(),
+             panel.grid.minor = element_blank(),
+             legend.position = c(0.85,0.85),
+             legend.key = element_blank()))
+}
+
+ggplot(df_melt, aes(datetime, value, group=variable, colour=variable)) +
+    theme_bw(base_size=18) + 
+    geom_line(size=2) +
+    scale_color_brewer(name="", palette=3) +
+    labs(x="", y="") +
+    gauge_theme()
+```
+
+And just one day
+
+```{r tidy=FALSE}
+oneday <- df_melt[ as.character(df_melt$date) %in% "2013-11-12", ]
+ggplot(oneday, aes(datetime, value, group=variable, colour=variable)) +
+    theme_bw(base_size=18) + 
+    geom_line(size=2) +
+    scale_color_brewer(name="", palette=3) +
+    labs(x="", y="") +
+    gauge_theme()
+```

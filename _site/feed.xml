@@ -6,10 +6,371 @@
 		<link>http://recology.info</link>
 		
 			<item>
-				<title>Jekyll - an intro</title>
-				<description>&lt;p&gt;I started using Jekyll when I didn't really know HTML, CSS, or Ruby - so I've had to learn a lot - but using Jekyll has been a great learning experience for all those languages.&lt;/p&gt;
+				<title>rgauges - fun with hourly web site analytics</title>
+				<description>&lt;p&gt;&lt;a href=&quot;http://get.gaug.es/&quot;&gt;Gaug.es&lt;/a&gt; is a really nice looking analytics platform as an alternative to Google Analytics. It is a paid service, but not that expensive really.&lt;/p&gt;
 
-&lt;p&gt;I've tried to boil down steps to building a Jekyll site or blog to the minimal steps:&lt;/p&gt;
+&lt;p&gt;We&#39;ve made an R package to interact with the Gaug.es API called &lt;code&gt;rgauges&lt;/code&gt;. Find it &lt;a href=&quot;https://github.com/ropensci/rgauges&quot;&gt;on Github&lt;/a&gt; and &lt;a href=&quot;http://cran.r-project.org/web/packages/rgauges/index.html&quot;&gt;on CRAN&lt;/a&gt;.&lt;/p&gt;
+
+&lt;p&gt;Although working with the Gaug.es API is nice and easy, they don&#39;t keep hourly visit stats and provide those via the API, so that you have to continually collect them yourself if you want them. That&#39;s what I have done for my own website.&lt;/p&gt;
+
+&lt;p&gt;It took a few steps to get this data:&lt;/p&gt;
+
+&lt;ul&gt;
+&lt;li&gt;I wrote a little Ruby script using &lt;a href=&quot;http://rubygems.org/gems/twelve&quot;&gt;Twelve gem&lt;/a&gt; to collect data from the Gaug.es API every day at the same time, which just gets the patst 24 hours of data. This script makes a call to the Gaug.es API and sends the data to a &lt;a href=&quot;http://couchdb.apache.org/&quot;&gt;CouchDB&lt;/a&gt; database hosted on &lt;a href=&quot;https://cloudant.com/&quot;&gt;Cloudant&lt;/a&gt;. In reality, the script is is embeded in a rack app as I don&#39;t think you can throw up a standalone script to Heroku. Here&#39;s the script:&lt;/li&gt;
+&lt;/ul&gt;
+
+
+&lt;pre&gt;&lt;code class=&quot;ruby&quot;&gt;class MyApp
+  require &#39;couchrest&#39;
+  require &#39;twelve&#39;
+  require &#39;date&#39;
+  require &#39;time&#39;
+
+  def self.getgaugesdata_scott
+    bfg = Twelve.new(&#39;&amp;lt;gaugeskey&amp;gt;&#39;)
+    out = bfg.gauges(&#39;&amp;lt;gaugeskey&amp;gt;&#39;)[&#39;recent_hours&#39;]
+    yip = { &quot;from_url&quot;=&amp;gt; &quot;http://sckott.github.io/&quot;, &quot;coll_date&quot;=&amp;gt; Date.today.to_s, &quot;coll_time&quot;=&amp;gt; Time.now.utc.localtime.to_s, &quot;recent_hours&quot;=&amp;gt; out }
+    @db = CouchRest.database!(&quot;https://app16517180.heroku:&amp;lt;key&amp;gt;@app16517180.heroku.cloudant.com/gaugesdb_scott&quot;)
+    @db.save_doc(yip)
+
+  def call env
+    [200, {&quot;Content-Type&quot; =&amp;gt; &quot;text/html&quot;}, [&quot;no output printed here&quot;]] 
+  end
+end
+&lt;/code&gt;&lt;/pre&gt;
+
+&lt;ul&gt;
+&lt;li&gt;&lt;p&gt;One little catch though: I run the Ruby script on Heroku, so I don&#39;t have to do it locally, but Heroku free instance goes down unless it&#39;s doing something. So I used a little service called &lt;a href=&quot;http://uptimerobot.com/&quot;&gt;UptimeRobot&lt;/a&gt; to ping the Heroku app every 5 minutes. UptimeRobot also is giving you uptime stats too on your app, which I don&#39;t really need, but is a cool feature.&lt;/p&gt;&lt;/li&gt;
+&lt;li&gt;&lt;p&gt;And that&#39;s it. Now the data is stored from each day&#39;s collection of visitor stats to a free Cloudant CouchDB database.&lt;/p&gt;&lt;/li&gt;
+&lt;/ul&gt;
+
+
+&lt;h2&gt;Regular Gaug.es data&lt;/h2&gt;
+
+&lt;p&gt;First, let&#39;s look at what you can do with data that Gaug.es does give to you, using the &lt;code&gt;rgauges&lt;/code&gt; R package.&lt;/p&gt;
+
+&lt;hr /&gt;
+
+&lt;h3&gt;Install rgauges&lt;/h3&gt;
+
+&lt;div class=&quot;highlight&quot;&gt;&lt;pre&gt;&lt;code class=&quot;r&quot;&gt;install.packages&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;s&quot;&gt;&amp;quot;devtools&amp;quot;&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt;
+library&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;devtools&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt;
+install_github&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;s&quot;&gt;&amp;quot;rgauges&amp;quot;&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt; &lt;span class=&quot;s&quot;&gt;&amp;quot;ropensci&amp;quot;&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt;
+&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;
+
+
+&lt;h3&gt;Load rgauges and other dependency libraries&lt;/h3&gt;
+
+&lt;div class=&quot;highlight&quot;&gt;&lt;pre&gt;&lt;code class=&quot;r&quot;&gt;library&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;rgauges&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt;
+library&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;ggplot2&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt;
+&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;
+
+
+&lt;h3&gt;Your info&lt;/h3&gt;
+
+&lt;div class=&quot;highlight&quot;&gt;&lt;pre&gt;&lt;code class=&quot;r&quot;&gt;gs_me&lt;span class=&quot;p&quot;&gt;()&lt;/span&gt;
+&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;
+
+
+
+
+&lt;div class=&quot;highlight&quot;&gt;&lt;pre&gt;&lt;code class=&quot;text&quot;&gt;## $user
+## $user$name
+## [1] &amp;quot;Scott Chamberlain&amp;quot;
+## 
+## $user$email
+## [1] &amp;quot;myrmecocystus@gmail.com&amp;quot;
+## 
+## $user$id
+## [1] &amp;quot;4eddbafb613f5d5139000001&amp;quot;
+## 
+## $user$last_name
+## [1] &amp;quot;Chamberlain&amp;quot;
+## 
+## $user$urls
+## $user$urls$self
+## [1] &amp;quot;https://secure.gaug.es/me&amp;quot;
+## 
+## $user$urls$clients
+## [1] &amp;quot;https://secure.gaug.es/clients&amp;quot;
+## 
+## $user$urls$gauges
+## [1] &amp;quot;https://secure.gaug.es/gauges&amp;quot;
+## 
+## 
+## $user$first_name
+## [1] &amp;quot;Scott&amp;quot;
+&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;
+
+
+&lt;h4&gt;Traffic&lt;/h4&gt;
+
+&lt;div class=&quot;highlight&quot;&gt;&lt;pre&gt;&lt;code class=&quot;r&quot;&gt;gs_traffic&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;id &lt;span class=&quot;o&quot;&gt;=&lt;/span&gt; &lt;span class=&quot;s&quot;&gt;&amp;quot;4efd83a6f5a1f5158a000004&amp;quot;&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt;
+&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;
+
+
+
+
+&lt;div class=&quot;highlight&quot;&gt;&lt;pre&gt;&lt;code class=&quot;text&quot;&gt;## $metadata
+## $metadata$views
+## [1] 386
+## 
+## $metadata$urls
+## $metadata$urls$older
+## [1] &amp;quot;https://secure.gaug.es/gauges/4efd83a6f5a1f5158a000004/traffic?date=2013-12-01&amp;quot;
+## 
+## $metadata$urls$newer
+## NULL
+## 
+## 
+## $metadata$date
+## [1] &amp;quot;2014-01-17&amp;quot;
+## 
+## $metadata$people
+## [1] 208
+## 
+## 
+## $data
+##    views       date people
+## 1      7 2014-01-01      5
+## 2     17 2014-01-02      7
+## 3     39 2014-01-03     17
+## 4     15 2014-01-04      9
+## 5     14 2014-01-05      7
+## 6     33 2014-01-06     22
+## 7     19 2014-01-07     11
+## 8     15 2014-01-08     11
+## 9     53 2014-01-09     24
+## 10    53 2014-01-10     13
+## 11    14 2014-01-11      9
+## 12    11 2014-01-12     10
+## 13    14 2014-01-13     14
+## 14    11 2014-01-14      9
+## 15    23 2014-01-15     16
+## 16    16 2014-01-16     14
+## 17    32 2014-01-17     25
+&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;
+
+
+&lt;h3&gt;Screen/browser information&lt;/h3&gt;
+
+&lt;div class=&quot;highlight&quot;&gt;&lt;pre&gt;&lt;code class=&quot;r&quot;&gt;gs_reso&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;id &lt;span class=&quot;o&quot;&gt;=&lt;/span&gt; &lt;span class=&quot;s&quot;&gt;&amp;quot;4efd83a6f5a1f5158a000004&amp;quot;&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt;
+&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;
+
+
+
+
+&lt;div class=&quot;highlight&quot;&gt;&lt;pre&gt;&lt;code class=&quot;text&quot;&gt;## $browser_height
+##   views title
+## 1   190   600
+## 2    77   768
+## 3    53   900
+## 4    38   480
+## 5    28  1024
+## 
+## $browser_width
+##   views title
+## 1   153  1280
+## 2    91  1024
+## 3    58  1600
+## 4    36   800
+## 5    30  1440
+## 6     6  2000
+## 7     6   320
+## 8     6   480
+## 
+## $screen_width
+##   views title
+## 1   176  1280
+## 2    90  1600
+## 3    55  1440
+## 4    35  1024
+## 5    14  2000
+## 6     6   320
+## 7     6   480
+## 8     4   800
+&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;
+
+
+&lt;h3&gt;Visualize traffic data&lt;/h3&gt;
+
+&lt;p&gt;You&#39;ll need to load ggplot2&lt;/p&gt;
+
+&lt;div class=&quot;highlight&quot;&gt;&lt;pre&gt;&lt;code class=&quot;r&quot;&gt;library&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;ggplot2&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt;
+out &lt;span class=&quot;o&quot;&gt;&amp;lt;-&lt;/span&gt; gs_gauge_detail&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;id &lt;span class=&quot;o&quot;&gt;=&lt;/span&gt; &lt;span class=&quot;s&quot;&gt;&amp;quot;4efd83a6f5a1f5158a000004&amp;quot;&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt;
+vis_gauge&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;out&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt;
+&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;
+
+
+
+
+&lt;div class=&quot;highlight&quot;&gt;&lt;pre&gt;&lt;code class=&quot;text&quot;&gt;## Using hour, time as id variables
+## Using date as id variables
+## Using date as id variables
+&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;
+
+
+&lt;p&gt;&lt;img src=&quot;/img/2014-01-17-rgauges-hourly/unnamed-chunk-4.png&quot; alt=&quot;center&quot; /&gt;&lt;/p&gt;
+
+&lt;div class=&quot;highlight&quot;&gt;&lt;pre&gt;&lt;code class=&quot;text&quot;&gt;## NULL
+&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;
+
+
+&lt;hr /&gt;
+
+&lt;hr /&gt;
+
+&lt;h2&gt;Historic hourly Gaug.es data&lt;/h2&gt;
+
+&lt;p&gt;Now let&#39;s play with the hourly data. To do that we aren&#39;t going to use &lt;code&gt;rgauges&lt;/code&gt;, but rather call the Cloudant API. CouchDB provides a RESTful API out of the box, so we can do a call like &lt;code&gt;https://app16517180.heroku.cloudant.com/gaugesdb_scott/_all_docs?limit=20&lt;/code&gt; to get metadata (or other calls to get the documents themselves). (note: that url won&#39;t work for you since you don&#39;t have my login info)&lt;/p&gt;
+
+&lt;h3&gt;Get some data&lt;/h3&gt;
+
+&lt;div class=&quot;highlight&quot;&gt;&lt;pre&gt;&lt;code class=&quot;r&quot;&gt;library&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;devtools&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt;
+install_github&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;s&quot;&gt;&amp;quot;sckott/sofa&amp;quot;&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt;  &lt;span class=&quot;c1&quot;&gt;# or install_github(&amp;#39;sofa&amp;#39;, &amp;#39;sckott&amp;#39;)&lt;/span&gt;
+&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;
+
+
+
+
+&lt;div class=&quot;highlight&quot;&gt;&lt;pre&gt;&lt;code class=&quot;r&quot;&gt;library&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;sofa&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt;
+cloudant_name &lt;span class=&quot;o&quot;&gt;&amp;lt;-&lt;/span&gt; &lt;span class=&quot;s&quot;&gt;&amp;quot;app16517180.heroku&amp;quot;&lt;/span&gt;
+cloudant_pwd &lt;span class=&quot;o&quot;&gt;&amp;lt;-&lt;/span&gt; getOption&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;s&quot;&gt;&amp;quot;sofa_cloudant_heroku&amp;quot;&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;)[[&lt;/span&gt;&lt;span class=&quot;m&quot;&gt;2&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;]]&lt;/span&gt;
+cushion&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;sofa_cloudant &lt;span class=&quot;o&quot;&gt;=&lt;/span&gt; c&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;cloudant_name&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt; cloudant_pwd&lt;span class=&quot;p&quot;&gt;))&lt;/span&gt;
+dat &lt;span class=&quot;o&quot;&gt;&amp;lt;-&lt;/span&gt; sofa_alldocs&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;cushion &lt;span class=&quot;o&quot;&gt;=&lt;/span&gt; &lt;span class=&quot;s&quot;&gt;&amp;quot;sofa_cloudant&amp;quot;&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt; dbname &lt;span class=&quot;o&quot;&gt;=&lt;/span&gt; &lt;span class=&quot;s&quot;&gt;&amp;quot;gaugesdb_scott&amp;quot;&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt; include_docs &lt;span class=&quot;o&quot;&gt;=&lt;/span&gt; &lt;span class=&quot;s&quot;&gt;&amp;quot;true&amp;quot;&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt;
+&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;
+
+
+&lt;h3&gt;Manipulate and visualize&lt;/h3&gt;
+
+&lt;div class=&quot;highlight&quot;&gt;&lt;pre&gt;&lt;code class=&quot;r&quot;&gt;library&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;plyr&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt;
+dates &lt;span class=&quot;o&quot;&gt;&amp;lt;-&lt;/span&gt; ldply&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;dat&lt;span class=&quot;o&quot;&gt;$&lt;/span&gt;rows&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt; &lt;span class=&quot;kr&quot;&gt;function&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;x&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt; x&lt;span class=&quot;o&quot;&gt;$&lt;/span&gt;doc&lt;span class=&quot;o&quot;&gt;$&lt;/span&gt;coll_date&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt;
+min&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;dates&lt;span class=&quot;o&quot;&gt;$&lt;/span&gt;V1&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt;
+&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;
+
+
+
+
+&lt;div class=&quot;highlight&quot;&gt;&lt;pre&gt;&lt;code class=&quot;text&quot;&gt;## [1] &amp;quot;2013-06-26&amp;quot;
+&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;
+
+
+
+
+&lt;div class=&quot;highlight&quot;&gt;&lt;pre&gt;&lt;code class=&quot;r&quot;&gt;max&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;dates&lt;span class=&quot;o&quot;&gt;$&lt;/span&gt;V1&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt;
+&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;
+
+
+
+
+&lt;div class=&quot;highlight&quot;&gt;&lt;pre&gt;&lt;code class=&quot;text&quot;&gt;## [1] &amp;quot;2014-01-16&amp;quot;
+&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;
+
+
+
+
+&lt;div class=&quot;highlight&quot;&gt;&lt;pre&gt;&lt;code class=&quot;r&quot;&gt;length&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;dates&lt;span class=&quot;o&quot;&gt;$&lt;/span&gt;V1&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt;
+&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;
+
+
+
+
+&lt;div class=&quot;highlight&quot;&gt;&lt;pre&gt;&lt;code class=&quot;text&quot;&gt;## [1] 198
+&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;
+
+
+&lt;p&gt;So we&#39;ve got 198 days of data, first collected near end of June, and most recent yesterday. Now get actual visits data&lt;/p&gt;
+
+&lt;div class=&quot;highlight&quot;&gt;&lt;pre&gt;&lt;code class=&quot;r&quot;&gt;df &lt;span class=&quot;o&quot;&gt;&amp;lt;-&lt;/span&gt; ldply&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;dat&lt;span class=&quot;o&quot;&gt;$&lt;/span&gt;rows&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt; &lt;span class=&quot;kr&quot;&gt;function&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;x&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;{&lt;/span&gt;
+    y &lt;span class=&quot;o&quot;&gt;&amp;lt;-&lt;/span&gt; do.call&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;rbind&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt; lapply&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;x&lt;span class=&quot;o&quot;&gt;$&lt;/span&gt;doc&lt;span class=&quot;o&quot;&gt;$&lt;/span&gt;recent_hours&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt; data.frame&lt;span class=&quot;p&quot;&gt;))&lt;/span&gt;
+    data.frame&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;date &lt;span class=&quot;o&quot;&gt;=&lt;/span&gt; x&lt;span class=&quot;o&quot;&gt;$&lt;/span&gt;doc&lt;span class=&quot;o&quot;&gt;$&lt;/span&gt;coll_date&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt; y&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt;
+&lt;span class=&quot;p&quot;&gt;})&lt;/span&gt;
+df&lt;span class=&quot;o&quot;&gt;$&lt;/span&gt;date &lt;span class=&quot;o&quot;&gt;&amp;lt;-&lt;/span&gt; as.Date&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;df&lt;span class=&quot;o&quot;&gt;$&lt;/span&gt;date&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt;
+df&lt;span class=&quot;o&quot;&gt;$&lt;/span&gt;hour &lt;span class=&quot;o&quot;&gt;&amp;lt;-&lt;/span&gt; as.numeric&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;df&lt;span class=&quot;o&quot;&gt;$&lt;/span&gt;hour&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt;
+
+library&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;reshape2&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt;
+df_melt &lt;span class=&quot;o&quot;&gt;&amp;lt;-&lt;/span&gt; melt&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;df&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt; id.vars &lt;span class=&quot;o&quot;&gt;=&lt;/span&gt; c&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;s&quot;&gt;&amp;quot;date&amp;quot;&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt; &lt;span class=&quot;s&quot;&gt;&amp;quot;hour&amp;quot;&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;))&lt;/span&gt;
+head&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;df_melt&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt;
+&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;
+
+
+
+
+&lt;div class=&quot;highlight&quot;&gt;&lt;pre&gt;&lt;code class=&quot;text&quot;&gt;##         date hour variable value
+## 1 2013-09-18    1    views     2
+## 2 2013-09-18    2    views     3
+## 3 2013-09-18    3    views     2
+## 4 2013-09-18    4    views     0
+## 5 2013-09-18    5    views     1
+## 6 2013-09-18    6    views    10
+&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;
+
+
+&lt;p&gt;We need to combine the date and hour in to one date time string:&lt;/p&gt;
+
+&lt;div class=&quot;highlight&quot;&gt;&lt;pre&gt;&lt;code class=&quot;r&quot;&gt;df_melt &lt;span class=&quot;o&quot;&gt;&amp;lt;-&lt;/span&gt; transform&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;df_melt&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt; datetime &lt;span class=&quot;o&quot;&gt;=&lt;/span&gt; as.POSIXct&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;paste&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;date&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt; sprintf&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;s&quot;&gt;&amp;quot;%s:00:00&amp;quot;&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt; 
+    hour&lt;span class=&quot;p&quot;&gt;))))&lt;/span&gt;
+head&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;df_melt&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt;
+&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;
+
+
+
+
+&lt;div class=&quot;highlight&quot;&gt;&lt;pre&gt;&lt;code class=&quot;text&quot;&gt;##         date hour variable value            datetime
+## 1 2013-09-18    1    views     2 2013-09-18 01:00:00
+## 2 2013-09-18    2    views     3 2013-09-18 02:00:00
+## 3 2013-09-18    3    views     2 2013-09-18 03:00:00
+## 4 2013-09-18    4    views     0 2013-09-18 04:00:00
+## 5 2013-09-18    5    views     1 2013-09-18 05:00:00
+## 6 2013-09-18    6    views    10 2013-09-18 06:00:00
+&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;
+
+
+&lt;p&gt;Now plot all data&lt;/p&gt;
+
+&lt;div class=&quot;highlight&quot;&gt;&lt;pre&gt;&lt;code class=&quot;r&quot;&gt;library&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;ggplot2&lt;span class=&quot;p&quot;&gt;);&lt;/span&gt; library&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;scales&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt;
+
+gauge_theme &lt;span class=&quot;o&quot;&gt;&amp;lt;-&lt;/span&gt; &lt;span class=&quot;kr&quot;&gt;function&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;(){&lt;/span&gt;
+  list&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;theme&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;panel.grid.major &lt;span class=&quot;o&quot;&gt;=&lt;/span&gt; element_blank&lt;span class=&quot;p&quot;&gt;(),&lt;/span&gt;
+             panel.grid.minor &lt;span class=&quot;o&quot;&gt;=&lt;/span&gt; element_blank&lt;span class=&quot;p&quot;&gt;(),&lt;/span&gt;
+             legend.position &lt;span class=&quot;o&quot;&gt;=&lt;/span&gt; c&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;m&quot;&gt;0.85&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt;&lt;span class=&quot;m&quot;&gt;0.85&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;),&lt;/span&gt;
+             legend.key &lt;span class=&quot;o&quot;&gt;=&lt;/span&gt; element_blank&lt;span class=&quot;p&quot;&gt;()))&lt;/span&gt;
+&lt;span class=&quot;p&quot;&gt;}&lt;/span&gt;
+
+ggplot&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;df_melt&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt; aes&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;datetime&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt; value&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt; group&lt;span class=&quot;o&quot;&gt;=&lt;/span&gt;variable&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt; colour&lt;span class=&quot;o&quot;&gt;=&lt;/span&gt;variable&lt;span class=&quot;p&quot;&gt;))&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;+&lt;/span&gt;
+    theme_bw&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;base_size&lt;span class=&quot;o&quot;&gt;=&lt;/span&gt;&lt;span class=&quot;m&quot;&gt;18&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;+&lt;/span&gt; 
+    geom_line&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;size&lt;span class=&quot;o&quot;&gt;=&lt;/span&gt;&lt;span class=&quot;m&quot;&gt;2&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;+&lt;/span&gt;
+    scale_color_brewer&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;name&lt;span class=&quot;o&quot;&gt;=&lt;/span&gt;&lt;span class=&quot;s&quot;&gt;&amp;quot;&amp;quot;&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt; palette&lt;span class=&quot;o&quot;&gt;=&lt;/span&gt;&lt;span class=&quot;m&quot;&gt;3&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;+&lt;/span&gt;
+    labs&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;x&lt;span class=&quot;o&quot;&gt;=&lt;/span&gt;&lt;span class=&quot;s&quot;&gt;&amp;quot;&amp;quot;&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt; y&lt;span class=&quot;o&quot;&gt;=&lt;/span&gt;&lt;span class=&quot;s&quot;&gt;&amp;quot;&amp;quot;&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;+&lt;/span&gt;
+    gauge_theme&lt;span class=&quot;p&quot;&gt;()&lt;/span&gt;
+&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;
+
+
+&lt;p&gt;&lt;img src=&quot;/img/2014-01-17-rgauges-hourly/unnamed-chunk-8.png&quot; alt=&quot;center&quot; /&gt;&lt;/p&gt;
+
+&lt;p&gt;And just one day&lt;/p&gt;
+
+&lt;div class=&quot;highlight&quot;&gt;&lt;pre&gt;&lt;code class=&quot;r&quot;&gt;oneday &lt;span class=&quot;o&quot;&gt;&amp;lt;-&lt;/span&gt; df_melt&lt;span class=&quot;p&quot;&gt;[&lt;/span&gt; as.character&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;df_melt&lt;span class=&quot;o&quot;&gt;$&lt;/span&gt;date&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;%in%&lt;/span&gt; &lt;span class=&quot;s&quot;&gt;&amp;quot;2013-11-12&amp;quot;&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;]&lt;/span&gt;
+ggplot&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;oneday&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt; aes&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;datetime&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt; value&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt; group&lt;span class=&quot;o&quot;&gt;=&lt;/span&gt;variable&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt; colour&lt;span class=&quot;o&quot;&gt;=&lt;/span&gt;variable&lt;span class=&quot;p&quot;&gt;))&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;+&lt;/span&gt;
+    theme_bw&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;base_size&lt;span class=&quot;o&quot;&gt;=&lt;/span&gt;&lt;span class=&quot;m&quot;&gt;18&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;+&lt;/span&gt; 
+    geom_line&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;size&lt;span class=&quot;o&quot;&gt;=&lt;/span&gt;&lt;span class=&quot;m&quot;&gt;2&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;+&lt;/span&gt;
+    scale_color_brewer&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;name&lt;span class=&quot;o&quot;&gt;=&lt;/span&gt;&lt;span class=&quot;s&quot;&gt;&amp;quot;&amp;quot;&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt; palette&lt;span class=&quot;o&quot;&gt;=&lt;/span&gt;&lt;span class=&quot;m&quot;&gt;3&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;+&lt;/span&gt;
+    labs&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;x&lt;span class=&quot;o&quot;&gt;=&lt;/span&gt;&lt;span class=&quot;s&quot;&gt;&amp;quot;&amp;quot;&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt; y&lt;span class=&quot;o&quot;&gt;=&lt;/span&gt;&lt;span class=&quot;s&quot;&gt;&amp;quot;&amp;quot;&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;+&lt;/span&gt;
+    gauge_theme&lt;span class=&quot;p&quot;&gt;()&lt;/span&gt;
+&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;
+
+
+&lt;p&gt;&lt;img src=&quot;/img/2014-01-17-rgauges-hourly/unnamed-chunk-9.png&quot; alt=&quot;center&quot; /&gt;&lt;/p&gt;
+</description>
+				<published>2014-01-17 00:00:00 -0800</published>
+				<link>http://recology.info/2014/01/rgauges-hourly/</link>
+			</item>
+		
+			<item>
+				<title>Jekyll - an intro</title>
+				<description>&lt;p&gt;I started using Jekyll when I didn&#39;t really know HTML, CSS, or Ruby - so I&#39;ve had to learn a lot - but using Jekyll has been a great learning experience for all those languages.&lt;/p&gt;
+
+&lt;p&gt;I&#39;ve tried to boil down steps to building a Jekyll site or blog to the minimal steps:&lt;/p&gt;
 
 &lt;p&gt;&lt;br&gt;&lt;br&gt;&lt;/p&gt;
 
@@ -27,10 +388,10 @@
 &lt;/ul&gt;
 &lt;/li&gt;
 &lt;li&gt;Install Jekyll using RubyGems &lt;code&gt;gem install jekyll&lt;/code&gt; (you may need to do &lt;code&gt;sudo...&lt;/code&gt;)&lt;/li&gt;
-&lt;li&gt;If you're having trouble installing, see the &lt;a href=&quot;http://jekyllrb.com/docs/troubleshooting/&quot;&gt;troubleshooting page&lt;/a&gt;.&lt;/li&gt;
+&lt;li&gt;If you&#39;re having trouble installing, see the &lt;a href=&quot;http://jekyllrb.com/docs/troubleshooting/&quot;&gt;troubleshooting page&lt;/a&gt;.&lt;/li&gt;
 &lt;/ul&gt;
 &lt;/li&gt;
-&lt;li&gt;Windows: Jekyll doesn't officially support installation on Windows - follow &lt;a href=&quot;http://www.madhur.co.in/blog/2011/09/01/runningjekyllwindows.html&quot;&gt;these steps&lt;/a&gt; for a Windows install.&lt;/li&gt;
+&lt;li&gt;Windows: Jekyll doesn&#39;t officially support installation on Windows - follow &lt;a href=&quot;http://www.madhur.co.in/blog/2011/09/01/runningjekyllwindows.html&quot;&gt;these steps&lt;/a&gt; for a Windows install.&lt;/li&gt;
 &lt;/ul&gt;
 
 
@@ -38,7 +399,7 @@
 
 &lt;h3&gt;Make a site&lt;/h3&gt;
 
-&lt;p&gt;The easiest way to get started is by using the command &lt;code&gt;jekyll new SITENAME&lt;/code&gt; - let's replace &lt;code&gt;SITENAME&lt;/code&gt; with &lt;code&gt;foobar&lt;/code&gt; for this example.&lt;/p&gt;
+&lt;p&gt;The easiest way to get started is by using the command &lt;code&gt;jekyll new SITENAME&lt;/code&gt; - let&#39;s replace &lt;code&gt;SITENAME&lt;/code&gt; with &lt;code&gt;foobar&lt;/code&gt; for this example.&lt;/p&gt;
 
 &lt;p&gt;So we run &lt;code&gt;jekyll new foobar&lt;/code&gt;, which gives us:&lt;/p&gt;
 
@@ -73,7 +434,7 @@ jekyll serve
 
 &lt;h3&gt;Write a new blog post&lt;/h3&gt;
 
-&lt;p&gt;We'll add a new file to the _posts folder.&lt;/p&gt;
+&lt;p&gt;We&#39;ll add a new file to the _posts folder.&lt;/p&gt;
 
 &lt;div class=&quot;highlight&quot;&gt;&lt;pre&gt;&lt;code class=&quot;bash&quot;&gt;---
 layout: post
@@ -86,7 +447,7 @@ My second blog post!
 &lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;
 
 
-&lt;p&gt;Paste this in to a new file in the &lt;code&gt;_posts&lt;/code&gt; folder, save as today's date (2013-11-20) plus the post name, which gives us 2013-11-20-second-post.md.&lt;/p&gt;
+&lt;p&gt;Paste this in to a new file in the &lt;code&gt;_posts&lt;/code&gt; folder, save as today&#39;s date (2013-11-20) plus the post name, which gives us 2013-11-20-second-post.md.&lt;/p&gt;
 
 &lt;p&gt;&lt;br&gt;&lt;br&gt;&lt;/p&gt;
 
@@ -95,19 +456,19 @@ My second blog post!
 &lt;p&gt;An obvious option given that Jekyll was built by Github, is to put it up on Github. Github has some instructions &lt;a href=&quot;http://jekyllrb.com/docs/github-pages/&quot;&gt;here&lt;/a&gt;. Here is my attempt at instructions:&lt;/p&gt;
 
 &lt;ul&gt;
-&lt;li&gt;If you don't have a Github account already, &lt;a href=&quot;https://help.github.com/articles/signing-up-for-a-new-github-account&quot;&gt;create one&lt;/a&gt; - it's free.&lt;/li&gt;
-&lt;li&gt;Set up Git. Github's help for this: https://help.github.com/articles/set-up-git&lt;/li&gt;
+&lt;li&gt;If you don&#39;t have a Github account already, &lt;a href=&quot;https://help.github.com/articles/signing-up-for-a-new-github-account&quot;&gt;create one&lt;/a&gt; - it&#39;s free.&lt;/li&gt;
+&lt;li&gt;Set up Git. Github&#39;s help for this: https://help.github.com/articles/set-up-git&lt;/li&gt;
 &lt;li&gt;Creat a new repo on Github, with the same name as your repo on your machine, in this case &lt;code&gt;foobar&lt;/code&gt;.&lt;/li&gt;
 &lt;li&gt;Make your new blog directory &lt;code&gt;foobar&lt;/code&gt; a git repo by doing &lt;code&gt;git init&lt;/code&gt; within the repo.&lt;/li&gt;
 &lt;li&gt;Add you files to be tracked by git via &lt;code&gt;git add --all&lt;/code&gt;&lt;/li&gt;
-&lt;li&gt;Commit your changes by &lt;code&gt;git commit -am 'new blog files added'&lt;/code&gt;&lt;/li&gt;
+&lt;li&gt;Commit your changes by &lt;code&gt;git commit -am &#39;new blog files added&#39;&lt;/code&gt;&lt;/li&gt;
 &lt;li&gt;Make a &lt;code&gt;gh-pages&lt;/code&gt; branch by doing &lt;code&gt;git branch gh-pages&lt;/code&gt;.&lt;/li&gt;
 &lt;li&gt;Add link for your repo on Github: &lt;code&gt;git remote add origin https://github.com/&amp;lt;yourgithubusername&amp;gt;/foobar.git&lt;/code&gt;&lt;/li&gt;
 &lt;li&gt;Push to Github using &lt;code&gt;git push -u origin master&lt;/code&gt;&lt;/li&gt;
 &lt;/ul&gt;
 
 
-&lt;p&gt;Github gives you one repo that you can name &lt;code&gt;&amp;lt;yourgithubusername&amp;gt;.github.io&lt;/code&gt; that will be viewable at the URL &lt;code&gt;http://&amp;lt;yourgithubusername&amp;gt;.github.io&lt;/code&gt;. You can have your blog/website on the master branch, and you don't need to create a &lt;code&gt;gh-pages&lt;/code&gt; branch. But if you have your site in any other named repo, you will need the &lt;code&gt;gh-pages&lt;/code&gt; branch. If you don't use a &lt;code&gt;&amp;lt;yourgithubusername&amp;gt;.github.io&lt;/code&gt; repo, your site will be viewable at &lt;code&gt;&amp;lt;yourgithubusername&amp;gt;.github.io/&amp;lt;reponame&amp;gt;&lt;/code&gt;, in this case &lt;code&gt;&amp;lt;yourgithubusername&amp;gt;.github.io/foobar&lt;/code&gt;.&lt;/p&gt;
+&lt;p&gt;Github gives you one repo that you can name &lt;code&gt;&amp;lt;yourgithubusername&amp;gt;.github.io&lt;/code&gt; that will be viewable at the URL &lt;code&gt;http://&amp;lt;yourgithubusername&amp;gt;.github.io&lt;/code&gt;. You can have your blog/website on the master branch, and you don&#39;t need to create a &lt;code&gt;gh-pages&lt;/code&gt; branch. But if you have your site in any other named repo, you will need the &lt;code&gt;gh-pages&lt;/code&gt; branch. If you don&#39;t use a &lt;code&gt;&amp;lt;yourgithubusername&amp;gt;.github.io&lt;/code&gt; repo, your site will be viewable at &lt;code&gt;&amp;lt;yourgithubusername&amp;gt;.github.io/&amp;lt;reponame&amp;gt;&lt;/code&gt;, in this case &lt;code&gt;&amp;lt;yourgithubusername&amp;gt;.github.io/foobar&lt;/code&gt;.&lt;/p&gt;
 
 &lt;p&gt;&lt;em&gt;Beginners take note:&lt;/em&gt; Instead of the command line, you could use a Git GUI, from Github (&lt;a href=&quot;http://mac.github.com/&quot;&gt;OSX&lt;/a&gt;, &lt;a href=&quot;http://windows.github.com/&quot;&gt;Windows&lt;/a&gt;), or others, e.g., &lt;a href=&quot;http://gitboxapp.com/&quot;&gt;GitBox&lt;/a&gt;.&lt;/p&gt;
 
@@ -115,9 +476,9 @@ My second blog post!
 
 &lt;h3&gt;Other info&lt;/h3&gt;
 
-&lt;p&gt;That's the basics of how to get started. Inevitably, you'll run into problems with various dependencies. The &lt;a href=&quot;http://jekyllrb.com/&quot;&gt;Jekyll site&lt;/a&gt; has a lot of documntation now, so go there for help - and see a roundup of links below.&lt;/p&gt;
+&lt;p&gt;That&#39;s the basics of how to get started. Inevitably, you&#39;ll run into problems with various dependencies. The &lt;a href=&quot;http://jekyllrb.com/&quot;&gt;Jekyll site&lt;/a&gt; has a lot of documntation now, so go there for help - and see a roundup of links below.&lt;/p&gt;
 
-&lt;p&gt;For inspiration, here are many examples of sites that use Jekyll: http://jekyllrb.com/docs/sites/. If you want to build off someone else's work, find one that provides their code.&lt;/p&gt;
+&lt;p&gt;For inspiration, here are many examples of sites that use Jekyll: http://jekyllrb.com/docs/sites/. If you want to build off someone else&#39;s work, find one that provides their code.&lt;/p&gt;
 
 &lt;hr /&gt;
 
@@ -142,11 +503,11 @@ My second blog post!
 		
 			<item>
 				<title>Code display in scholarly journals</title>
-				<description>&lt;p&gt;Code in journals, that is, code you would type to do some programmatic operation in say R or Python, is kind of a mess to say the least. Okay, so you can &lt;strong&gt;SEE&lt;/strong&gt; code in papers, but code is not formatted in a way that facilites reuse. If an author in a paper writes out some code for software they create, or an analysis they do in the paper, wouldn't it be nice for a reader to be able to copy and paste that code directly into whatever environment that code should execute in, and actually work. Of course there is dependencies, etc. for that software to worry about, but here I am just concerned with the code formatting in articles. Code is displayed as an image in some cases (gasp!). Additionally, there's this thing called the internet, and we can use color, so let's highlight code already. At least in one of our recent &lt;a href=&quot;http://ropensci.org/&quot;&gt;rOpenSci&lt;/a&gt; papers in F1000 Research, &lt;a href=&quot;http://f1000research.com/articles/2-191/v1&quot;&gt;they do use syntax highlighting&lt;/a&gt; - w00t!&lt;/p&gt;
+				<description>&lt;p&gt;Code in journals, that is, code you would type to do some programmatic operation in say R or Python, is kind of a mess to say the least. Okay, so you can &lt;strong&gt;SEE&lt;/strong&gt; code in papers, but code is not formatted in a way that facilites reuse. If an author in a paper writes out some code for software they create, or an analysis they do in the paper, wouldn&#39;t it be nice for a reader to be able to copy and paste that code directly into whatever environment that code should execute in, and actually work. Of course there is dependencies, etc. for that software to worry about, but here I am just concerned with the code formatting in articles. Code is displayed as an image in some cases (gasp!). Additionally, there&#39;s this thing called the internet, and we can use color, so let&#39;s highlight code already. At least in one of our recent &lt;a href=&quot;http://ropensci.org/&quot;&gt;rOpenSci&lt;/a&gt; papers in F1000 Research, &lt;a href=&quot;http://f1000research.com/articles/2-191/v1&quot;&gt;they do use syntax highlighting&lt;/a&gt; - w00t!&lt;/p&gt;
 
 &lt;p&gt;Carl Boettiger (@cboettig) and I disccused how frustrated we are with the state of code in papers, and started a Github gist, listing publishers/journals and how they display code. It lives here: &lt;a href=&quot;https://gist.github.com/sckott/6787278&quot;&gt;https://gist.github.com/sckott/6787278&lt;/a&gt;.&lt;/p&gt;
 
-&lt;p&gt;We have a start, but would like your help in filling this list out more. What are the code presentation practices for various publishers and journals? With a list of what currently happens, perhaps we can start to convince publishers to display code more appropriately, partly by pointing out that &quot;XYZ publisher does it really well, why can't you?&quot;. I tried to record info in a standardized way across publishers...&lt;/p&gt;
+&lt;p&gt;We have a start, but would like your help in filling this list out more. What are the code presentation practices for various publishers and journals? With a list of what currently happens, perhaps we can start to convince publishers to display code more appropriately, partly by pointing out that &quot;XYZ publisher does it really well, why can&#39;t you?&quot;. I tried to record info in a standardized way across publishers...&lt;/p&gt;
 </description>
 				<published>2013-10-25 00:00:00 -0700</published>
 				<link>http://recology.info/2013/10/codeinpapers/</link>
@@ -172,7 +533,7 @@ My second blog post!
 
 &lt;blockquote&gt;&lt;p&gt;Due to the Federal government shutdown, NOAA.gov and most associated web sites are unavailable. Specific NOAA web sites necessary to protect lives and property are operational and will be maintained.&lt;/p&gt;&lt;/blockquote&gt;
 
-&lt;p&gt;Here's a table of APIs we interact with, the related R package, and any notes:
+&lt;p&gt;Here&#39;s a table of APIs we interact with, the related R package, and any notes:
 &lt;br&gt;&lt;br&gt;&lt;/p&gt;
 
 &lt;table class=&quot;table table-bordered table-striped&quot;&gt;
@@ -240,9 +601,9 @@ For those wanting to get NOAA climate data, perhaps check out the &lt;a href=&qu
 				<title>Taxonomy data from the web in three languages</title>
 				<description>&lt;p&gt;Eduard Szöcs and I started developing a taxonomic toolbelt for the R language a while back , which lets you interact with a multitude of taxonomic databases on the web. We have a paper in F1000Research if you want to find out more (see &lt;a href=&quot;http://f1000research.com/articles/2-191/v1&quot;&gt;here&lt;/a&gt;).&lt;/p&gt;
 
-&lt;p&gt;I thought it would be fun to rewrite some of taxize in other languages to learn more languages. Ruby and Python made the most sense to try. I did try others (Julia, Node), but gave up on those for now. The goal here isn't to port taxize to Python and Ruby right now - it's for me to learn myself some coding.&lt;/p&gt;
+&lt;p&gt;I thought it would be fun to rewrite some of taxize in other languages to learn more languages. Ruby and Python made the most sense to try. I did try others (Julia, Node), but gave up on those for now. The goal here isn&#39;t to port taxize to Python and Ruby right now - it&#39;s for me to learn myself some coding.&lt;/p&gt;
 
-&lt;p&gt;Anyway, here's use of the same function in three languages: R, Ruby, and Python. The function searches the &lt;a href=&quot;http://gni.globalnames.org/&quot;&gt;Global Names Index&lt;/a&gt;, but is named slightly differently in R (&lt;code&gt;gni_search&lt;/code&gt;) vs. Ruby/Python (&lt;code&gt;gniSearch&lt;/code&gt;). (yes, I realize the package names aren't consistent)&lt;/p&gt;
+&lt;p&gt;Anyway, here&#39;s use of the same function in three languages: R, Ruby, and Python. The function searches the &lt;a href=&quot;http://gni.globalnames.org/&quot;&gt;Global Names Index&lt;/a&gt;, but is named slightly differently in R (&lt;code&gt;gni_search&lt;/code&gt;) vs. Ruby/Python (&lt;code&gt;gniSearch&lt;/code&gt;). (yes, I realize the package names aren&#39;t consistent)&lt;/p&gt;
 
 &lt;p&gt;Note that there are only a few functions available in the Ruby and Python versions:&lt;/p&gt;
 
@@ -352,7 +713,7 @@ python setup.py install
 		
 			<item>
 				<title>Pollinator niche breadth and natural enemies</title>
-				<description>&lt;p&gt;I am on my way out of academia, so I want to share what I won't ever get around to finishing. I started a paper many years ago examining the prevalence of natural enemy pressure on pollinators, and patterns of occurrence of pollinator natural enemies in relation to plant attributes.&lt;/p&gt;
+				<description>&lt;p&gt;I am on my way out of academia, so I want to share what I won&#39;t ever get around to finishing. I started a paper many years ago examining the prevalence of natural enemy pressure on pollinators, and patterns of occurrence of pollinator natural enemies in relation to plant attributes.&lt;/p&gt;
 
 &lt;p&gt;&lt;br&gt;
 &lt;img src=&quot;/img/beeenemy.png&quot;&gt;
@@ -366,7 +727,7 @@ python setup.py install
 		
 			<item>
 				<title>govdat - SunlightLabs and New York Times Congress data via R</title>
-				<description>&lt;p&gt;I started an R package a while back, and a few people have shown interest, so I thought it was time to revist the code. govdat is an interface to various APIs for government data: currently the Sunlight Labs APIs, and the New York Times congress API. Returned objects from functions are simple lists. In future versions of govdat, I may change how data is returned. The following are examples (which is also the package vignette) of using the Sunlight Labs API. I will add examples of using the New York Times Congress API once their site is up again; I'm doing this on 2013-08-28, just after the takedown of their site.&lt;/p&gt;
+				<description>&lt;p&gt;I started an R package a while back, and a few people have shown interest, so I thought it was time to revist the code. govdat is an interface to various APIs for government data: currently the Sunlight Labs APIs, and the New York Times congress API. Returned objects from functions are simple lists. In future versions of govdat, I may change how data is returned. The following are examples (which is also the package vignette) of using the Sunlight Labs API. I will add examples of using the New York Times Congress API once their site is up again; I&#39;m doing this on 2013-08-28, just after the takedown of their site.&lt;/p&gt;
 
 &lt;p&gt;I show just a bit of each data object returned for brevity. And yes, I realize this is not related at all to ecology.&lt;/p&gt;
 
@@ -742,7 +1103,7 @@ ldply&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;out&lt;span class=&quot;p&quo
 
 &lt;hr /&gt;
 
-&lt;h4&gt;Return the top contributoring organizations, ranked by total dollars given. An organization's giving is broken down into money given directly (by the organization's PAC) versus money given by individuals employed by or associated with the organization.&lt;/h4&gt;
+&lt;h4&gt;Return the top contributoring organizations, ranked by total dollars given. An organization&#39;s giving is broken down into money given directly (by the organization&#39;s PAC) versus money given by individuals employed by or associated with the organization.&lt;/h4&gt;
 
 &lt;div class=&quot;highlight&quot;&gt;&lt;pre&gt;&lt;code class=&quot;r&quot;&gt;out &lt;span class=&quot;o&quot;&gt;&amp;lt;-&lt;/span&gt; sll_ts_aggregatetopcontribs&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;id &lt;span class=&quot;o&quot;&gt;=&lt;/span&gt; &lt;span class=&quot;s&quot;&gt;&amp;quot;85ab2e74589a414495d18cc7a9233981&amp;quot;&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt;
 ldply&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;out&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt; data.frame&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt;
@@ -792,13 +1153,13 @@ ldply&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;out&lt;span class=&quot;p&quo
 
 &lt;h2&gt;Can we reach the public with phenology data?&lt;/h2&gt;
 
-&lt;p&gt;During the #sciodemocracy session, I had a thought but couldn't articulate it at the time. So here goes. People that are not inolved in climate change discussions may not think about climate change in the framework of changing sea level, melting ice, and altered severity of extreme events. However, many people observe birds, butterflies, and trees outside their apartment windows, cars/trains/buses, or on walks or hikes. When you live in a one place for many years changes in the timing of when birds, butterflies, and trees do certain things are easily noticed. Many of us, including myself, don't necessarily record these changes, but some do! In fact, there are many web sites with databases of observations of birds, butterflies, and more that anyone, not just scientists, can submit observations to. Some examples are the &lt;a href=&quot;https://www.usanpn.org/&quot;&gt;USA National Phenology Network&lt;/a&gt; and &lt;a href=&quot;http://www.inaturalist.org/&quot;&gt;iNaturalist&lt;/a&gt;. And of course there are other databases that are focused on observations of organisms collected by scientists, like &lt;a href=&quot;http://www.gbif.org/&quot;&gt;GBIF&lt;/a&gt; and &lt;a href=&quot;http://vertnet.org/index.php&quot;&gt;VertNet&lt;/a&gt;.&lt;/p&gt;
+&lt;p&gt;During the #sciodemocracy session, I had a thought but couldn&#39;t articulate it at the time. So here goes. People that are not inolved in climate change discussions may not think about climate change in the framework of changing sea level, melting ice, and altered severity of extreme events. However, many people observe birds, butterflies, and trees outside their apartment windows, cars/trains/buses, or on walks or hikes. When you live in a one place for many years changes in the timing of when birds, butterflies, and trees do certain things are easily noticed. Many of us, including myself, don&#39;t necessarily record these changes, but some do! In fact, there are many web sites with databases of observations of birds, butterflies, and more that anyone, not just scientists, can submit observations to. Some examples are the &lt;a href=&quot;https://www.usanpn.org/&quot;&gt;USA National Phenology Network&lt;/a&gt; and &lt;a href=&quot;http://www.inaturalist.org/&quot;&gt;iNaturalist&lt;/a&gt;. And of course there are other databases that are focused on observations of organisms collected by scientists, like &lt;a href=&quot;http://www.gbif.org/&quot;&gt;GBIF&lt;/a&gt; and &lt;a href=&quot;http://vertnet.org/index.php&quot;&gt;VertNet&lt;/a&gt;.&lt;/p&gt;
 
 &lt;p&gt;So what? What about it?&lt;/p&gt;
 
-&lt;p&gt;When enough of these observations are collected on any one species in one location (e.g., let's say we have 1000 observations of a species in Seattle over 20 years) we can simply ask how has the first date of record of the species in Seattle changed through time? If there is a change in timing of first appearance in the spring through the years, we can hypothesize that this may be due to climate change, and look at the data to see if there is a correlation, etc.&lt;/p&gt;
+&lt;p&gt;When enough of these observations are collected on any one species in one location (e.g., let&#39;s say we have 1000 observations of a species in Seattle over 20 years) we can simply ask how has the first date of record of the species in Seattle changed through time? If there is a change in timing of first appearance in the spring through the years, we can hypothesize that this may be due to climate change, and look at the data to see if there is a correlation, etc.&lt;/p&gt;
 
-&lt;p&gt;Non-scientists along with scientists are collecting vast amounts of data on observations of species. This data can be used to make people think about climate change. That is, why don't we not only facilitate the public's ability to collect data, but also to analyze the data - to do their own science, ask their own questions. In this way, people can link a bird appearing for the first time in spring a bit later than the previous year, or a tree flowering a bit early, to variables associated with climate change, like temperature, precipitation, etc.&lt;/p&gt;
+&lt;p&gt;Non-scientists along with scientists are collecting vast amounts of data on observations of species. This data can be used to make people think about climate change. That is, why don&#39;t we not only facilitate the public&#39;s ability to collect data, but also to analyze the data - to do their own science, ask their own questions. In this way, people can link a bird appearing for the first time in spring a bit later than the previous year, or a tree flowering a bit early, to variables associated with climate change, like temperature, precipitation, etc.&lt;/p&gt;
 
 &lt;p&gt;Empowering the general public to do their own science may bring the vague notion of climate change into stark relief - thereby movivating some to take action with their elected representatives, or to at least get curious to find out more.&lt;/p&gt;
 </description>
@@ -810,11 +1171,11 @@ ldply&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;out&lt;span class=&quot;p&quo
 				<title>Working with climate data from the web in R</title>
 				<description>&lt;p&gt;I recently attended &lt;a href=&quot;http://scioclimate.wikispaces.com&quot;&gt;ScienceOnline Climate&lt;/a&gt;, a conference in Washington, D.C. at AAAS. You may have heard of the &lt;a href=&quot;https://twitter.com/#sciox&quot;&gt;ScienceOnline annual meeting in North Carolina&lt;/a&gt; - this was one of their topical meetings focused on Climate Change. I moderated a session on &lt;a href=&quot;http://scioclimate.wikispaces.com/3W.+Working+With+Science+Data+From+Around+The+Web&quot;&gt;working with data from the web in R&lt;/a&gt;, focusing on climate data. Search Twitter for #scioClimate for tweets from the conference, and #sciordata for tweets from the session I ran. The following is an abbreviated demo of what I did in the workshop showing some of what you can do with climate data in R using our packages.&lt;/p&gt;
 
-&lt;p&gt;Before digging in, why would you want to get climate data programatically vs. via pushing buttons in a browser? Learning a programming language can take some time - we all already know how to use browsers. So why?!  First, getting data programatically, especially in R (or Python), allows you to then easily do other stuff, like manipulate data, visualize, and analyze data. Second, if you do your work programatically, &lt;strong&gt;you&lt;/strong&gt; and &lt;em&gt;others&lt;/em&gt; can reproduce, and extend, the work you did with little extra effort. Third, programatically getting data makes tasks that are repetitive and slow, fast and easy - you can't easily automate button clicks in a browser. Fourth, you can combine code with writing to make your entire workflow reproducible, whether it's notes, a blog post, or even a research article.&lt;/p&gt;
+&lt;p&gt;Before digging in, why would you want to get climate data programatically vs. via pushing buttons in a browser? Learning a programming language can take some time - we all already know how to use browsers. So why?!  First, getting data programatically, especially in R (or Python), allows you to then easily do other stuff, like manipulate data, visualize, and analyze data. Second, if you do your work programatically, &lt;strong&gt;you&lt;/strong&gt; and &lt;em&gt;others&lt;/em&gt; can reproduce, and extend, the work you did with little extra effort. Third, programatically getting data makes tasks that are repetitive and slow, fast and easy - you can&#39;t easily automate button clicks in a browser. Fourth, you can combine code with writing to make your entire workflow reproducible, whether it&#39;s notes, a blog post, or even a research article.&lt;/p&gt;
 
 &lt;h2&gt;Interactive visualizations in R&lt;/h2&gt;
 
-&lt;p&gt;Let's start off with something shiny. The majority of time I make static visualizations, which are great for me to look at during analyses, and for publications of research findings in PDFs. However, static visualizations don't take advantage of the interactive nature of the web. Ramnath Vaidyanathan has developed an R package, &lt;a href=&quot;https://github.com/ramnathv/rCharts&quot;&gt;rCharts&lt;/a&gt;, to generate dynamic Javascript visualizations directly from R that can be used interactively in a browser. Here is an example visualizing a dataset that comes with R.&lt;/p&gt;
+&lt;p&gt;Let&#39;s start off with something shiny. The majority of time I make static visualizations, which are great for me to look at during analyses, and for publications of research findings in PDFs. However, static visualizations don&#39;t take advantage of the interactive nature of the web. Ramnath Vaidyanathan has developed an R package, &lt;a href=&quot;https://github.com/ramnathv/rCharts&quot;&gt;rCharts&lt;/a&gt;, to generate dynamic Javascript visualizations directly from R that can be used interactively in a browser. Here is an example visualizing a dataset that comes with R.&lt;/p&gt;
 
 &lt;div class=&quot;highlight&quot;&gt;&lt;pre&gt;&lt;code class=&quot;r&quot;&gt;library&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;devtools&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt;
 install_github&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;s&quot;&gt;&amp;quot;rCharts&amp;quot;&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt; &lt;span class=&quot;s&quot;&gt;&amp;quot;ramnathv&amp;quot;&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt;
@@ -831,7 +1192,7 @@ n1&lt;span class=&quot;o&quot;&gt;$&lt;/span&gt;show&lt;span class=&quot;p&quot;
 &lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;
 
 
-&lt;p&gt;Check out the output &lt;a href=&quot;http://recology.info/vis/nvd3_eg.html&quot;&gt;here&lt;/a&gt;. If you like you can take the source code from the visualization (right click on select &lt;em&gt;View Page Source&lt;/em&gt;) and put it in your html files, and you're good to go (as long as you have dependencies, etc.) - quicker than learning &lt;a href=&quot;http://d3js.org/&quot;&gt;d3&lt;/a&gt; and company from scratch, eh. This is a super simple example, but you can imagine the possibilities.&lt;/p&gt;
+&lt;p&gt;Check out the output &lt;a href=&quot;http://recology.info/vis/nvd3_eg.html&quot;&gt;here&lt;/a&gt;. If you like you can take the source code from the visualization (right click on select &lt;em&gt;View Page Source&lt;/em&gt;) and put it in your html files, and you&#39;re good to go (as long as you have dependencies, etc.) - quicker than learning &lt;a href=&quot;http://d3js.org/&quot;&gt;d3&lt;/a&gt; and company from scratch, eh. This is a super simple example, but you can imagine the possibilities.&lt;/p&gt;
 
 &lt;h2&gt;The data itself&lt;/h2&gt;
 
@@ -910,7 +1271,7 @@ ggplot&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;df&lt;span class=&quot;p&quo
 
 &lt;h4&gt;Plotting annual data for different countries&lt;/h4&gt;
 
-&lt;p&gt;Data can be extracted from countries or basins submitted as vectors. Here we will plot the expected temperature anomaly for each 20 year period over a baseline control period of 1961-2000. These countries chosen span the north to south pole. It's clear from the plot that the northern most countries (US and Canada) have the biggest anomaly, and Belize, the most equatorial country, has the smallest anomaly.&lt;/p&gt;
+&lt;p&gt;Data can be extracted from countries or basins submitted as vectors. Here we will plot the expected temperature anomaly for each 20 year period over a baseline control period of 1961-2000. These countries chosen span the north to south pole. It&#39;s clear from the plot that the northern most countries (US and Canada) have the biggest anomaly, and Belize, the most equatorial country, has the smallest anomaly.&lt;/p&gt;
 
 &lt;div class=&quot;highlight&quot;&gt;&lt;pre&gt;&lt;code class=&quot;r&quot;&gt;library&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;rWBclimate&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt;
 
@@ -969,7 +1330,7 @@ ggplot&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;df&lt;span class=&quot;p&quo
 		
 			<item>
 				<title>R ecology workshop</title>
-				<description>&lt;p&gt;After &lt;a href=&quot;http://sckott.github.io/2013/07/r-resources/&quot;&gt;my presentation yesterday&lt;/a&gt; to a group of grad students on R resources, I did a presentation today on intro to R data manipulation, visualizations, and analyses/visualizations of biparite networks and community level analyses (diversity, rarefaction, ordination, etc.). As I said &lt;a href=&quot;http://sckott.github.io/2013/07/r-resources/&quot;&gt;yesterday&lt;/a&gt; I've been playing with two ways to make reproducible presentations in R: &lt;a href=&quot;http://www.rstudio.com/ide/docs/presentations/overview&quot;&gt;RStudio's presentations&lt;/a&gt; built in to RStudio IDE, and &lt;a href=&quot;http://slidify.org/&quot;&gt;Slidify&lt;/a&gt;. Yesterday I went with RStudio's product - today I used Slidify. See the Markdown file for the presentation &lt;a href=&quot;https://github.com/sckott/posterstalks/blob/gh-pages/sfu/resources/r_resources.Rpres&quot;&gt;here&lt;/a&gt;.&lt;/p&gt;
+				<description>&lt;p&gt;After &lt;a href=&quot;http://sckott.github.io/2013/07/r-resources/&quot;&gt;my presentation yesterday&lt;/a&gt; to a group of grad students on R resources, I did a presentation today on intro to R data manipulation, visualizations, and analyses/visualizations of biparite networks and community level analyses (diversity, rarefaction, ordination, etc.). As I said &lt;a href=&quot;http://sckott.github.io/2013/07/r-resources/&quot;&gt;yesterday&lt;/a&gt; I&#39;ve been playing with two ways to make reproducible presentations in R: &lt;a href=&quot;http://www.rstudio.com/ide/docs/presentations/overview&quot;&gt;RStudio&#39;s presentations&lt;/a&gt; built in to RStudio IDE, and &lt;a href=&quot;http://slidify.org/&quot;&gt;Slidify&lt;/a&gt;. Yesterday I went with RStudio&#39;s product - today I used Slidify. See the Markdown file for the presentation &lt;a href=&quot;https://github.com/sckott/posterstalks/blob/gh-pages/sfu/resources/r_resources.Rpres&quot;&gt;here&lt;/a&gt;.&lt;/p&gt;
 
 &lt;p&gt;Check out the presentation slides &lt;a href=&quot;https://bitly.com/sfuworkshop&quot;&gt;here&lt;/a&gt;, and if you want, fork &lt;a href=&quot;http://bit.ly/1bKVX2O&quot;&gt;the code on Github&lt;/a&gt;, change it, submit changes back to me, etc. (click on the image to go to slides)&lt;/p&gt;
 
@@ -981,31 +1342,6 @@ ggplot&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;df&lt;span class=&quot;p&quo
 </description>
 				<published>2013-07-31 00:00:00 -0700</published>
 				<link>http://recology.info/2013/07/r-ecology-workshop/</link>
-			</item>
-		
-			<item>
-				<title>R resources</title>
-				<description>&lt;p&gt;I'm doing a presentation today to grad students on R resources. I have been writing HTML presentations recently, but some great tools are now available to convert text that is easy to read and write to presentations.&lt;/p&gt;
-
-&lt;ul&gt;
-&lt;li&gt;RStudio has something called &lt;code&gt;R presentations&lt;/code&gt;, that is basically Markdown. This tool is built in to RStudio. See some docs &lt;a href=&quot;http://www.rstudio.com/ide/docs/presentations/overview&quot;&gt;here&lt;/a&gt;. A cool feature of RStudio's presentations is that the preview of the presentation live updates on each save - nice &lt;i class=&quot;icon-thumbs-up&quot;&gt;&lt;/i&gt;&lt;/li&gt;
-&lt;li&gt;Another option is the slidify package, made by &lt;a href=&quot;https://github.com/ramnathv&quot;&gt;Ramnath Vaidyanathan&lt;/a&gt;. The canonical url for slidify is &lt;a href=&quot;http://slidify.org/&quot;&gt;here&lt;/a&gt;. Slidify gives you more options and flexibity than RStudio presentations.&lt;/li&gt;
-&lt;/ul&gt;
-
-
-&lt;p&gt;For this presentation I went with RStudio's product. See the Markdown file for the presentation &lt;a href=&quot;https://github.com/sckott/posterstalks/blob/gh-pages/sfu/resources/r_resources.Rpres&quot;&gt;here&lt;/a&gt;.&lt;/p&gt;
-
-&lt;p&gt;Check out the presentation slides here, and if you want, fork it on Github, change it, submit changes back to me, etc. (click to go to slides)&lt;/p&gt;
-
-&lt;p&gt;&lt;br&gt;&lt;/p&gt;
-
-&lt;!-- ![](/img/rstudio_pres.png) --&gt;
-
-
-&lt;p&gt;&lt;a href=&quot;http://rpubs.com/recology_/rresources&quot;&gt;&lt;img src=&quot;/img/rstudio_pres.png&quot;&gt;&lt;/img&gt;&lt;/a&gt;&lt;/p&gt;
-</description>
-				<published>2013-07-30 00:00:00 -0700</published>
-				<link>http://recology.info/2013/07/r-resources/</link>
 			</item>
 		
 	</channel>
