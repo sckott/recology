@@ -84,7 +84,7 @@ ggplot(dat_both, aes(day, count, colour = party)) + theme_grey(base_size = 20) +
     geom_line() + scale_colour_manual(values = c("blue", "red"))
 {% endhighlight %}
 
-![center](/img/2013-08-17-sciordata/govdat.png) 
+![center](/public/img/2013-08-17-sciordata/govdat.png) 
 
 
 
@@ -118,7 +118,7 @@ ggplot(df, aes(long, lat, group = group)) + geom_polygon(fill = "steelblue") +
     theme_ice() + facet_wrap(~.id)
 {% endhighlight %}
 
-![center](/img/2013-08-17-sciordata/seaice2.png) 
+![center](/public/img/2013-08-17-sciordata/seaice2.png) 
 
 
 
@@ -148,7 +148,7 @@ ggplot(country.dat.bcc, aes(x = fromYear, y = data, group = locator, colour = lo
     theme_bw(base_size = 20)
 {% endhighlight %}
 
-![center](/img/2013-08-17-sciordata/unnamed-chunk-1.png) 
+![center](/public/img/2013-08-17-sciordata/unnamed-chunk-1.png) 
 
 
 
@@ -176,7 +176,7 @@ ggplot(df, aes(date, count)) + geom_line() + theme_grey(base_size = 20) + facet_
     .)
 {% endhighlight %}
 
-![center](/img/2013-08-17-sciordata/rnpn.png) 
+![center](/public/img/2013-08-17-sciordata/rnpn.png) 
 
 
 

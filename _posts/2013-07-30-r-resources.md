@@ -19,6 +19,6 @@ Check out the presentation slides here, and if you want, fork it on Github, chan
 
 <br>
 
-<!-- ![](/img/rstudio_pres.png) -->
+<!-- ![](/public/img/rstudio_pres.png) -->
 
-<a href="http://rpubs.com/recology_/rresources"><img src="/img/rstudio_pres.png"></img></a>
+<a href="http://rpubs.com/recology_/rresources"><img src="/public/img/rstudio_pres.png"></img></a>

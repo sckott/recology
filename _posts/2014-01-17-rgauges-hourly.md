@@ -219,7 +219,7 @@ vis_gauge(out)
 ## Using date as id variables
 {% endhighlight %}
 
-![center](/img/2014-01-17-rgauges-hourly/unnamed-chunk-4.png) 
+![center](/public/img/2014-01-17-rgauges-hourly/unnamed-chunk-4.png) 
 
 {% highlight text %}
 ## NULL
@@ -365,7 +365,7 @@ ggplot(df_melt, aes(datetime, value, group=variable, colour=variable)) +
     gauge_theme()
 {% endhighlight %}
 
-![center](/img/2014-01-17-rgauges-hourly/unnamed-chunk-8.png) 
+![center](/public/img/2014-01-17-rgauges-hourly/unnamed-chunk-8.png) 
 
 
 And just one day
@@ -381,5 +381,5 @@ ggplot(oneday, aes(datetime, value, group=variable, colour=variable)) +
     gauge_theme()
 {% endhighlight %}
 
-![center](/img/2014-01-17-rgauges-hourly/unnamed-chunk-9.png) 
+![center](/public/img/2014-01-17-rgauges-hourly/unnamed-chunk-9.png) 
 

@@ -265,7 +265,7 @@ dat <- sll_cw_timeseries(phrase = "climate change")
 ggplot(dat, aes(day, count)) + geom_line() + theme_grey(base_size = 20)
 {% endhighlight %}
 
-![center](/img/2013-08-28-govdat-vignette/sll_cw_timeseries2.png) 
+![center](/public/img/2013-08-28-govdat-vignette/sll_cw_timeseries2.png) 
 
 
 ##### Plot more data
@@ -303,7 +303,7 @@ ggplot(dat_both, aes(day, count, colour = party)) + geom_line() + theme_grey(bas
     scale_colour_manual(values = c("blue", "red"))
 {% endhighlight %}
 
-![center](/img/2013-08-28-govdat-vignette/sll_cw_timeseries3.png) 
+![center](/public/img/2013-08-28-govdat-vignette/sll_cw_timeseries3.png) 
 
 
 ********************

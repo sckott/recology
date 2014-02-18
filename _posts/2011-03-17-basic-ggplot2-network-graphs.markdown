@@ -17,9 +17,9 @@ I have been looking around on the web and have not found anything yet related to
 
 <script src="https://gist.github.com/3601320.js?file=gggraph.r"></script>
 
-<img src="/img/gggraph/erdos.jpeg" width="500" height="500">
-<img src="/img/gggraph/barabasi.jpeg" width="500" height="500">
-<img src="/img/gggraph/grg.jpeg" width="500" height="500">
-<img src="/img/gggraph/growing.jpeg" width="500" height="500">
-<img src="/img/gggraph/watts.jpeg" width="500" height="500">
-<img src="/img/gggraph/grg-bipartite.jpeg" width="500" height="500">
+<img src="/public/img/gggraph/erdos.jpeg" width="500" height="500">
+<img src="/public/img/gggraph/barabasi.jpeg" width="500" height="500">
+<img src="/public/img/gggraph/grg.jpeg" width="500" height="500">
+<img src="/public/img/gggraph/growing.jpeg" width="500" height="500">
+<img src="/public/img/gggraph/watts.jpeg" width="500" height="500">
+<img src="/public/img/gggraph/grg-bipartite.jpeg" width="500" height="500">

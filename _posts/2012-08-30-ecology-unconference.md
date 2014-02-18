@@ -24,7 +24,7 @@ What will we do there? The broadest restriction is that topics should be about s
 
 How do I get involved? Go to the wiki and start contributing: [http://ecologyunconference.wikispaces.com/](http://ecologyunconference.wikispaces.com/). There are already some suggestions for topics...Here's a screenshot of the ideas for Session Proposals page:
 
-![ecologyunconf](/img/ecologyunconf.png)
+![ecologyunconf](/public/img/ecologyunconf.png)
 
 *********
 

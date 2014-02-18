@@ -19,7 +19,7 @@ There are two possible outputs from using `gisd_isinvasive`: "Invasive" or "Not 
 
 ***************
 
-![center](http://sckott.github.io/img/gisd_small.png) 
+![center](http://sckott.github.io/public/img/gisd_small.png) 
 
 ***************
 

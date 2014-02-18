@@ -26,7 +26,7 @@ Here's an example from the function.  Paste the following in to your browser and
 
 http://beta.opencpu.org/R/call/opencpu.demo/gitstats/png
 
-![had](/img/hadley.png)
+![had](/public/img/hadley.png)
 
 
 
@@ -34,7 +34,7 @@ And you can specify user or organization name using arguments in the URL
 
 http://beta.opencpu.org/R/call/opencpu.demo/gitstats/png?type='org'&id='ropensci'
 
-![ropensci](/img/ropensci.png)
+![ropensci](/public/img/ropensci.png)
 
 
 

@@ -9,7 +9,7 @@ tags:
 - ropensci
 ---
 
-![center](https://raw.github.com/sckott/sckott.github.com/master/img/ropensci_challenge.png)
+![center](https://raw.github.com/sckott/sckott.github.com/master/public/img/ropensci_challenge.png)
 
 ***************
 

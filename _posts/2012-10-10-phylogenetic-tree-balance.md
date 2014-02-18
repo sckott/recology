@@ -97,7 +97,7 @@ a <- ggplot(colless_df, aes(V1)) +  # plot histogram of distribution of values
 a
 {% endhighlight %}
 
-![center](/img/collesshist.png) 
+![center](/public/img/collesshist.png) 
 
 
 ### Create phylogenies representing balanced and unbalanced trees (using the custom theme)
@@ -111,7 +111,7 @@ c <- ggphylo(trees[which.max(colless_df$V1)], do.plot = F) + theme_myblank()
 b
 {% endhighlight %}
 
-![center](/img/collessphylog.png) 
+![center](/public/img/collessphylog.png) 
 
 
 ### Now, put it all together in one plot using some gridExtra magic.
@@ -129,7 +129,7 @@ print(b, vp = vpb_)
 print(c, vp = vpc_)
 {% endhighlight %}
 
-![center](/img/collessall.png) 
+![center](/public/img/collessall.png) 
 
 
 ### And the same for Gamma stat, which measures the distribution of nodes in time. 
@@ -160,7 +160,7 @@ print(b, vp = vpb_)
 print(c, vp = vpc_)
 {% endhighlight %}
 
-![center](/img/gammaall.png) 
+![center](/public/img/gammaall.png) 
 
 
 *********

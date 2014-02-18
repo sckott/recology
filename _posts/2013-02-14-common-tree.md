@@ -20,7 +20,7 @@ But how do you use Common Tree?
 ***************
 
 ### Get a species list
-Grab the taxon list from my github account [here](https://raw.github.com/sckott/sckott.github.com/master/img/species.txt) 
+Grab the taxon list from my github account [here](https://raw.github.com/sckott/sckott.github.com/master/public/img/species.txt) 
 
 ### Go to the site
 Go to the Common Tree site [here](http://www.ncbi.nlm.nih.gov/Taxonomy/CommonTree/wwwcmt.cgi)
@@ -31,12 +31,12 @@ Hit the "choose file" button, then select the `species.txt` file you downloaded 
 ### Add the species list to make the tree
 Then hit "add from file", and you got a "tree"
 
-![image](https://raw.github.com/sckott/sckott.github.com/master/img/ncbi.png)
+![image](https://raw.github.com/sckott/sckott.github.com/master/public/img/ncbi.png)
 
 ## Download
 You can download the tree in a variety of formats, including a .phy file
 
-![image](https://raw.github.com/sckott/sckott.github.com/master/img/ncbi2.png)
+![image](https://raw.github.com/sckott/sckott.github.com/master/public/img/ncbi2.png)
 
 ## Plot the tree on your machine
 Make a tree, in R for me
@@ -60,7 +60,7 @@ plot(tree2, no.margin = TRUE, cex = 0.7)
 
 ### w00p, there it is...
 
-![image4](https://raw.github.com/sckott/sckott.github.com/master/img/ncbi_tree.png)
+![image4](https://raw.github.com/sckott/sckott.github.com/master/public/img/ncbi_tree.png)
 
 ***************
 

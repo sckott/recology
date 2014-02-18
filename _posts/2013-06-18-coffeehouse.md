@@ -14,7 +14,7 @@ Have you heard of [DataONE](http://www.dataone.org/)? It stands for the Data Obs
 
 At our last meeting, we decided to start a blog aggregator to pull in to one place blog posts about data, data management, and related topics. Those reading this blog have likely heard of [R-Bloggers](http://www.r-bloggers.com/) - and there are many more aggregator blogs. We are calling this blog aggregator **Coffeehouse** - as it's sort of a place to gather to talk/read about ideas. Check it out [here][coffee]. If you blog about data management think about adding your blog to Coffeehouse - go to the [*Add your blog*][addblog] page to do so. A screenshot:
 
-![](/img/coffeehouse.png)
+![](/public/img/coffeehouse.png)
 
 ********************
 

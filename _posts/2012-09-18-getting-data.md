@@ -18,7 +18,7 @@ tags:
 ## The problem:
 There are a lot of figures in published papers in the scholarly literature, like the below, from (Attwood _et. al._ 2012)):  
 
-![alt text](/img/getfig2.png)
+![alt text](/public/img/getfig2.png)
 
 At some point, a scientist wants to ask a question for which they can synthesize the knowledge on that question by collecting data from the published literature.  This often requires something like the following workflow:
 
@@ -70,7 +70,7 @@ At least in my mind, I think of this idea going the direction of gamification, i
 
 Once there are a lot of people collecting data we can get many data points for every single data point in a graph.  Whereas right now, someone clicks on each data point in a graph one, maybe two times if they are lucky.  In the future, we could have ten different users clicking on each mean and each error bar in each graph.  So exciting!  The following figure illustrates this. 
 
-![center](/img/clicks.png) 
+![center](/public/img/clicks.png) 
 
 
 ## What do you think?

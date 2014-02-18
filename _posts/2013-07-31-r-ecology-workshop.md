@@ -20,7 +20,7 @@ How I actually ran the 2 hr workshop was to present a few slides, then live demo
 
 <br>
 
-<a href="https://bitly.com/sfuworkshop"><img src="/img/pres.png"></img></a>
+<a href="https://bitly.com/sfuworkshop"><img src="/public/img/pres.png"></img></a>
 
 [last]: http://sckott.github.io/2013/07/r-resources/
 [rstudio]: http://www.rstudio.com/ide/docs/presentations/overview

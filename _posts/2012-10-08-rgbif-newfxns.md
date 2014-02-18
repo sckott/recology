@@ -173,7 +173,7 @@ out <- occurrencelist(scientificname = "Puma concolor", coordinatestatus = TRUE,
 gbifmap(input = out)  # make a map, plotting on world map
 {% endhighlight %}
 
-![center](/img/gbifmap1.png) 
+![center](/public/img/gbifmap1.png) 
 
 
 ### Point map, using output from occurrencelist, with many species plotted as different colors
@@ -185,7 +185,7 @@ out <- lapply(splist, function(x) occurrencelist(x, coordinatestatus = T, maxres
 gbifmap(out)
 {% endhighlight %}
 
-![center](/img/gbifmap2.png) 
+![center](/public/img/gbifmap2.png) 
 
 
 ### Tile map, using output from densitylist, using results in Canada only.
@@ -195,13 +195,13 @@ out2 <- densitylist(originisocountrycode = "CA")  # data for Canada
 gbifmap(out2)  # on world map
 {% endhighlight %}
 
-![center](/img/gbifmap31.png) 
+![center](/public/img/gbifmap31.png) 
 
 {% highlight r linenos %}
 gbifmap(out2, region = "Canada")  # on Canada map
 {% endhighlight %}
 
-![NA](/img/gbifmap32.png) 
+![NA](/public/img/gbifmap32.png) 
 
 
 *****
@@ -213,7 +213,7 @@ out <- densitylist(taxonconceptKey = 7071443)
 gbifmap(out)
 {% endhighlight %}
 
-![center](/img/algae.png) 
+![center](/public/img/algae.png) 
 
 
 ### seminym asked about querying by area. You can query by area, though slightly differently for occurrencelist and densitylist functions. For occurrencelist you can search using min and max lat and long values (and min an max altitude, pretty cool, eh).  
@@ -227,7 +227,7 @@ out <- occurrencelist(minlatitude = 30, maxlatitude = 35, minlongitude = -100,
 gbifmap(out, "state", "texas", geom_point)
 {% endhighlight %}
 
-![center](/img/byarea_occurr1.png) 
+![center](/public/img/byarea_occurr1.png) 
 
 {% highlight r linenos %}
 
@@ -235,7 +235,7 @@ gbifmap(out, "state", "texas", geom_point)
 gbifmap(out, "state", "texas", geom_jitter, position_jitter(width = 0.3, height = 0.3))
 {% endhighlight %}
 
-![NA](/img/byarea_occurr2.png) 
+![NA](/public/img/byarea_occurr2.png) 
 
 {% highlight r linenos %}
 
@@ -243,7 +243,7 @@ gbifmap(out, "state", "texas", geom_jitter, position_jitter(width = 0.3, height 
 gbifmap(out, "state", "texas", geom_jitter, position_jitter(width = 1, height = 1))
 {% endhighlight %}
 
-![NA](/img/byarea_occurr3.png) 
+![NA](/public/img/byarea_occurr3.png) 
 
 
 ### And you can query by area in `densitylist` by specifying a place using the `originisocountrycode` argument (as done in an above example).  Just showing the head of the data.frame here.  

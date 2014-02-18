@@ -366,7 +366,7 @@ ggplot(toplot_, aes(articletype, authors)) + theme_tufte(base_size = 16) + geom_
     coord_flip()
 {% endhighlight %}
 
-![center](/img/someplotting.png)
+![center](/public/img/someplotting.png)
 
 ***************
 

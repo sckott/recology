@@ -102,7 +102,7 @@ ggplot(outdf_subset, aes(date, value, fill = .id)) +
 {% endhighlight %}
 
 
-![center](/img/commitsbydate.png) 
+![center](/public/img/commitsbydate.png) 
 
 
 The plot above plots the sum of additions+deletions, and is sorted by the first commit date of reach repo, with the first being [treebase](https://github.com/ropensci/treeBASE), which wraps the [Treebase API](http://treebase.org/treebase-web/urlAPI.html), and the most recent being [rwbclimate](https://github.com/ropensci/rWBclimate), which wraps the [World Blank climate data API](http://data.worldbank.org/developers/climate-data-api). 
@@ -129,7 +129,7 @@ plotweb(sortweb(mat, sort.order = "dec"), method = "normal", text.rot = 90,
     ybig = 0.09, labsize = 0.7)
 {% endhighlight %}
 
-![center](/img/collabnetwork.png) 
+![center](/public/img/collabnetwork.png) 
 
 
 The plot above shows repos on one side and contributors on the other. Some folks (the core rOpenSci team: cboettig, karthikram, emhart, and schamberlain) have committed quite a lot to many packages. We also have amny awesome contributors to our packages (some contributors and repos have been removed for clarity). 

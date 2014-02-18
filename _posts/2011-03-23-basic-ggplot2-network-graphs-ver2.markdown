@@ -154,7 +154,7 @@ gggraph(Takapoto, vplace = rnorm, method = "df", trophic = "TRUE", trophinames =
     import = "CO2", export = c("CO2", "Sedimentation", "Grazing"))
 {% endhighlight %}
 
-![center](/img/gggraph1.png) 
+![center](/public/img/gggraph1.png) 
 
 
 
@@ -169,6 +169,6 @@ rownames(z) <- c("a", "b", "c", "d", "e")
 gggraph(z, vplace = rnorm, method = "df", trophic = "FALSE")
 {% endhighlight %}
 
-![center](/img/gggraph2.png) 
+![center](/public/img/gggraph2.png) 
 
 

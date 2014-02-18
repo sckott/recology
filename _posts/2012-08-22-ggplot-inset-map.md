@@ -132,7 +132,7 @@ print(b, vp = vpb_)
 print(a, vp = vpa_)
 {% endhighlight %}
 
-![center](/img/unnamed-chunk-5.png) 
+![center](/public/img/unnamed-chunk-5.png) 
 
 
 *********
