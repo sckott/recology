@@ -1,0 +1,176 @@
+opts_chunk$set(warning=FALSE, message=FALSE, comment=NA, cache=FALSE)
+
+---
+name: r-metadata
+layout: post
+title: Scholarly metadata in R
+date: 2013-03-14
+author: Scott Chamberlain
+tags: 
+- R
+- ropensci
+- metadata
+- API
+---
+
+Scholarly metadata - the meta-information surrounding articles - can be super useful.  Although metadata does not contain the full content of articles, it contains a lot of useful information, including title, authors, abstract, URL to the article, etc. 
+
+One of the largest sources of metadata is provided via the Open Archives Initiative Protocol for Metadata Harvesting or [OAI-PMH](http://www.openarchives.org/OAI/openarchivesprotocol.html). Many publishers, provide their metadata through their own endpoint, and implement the standard OAI-PMH methods: [GetRecord](http://www.openarchives.org/OAI/openarchivesprotocol.html#GetRecord), [Identify](http://www.openarchives.org/OAI/openarchivesprotocol.html#Identify), [ListIdentifiers](http://www.openarchives.org/OAI/openarchivesprotocol.html#ListIdentifiers), [ListMetadataFormats](http://www.openarchives.org/OAI/openarchivesprotocol.html#ListMetadataFormats), [ListRecords](http://www.openarchives.org/OAI/openarchivesprotocol.html#ListRecords), and [ListSets](http://www.openarchives.org/OAI/openarchivesprotocol.html#ListSets). Many providers use OAI-PMH, including [__DataCite__](http://oai.datacite.org/), [__Dryad__](http://wiki.datadryad.org/Data_Access#OAI-PMH), and [PubMed](http://www.ncbi.nlm.nih.gov/pmc/tools/oai/).
+
+Some data-/article-providers provide their metadata via their own APIs. For example, Nature Publishing Group provides their own metadata API [here](http://developers.nature.com/docs) in non OAI-PMH format; you can get PLoS metadata through their [search API](http://api.plos.org/), and the BHL (see below) provides their own custom metadata service.
+
+In addition, CrossRef provides a number of metadata search services: [metadata search](http://search.labs.crossref.org/help/api) and [openurl](http://labs.crossref.org/openurl/). 
+
+What about the other publishers? (please tell me if I'm wrong about these three) 
+
++ Springer has [a metadata API](http://dev.springer.com/docs), but it is terrible, soooo...
++ Elsevier, are you kidding? Well, they do have some sort of API service, but its a pain in the ass. 
++ Wiley, no better than Elsevier.
+
+Note that metadata can live in other places:
+
++ Another package being developed by David Springate, [rpubmed](https://github.com/ropensci/rpubmed) can get PubMed metadata. 
++ Our wrapper to the Mendeley API, [RMendeley](https://github.com/ropensci/rmendeley), gets article metadata via Mendeley's database. 
++ Our wrapper to the Biodiversity Heritage Library API [here](http://www.biodiversitylibrary.org/api2/docs/docs.html) gets their metadata. 
+
+No, you can't get metadata via Google Scholar - the don't allow scraping, and don't have expose their data via an API.
+
+I have discussed this package [in a previous blog post](http://sckott.github.io/2012/09/rmetadata/), but have since worked on the code a bit, and thought it deserved a new post. 
+
+You can see a tutorial for this package [here](http://ropensci.github.com/rmetadata/), and contribute to the code [here](https://github.com/ropensci/rmetadata).
+
+***************
+
+### Install rmetadata
+```{r install}
+# install_github("rmetadata", "ropensci") # uncomment to install
+library(rmetadata)
+```
+
+***************
+
+### Count OAI-PMH identifiers for a data provider.
+	
+```{r count}
+# For DataCite.
+count_identifiers("datacite")
+```
+
+*********
+	
+### Lookup article info via CrossRef with DOI and get a citation.
+
+#### As Bibtex
+	
+```{r citation-one}
+print(crossref_citation("10.3998/3336451.0009.101"), style="Bibtex")
+```
+	
+#### As regular text
+	
+```{r citation-two}
+print(crossref_citation("10.3998/3336451.0009.101"), style="text")
+```
+	
+*********
+	
+### Search the CrossRef Metatdata for DOIs using free form references.
+	
+#### Search with title, author, year, and journal
+	
+```{r search-one}
+crossref_search_free(query = "Piwowar Sharing Detailed Research Data Is Associated with Increased Citation Rate PLOS one 2007") 
+```
+	
+#### Get a DOI and get the citation using \code{crossref_search}
+	
+```{r search-two}
+# Get a DOI for a paper
+doi <- crossref_search_free(query="Piwowar sharing data PLOS one")$doi
+
+# Get the metadata
+crossref_search(doi = doi)[,1:3]
+```
+
+*********
+	
+### Get a random set of DOI's through CrossRef.
+	
+```{r random}
+# Default search gets 20 random DOIs
+crossref_r()
+
+# Specify you want journal articles only
+crossref_r(type = 'journal_article')
+```
+	
+*********
+	
+### Search the CrossRef Metatdata API. 
+	
+```{r search-three}
+# Search for two different query terms
+crossref_search(query = c("renear", "palmer"), rows = 4)[,1:3]
+
+# Get results for a certain year
+crossref_search(query = c("renear", "palmer"), year = 2010)[,1:3]
+```
+	
+*********
+	
+### Get a short DOI from shortdoi.org.
+	
+```{r shortdoi}
+# Geta a short DOI, just the short DOI returned
+short_doi(doi = "10.1371/journal.pone.0042793")
+ 
+# Geta a short DOI, all data returned
+short_doi(doi = "10.1371/journal.pone.0042793", justshort=FALSE)
+```
+	
+*********
+	
+### Get a record from a OAI-PMH data provider.
+	
+```{r getrecord}
+# Single provider, one identifier
+md_getrecord(provider = "pensoft", identifier = "10.3897/zookeys.1.10")
+ 
+# Single provider, multiple identifiers
+md_getrecord(provider = "pensoft", identifier = c("10.3897/zookeys.1.10","10.3897/zookeys.4.57"))
+```
+	
+*********
+
+### List available metadata formats from various providers. 
+	
+```{r listmdformats}
+# List metadata formats for a provider
+md_listmetadataformats(provider = "dryad")
+
+# List metadata formats for a specific identifier for a provider
+md_listmetadataformats(provider = "pensoft", identifier = "10.3897/zookeys.1.10")
+```
+
+*********
+
+### Some plotting - mean number of authors per paper
+
+Okay, so this isn't a super useful visualization, but you can surely think of something better. 
+
+```{r someplotting}
+library(ggplot2); library(ggthemes); library(reshape)
+
+temp <- md_listrecords(provider = "pensoft", from = "2011-10-01", until="2012-01-01")
+temp2 <- ldply(temp)[,-1]
+auths <- sapply(temp2$creator, function(x) length(strsplit(as.character(x), ";")[[1]]))
+toplot <- data.frame(authors = auths, articletype = temp2$type)
+toplot_ <- ddply(toplot, .(articletype), summarise, 
+			authors = mean(authors))
+toplot_$articletype <- reorder(toplot_$articletype, toplot_$authors)
+
+ggplot(toplot_, aes(articletype, authors)) +
+	theme_tufte(base_size=16) +
+	geom_bar(stat='identity') +
+	coord_flip()
+```

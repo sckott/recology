@@ -1,0 +1,103 @@
+`ro warning=FALSE, message=FALSE, comment=NA, cache=FALSE or`
+
+---
+name: rmetadata
+layout: post
+title: Scholarly metadata from R
+date: 2012-09-15
+author: Scott Chamberlain
+tags: 
+- R
+- open access
+- data
+- metadata
+- OAI-PMH
+---
+
+Metadata!  Metadata is very cool.  It's super hot right now - everybody is talking about it.  Okay, maybe not everyone, but it's an important part of archiving scholarly work. 
+
+We are working on [a repo on GitHub `rmetadata`](https://github.com/ropensci/rmetadata) to be a one stop shop for querying metadata from around the web.  Various repos on GitHub we have started - [rpmc](https://github.com/ropensci/rpmc), [rdatacite](https://github.com/ropensci/rpmc), [rdryad](https://github.com/ropensci/rpmc), [rpensoft](https://github.com/ropensci/rpmc), [rhindawi](https://github.com/ropensci/rpmc) - will at least in part be folded into `rmetadata`.  
+
+As a start we are writing functions to hit any metadata services that use the [OAI-PMH: "Open Archives Initiative Protocol for Metadata Harvesting"](http://www.openarchives.org/OAI/openarchivesprotocol.html) framework.  `OAI-PMH` has six methods (or verbs as they are called) for data harvesting that are the same across different metadata providers: 
+
++ `GetRecord`
++ `Identify`
++ `ListIdentifiers`
++ `ListMetadataFormats`
++ `ListRecords`
++ `ListSets`
+
+`OAI-PMH` provides an updating list of data providers, which we can easily use to get the base URLs for their data.  Then we just use one of the six above methods to query their metadata. 
+
+Note that the functions for the six verbs all start with `md_` to differentiate them from the similarly named functions without the `md_` in packages for single data sources, such as [rpmc](https://github.com/ropensci/rpmc) and [rdatacite](https://github.com/ropensci/rpmc).
+
+### Install rmetadata first.
+```{r install }
+install_github('rmetadata', 'ropensci')
+library(rmetadata)
+````
+
+### The most basic thing you can do with `OAI-PMH` is identify the data provider, getting their basic information. The `Identify` verb.
+```{r identify }
+# one provider
+md_identify(provider = "datacite") 
+
+# many providers
+md_identify(provider = c("datacite","pensoft"))
+
+# no match for one, two matches for other
+md_identify(provider = c("harvard", "journal"))
+
+# let's pick one from the second
+md_identify(provider = "Hrcak")
+````
+
+### There are a variety of metadata formats, depending on the data provider - list them with the `ListMetadataFormats` verb.
+```{r listmetadataformats }
+# List metadata formats for a provider
+md_listmetadataformats(provider = "dryad")
+ 
+# List metadata formats for a specific identifier for a provider
+md_listmetadataformats(provider = "pensoft", identifier = "10.3897/zookeys.1.10")
+````
+
+### The `ListRecords` verb is used to harvest records from a repository
+```{r listrecords }
+head( md_listrecords(provider = "datacite")[[1]][,2:4] )
+````
+
+### `ListIdentifiers` is an abbreviated form of `ListRecords`, retrieving only headers rather than records.
+```{r listidentifiers }
+# Single provider
+md_listidentifiers(provider = "datacite", set = "REFQUALITY")[[1]][1:10]
+md_listidentifiers(provider = "dryad", from = "2012-07-15")[[1]][1:10]
+
+# Many providers
+out <- md_listidentifiers(provider = c("datacite","pensoft"), from = "2012-08-21")
+llply(out, function(x) x[1:10]) # display just a few of them
+````
+
+### With `ListSets` you can retrieve the set structure of a repository.
+```{r listsets }
+# arXiv, returns a data.frame
+head( md_listsets(provider = "arXiv")[[1]] ) 
+
+# many providers, returns a list
+md_listsets(provider = c("pensoft","arXiv")) 
+````
+
+### Retrieve an individual metadata record from a repository using the `GetRecord` verb.
+```{r getrecord }
+# Single provider, one identifier
+md_getrecord(provider = "pensoft", identifier = "10.3897/zookeys.1.10")
+ 
+# Single provider, multiple identifiers
+md_getrecord(provider = "pensoft", identifier = c("10.3897/zookeys.1.10","10.3897/zookeys.4.57"))
+````
+
+Cool, so I hope people find this post and package useful.  Let me know what you think in comments below, or if you have code specific comments or additions, go to [the GitHub repo for `rmetadata`](https://github.com/ropensci/rmetadata).  In a upcoming post I will show an example  of what you can do with `rmetadata` in terms of an actual research question.  
+
+*********
+#### Get the .Rmd file used to create this post [at my github account](https://github.com/sckott/sckott.github.io/blob/master/_drafts/2012-09-15-rmetadata.Rmd) - or [.md file](https://github.com/sckott/sckott.github.io/tree/master/_posts/2012-09-15-rmetadata.md).
+
+#### Written in [Markdown](http://daringfireball.net/projects/markdown/), with help from [knitr](http://yihui.name/knitr/), and nice knitr highlighting/etc. in in [RStudio](http://rstudio.org/).
