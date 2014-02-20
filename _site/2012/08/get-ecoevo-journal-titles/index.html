@@ -1,0 +1,272 @@
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en" lang="en-us">
+
+  <head>
+  <meta http-equiv="content-type" content="text/html; charset=utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1">
+  <link href="http://gmpg.org/xfn/11" rel="profile">
+
+  <title>
+    Getting ecology and evolution journal titles from R &middot; 
+    Recology, R ecology
+  </title>
+
+  <!-- CSS -->
+  <link rel="stylesheet" href="/public/css/hyde.css">
+  <link rel="stylesheet" href="/public/css/syntax.css">
+  <link rel="stylesheet" href="http://fonts.googleapis.com/css?family=Open+Sans:300,400italic,400,600,700|Abril+Fatface">
+  
+
+  <!-- Icons -->
+  <link rel="apple-touch-icon-precomposed" sizes="144x144" href="/public/touch-icon-144-precomposed.png">
+  <link rel="shortcut icon" href="/public/favicon.png">
+  <link href="//netdna.bootstrapcdn.com/font-awesome/4.0.3/css/font-awesome.css" rel="stylesheet">
+
+  <!-- RSS -->
+  <link rel="alternate" type="application/rss+xml" title="RSS" href="/atom.xml">
+</head>
+
+
+  <body class="theme-base-0f layout-reverse">
+
+    <header class="masthead">
+      <div class="masthead-inner">
+        <h1>Recology</h1>
+        <!-- <h1> <a href="http://recology.info/">Recology</a></h1> -->
+        <p class="lead">R & science</p>
+
+        <div class="colophon">
+          <ul class="colophon-links">
+            <li>
+              <a href="/"><i class="fa fa-home fa-lg"></i></a>&nbsp;
+              <a href="/about"><i class="fa fa-info-circle fa-lg"></i></a>&nbsp;
+              <a href="/rresources"><i class="fa fa-book fa-lg"></i></a>&nbsp;
+              <a href="http://feeds.feedburner.com/github/wpna"><i class="fa fa-rss fa-lg"></i></a>&nbsp;
+              <a href="https://twitter.com/recology_"><i class="fa fa-twitter fa-lg"></i></a>&nbsp;
+              <a href="https://alpha.app.net/intent/follow/?user_id=@recology_"><i class="fa fa-font fa-lg"></i></a>
+              <a href="/fork"><i class="fa fa-spinner fa-lg"></i></a>
+            </li>
+          </ul>
+          <small><a href="https://github.com/mdo/hyde">Hyde</a> from <a href="https://twitter.com/mdo" target="_blank">@mdo</a>.</small>
+        </div>
+      </div>
+    </header>
+
+    <div class="content container">
+      <div class="post">
+  <h1>Getting ecology and evolution journal titles from R</h1>
+  <span class="post-date">31 Aug 2012</span>
+  <hr />
+
+<p>So I want to mine some #altmetrics data for some research I'm thinking about doing.  The steps would be:</p>
+
+<ul>
+<li>Get journal titles for ecology and evolution journals.</li>
+<li>Get DOI's for all papers in all the above journal titles.</li>
+<li>Get altmetrics data on each DOI.</li>
+<li>Do some fancy analyses.</li>
+<li>Make som pretty figs.</li>
+<li>Write up results.</li>
+</ul>
+
+
+<p>It's early days, so jus working on the first step.  However, getting a list of journals in ecology and evolution is frustratingly hard.  This turns out to not be that easy if you are (1) trying to avoid <a href="http://thomsonreuters.com/">Thomson Reuters</a>, and (2) want a machine interface way to do it (read: API).</p>
+
+<p>Unfortunately, Mendeley's API does not have methods for getting a list of journals by field, or at least I don't know how to do it using <a href="http://apidocs.mendeley.com/">their API</a>.  No worries though - <a href="http://crossref.org/">Crossref</a> comes to save the day.   Here's my attempt at this using the <a href="http://help.crossref.org/#using_oai_pmh">Crossref OAI-PMH</a>.</p>
+
+<hr />
+
+<h3>I wrote a little while loop to get journal titles from the Crossref OAI-PMH. This takes a while to run, but at least it works on my machine - hopefully yours too!</h3>
+
+<div class="highlight"><pre><code class="r"><span class="lineno"> 1</span> library<span class="p">(</span>XML<span class="p">)</span>
+<span class="lineno"> 2</span> library<span class="p">(</span>RCurl<span class="p">)</span>
+<span class="lineno"> 3</span> 
+<span class="lineno"> 4</span> token <span class="o">&lt;-</span> <span class="s">&quot;characters&quot;</span>  <span class="c1"># define a iterator, also used for gettingn the resumptionToken</span>
+<span class="lineno"> 5</span> nameslist <span class="o">&lt;-</span> list<span class="p">()</span>  <span class="c1"># define empty list to put joural titles in to</span>
+<span class="lineno"> 6</span> <span class="kr">while</span> <span class="p">(</span>is.character<span class="p">(</span>token<span class="p">)</span> <span class="o">==</span> <span class="kc">TRUE</span><span class="p">)</span> <span class="p">{</span>
+<span class="lineno"> 7</span>     baseurl <span class="o">&lt;-</span> <span class="s">&quot;http://oai.crossref.org/OAIHandler?verb=ListSets&quot;</span>
+<span class="lineno"> 8</span>     <span class="kr">if</span> <span class="p">(</span>token <span class="o">==</span> <span class="s">&quot;characters&quot;</span><span class="p">)</span> <span class="p">{</span>
+<span class="lineno"> 9</span>         tok2 <span class="o">&lt;-</span> <span class="kc">NULL</span>
+<span class="lineno">10</span>     <span class="p">}</span> <span class="kr">else</span> <span class="p">{</span>
+<span class="lineno">11</span>         tok2 <span class="o">&lt;-</span> paste<span class="p">(</span><span class="s">&quot;&amp;resumptionToken=&quot;</span><span class="p">,</span> token<span class="p">,</span> sep <span class="o">=</span> <span class="s">&quot;&quot;</span><span class="p">)</span>
+<span class="lineno">12</span>     <span class="p">}</span>
+<span class="lineno">13</span>     query <span class="o">&lt;-</span> paste<span class="p">(</span>baseurl<span class="p">,</span> tok2<span class="p">,</span> sep <span class="o">=</span> <span class="s">&quot;&quot;</span><span class="p">)</span>
+<span class="lineno">14</span>     crsets <span class="o">&lt;-</span> xmlToList<span class="p">(</span>xmlParse<span class="p">(</span>getURL<span class="p">(</span>query<span class="p">)))</span>
+<span class="lineno">15</span>     names <span class="o">&lt;-</span> as.character<span class="p">(</span>sapply<span class="p">(</span>crsets<span class="p">[[</span><span class="m">4</span><span class="p">]],</span> <span class="kr">function</span><span class="p">(</span>x<span class="p">)</span> x<span class="p">[[</span><span class="s">&quot;setName&quot;</span><span class="p">]]))</span>
+<span class="lineno">16</span>     nameslist<span class="p">[[</span>token<span class="p">]]</span> <span class="o">&lt;-</span> names
+<span class="lineno">17</span>     <span class="kr">if</span> <span class="p">(</span>class<span class="p">(</span>try<span class="p">(</span>crsets<span class="p">[[</span><span class="m">2</span><span class="p">]]</span><span class="o">$</span>.attrs<span class="p">[[</span><span class="s">&quot;resumptionToken&quot;</span><span class="p">]]))</span> <span class="o">==</span> <span class="s">&quot;try-error&quot;</span><span class="p">)</span> <span class="p">{</span>
+<span class="lineno">18</span>         stop<span class="p">(</span><span class="s">&quot;no more data&quot;</span><span class="p">)</span>
+<span class="lineno">19</span>     <span class="p">}</span> <span class="kr">else</span> token <span class="o">&lt;-</span> crsets<span class="p">[[</span><span class="m">2</span><span class="p">]]</span><span class="o">$</span>.attrs<span class="p">[[</span><span class="s">&quot;resumptionToken&quot;</span><span class="p">]]</span>
+<span class="lineno">20</span> <span class="p">}</span>
+</code></pre></div>
+
+
+<hr />
+
+<h3>Yay!  Hopefully it worked if you tried it.  Let's see how long the list of journal titles is.</h3>
+
+<div class="highlight"><pre><code class="r"><span class="lineno">1</span> sapply<span class="p">(</span>nameslist<span class="p">,</span> length<span class="p">)</span>  <span class="c1"># length of each list</span>
+</code></pre></div>
+
+
+
+
+<div class="highlight"><pre><code class="text">                          characters c65ebc3f-b540-4672-9c00-f3135bf849e3 
+                               10001                                10001 
+6f61b343-a8f4-48f1-8297-c6f6909ca7f7 
+                                6864 
+</code></pre></div>
+
+
+
+
+<div class="highlight"><pre><code class="r"><span class="lineno">1</span> allnames <span class="o">&lt;-</span> do.call<span class="p">(</span>c<span class="p">,</span> nameslist<span class="p">)</span>  <span class="c1"># combine to list</span>
+<span class="lineno">2</span> length<span class="p">(</span>allnames<span class="p">)</span>
+</code></pre></div>
+
+
+
+
+<div class="highlight"><pre><code class="text">[1] 26866
+</code></pre></div>
+
+
+<hr />
+
+<h3>Now, let's use some <code>regex</code> to pull out the journal titles that are likely ecology and evolutionary biology journals.  The <code>^</code> symbol says "the string must start here". The <code>\\s</code> means whitespace.  The <code>[]</code> lets you specify a set of letters you are looking for, e.g., <code>[Ee]</code> means capital <code>E</code> <em>OR</em> lowercase <code>e</code>.  I threw in titles that had the words systematic and natrualist too.  Tried to trim any whitespace as well using the <code>stringr</code> package.</h3>
+
+<div class="highlight"><pre><code class="r"><span class="lineno"> 1</span> library<span class="p">(</span>stringr<span class="p">)</span>
+<span class="lineno"> 2</span> 
+<span class="lineno"> 3</span> ecotitles <span class="o">&lt;-</span> as.character<span class="p">(</span>allnames<span class="p">[</span>str_detect<span class="p">(</span>allnames<span class="p">,</span> <span class="s">&quot;^[Ee]cology|\\s[Ee]cology&quot;</span><span class="p">)])</span>
+<span class="lineno"> 4</span> evotitles <span class="o">&lt;-</span> as.character<span class="p">(</span>allnames<span class="p">[</span>str_detect<span class="p">(</span>allnames<span class="p">,</span> <span class="s">&quot;^[Ee]volution|\\s[Ee]volution&quot;</span><span class="p">)])</span>
+<span class="lineno"> 5</span> systtitles <span class="o">&lt;-</span> as.character<span class="p">(</span>allnames<span class="p">[</span>str_detect<span class="p">(</span>allnames<span class="p">,</span> <span class="s">&quot;^[Ss]ystematic|\\s[Ss]systematic&quot;</span><span class="p">)])</span>
+<span class="lineno"> 6</span> naturalist <span class="o">&lt;-</span> as.character<span class="p">(</span>allnames<span class="p">[</span>str_detect<span class="p">(</span>allnames<span class="p">,</span> <span class="s">&quot;[Nn]aturalist&quot;</span><span class="p">)])</span>
+<span class="lineno"> 7</span> 
+<span class="lineno"> 8</span> ecoevotitles <span class="o">&lt;-</span> unique<span class="p">(</span>c<span class="p">(</span>ecotitles<span class="p">,</span> evotitles<span class="p">,</span> systtitles<span class="p">,</span> naturalist<span class="p">))</span>  <span class="c1"># combine to list</span>
+<span class="lineno"> 9</span> ecoevotitles <span class="o">&lt;-</span> str_trim<span class="p">(</span>ecoevotitles<span class="p">,</span> side <span class="o">=</span> <span class="s">&quot;both&quot;</span><span class="p">)</span>  <span class="c1"># trim whitespace, if any</span>
+<span class="lineno">10</span> length<span class="p">(</span>ecoevotitles<span class="p">)</span>
+</code></pre></div>
+
+
+
+
+<div class="highlight"><pre><code class="text">[1] 188
+</code></pre></div>
+
+
+
+
+<div class="highlight"><pre><code class="r"><span class="lineno">1</span> <span class="c1"># Just the first ten titles</span>
+<span class="lineno">2</span> ecoevotitles<span class="p">[</span><span class="m">1</span><span class="o">:</span><span class="m">10</span><span class="p">]</span>
+</code></pre></div>
+
+
+
+
+<div class="highlight"><pre><code class="text"> [1] &quot;Microbial Ecology in Health and Disease&quot;           
+ [2] &quot;Population Ecology&quot;                                
+ [3] &quot;Researches on Population Ecology&quot;                  
+ [4] &quot;Behavioral Ecology and Sociobiology&quot;               
+ [5] &quot;Microbial Ecology&quot;                                 
+ [6] &quot;Biochemical Systematics and Ecology&quot;               
+ [7] &quot;FEMS Microbiology Ecology&quot;                         
+ [8] &quot;Journal of Experimental Marine Biology and Ecology&quot;
+ [9] &quot;Applied Soil Ecology&quot;                              
+[10] &quot;Forest Ecology and Management&quot;                     
+</code></pre></div>
+
+
+<hr />
+
+<h3>Get the .Rmd file used to create this post <a href="https://github.com/sckott/sckott.github.io/tree/master/_drafts/2012-08-30-get-ecoevo-journal-titles.Rmd">at my github account</a>.</h3>
+
+<hr />
+
+<h3>Written in <a href="http://daringfireball.net/projects/markdown/">Markdown</a>, with help from <a href="http://yihui.name/knitr/">knitr</a>, and nice knitr highlighting/etc. in in <a href="http://rstudio.org/">RStudio</a>.</h3>
+
+</div>
+
+<div id="disqus_thread"></div>
+<script type="text/javascript">
+    /* * * CONFIGURATION VARIABLES: EDIT BEFORE PASTING INTO YOUR WEBPAGE * * */
+    var disqus_shortname = 'coffeehaus'; // required: replace example with your forum shortname
+
+    /* * * DON'T EDIT BELOW THIS LINE * * */
+    (function() {
+        var dsq = document.createElement('script'); dsq.type = 'text/javascript'; dsq.async = true;
+        dsq.src = '//' + disqus_shortname + '.disqus.com/embed.js';
+        (document.getElementsByTagName('head')[0] || document.getElementsByTagName('body')[0]).appendChild(dsq);
+    })();
+</script>
+<noscript>Please enable JavaScript to view the <a href="http://disqus.com/?ref_noscript">comments powered by Disqus.</a></noscript>
+<a href="http://disqus.com" class="dsq-brlink">comments powered by <span class="logo-disqus">Disqus</span></a>
+
+<div class="related">
+  <h2>Related Posts</h2>
+  <ul class="related-posts">
+    
+      <li>
+        <h3>
+          <a href="/2014/01/cites/">
+            cites - citation stuff from the command line
+            <small>18 Jan 2014</small>
+          </a>
+        </h3>
+      </li>
+    
+      <li>
+        <h3>
+          <a href="/2014/01/rgauges-hourly/">
+            rgauges - fun with hourly web site analytics
+            <small>17 Jan 2014</small>
+          </a>
+        </h3>
+      </li>
+    
+      <li>
+        <h3>
+          <a href="/2013/12/hello-world/">
+            Hello, world!
+            <small>28 Dec 2013</small>
+          </a>
+        </h3>
+      </li>
+    
+  </ul>
+</div>
+
+    </div>
+
+  </body>
+
+  <footer>  
+  <!-- Disqus code -->
+  <script type="text/javascript">
+      /* * * CONFIGURATION VARIABLES: EDIT BEFORE PASTING INTO YOUR WEBPAGE * * */
+      var disqus_shortname = 'recology'; // required: replace example with your forum shortname
+
+      /* * * DON'T EDIT BELOW THIS LINE * * */
+      (function () {
+          var s = document.createElement('script'); s.async = true;
+          s.type = 'text/javascript';
+          s.src = 'http://' + disqus_shortname + '.disqus.com/count.js';
+          (document.getElementsByTagName('HEAD')[0] || document.getElementsByTagName('BODY')[0]).appendChild(s);
+      }());
+  </script>
+
+  <!-- Gaug.es Analytics -->
+  <script type="text/javascript">
+    var _gauges = _gauges || [];
+    (function() {
+      var t   = document.createElement('script');
+      t.type  = 'text/javascript';
+      t.async = true;
+      t.id    = 'gauges-tracker';
+      t.setAttribute('data-site-id', '4efd83a6f5a1f5158a000004');
+      t.src = '//secure.gaug.es/track.js';
+      var s = document.getElementsByTagName('script')[0];
+      s.parentNode.insertBefore(t, s);
+    })();
+  </script>
+</footer>      
+</html>
