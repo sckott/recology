@@ -5,7 +5,7 @@ title: rgauges - fun with hourly web site analytics
 date: 2014-01-17
 author: Scott Chamberlain
 tags:
-- r
+- R
 - API
 ---
 

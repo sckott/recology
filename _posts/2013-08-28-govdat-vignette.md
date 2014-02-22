@@ -5,7 +5,7 @@ title: govdat - SunlightLabs and New York Times Congress data via R
 date: 2013-08-28
 author: Scott Chamberlain
 tags:
-- r
+- R
 - API
 - government
 - transparency

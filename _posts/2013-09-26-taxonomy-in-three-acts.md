@@ -5,7 +5,7 @@ title: Taxonomy data from the web in three languages
 date: 2013-09-27
 author: Scott Chamberlain
 tags:
-- r
+- R
 - ruby
 - python
 - taxonomy

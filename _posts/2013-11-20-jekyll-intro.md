@@ -5,7 +5,7 @@ title: Jekyll - an intro
 date: 2013-11-20
 author: Scott Chamberlain
 tags:
-- r
+- R
 - github
 - jekyll
 - ruby
