@@ -1,5 +1,5 @@
 --- 
-name: -ten-simple-rules-for-oa-publishers-talk-by-philip-bourne
+name: ten-simple-rules-for-oa-publishers-talk
 layout: post
 title: Ten Simple Rules for OA Publishers talk by Philip Bourne
 author: Scott Chamberlain

@@ -1,5 +1,5 @@
 --- 
-name: my-take-on-an-r-introduction-talk
+name: my-take-on-r-introduction-talk
 layout: post
 title: My take on an R introduction talk
 author: Scott Chamberlain

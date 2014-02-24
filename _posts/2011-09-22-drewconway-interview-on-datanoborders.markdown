@@ -1,5 +1,5 @@
 --- 
-name: -drewconway-interview-on-datanoborders-at-the-strata-conference
+name: drewconway-interview-on-datanoborders
 layout: post
 title: "@drewconway interview on @DataNoBorders at the Strata conference"
 author: Scott Chamberlain
