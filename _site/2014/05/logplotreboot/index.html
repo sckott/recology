@@ -1,0 +1,275 @@
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en" lang="en-us">
+
+  <head>
+  <meta http-equiv="content-type" content="text/html; charset=utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1">
+  <link href="http://gmpg.org/xfn/11" rel="profile">
+
+  <title>
+    Logistic plot reboot &middot; 
+    Recology, R ecology
+  </title>
+
+  <!-- CSS -->
+  <link rel="stylesheet" href="/public/css/hyde.css">
+  <link rel="stylesheet" href="/public/css/syntax.css">
+  <link rel="stylesheet" href="http://fonts.googleapis.com/css?family=Open+Sans:300,400italic,400,600,700|Abril+Fatface">
+  
+
+  <!-- Icons -->
+  <link rel="apple-touch-icon-precomposed" sizes="144x144" href="/public/favicon.ico">
+  <link rel="shortcut icon" href="/public/favicon.ico">
+  <link href="//netdna.bootstrapcdn.com/font-awesome/4.0.3/css/font-awesome.css" rel="stylesheet">
+
+  <!-- RSS -->
+  <link rel="alternate" type="application/rss+xml" title="RSS" href="/atom.xml">
+</head>
+
+
+  <body class="theme-base-0f layout-reverse">
+
+    <header class="masthead">
+      <div class="masthead-inner">
+        <h1>Recology</h1>
+        <!-- <h1> <a href="http://recology.info/">Recology</a></h1> -->
+        <p class="lead">R & science</p>
+
+        <div class="colophon">
+          <ul class="colophon-links">
+            <li>
+              <a href="/"><i class="fa fa-home fa-lg"></i></a>&nbsp;
+              <a href="/about"><i class="fa fa-info-circle fa-lg"></i></a>&nbsp;
+              <a href="/rresources"><i class="fa fa-book fa-lg"></i></a>&nbsp;
+              <a href="http://feeds.feedburner.com/github/wpna"><i class="fa fa-rss fa-lg"></i></a>&nbsp;
+              <a href="https://twitter.com/recology_"><i class="fa fa-twitter fa-lg"></i></a>&nbsp;
+              <a href="https://alpha.app.net/intent/follow/?user_id=@recology_"><i class="fa fa-font fa-lg"></i></a>
+              <a href="/fork"><i class="fa fa-spinner fa-lg"></i></a>
+            </li>
+          </ul>
+          <small><a href="https://github.com/mdo/hyde">Hyde</a> from <a href="https://twitter.com/mdo" target="_blank">@mdo</a>.</small>
+        </div>
+      </div>
+    </header>
+
+    <div class="content container">
+      <div class="post">
+  <h1>Logistic plot reboot</h1>
+  <span class="post-date">22 May 2014</span>
+  <i class="fa fa-tags fa-large"></i>&nbsp;
+     <a href="/tags/R" class="badge" rel="tooltip" data-placement="bottom" title="View posts tagged with &quot;R&quot;"><span class="blog_tag">R</span></a>    <a href="/tags/ggplot2" class="badge" rel="tooltip" data-placement="bottom" title="View posts tagged with &quot;ggplot2&quot;"><span class="blog_tag">ggplot2</span></a>    <a href="/tags/vizualization" class="badge" rel="tooltip" data-placement="bottom" title="View posts tagged with &quot;vizualization&quot;"><span class="blog_tag">vizualization</span></a>  
+  <br>
+  <p>Someone asked about plotting something like this today</p>
+
+<p>I <a href="http://recology.info/2012/01/logistic-regression-barplot-fig/">wrote a few functions previously</a> to do something like this. However, since then <code>ggplot2</code> has changed, and one of the functions no longer works.</p>
+
+<p>Hence, I fixed <code>opts()</code> to <code>theme()</code>, <code>theme_blank()</code> to <code>element_blank()</code>, and <code>panel.background = element_blank()</code> to <code>plot.background = element_blank()</code> to get the histograms to show up with the line plot and not cover it.</p>
+
+<p>The new functions:</p>
+
+<pre><code class="r">loghistplot  &lt;- function(data) {
+  names(data) &lt;- c('x','y') # rename columns
+
+  # get min and max axis values
+  min_x &lt;- min(data$x)
+  max_x &lt;- max(data$x)
+  min_y &lt;- min(data$y)
+  max_y &lt;- max(data$y)
+
+  # get bin numbers
+  bin_no &lt;- max(hist(data$x, plot = FALSE)$counts) + 5
+
+  # create plots
+  a &lt;- ggplot(data, aes(x = x, y = y)) +
+    theme_bw(base_size=16) +
+    geom_smooth(method = "glm", family = "binomial", se = TRUE,
+                colour='black', size=1.5, alpha = 0.3) +
+    scale_x_continuous(limits=c(min_x,max_x)) +
+    theme(panel.grid.major = element_blank(),
+          panel.grid.minor=element_blank(),
+          panel.background = element_blank(),
+          plot.background = element_blank()) +
+    labs(y = "Probability\n", x = "\nYour X Variable")
+
+  theme_loghist &lt;- list(
+    theme(panel.grid.major = element_blank(),
+          panel.grid.minor=element_blank(),
+          axis.text.y = element_blank(),
+          axis.text.x = element_blank(),
+          axis.ticks = element_blank(),
+          panel.border = element_blank(),
+          panel.background = element_blank(),
+          plot.background = element_blank())
+  )
+
+  b &lt;-
+  ggplot(data[data$y == unique(data$y)[1], ], aes(x = x)) +
+    theme_bw(base_size=16) +
+    geom_histogram(fill = "grey") +
+    scale_y_continuous(limits=c(0,bin_no)) +
+    scale_x_continuous(limits=c(min_x,max_x)) +
+    theme_loghist +
+    labs(y='\n', x='\n')
+
+  c &lt;- ggplot(data[data$y == unique(data$y)[2], ], aes(x = x)) +
+    theme_bw(base_size=16) +
+    geom_histogram(fill = "grey") +
+    scale_y_continuous(trans='reverse', limits=c(bin_no,0)) +
+    scale_x_continuous(limits=c(min_x,max_x)) +
+    theme_loghist +
+    labs(y='\n', x='\n')
+
+  grid.newpage()
+  pushViewport(viewport(layout = grid.layout(1,1)))
+
+  vpa_ &lt;- viewport(width = 1, height = 1, x = 0.5, y = 0.5)
+  vpb_ &lt;- viewport(width = 1, height = 1, x = 0.5, y = 0.5)
+  vpc_ &lt;- viewport(width = 1, height = 1, x = 0.5, y = 0.5)
+
+  print(b, vp = vpb_)
+  print(c, vp = vpc_)
+  print(a, vp = vpa_)
+}
+</code></pre>
+
+<pre><code class="r">logpointplot  &lt;- function(data) {
+  names(data) &lt;- c('x','y') # rename columns
+
+  # get min and max axis values
+  min_x &lt;- min(data$x)
+  max_x &lt;- max(data$x)
+  min_y &lt;- min(data$y)
+  max_y &lt;- max(data$y)
+
+  # create plots
+  ggplot(data, aes(x = x, y = y)) +
+    theme_bw(base_size=16) +
+    geom_point(size = 3, alpha = 0.5, position = position_jitter(w=0, h=0.02)) +
+    geom_smooth(method = "glm", family = "binomial", se = TRUE,
+                colour='black', size=1.5, alpha = 0.3) +
+    scale_x_continuous(limits=c(min_x,max_x)) +
+    theme(panel.grid.major = element_blank(),
+          panel.grid.minor=element_blank(),
+          panel.background = element_blank()) +
+    labs(y = "Probability\n", x = "\nYour X Variable")
+
+}
+</code></pre>
+
+<p>Install <code>ggplot2</code> and <code>gridExtra</code> if you don't have them:</p>
+
+<pre><code class="r">install.packages(c("ggplot2","gridExtra"), repos = "http://cran.rstudio.com")
+</code></pre>
+
+<p>And their use:</p>
+
+<p><strong>Logistic histogram plots</strong></p>
+
+<pre><code class="r">loghistplot(data=mtcars[,c("mpg","vs")])
+</code></pre>
+
+<p><img src="../public/img/2014-05-22-logplotreboot/unnamed-chunk-5.png" alt="plot of chunk unnamed-chunk-5" /></p>
+
+<pre><code class="r">loghistplot(movies[,c("rating","Action")])
+</code></pre>
+
+<p><img src="../public/img/2014-05-22-logplotreboot/unnamed-chunk-6.png" alt="plot of chunk unnamed-chunk-6" /></p>
+
+<p><strong>Logistic point plots</strong></p>
+
+<pre><code class="r">loghistplot(data=mtcars[,c("mpg","vs")])
+</code></pre>
+
+<p><img src="../public/img/2014-05-22-logplotreboot/unnamed-chunk-7.png" alt="plot of chunk unnamed-chunk-7" /></p>
+
+<pre><code class="r">loghistplot(movies[,c("rating","Action")])
+</code></pre>
+
+<p><img src="../public/img/2014-05-22-logplotreboot/unnamed-chunk-8.png" alt="plot of chunk unnamed-chunk-8" /></p>
+
+</div>
+
+<div id="disqus_thread"></div>
+<script type="text/javascript">
+    /* * * CONFIGURATION VARIABLES: EDIT BEFORE PASTING INTO YOUR WEBPAGE * * */
+    var disqus_shortname = 'coffeehaus'; // required: replace example with your forum shortname
+
+    /* * * DON'T EDIT BELOW THIS LINE * * */
+    (function() {
+        var dsq = document.createElement('script'); dsq.type = 'text/javascript'; dsq.async = true;
+        dsq.src = '//' + disqus_shortname + '.disqus.com/embed.js';
+        (document.getElementsByTagName('head')[0] || document.getElementsByTagName('body')[0]).appendChild(dsq);
+    })();
+</script>
+<noscript>Please enable JavaScript to view the <a href="http://disqus.com/?ref_noscript">comments powered by Disqus.</a></noscript>
+<a href="http://disqus.com" class="dsq-brlink">comments powered by <span class="logo-disqus">Disqus</span></a>
+
+<!-- <div class="related">
+  <h2>Related Posts</h2>
+  <ul class="related-posts">
+    
+      <li>
+        <h3>
+          <a href="/2014/02/cowsay/">
+            cowsay - ascii messages and warnings for R
+            <small>20 Feb 2014</small>
+          </a>
+        </h3>
+      </li>
+    
+      <li>
+        <h3>
+          <a href="/2014/01/cites/">
+            cites - citation stuff from the command line
+            <small>18 Jan 2014</small>
+          </a>
+        </h3>
+      </li>
+    
+      <li>
+        <h3>
+          <a href="/2014/01/rgauges-hourly/">
+            rgauges - fun with hourly web site analytics
+            <small>17 Jan 2014</small>
+          </a>
+        </h3>
+      </li>
+    
+  </ul>
+</div>
+ -->
+    </div>
+
+  </body>
+
+  <footer>  
+  <!-- Disqus code -->
+  <script type="text/javascript">
+      /* * * CONFIGURATION VARIABLES: EDIT BEFORE PASTING INTO YOUR WEBPAGE * * */
+      var disqus_shortname = 'recology'; // required: replace example with your forum shortname
+
+      /* * * DON'T EDIT BELOW THIS LINE * * */
+      (function () {
+          var s = document.createElement('script'); s.async = true;
+          s.type = 'text/javascript';
+          s.src = 'http://' + disqus_shortname + '.disqus.com/count.js';
+          (document.getElementsByTagName('HEAD')[0] || document.getElementsByTagName('BODY')[0]).appendChild(s);
+      }());
+  </script>
+
+  <!-- Gaug.es Analytics -->
+  <script type="text/javascript">
+    var _gauges = _gauges || [];
+    (function() {
+      var t   = document.createElement('script');
+      t.type  = 'text/javascript';
+      t.async = true;
+      t.id    = 'gauges-tracker';
+      t.setAttribute('data-site-id', '4efd83a6f5a1f5158a000004');
+      t.src = '//secure.gaug.es/track.js';
+      var s = document.getElementsByTagName('script')[0];
+      s.parentNode.insertBefore(t, s);
+    })();
+  </script>
+</footer>      
+</html>

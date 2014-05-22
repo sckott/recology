@@ -1,5 +1,5 @@
 --- 
-name: tenure-track-position-in-systematics-at-the-university-of-vermont
+name: tenure-track-position-in-systematics-at
 layout: post
 title: Tenure track position in systematics at the University of Vermont
 author: Scott Chamberlain

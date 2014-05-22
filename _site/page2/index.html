@@ -57,6 +57,372 @@
   
   <div class="post">
     <h1>
+      <a href="/2014/01/rgauges-hourly/">
+        rgauges - fun with hourly web site analytics
+      </a>
+    </h1>
+
+    <span class="post-date">17 Jan 2014</span>
+
+    <p><a href="http://get.gaug.es/">Gaug.es</a> is a really nice looking analytics platform as an alternative to Google Analytics. It is a paid service, but not that expensive really.</p>
+
+<p>We've made an R package to interact with the Gaug.es API called <code>rgauges</code>. Find it <a href="https://github.com/ropensci/rgauges">on Github</a> and <a href="http://cran.r-project.org/web/packages/rgauges/index.html">on CRAN</a>.</p>
+
+<p>Although working with the Gaug.es API is nice and easy, they don't keep hourly visit stats and provide those via the API, so that you have to continually collect them yourself if you want them. That's what I have done for my own website.</p>
+
+<p>It took a few steps to get this data:</p>
+
+<ul>
+<li>I wrote a little Ruby script using <a href="http://rubygems.org/gems/twelve">Twelve gem</a> to collect data from the Gaug.es API every day at the same time, which just gets the patst 24 hours of data. This script makes a call to the Gaug.es API and sends the data to a <a href="http://couchdb.apache.org/">CouchDB</a> database hosted on <a href="https://cloudant.com/">Cloudant</a>. In reality, the script is is embeded in a rack app as I don't think you can throw up a standalone script to Heroku. Here's the script:</li>
+</ul>
+
+
+<pre><code class="ruby">class MyApp
+  require 'couchrest'
+  require 'twelve'
+  require 'date'
+  require 'time'
+
+  def self.getgaugesdata_scott
+    bfg = Twelve.new('&lt;gaugeskey&gt;')
+    out = bfg.gauges('&lt;gaugeskey&gt;')['recent_hours']
+    yip = { "from_url"=&gt; "http://sckott.github.io/", "coll_date"=&gt; Date.today.to_s, "coll_time"=&gt; Time.now.utc.localtime.to_s, "recent_hours"=&gt; out }
+    @db = CouchRest.database!("https://app16517180.heroku:&lt;key&gt;@app16517180.heroku.cloudant.com/gaugesdb_scott")
+    @db.save_doc(yip)
+
+  def call env
+    [200, {"Content-Type" =&gt; "text/html"}, ["no output printed here"]] 
+  end
+end
+</code></pre>
+
+<ul>
+<li><p>One little catch though: I run the Ruby script on Heroku, so I don't have to do it locally, but Heroku free instance goes down unless it's doing something. So I used a little service called <a href="http://uptimerobot.com/">UptimeRobot</a> to ping the Heroku app every 5 minutes. UptimeRobot also is giving you uptime stats too on your app, which I don't really need, but is a cool feature.</p></li>
+<li><p>And that's it. Now the data is stored from each day's collection of visitor stats to a free Cloudant CouchDB database.</p></li>
+</ul>
+
+
+<h2>Regular Gaug.es data</h2>
+
+<p>First, let's look at what you can do with data that Gaug.es does give to you, using the <code>rgauges</code> R package.</p>
+
+<hr />
+
+<h3>Install rgauges</h3>
+
+<div class="highlight"><pre><code class="r">install.packages<span class="p">(</span><span class="s">&quot;devtools&quot;</span><span class="p">)</span>
+library<span class="p">(</span>devtools<span class="p">)</span>
+install_github<span class="p">(</span><span class="s">&quot;rgauges&quot;</span><span class="p">,</span> <span class="s">&quot;ropensci&quot;</span><span class="p">)</span>
+</code></pre></div>
+
+
+<h3>Load rgauges and other dependency libraries</h3>
+
+<div class="highlight"><pre><code class="r">library<span class="p">(</span>rgauges<span class="p">)</span>
+library<span class="p">(</span>ggplot2<span class="p">)</span>
+</code></pre></div>
+
+
+<h3>Your info</h3>
+
+<div class="highlight"><pre><code class="r">gs_me<span class="p">()</span>
+</code></pre></div>
+
+
+
+
+<div class="highlight"><pre><code class="text">## $user
+## $user$name
+## [1] &quot;Scott Chamberlain&quot;
+## 
+## $user$email
+## [1] &quot;myrmecocystus@gmail.com&quot;
+## 
+## $user$id
+## [1] &quot;4eddbafb613f5d5139000001&quot;
+## 
+## $user$last_name
+## [1] &quot;Chamberlain&quot;
+## 
+## $user$urls
+## $user$urls$self
+## [1] &quot;https://secure.gaug.es/me&quot;
+## 
+## $user$urls$clients
+## [1] &quot;https://secure.gaug.es/clients&quot;
+## 
+## $user$urls$gauges
+## [1] &quot;https://secure.gaug.es/gauges&quot;
+## 
+## 
+## $user$first_name
+## [1] &quot;Scott&quot;
+</code></pre></div>
+
+
+<h4>Traffic</h4>
+
+<div class="highlight"><pre><code class="r">gs_traffic<span class="p">(</span>id <span class="o">=</span> <span class="s">&quot;4efd83a6f5a1f5158a000004&quot;</span><span class="p">)</span>
+</code></pre></div>
+
+
+
+
+<div class="highlight"><pre><code class="text">## $metadata
+## $metadata$views
+## [1] 386
+## 
+## $metadata$urls
+## $metadata$urls$older
+## [1] &quot;https://secure.gaug.es/gauges/4efd83a6f5a1f5158a000004/traffic?date=2013-12-01&quot;
+## 
+## $metadata$urls$newer
+## NULL
+## 
+## 
+## $metadata$date
+## [1] &quot;2014-01-17&quot;
+## 
+## $metadata$people
+## [1] 208
+## 
+## 
+## $data
+##    views       date people
+## 1      7 2014-01-01      5
+## 2     17 2014-01-02      7
+## 3     39 2014-01-03     17
+## 4     15 2014-01-04      9
+## 5     14 2014-01-05      7
+## 6     33 2014-01-06     22
+## 7     19 2014-01-07     11
+## 8     15 2014-01-08     11
+## 9     53 2014-01-09     24
+## 10    53 2014-01-10     13
+## 11    14 2014-01-11      9
+## 12    11 2014-01-12     10
+## 13    14 2014-01-13     14
+## 14    11 2014-01-14      9
+## 15    23 2014-01-15     16
+## 16    16 2014-01-16     14
+## 17    32 2014-01-17     25
+</code></pre></div>
+
+
+<h3>Screen/browser information</h3>
+
+<div class="highlight"><pre><code class="r">gs_reso<span class="p">(</span>id <span class="o">=</span> <span class="s">&quot;4efd83a6f5a1f5158a000004&quot;</span><span class="p">)</span>
+</code></pre></div>
+
+
+
+
+<div class="highlight"><pre><code class="text">## $browser_height
+##   views title
+## 1   190   600
+## 2    77   768
+## 3    53   900
+## 4    38   480
+## 5    28  1024
+## 
+## $browser_width
+##   views title
+## 1   153  1280
+## 2    91  1024
+## 3    58  1600
+## 4    36   800
+## 5    30  1440
+## 6     6  2000
+## 7     6   320
+## 8     6   480
+## 
+## $screen_width
+##   views title
+## 1   176  1280
+## 2    90  1600
+## 3    55  1440
+## 4    35  1024
+## 5    14  2000
+## 6     6   320
+## 7     6   480
+## 8     4   800
+</code></pre></div>
+
+
+<h3>Visualize traffic data</h3>
+
+<p>You'll need to load ggplot2</p>
+
+<div class="highlight"><pre><code class="r">library<span class="p">(</span>ggplot2<span class="p">)</span>
+out <span class="o">&lt;-</span> gs_gauge_detail<span class="p">(</span>id <span class="o">=</span> <span class="s">&quot;4efd83a6f5a1f5158a000004&quot;</span><span class="p">)</span>
+vis_gauge<span class="p">(</span>out<span class="p">)</span>
+</code></pre></div>
+
+
+
+
+<div class="highlight"><pre><code class="text">## Using hour, time as id variables
+## Using date as id variables
+## Using date as id variables
+</code></pre></div>
+
+
+<p><img src="/public/img/2014-01-17-rgauges-hourly/unnamed-chunk-4.png" alt="center" /></p>
+
+<div class="highlight"><pre><code class="text">## NULL
+</code></pre></div>
+
+
+<hr />
+
+<hr />
+
+<h2>Historic hourly Gaug.es data</h2>
+
+<p>Now let's play with the hourly data. To do that we aren't going to use <code>rgauges</code>, but rather call the Cloudant API. CouchDB provides a RESTful API out of the box, so we can do a call like <code>https://app16517180.heroku.cloudant.com/gaugesdb_scott/_all_docs?limit=20</code> to get metadata (or other calls to get the documents themselves). (note: that url won't work for you since you don't have my login info)</p>
+
+<h3>Get some data</h3>
+
+<div class="highlight"><pre><code class="r">library<span class="p">(</span>devtools<span class="p">)</span>
+install_github<span class="p">(</span><span class="s">&quot;sckott/sofa&quot;</span><span class="p">)</span>  <span class="c1"># or install_github(&#39;sofa&#39;, &#39;sckott&#39;)</span>
+</code></pre></div>
+
+
+
+
+<div class="highlight"><pre><code class="r">library<span class="p">(</span>sofa<span class="p">)</span>
+cloudant_name <span class="o">&lt;-</span> <span class="s">&quot;app16517180.heroku&quot;</span>
+cloudant_pwd <span class="o">&lt;-</span> getOption<span class="p">(</span><span class="s">&quot;sofa_cloudant_heroku&quot;</span><span class="p">)[[</span><span class="m">2</span><span class="p">]]</span>
+cushion<span class="p">(</span>sofa_cloudant <span class="o">=</span> c<span class="p">(</span>cloudant_name<span class="p">,</span> cloudant_pwd<span class="p">))</span>
+dat <span class="o">&lt;-</span> sofa_alldocs<span class="p">(</span>cushion <span class="o">=</span> <span class="s">&quot;sofa_cloudant&quot;</span><span class="p">,</span> dbname <span class="o">=</span> <span class="s">&quot;gaugesdb_scott&quot;</span><span class="p">,</span> include_docs <span class="o">=</span> <span class="s">&quot;true&quot;</span><span class="p">)</span>
+</code></pre></div>
+
+
+<h3>Manipulate and visualize</h3>
+
+<div class="highlight"><pre><code class="r">library<span class="p">(</span>plyr<span class="p">)</span>
+dates <span class="o">&lt;-</span> ldply<span class="p">(</span>dat<span class="o">$</span>rows<span class="p">,</span> <span class="kr">function</span><span class="p">(</span>x<span class="p">)</span> x<span class="o">$</span>doc<span class="o">$</span>coll_date<span class="p">)</span>
+min<span class="p">(</span>dates<span class="o">$</span>V1<span class="p">)</span>
+</code></pre></div>
+
+
+
+
+<div class="highlight"><pre><code class="text">## [1] &quot;2013-06-26&quot;
+</code></pre></div>
+
+
+
+
+<div class="highlight"><pre><code class="r">max<span class="p">(</span>dates<span class="o">$</span>V1<span class="p">)</span>
+</code></pre></div>
+
+
+
+
+<div class="highlight"><pre><code class="text">## [1] &quot;2014-01-16&quot;
+</code></pre></div>
+
+
+
+
+<div class="highlight"><pre><code class="r">length<span class="p">(</span>dates<span class="o">$</span>V1<span class="p">)</span>
+</code></pre></div>
+
+
+
+
+<div class="highlight"><pre><code class="text">## [1] 198
+</code></pre></div>
+
+
+<p>So we've got 198 days of data, first collected near end of June, and most recent yesterday. Now get actual visits data</p>
+
+<div class="highlight"><pre><code class="r">df <span class="o">&lt;-</span> ldply<span class="p">(</span>dat<span class="o">$</span>rows<span class="p">,</span> <span class="kr">function</span><span class="p">(</span>x<span class="p">)</span> <span class="p">{</span>
+    y <span class="o">&lt;-</span> do.call<span class="p">(</span>rbind<span class="p">,</span> lapply<span class="p">(</span>x<span class="o">$</span>doc<span class="o">$</span>recent_hours<span class="p">,</span> data.frame<span class="p">))</span>
+    data.frame<span class="p">(</span>date <span class="o">=</span> x<span class="o">$</span>doc<span class="o">$</span>coll_date<span class="p">,</span> y<span class="p">)</span>
+<span class="p">})</span>
+df<span class="o">$</span>date <span class="o">&lt;-</span> as.Date<span class="p">(</span>df<span class="o">$</span>date<span class="p">)</span>
+df<span class="o">$</span>hour <span class="o">&lt;-</span> as.numeric<span class="p">(</span>df<span class="o">$</span>hour<span class="p">)</span>
+
+library<span class="p">(</span>reshape2<span class="p">)</span>
+df_melt <span class="o">&lt;-</span> melt<span class="p">(</span>df<span class="p">,</span> id.vars <span class="o">=</span> c<span class="p">(</span><span class="s">&quot;date&quot;</span><span class="p">,</span> <span class="s">&quot;hour&quot;</span><span class="p">))</span>
+head<span class="p">(</span>df_melt<span class="p">)</span>
+</code></pre></div>
+
+
+
+
+<div class="highlight"><pre><code class="text">##         date hour variable value
+## 1 2013-09-18    1    views     2
+## 2 2013-09-18    2    views     3
+## 3 2013-09-18    3    views     2
+## 4 2013-09-18    4    views     0
+## 5 2013-09-18    5    views     1
+## 6 2013-09-18    6    views    10
+</code></pre></div>
+
+
+<p>We need to combine the date and hour in to one date time string:</p>
+
+<div class="highlight"><pre><code class="r">df_melt <span class="o">&lt;-</span> transform<span class="p">(</span>df_melt<span class="p">,</span> datetime <span class="o">=</span> as.POSIXct<span class="p">(</span>paste<span class="p">(</span>date<span class="p">,</span> sprintf<span class="p">(</span><span class="s">&quot;%s:00:00&quot;</span><span class="p">,</span> 
+    hour<span class="p">))))</span>
+head<span class="p">(</span>df_melt<span class="p">)</span>
+</code></pre></div>
+
+
+
+
+<div class="highlight"><pre><code class="text">##         date hour variable value            datetime
+## 1 2013-09-18    1    views     2 2013-09-18 01:00:00
+## 2 2013-09-18    2    views     3 2013-09-18 02:00:00
+## 3 2013-09-18    3    views     2 2013-09-18 03:00:00
+## 4 2013-09-18    4    views     0 2013-09-18 04:00:00
+## 5 2013-09-18    5    views     1 2013-09-18 05:00:00
+## 6 2013-09-18    6    views    10 2013-09-18 06:00:00
+</code></pre></div>
+
+
+<p>Now plot all data</p>
+
+<div class="highlight"><pre><code class="r">library<span class="p">(</span>ggplot2<span class="p">);</span> library<span class="p">(</span>scales<span class="p">)</span>
+
+gauge_theme <span class="o">&lt;-</span> <span class="kr">function</span><span class="p">(){</span>
+  list<span class="p">(</span>theme<span class="p">(</span>panel.grid.major <span class="o">=</span> element_blank<span class="p">(),</span>
+             panel.grid.minor <span class="o">=</span> element_blank<span class="p">(),</span>
+             legend.position <span class="o">=</span> c<span class="p">(</span><span class="m">0.85</span><span class="p">,</span><span class="m">0.85</span><span class="p">),</span>
+             legend.key <span class="o">=</span> element_blank<span class="p">()))</span>
+<span class="p">}</span>
+
+ggplot<span class="p">(</span>df_melt<span class="p">,</span> aes<span class="p">(</span>datetime<span class="p">,</span> value<span class="p">,</span> group<span class="o">=</span>variable<span class="p">,</span> colour<span class="o">=</span>variable<span class="p">))</span> <span class="o">+</span>
+    theme_bw<span class="p">(</span>base_size<span class="o">=</span><span class="m">18</span><span class="p">)</span> <span class="o">+</span> 
+    geom_line<span class="p">(</span>size<span class="o">=</span><span class="m">2</span><span class="p">)</span> <span class="o">+</span>
+    scale_color_brewer<span class="p">(</span>name<span class="o">=</span><span class="s">&quot;&quot;</span><span class="p">,</span> palette<span class="o">=</span><span class="m">3</span><span class="p">)</span> <span class="o">+</span>
+    labs<span class="p">(</span>x<span class="o">=</span><span class="s">&quot;&quot;</span><span class="p">,</span> y<span class="o">=</span><span class="s">&quot;&quot;</span><span class="p">)</span> <span class="o">+</span>
+    gauge_theme<span class="p">()</span>
+</code></pre></div>
+
+
+<p><img src="/public/img/2014-01-17-rgauges-hourly/unnamed-chunk-8.png" alt="center" /></p>
+
+<p>And just one day</p>
+
+<div class="highlight"><pre><code class="r">oneday <span class="o">&lt;-</span> df_melt<span class="p">[</span> as.character<span class="p">(</span>df_melt<span class="o">$</span>date<span class="p">)</span> <span class="o">%in%</span> <span class="s">&quot;2013-11-12&quot;</span><span class="p">,</span> <span class="p">]</span>
+ggplot<span class="p">(</span>oneday<span class="p">,</span> aes<span class="p">(</span>datetime<span class="p">,</span> value<span class="p">,</span> group<span class="o">=</span>variable<span class="p">,</span> colour<span class="o">=</span>variable<span class="p">))</span> <span class="o">+</span>
+    theme_bw<span class="p">(</span>base_size<span class="o">=</span><span class="m">18</span><span class="p">)</span> <span class="o">+</span> 
+    geom_line<span class="p">(</span>size<span class="o">=</span><span class="m">2</span><span class="p">)</span> <span class="o">+</span>
+    scale_color_brewer<span class="p">(</span>name<span class="o">=</span><span class="s">&quot;&quot;</span><span class="p">,</span> palette<span class="o">=</span><span class="m">3</span><span class="p">)</span> <span class="o">+</span>
+    labs<span class="p">(</span>x<span class="o">=</span><span class="s">&quot;&quot;</span><span class="p">,</span> y<span class="o">=</span><span class="s">&quot;&quot;</span><span class="p">)</span> <span class="o">+</span>
+    gauge_theme<span class="p">()</span>
+</code></pre></div>
+
+
+<p><img src="/public/img/2014-01-17-rgauges-hourly/unnamed-chunk-9.png" alt="center" /></p>
+
+  </div>
+  
+  <div class="post">
+    <h1>
       <a href="/2013/11/jekyll-intro/">
         Jekyll - an intro
       </a>
@@ -209,95 +575,6 @@ My second blog post!
 <p>Carl Boettiger (@cboettig) and I disccused how frustrated we are with the state of code in papers, and started a Github gist, listing publishers/journals and how they display code. It lives here: <a href="https://gist.github.com/sckott/6787278">https://gist.github.com/sckott/6787278</a>.</p>
 
 <p>We have a start, but would like your help in filling this list out more. What are the code presentation practices for various publishers and journals? With a list of what currently happens, perhaps we can start to convince publishers to display code more appropriately, partly by pointing out that "XYZ publisher does it really well, why can't you?". I tried to record info in a standardized way across publishers...</p>
-
-  </div>
-  
-  <div class="post">
-    <h1>
-      <a href="/2013/10/shutdown/">
-        Guide to using rOpenSci packages during the US Gov't shutdown
-      </a>
-    </h1>
-
-    <span class="post-date">08 Oct 2013</span>
-
-    <p><em>Note: This is cross-posted from the <a href="http://ropensci.org/blog">rOpenSci blog</a>, which will update with this post when our technical snafu is fixed.</em></p>
-
-<p>With the US government shut down, many of the federal government provided data APIs are down. We write R packages to interact with many of these APIs. We have been tweeting about what APIs that are down related to R pacakges we make, but we thought we would write up a proper blog post on the issue.</p>
-
-<p>NCBI services are still up! NCBI is within NIH, which is within the Department of Health and Human Services. Here is the message on the NCBI page:</p>
-
-<blockquote><p>The information on this web site remains accessible; but, due to the lapse in government funding, the information may not be up to date, and the agency may not be able to respond to inquiries until appropriations are enacted. For updates regarding government operating status see USA.gov.</p></blockquote>
-
-<p>Most USGS services are down. Some of the message on the USGS page (ITIS is under USGS, which is under the Department of the Interior):</p>
-
-<blockquote><p>Due to the Federal government shutdown, usgs.gov and most associated web sites are unavailable. Only web sites necessary to protect lives and property will be maintained...</p></blockquote>
-
-<p>However, the USGS BISON service is still up for some reason - perhaps a different pot of money than other USGS projects?</p>
-
-<p>Some of the shutdown message from NOAA, under the Department of Commerce:</p>
-
-<blockquote><p>Due to the Federal government shutdown, NOAA.gov and most associated web sites are unavailable. Specific NOAA web sites necessary to protect lives and property are operational and will be maintained.</p></blockquote>
-
-<p>Here's a table of APIs we interact with, the related R package, and any notes:
-<br><br></p>
-
-<table class="table table-bordered table-striped">
-    <thead>
-      <tr>
-        <th>API provider</th>
-        <th>API still up?</th>
-        <th>rOpenSci R package</th>
-      </tr>
-    </thead>
-    <tbody>
-      <tr>
-        <td>USGS BISON (Biodiversity Information Serving our Nation) <a href="http://bison.usgs.ornl.gov/services.html">link</a></td>
-        <td>Yep!</td>
-        <td><a href="https://github.com/ropensci/rbison">rbison</a></td>
-      </tr>
-      <tr>
-        <td>NOAA Climate data <a href="http://www.ncdc.noaa.gov/cdo-web/webservices">link</a></td>
-        <td>No :(</td>
-        <td><a href="https://github.com/ropensci/rnoaa">rnoaa</a></td>
-      </tr>
-      <tr>
-        <td>USGS ITIS (Integrated Taxonomic Information Service) <a href="http://www.itis.gov/ws_description.html">link</a></td>
-        <td>No :(</td>
-        <td><a href="https://github.com/ropensci/taxize_">taxize</a></td>
-      </tr>
-      <tr>
-        <td>NCBI Entrez <a href="http://www.ncbi.nlm.nih.gov/">link</a></td>
-        <td>No :(</td>
-        <td><a href="https://github.com/ropensci/taxize_">taxize</a>,<a href="https://github.com/ropensci/rentrez">rentrez</a></td>
-      </tr>
-      <tr>
-        <td>PubMed <a href="http://www.ncbi.nlm.nih.gov/pubmed">link</a></td>
-        <td>No :(</td>
-        <td><a href="https://github.com/ropensci/rpubmed">rpubmed</a></td>
-      </tr>
-    </tbody>
-</table>
-
-
-<p><br><br>
-For those wanting to get NOAA climate data, perhaps check out the <a href="http://cran.r-project.org/web/packages/RNCEP/index.html">RNCEP package</a>.</p>
-
-<p>For those using taxize, you can grab taxonomic IDs from NCBI using <code>get_uid()</code> rather than the ITIS version <code>get_tsn()</code>. With a UID from NCBI, you can do things like get a taxonomic classification using the function <code>classification()</code>. There are many non-government taxonomic sources in taxize, so you should be able to find what you need without ITIS. Other functions that use ITIS, and that you should avoid until the shutdown is over, are:</p>
-
-<ul>
-<li>A long list carried over from the itis package that is now within taxize: <code>getacceptednamesfromtsn()</code>, <code>getanymatchcount()</code>, <code>getcommentdetailfromtsn()</code>, <code>getcommonnamesfromtsn()</code>, <code>getcoremetadatafromtsn()</code>, <code>getcoveragefromtsn()</code>, <code>getcredibilityratingfromtsn()</code>, <code>getcredibilityratings()</code>, <code>getcurrencyfromtsn()</code>, <code>getdatedatafromtsn()</code>, <code>getdescription()</code>, <code>getexpertsfromtsn()</code>, <code>getfullhierarchyfromtsn()</code>, <code>getfullrecordfromlsid()</code>, <code>getfullrecordfromtsn()</code>, <code>getgeographicdivisionsfromtsn()</code>, <code>getgeographicvalues()</code>, <code>getglobalspeciescompletenessfromtsn()</code>, <code>gethierarchydownfromtsn()</code>, <code>gethierarchyupfromtsn()</code>, <code>getitistermsfromcommonname()</code>, <code>getitistermsfromscientificname()</code>, <code>getjurisdictionaloriginfromtsn()</code>, <code>getjurisdictionoriginvalues()</code>, <code>getjurisdictionvalues()</code>, <code>getkingdomnamefromtsn()</code>, <code>getkingdomnames()</code>, <code>getlastchangedate()</code>, <code>getlsidfromtsn()</code>, <code>getothersourcesfromtsn()</code>, <code>getparenttsnfromtsn()</code>, <code>getpublicationsfromtsn()</code>, <code>getranknames()</code>, <code>getrecordfromlsid()</code>, <code>getreviewyearfromtsn()</code>, <code>getscientificnamefromtsn()</code>, <code>getsynonymnamesfromtsn()</code>, <code>gettaxonauthorshipfromtsn()</code>, <code>gettaxonomicranknamefromtsn()</code>, <code>gettaxonomicusagefromtsn()</code>, <code>gettsnbyvernacularlanguage()</code>, <code>gettsnfromlsid()</code>, <code>getunacceptabilityreasonfromtsn()</code>, <code>getvernacularlanguages()</code>, <code>searchbycommonname()</code>, <code>searchbycommonnamebeginswith()</code>, <code>searchbycommonnameendswith()</code>, <code>searchbyscientificname()</code>, <code>searchforanymatch()</code>, <code>searchforanymatchpaged()</code></li>
-<li><code>itis_acceptname()</code></li>
-<li><code>itis_downstream()</code></li>
-<li><code>itis_name()</code></li>
-<li><code>itis_taxrank()</code></li>
-<li>In <code>tax_agg()</code>, only use db="ncbi"</li>
-<li>In <code>tax_name()</code>, only use db="ncbi"</li>
-<li>In <code>tax_rank()</code>, only use db="ncbi"</li>
-</ul>
-
-
-<p>Let us know if you have any questions or comments.</p>
 
   </div>
   

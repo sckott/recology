@@ -1,5 +1,5 @@
 --- 
-name: a-data-visualization-book
+name: data-visualization-book
 layout: post
 title: A Data Visualization Book
 author: Scott Chamberlain

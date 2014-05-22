@@ -5,6 +5,140 @@
 		<link>http://recology.info/</link>
 		
 			<item>
+				<title>Logistic plot reboot</title>
+				<description>&lt;p&gt;Someone asked about plotting something like this today&lt;/p&gt;
+
+&lt;p&gt;I &lt;a href=&quot;http://recology.info/2012/01/logistic-regression-barplot-fig/&quot;&gt;wrote a few functions previously&lt;/a&gt; to do something like this. However, since then &lt;code&gt;ggplot2&lt;/code&gt; has changed, and one of the functions no longer works.&lt;/p&gt;
+
+&lt;p&gt;Hence, I fixed &lt;code&gt;opts()&lt;/code&gt; to &lt;code&gt;theme()&lt;/code&gt;, &lt;code&gt;theme_blank()&lt;/code&gt; to &lt;code&gt;element_blank()&lt;/code&gt;, and &lt;code&gt;panel.background = element_blank()&lt;/code&gt; to &lt;code&gt;plot.background = element_blank()&lt;/code&gt; to get the histograms to show up with the line plot and not cover it.&lt;/p&gt;
+
+&lt;p&gt;The new functions:&lt;/p&gt;
+
+&lt;pre&gt;&lt;code class=&quot;r&quot;&gt;loghistplot  &amp;lt;- function(data) {
+  names(data) &amp;lt;- c(&#39;x&#39;,&#39;y&#39;) # rename columns
+
+  # get min and max axis values
+  min_x &amp;lt;- min(data$x)
+  max_x &amp;lt;- max(data$x)
+  min_y &amp;lt;- min(data$y)
+  max_y &amp;lt;- max(data$y)
+
+  # get bin numbers
+  bin_no &amp;lt;- max(hist(data$x, plot = FALSE)$counts) + 5
+
+  # create plots
+  a &amp;lt;- ggplot(data, aes(x = x, y = y)) +
+    theme_bw(base_size=16) +
+    geom_smooth(method = &quot;glm&quot;, family = &quot;binomial&quot;, se = TRUE,
+                colour=&#39;black&#39;, size=1.5, alpha = 0.3) +
+    scale_x_continuous(limits=c(min_x,max_x)) +
+    theme(panel.grid.major = element_blank(),
+          panel.grid.minor=element_blank(),
+          panel.background = element_blank(),
+          plot.background = element_blank()) +
+    labs(y = &quot;Probability\n&quot;, x = &quot;\nYour X Variable&quot;)
+
+  theme_loghist &amp;lt;- list(
+    theme(panel.grid.major = element_blank(),
+          panel.grid.minor=element_blank(),
+          axis.text.y = element_blank(),
+          axis.text.x = element_blank(),
+          axis.ticks = element_blank(),
+          panel.border = element_blank(),
+          panel.background = element_blank(),
+          plot.background = element_blank())
+  )
+
+  b &amp;lt;-
+  ggplot(data[data$y == unique(data$y)[1], ], aes(x = x)) +
+    theme_bw(base_size=16) +
+    geom_histogram(fill = &quot;grey&quot;) +
+    scale_y_continuous(limits=c(0,bin_no)) +
+    scale_x_continuous(limits=c(min_x,max_x)) +
+    theme_loghist +
+    labs(y=&#39;\n&#39;, x=&#39;\n&#39;)
+
+  c &amp;lt;- ggplot(data[data$y == unique(data$y)[2], ], aes(x = x)) +
+    theme_bw(base_size=16) +
+    geom_histogram(fill = &quot;grey&quot;) +
+    scale_y_continuous(trans=&#39;reverse&#39;, limits=c(bin_no,0)) +
+    scale_x_continuous(limits=c(min_x,max_x)) +
+    theme_loghist +
+    labs(y=&#39;\n&#39;, x=&#39;\n&#39;)
+
+  grid.newpage()
+  pushViewport(viewport(layout = grid.layout(1,1)))
+
+  vpa_ &amp;lt;- viewport(width = 1, height = 1, x = 0.5, y = 0.5)
+  vpb_ &amp;lt;- viewport(width = 1, height = 1, x = 0.5, y = 0.5)
+  vpc_ &amp;lt;- viewport(width = 1, height = 1, x = 0.5, y = 0.5)
+
+  print(b, vp = vpb_)
+  print(c, vp = vpc_)
+  print(a, vp = vpa_)
+}
+&lt;/code&gt;&lt;/pre&gt;
+
+&lt;pre&gt;&lt;code class=&quot;r&quot;&gt;logpointplot  &amp;lt;- function(data) {
+  names(data) &amp;lt;- c(&#39;x&#39;,&#39;y&#39;) # rename columns
+
+  # get min and max axis values
+  min_x &amp;lt;- min(data$x)
+  max_x &amp;lt;- max(data$x)
+  min_y &amp;lt;- min(data$y)
+  max_y &amp;lt;- max(data$y)
+
+  # create plots
+  ggplot(data, aes(x = x, y = y)) +
+    theme_bw(base_size=16) +
+    geom_point(size = 3, alpha = 0.5, position = position_jitter(w=0, h=0.02)) +
+    geom_smooth(method = &quot;glm&quot;, family = &quot;binomial&quot;, se = TRUE,
+                colour=&#39;black&#39;, size=1.5, alpha = 0.3) +
+    scale_x_continuous(limits=c(min_x,max_x)) +
+    theme(panel.grid.major = element_blank(),
+          panel.grid.minor=element_blank(),
+          panel.background = element_blank()) +
+    labs(y = &quot;Probability\n&quot;, x = &quot;\nYour X Variable&quot;)
+
+}
+&lt;/code&gt;&lt;/pre&gt;
+
+&lt;p&gt;Install &lt;code&gt;ggplot2&lt;/code&gt; and &lt;code&gt;gridExtra&lt;/code&gt; if you don&#39;t have them:&lt;/p&gt;
+
+&lt;pre&gt;&lt;code class=&quot;r&quot;&gt;install.packages(c(&quot;ggplot2&quot;,&quot;gridExtra&quot;), repos = &quot;http://cran.rstudio.com&quot;)
+&lt;/code&gt;&lt;/pre&gt;
+
+&lt;p&gt;And their use:&lt;/p&gt;
+
+&lt;p&gt;&lt;strong&gt;Logistic histogram plots&lt;/strong&gt;&lt;/p&gt;
+
+&lt;pre&gt;&lt;code class=&quot;r&quot;&gt;loghistplot(data=mtcars[,c(&quot;mpg&quot;,&quot;vs&quot;)])
+&lt;/code&gt;&lt;/pre&gt;
+
+&lt;p&gt;&lt;img src=&quot;../public/img/2014-05-22-logplotreboot/unnamed-chunk-5.png&quot; alt=&quot;plot of chunk unnamed-chunk-5&quot; /&gt;&lt;/p&gt;
+
+&lt;pre&gt;&lt;code class=&quot;r&quot;&gt;loghistplot(movies[,c(&quot;rating&quot;,&quot;Action&quot;)])
+&lt;/code&gt;&lt;/pre&gt;
+
+&lt;p&gt;&lt;img src=&quot;../public/img/2014-05-22-logplotreboot/unnamed-chunk-6.png&quot; alt=&quot;plot of chunk unnamed-chunk-6&quot; /&gt;&lt;/p&gt;
+
+&lt;p&gt;&lt;strong&gt;Logistic point plots&lt;/strong&gt;&lt;/p&gt;
+
+&lt;pre&gt;&lt;code class=&quot;r&quot;&gt;loghistplot(data=mtcars[,c(&quot;mpg&quot;,&quot;vs&quot;)])
+&lt;/code&gt;&lt;/pre&gt;
+
+&lt;p&gt;&lt;img src=&quot;../public/img/2014-05-22-logplotreboot/unnamed-chunk-7.png&quot; alt=&quot;plot of chunk unnamed-chunk-7&quot; /&gt;&lt;/p&gt;
+
+&lt;pre&gt;&lt;code class=&quot;r&quot;&gt;loghistplot(movies[,c(&quot;rating&quot;,&quot;Action&quot;)])
+&lt;/code&gt;&lt;/pre&gt;
+
+&lt;p&gt;&lt;img src=&quot;../public/img/2014-05-22-logplotreboot/unnamed-chunk-8.png&quot; alt=&quot;plot of chunk unnamed-chunk-8&quot; /&gt;&lt;/p&gt;
+</description>
+				<published>2014-05-22 00:00:00 -0700</published>
+				<link>http://recology.info//2014/05/logplotreboot/</link>
+			</item>
+		
+			<item>
 				<title>cowsay - ascii messages and warnings for R</title>
 				<description>&lt;h2&gt;The history&lt;/h2&gt;
 
@@ -1609,30 +1743,6 @@ ldply&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;out&lt;span class=&quot;p&quo
 </description>
 				<published>2013-08-28 00:00:00 -0700</published>
 				<link>http://recology.info//2013/08/govdat-vignette/</link>
-			</item>
-		
-			<item>
-				<title>Engaging the public on climate change through phenology data</title>
-				<description>&lt;h2&gt;ScienceOnline Climate&lt;/h2&gt;
-
-&lt;p&gt;I recently attended ScienceOnline Climate, a conference in Washington, D.C. at AAAS offices. You may have heard of the ScienceOnline annual meeting in North Carolina - this was one of their topical meetings focused on Climate Change. Another one is coming up in October, ScienceOnline Oceans. Search Twitter for #scioClimate (or the entire list of hashtags &lt;a href=&quot;https://gist.github.com/sckott/6213308&quot;&gt;here&lt;/a&gt;) for tweets from the conference.&lt;/p&gt;
-
-&lt;p&gt;One of the sessions I attended was focused on how to democratize climate change knowledge, moderated by a fellow from the Union of Concerned Scientists. Search Twitter for #sciodemocracy to see the conversation from that session. There was a lot of very interesting discussion.&lt;/p&gt;
-
-&lt;h2&gt;Can we reach the public with phenology data?&lt;/h2&gt;
-
-&lt;p&gt;During the #sciodemocracy session, I had a thought but couldn&#39;t articulate it at the time. So here goes. People that are not inolved in climate change discussions may not think about climate change in the framework of changing sea level, melting ice, and altered severity of extreme events. However, many people observe birds, butterflies, and trees outside their apartment windows, cars/trains/buses, or on walks or hikes. When you live in a one place for many years changes in the timing of when birds, butterflies, and trees do certain things are easily noticed. Many of us, including myself, don&#39;t necessarily record these changes, but some do! In fact, there are many web sites with databases of observations of birds, butterflies, and more that anyone, not just scientists, can submit observations to. Some examples are the &lt;a href=&quot;https://www.usanpn.org/&quot;&gt;USA National Phenology Network&lt;/a&gt; and &lt;a href=&quot;http://www.inaturalist.org/&quot;&gt;iNaturalist&lt;/a&gt;. And of course there are other databases that are focused on observations of organisms collected by scientists, like &lt;a href=&quot;http://www.gbif.org/&quot;&gt;GBIF&lt;/a&gt; and &lt;a href=&quot;http://vertnet.org/index.php&quot;&gt;VertNet&lt;/a&gt;.&lt;/p&gt;
-
-&lt;p&gt;So what? What about it?&lt;/p&gt;
-
-&lt;p&gt;When enough of these observations are collected on any one species in one location (e.g., let&#39;s say we have 1000 observations of a species in Seattle over 20 years) we can simply ask how has the first date of record of the species in Seattle changed through time? If there is a change in timing of first appearance in the spring through the years, we can hypothesize that this may be due to climate change, and look at the data to see if there is a correlation, etc.&lt;/p&gt;
-
-&lt;p&gt;Non-scientists along with scientists are collecting vast amounts of data on observations of species. This data can be used to make people think about climate change. That is, why don&#39;t we not only facilitate the public&#39;s ability to collect data, but also to analyze the data - to do their own science, ask their own questions. In this way, people can link a bird appearing for the first time in spring a bit later than the previous year, or a tree flowering a bit early, to variables associated with climate change, like temperature, precipitation, etc.&lt;/p&gt;
-
-&lt;p&gt;Empowering the general public to do their own science may bring the vague notion of climate change into stark relief - thereby movivating some to take action with their elected representatives, or to at least get curious to find out more.&lt;/p&gt;
-</description>
-				<published>2013-08-18 00:00:00 -0700</published>
-				<link>http://recology.info//2013/08/phenology/</link>
 			</item>
 		
 	</channel>

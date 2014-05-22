@@ -1,5 +1,5 @@
 --- 
-name: jonathan-eisen-on-the-fourth-domain-and-open-science
+name: jonathan-eisen-on-fourth-domain-and
 layout: post
 title: Jonathan Eisen on the Fourth Domain and Open Science
 author: Scott Chamberlain
