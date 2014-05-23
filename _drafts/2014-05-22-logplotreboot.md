@@ -126,32 +126,9 @@ And their use:
 __Logistic histogram plots__
 
 
-```r
-loghistplot(data=mtcars[,c("mpg","vs")])
-```
-
-![plot of chunk unnamed-chunk-5](../public/img/2014-05-22-logplotreboot/unnamed-chunk-5.png) 
 
 
-```r
-loghistplot(movies[,c("rating","Action")])
-```
-
-![plot of chunk unnamed-chunk-6](../public/img/2014-05-22-logplotreboot/unnamed-chunk-6.png) 
 
 
-__Logistic point plots__
 
 
-```r
-logpointplot(mtcars[,c("mpg","vs")])
-```
-
-![plot of chunk unnamed-chunk-7](../public/img/2014-05-22-logplotreboot/unnamed-chunk-7.png) 
-
-
-```r
-logpointplot(movies[,c("rating","Action")])
-```
-
-![plot of chunk unnamed-chunk-8](../public/img/2014-05-22-logplotreboot/unnamed-chunk-8.png) 
