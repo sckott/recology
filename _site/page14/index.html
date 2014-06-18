@@ -58,6 +58,262 @@
   
   <div class="post">
     <h1>
+      <a href="/2012/10/rgbif-newfxns/">
+        GBIF biodiversity data from R - more functions
+      </a>
+    </h1>
+
+    <span class="post-date">08 Oct 2012</span>
+
+    <h4>UPDATE: In response to Jarrett's query I laid out a separate use case in which you may want to query by higher taxonomic rankings than species. See below.  In addition, added examples of querying by location in reply to comments by seminym.</h4>
+
+<hr />
+
+<p>We have been working on an R package to get GBIF data from R, with the stable version available through CRAN <a href="URL">here</a>, and the development version available on GitHub <a href="http://github.com/rgbif">here</a>.</p>
+
+<p>We had a Google Summer of code stuent work on the package this summer - you can see his work on the package over at his GitHub page <a href="">here</a>.  We have added some new functionality since his work, and would like to show it off.</p>
+
+<h3>Lets install rgbif first.</h3>
+
+<div class="highlight"><pre><code class="r"><span class="lineno">1</span> <span class="c1"># install_github(&#39;rgbif&#39;, &#39;ropensci&#39;) # uncomment if not already installed</span>
+<span class="lineno">2</span> library<span class="p">(</span>rgbif<span class="p">)</span>
+<span class="lineno">3</span> library<span class="p">(</span>plyr<span class="p">)</span>
+<span class="lineno">4</span> library<span class="p">(</span>XML<span class="p">)</span>
+<span class="lineno">5</span> library<span class="p">(</span>httr<span class="p">)</span>
+<span class="lineno">6</span> library<span class="p">(</span>maps<span class="p">)</span>
+<span class="lineno">7</span> library<span class="p">(</span>ggplot2<span class="p">)</span>
+</code></pre></div>
+
+
+<h3>Get taxonomic information on a specific taxon or taxa in GBIF by their taxon concept keys.</h3>
+
+<div class="highlight"><pre><code class="r"><span class="lineno">1</span> <span class="p">(</span>keys <span class="o">&lt;-</span> taxonsearch<span class="p">(</span>scientificname <span class="o">=</span> <span class="s">&quot;Puma concolor&quot;</span><span class="p">))</span>  <span class="c1"># many matches to this search</span>
+</code></pre></div>
+
+
+
+
+<div class="highlight"><pre><code class="text"> [1] &quot;51780668&quot; &quot;51758018&quot; &quot;50010499&quot; &quot;51773067&quot; &quot;51078815&quot; &quot;51798065&quot;
+ [7] &quot;51088007&quot; &quot;50410780&quot; &quot;50305290&quot; &quot;51791438&quot;
+</code></pre></div>
+
+
+
+
+<div class="highlight"><pre><code class="r"><span class="lineno">1</span> taxonget<span class="p">(</span>keys<span class="p">[[</span><span class="m">1</span><span class="p">]])</span>  <span class="c1"># let&#39;s get the first one - the first row in the data.frame is the one we searched for (51780668)</span>
+</code></pre></div>
+
+
+
+
+<div class="highlight"><pre><code class="text">[[1]]
+                    sciname taxonconceptkeys       rank
+1             Puma concolor         51780668    species
+2                      Puma         51780667      genus
+3                   Felidae         51780651     family
+4                 Carnivora         51780613      order
+5                  Mammalia         51780547      class
+6                  Chordata         51775774     phylum
+7                  Animalia         51775773    kingdom
+8 Puma concolor californica         51780669 subspecies
+9   Puma concolor improcera         51780670 subspecies
+</code></pre></div>
+
+
+<h3>The <code>occurrencedensity</code> function was renamed to <code>densitylist</code> because it is in the <code>density</code> API service, not the <code>occurrence</code> API service.  You can use <code>densitylist</code> to get a data.frame of total occurrence counts by one-degree cell for a single taxon, country, dataset, data publisher or data network.  Just a quick reminder of what the function can do:</h3>
+
+<div class="highlight"><pre><code class="r"><span class="lineno">1</span> head<span class="p">(</span>densitylist<span class="p">(</span>originisocountrycode <span class="o">=</span> <span class="s">&quot;CA&quot;</span><span class="p">))</span>
+</code></pre></div>
+
+
+
+
+<div class="highlight"><pre><code class="text">  cellid minLatitude maxLatitude minLongitude maxLongitude count
+1  46913          40          41          -67          -66    44
+2  46914          40          41          -66          -65   907
+3  46915          40          41          -65          -64   510
+4  46916          40          41          -64          -63   645
+5  46917          40          41          -63          -62    56
+6  46918          40          41          -62          -61   143
+</code></pre></div>
+
+
+<h3>Using a related function, <code>density_spplist</code>, you can get a species list by one-degree cell as well.</h3>
+
+<div class="highlight"><pre><code class="r"><span class="lineno">1</span> <span class="c1"># Get a species list by cell, choosing one at random</span>
+<span class="lineno">2</span> density_spplist<span class="p">(</span>originisocountrycode <span class="o">=</span> <span class="s">&quot;CO&quot;</span><span class="p">,</span> spplist <span class="o">=</span> <span class="s">&quot;random&quot;</span><span class="p">)[</span><span class="m">1</span><span class="o">:</span><span class="m">10</span><span class="p">]</span>
+</code></pre></div>
+
+
+
+
+<div class="highlight"><pre><code class="text"> [1] &quot;Abarema laeta (Benth.) Barneby &amp; J.W.Grimes&quot;
+ [2] &quot;Abuta grandifolia (Mart.) Sandwith&quot;         
+ [3] &quot;Acalypha cuneata Poepp.&quot;                    
+ [4] &quot;Acalypha diversifolia Jacq.&quot;                
+ [5] &quot;Acalypha macrostachya Jacq.&quot;                
+ [6] &quot;Acalypha stachyura Pax&quot;                     
+ [7] &quot;Acanthoscelio acutus&quot;                       
+ [8] &quot;Accipiter collaris&quot;                         
+ [9] &quot;Actitis macularia&quot;                          
+[10] &quot;Adelobotrys klugii Wurdack&quot;                 
+</code></pre></div>
+
+
+
+
+<div class="highlight"><pre><code class="r"><span class="lineno">1</span> <span class="c1"># density_spplist(originisocountrycode = &#39;CO&#39;, spplist = &#39;r&#39;) # can</span>
+<span class="lineno">2</span> <span class="c1"># abbreviate the `spplist` argument</span>
+<span class="lineno">3</span> 
+<span class="lineno">4</span> <span class="c1"># Get a species list by cell, choosing the one with the greatest no. of</span>
+<span class="lineno">5</span> <span class="c1"># records</span>
+<span class="lineno">6</span> density_spplist<span class="p">(</span>originisocountrycode <span class="o">=</span> <span class="s">&quot;CO&quot;</span><span class="p">,</span> spplist <span class="o">=</span> <span class="s">&quot;great&quot;</span><span class="p">)[</span><span class="m">1</span><span class="o">:</span><span class="m">10</span><span class="p">]</span>  <span class="c1"># great is abbreviated from `greatest`</span>
+</code></pre></div>
+
+
+
+
+<div class="highlight"><pre><code class="text"> [1] &quot;Acanthaceae Juss.&quot;                
+ [2] &quot;Accipitridae sp.&quot;                 
+ [3] &quot;Accipitriformes/Falconiformes sp.&quot;
+ [4] &quot;Apodidae sp.&quot;                     
+ [5] &quot;Apodidae sp. (large swift sp.)&quot;   
+ [6] &quot;Apodidae sp. (small swift sp.)&quot;   
+ [7] &quot;Arctiinae&quot;                        
+ [8] &quot;Asteraceae Bercht. &amp; J. Presl&quot;    
+ [9] &quot;Asteraceae sp. 1&quot;                 
+[10] &quot;Asteraceae sp. 6&quot;                 
+</code></pre></div>
+
+
+
+
+<div class="highlight"><pre><code class="r"><span class="lineno">1</span> <span class="c1"># Can also get a data.frame with counts instead of the species list</span>
+<span class="lineno">2</span> density_spplist<span class="p">(</span>originisocountrycode <span class="o">=</span> <span class="s">&quot;CO&quot;</span><span class="p">,</span> spplist <span class="o">=</span> <span class="s">&quot;great&quot;</span><span class="p">,</span> listcount <span class="o">=</span> <span class="s">&quot;counts&quot;</span><span class="p">)[</span><span class="m">1</span><span class="o">:</span><span class="m">10</span><span class="p">,</span> 
+<span class="lineno">3</span>     <span class="p">]</span>
+</code></pre></div>
+
+
+
+
+<div class="highlight"><pre><code class="text">                              names_ count
+1                  Acanthaceae Juss.     2
+2                   Accipitridae sp.     6
+3  Accipitriformes/Falconiformes sp.     2
+4                       Apodidae sp.     5
+5     Apodidae sp. (large swift sp.)     8
+6     Apodidae sp. (small swift sp.)     5
+7                          Arctiinae     7
+8      Asteraceae Bercht. &amp; J. Presl     2
+9                   Asteraceae sp. 1     6
+10                  Asteraceae sp. 6    10
+</code></pre></div>
+
+
+<h3>You can now map point results, from fxns <code>occurrencelist</code> and those from <code>densitylist</code>, which plots them as points or as tiles, respectively.  Point map, using output from occurrencelist.</h3>
+
+<div class="highlight"><pre><code class="r"><span class="lineno">1</span> out <span class="o">&lt;-</span> occurrencelist<span class="p">(</span>scientificname <span class="o">=</span> <span class="s">&quot;Puma concolor&quot;</span><span class="p">,</span> coordinatestatus <span class="o">=</span> <span class="kc">TRUE</span><span class="p">,</span> 
+<span class="lineno">2</span>     maxresults <span class="o">=</span> <span class="m">100</span><span class="p">,</span> latlongdf <span class="o">=</span> <span class="k-Variable">T</span><span class="p">)</span>
+<span class="lineno">3</span> gbifmap<span class="p">(</span>input <span class="o">=</span> out<span class="p">)</span>  <span class="c1"># make a map, plotting on world map</span>
+</code></pre></div>
+
+
+<p><img src="/public/img/gbifmap1.png" alt="center" /></p>
+
+<h3>Point map, using output from occurrencelist, with many species plotted as different colors</h3>
+
+<div class="highlight"><pre><code class="r"><span class="lineno">1</span> splist <span class="o">&lt;-</span> c<span class="p">(</span><span class="s">&quot;Accipiter erythronemius&quot;</span><span class="p">,</span> <span class="s">&quot;Junco hyemalis&quot;</span><span class="p">,</span> <span class="s">&quot;Aix sponsa&quot;</span><span class="p">,</span> <span class="s">&quot;Buteo regalis&quot;</span><span class="p">)</span>
+<span class="lineno">2</span> out <span class="o">&lt;-</span> lapply<span class="p">(</span>splist<span class="p">,</span> <span class="kr">function</span><span class="p">(</span>x<span class="p">)</span> occurrencelist<span class="p">(</span>x<span class="p">,</span> coordinatestatus <span class="o">=</span> <span class="k-Variable">T</span><span class="p">,</span> maxresults <span class="o">=</span> <span class="m">100</span><span class="p">,</span> 
+<span class="lineno">3</span>     latlongdf <span class="o">=</span> <span class="k-Variable">T</span><span class="p">))</span>
+<span class="lineno">4</span> gbifmap<span class="p">(</span>out<span class="p">)</span>
+</code></pre></div>
+
+
+<p><img src="/public/img/gbifmap2.png" alt="center" /></p>
+
+<h3>Tile map, using output from densitylist, using results in Canada only.</h3>
+
+<div class="highlight"><pre><code class="r"><span class="lineno">1</span> out2 <span class="o">&lt;-</span> densitylist<span class="p">(</span>originisocountrycode <span class="o">=</span> <span class="s">&quot;CA&quot;</span><span class="p">)</span>  <span class="c1"># data for Canada</span>
+<span class="lineno">2</span> gbifmap<span class="p">(</span>out2<span class="p">)</span>  <span class="c1"># on world map</span>
+</code></pre></div>
+
+
+<p><img src="/public/img/gbifmap31.png" alt="center" /></p>
+
+<div class="highlight"><pre><code class="r"><span class="lineno">1</span> gbifmap<span class="p">(</span>out2<span class="p">,</span> region <span class="o">=</span> <span class="s">&quot;Canada&quot;</span><span class="p">)</span>  <span class="c1"># on Canada map</span>
+</code></pre></div>
+
+
+<p><img src="/public/img/gbifmap32.png" alt="NA" /></p>
+
+<hr />
+
+<h3>We can also query by higher taxonomic rankings, and map all lower species within that ranking. Above we queried by scientificname, but we can also query by higher taxonomy. 7071443 is the taxonconceptkey for 'Bacillariophyceae', a Class which includes many lower species.</h3>
+
+<div class="highlight"><pre><code class="r"><span class="lineno">1</span> out <span class="o">&lt;-</span> densitylist<span class="p">(</span>taxonconceptKey <span class="o">=</span> <span class="m">7071443</span><span class="p">)</span>
+<span class="lineno">2</span> gbifmap<span class="p">(</span>out<span class="p">)</span>
+</code></pre></div>
+
+
+<p><img src="/public/img/algae.png" alt="center" /></p>
+
+<h3>seminym asked about querying by area. You can query by area, though slightly differently for occurrencelist and densitylist functions. For occurrencelist you can search using min and max lat and long values (and min an max altitude, pretty cool, eh).</h3>
+
+<div class="highlight"><pre><code class="r"><span class="lineno">1</span> <span class="c1"># Get occurrences or density by area, using min/max lat/long coordinates</span>
+<span class="lineno">2</span> out <span class="o">&lt;-</span> occurrencelist<span class="p">(</span>minlatitude <span class="o">=</span> <span class="m">30</span><span class="p">,</span> maxlatitude <span class="o">=</span> <span class="m">35</span><span class="p">,</span> minlongitude <span class="o">=</span> <span class="m">-100</span><span class="p">,</span> 
+<span class="lineno">3</span>     maxlongitude <span class="o">=</span> <span class="m">-95</span><span class="p">,</span> coordinatestatus <span class="o">=</span> <span class="k-Variable">T</span><span class="p">,</span> maxresults <span class="o">=</span> <span class="m">5000</span><span class="p">,</span> latlongdf <span class="o">=</span> <span class="k-Variable">T</span><span class="p">)</span>
+<span class="lineno">4</span> 
+<span class="lineno">5</span> <span class="c1"># Using `geom_point`</span>
+<span class="lineno">6</span> gbifmap<span class="p">(</span>out<span class="p">,</span> <span class="s">&quot;state&quot;</span><span class="p">,</span> <span class="s">&quot;texas&quot;</span><span class="p">,</span> geom_point<span class="p">)</span>
+</code></pre></div>
+
+
+<p><img src="/public/img/byarea_occurr1.png" alt="center" /></p>
+
+<div class="highlight"><pre><code class="r"><span class="lineno">1</span> <span class="c1"># Using geom_jitter to move the points apart from one another</span>
+<span class="lineno">2</span> gbifmap<span class="p">(</span>out<span class="p">,</span> <span class="s">&quot;state&quot;</span><span class="p">,</span> <span class="s">&quot;texas&quot;</span><span class="p">,</span> geom_jitter<span class="p">,</span> position_jitter<span class="p">(</span>width <span class="o">=</span> <span class="m">0.3</span><span class="p">,</span> height <span class="o">=</span> <span class="m">0.3</span><span class="p">))</span>
+</code></pre></div>
+
+
+<p><img src="/public/img/byarea_occurr2.png" alt="NA" /></p>
+
+<div class="highlight"><pre><code class="r"><span class="lineno">1</span> <span class="c1"># And move points a lot</span>
+<span class="lineno">2</span> gbifmap<span class="p">(</span>out<span class="p">,</span> <span class="s">&quot;state&quot;</span><span class="p">,</span> <span class="s">&quot;texas&quot;</span><span class="p">,</span> geom_jitter<span class="p">,</span> position_jitter<span class="p">(</span>width <span class="o">=</span> <span class="m">1</span><span class="p">,</span> height <span class="o">=</span> <span class="m">1</span><span class="p">))</span>
+</code></pre></div>
+
+
+<p><img src="/public/img/byarea_occurr3.png" alt="NA" /></p>
+
+<h3>And you can query by area in <code>densitylist</code> by specifying a place using the <code>originisocountrycode</code> argument (as done in an above example).  Just showing the head of the data.frame here.</h3>
+
+<div class="highlight"><pre><code class="r"><span class="lineno">1</span> <span class="c1"># Get density by place, note that you can&#39;t use the lat and long arguments</span>
+<span class="lineno">2</span> <span class="c1"># in densitylist</span>
+<span class="lineno">3</span> head<span class="p">(</span>densitylist<span class="p">(</span>originisocountrycode <span class="o">=</span> <span class="s">&quot;CA&quot;</span><span class="p">))</span>
+</code></pre></div>
+
+
+
+
+<div class="highlight"><pre><code class="text">  cellid minLatitude maxLatitude minLongitude maxLongitude count
+1  46913          40          41          -67          -66    44
+2  46914          40          41          -66          -65   907
+3  46915          40          41          -65          -64   510
+4  46916          40          41          -64          -63   645
+5  46917          40          41          -63          -62    56
+6  46918          40          41          -62          -61   143
+</code></pre></div>
+
+
+<hr />
+
+<h4>Get the .Rmd file used to create this post <a href="https://github.com/sckott/sckott.github.io/tree/master/_drafts/2012-10-08-rgbif-newfxns.Rmd">at my github account</a> - or <a href="https://github.com/sckott/sckott.github.io/tree/master/_posts/2012-10-08-rgbif-newfxns.md">.md file</a>.</h4>
+
+<h4>Written in <a href="http://daringfireball.net/projects/markdown/">Markdown</a>, with help from <a href="http://yihui.name/knitr/">knitr</a>.</h4>
+
+  </div>
+  
+  <div class="post">
+    <h1>
       <a href="/2012/09/rvertnet/">
         Vertnet - getting vertebrate museum record data and a quick map
       </a>
@@ -209,398 +465,6 @@
 &ldquo;Glass Shape Influences Consumption Rate For Alcoholic Beverages.&rdquo;
 <EM>Plos One</EM>, <B>7</B>.
 <a href="http://dx.doi.org/10.1371/journal.pone.0043007">http://dx.doi.org/10.1371/journal.pone.0043007</a>.</p>
-
-  </div>
-  
-  <div class="post">
-    <h1>
-      <a href="/2012/09/rmetadata/">
-        Scholarly metadata from R
-      </a>
-    </h1>
-
-    <span class="post-date">17 Sep 2012</span>
-
-    <p>Metadata!  Metadata is very cool.  It's super hot right now - everybody is talking about it.  Okay, maybe not everyone, but it's an important part of archiving scholarly work.</p>
-
-<p>We are working on <a href="https://github.com/ropensci/rmetadata">a repo on GitHub <code>rmetadata</code></a> to be a one stop shop for querying metadata from around the web.  Various repos on GitHub we have started - <a href="https://github.com/ropensci/rpmc">rpmc</a>, <a href="https://github.com/ropensci/rpmc">rdatacite</a>, <a href="https://github.com/ropensci/rpmc">rdryad</a>, <a href="https://github.com/ropensci/rpmc">rpensoft</a>, <a href="https://github.com/ropensci/rpmc">rhindawi</a> - will at least in part be folded into <code>rmetadata</code>.</p>
-
-<p>As a start we are writing functions to hit any metadata services that use the <a href="http://www.openarchives.org/OAI/openarchivesprotocol.html">OAI-PMH: "Open Archives Initiative Protocol for Metadata Harvesting"</a> framework.  <code>OAI-PMH</code> has six methods (or verbs as they are called) for data harvesting that are the same across different metadata providers:</p>
-
-<ul>
-<li><code>GetRecord</code></li>
-<li><code>Identify</code></li>
-<li><code>ListIdentifiers</code></li>
-<li><code>ListMetadataFormats</code></li>
-<li><code>ListRecords</code></li>
-<li><code>ListSets</code></li>
-</ul>
-
-
-<p><code>OAI-PMH</code> provides an updating list of data providers, which we can easily use to get the base URLs for their data.  Then we just use one of the six above methods to query their metadata.</p>
-
-<h3>Let's install rmetadata first.</h3>
-
-<div class="highlight"><pre><code class="r"><span class="lineno">1</span> install_github<span class="p">(</span><span class="s">&quot;rmetadata&quot;</span><span class="p">,</span> <span class="s">&quot;ropensci&quot;</span><span class="p">)</span>
-<span class="lineno">2</span> library<span class="p">(</span>rmetadata<span class="p">)</span>
-</code></pre></div>
-
-
-<h3>The most basic thing you can do with <code>OAI-PMH</code> is identify the data provider, getting their basic information. The <code>Identify</code> verb.</h3>
-
-<div class="highlight"><pre><code class="r"><span class="lineno">1</span> <span class="c1"># one provider</span>
-<span class="lineno">2</span> md_identify<span class="p">(</span>provider <span class="o">=</span> <span class="s">&quot;datacite&quot;</span><span class="p">)</span>
-</code></pre></div>
-
-
-
-
-<div class="highlight"><pre><code class="text">  repositoryName                     baseURL protocolVersion
-1   DataCite MDS http://oai.datacite.org/oai             2.0
-          adminEmail    earliestDatestamp deletedRecord
-1 admin@datacite.org 2011-01-01T00:00:00Z            no
-           granularity compression compression.1
-1 YYYY-MM-DDThh:mm:ssZ        gzip       deflate
-                                                                                                                                                      description
-1 oai, oai.datacite.org, :, oai:oai.datacite.org:12425, http://www.openarchives.org/OAI/2.0/oai-identifier http://www.openarchives.org/OAI/2.0/oai-identifier.xsd
-</code></pre></div>
-
-
-
-
-<div class="highlight"><pre><code class="r"><span class="lineno">1</span> <span class="c1"># many providers</span>
-<span class="lineno">2</span> md_identify<span class="p">(</span>provider <span class="o">=</span> c<span class="p">(</span><span class="s">&quot;datacite&quot;</span><span class="p">,</span> <span class="s">&quot;pensoft&quot;</span><span class="p">))</span>
-</code></pre></div>
-
-
-
-
-<div class="highlight"><pre><code class="text">      repositoryName                     baseURL protocolVersion
-1       DataCite MDS http://oai.datacite.org/oai             2.0
-2 Pensoft Publishers       http://oai.pensoft.eu             2.0
-          adminEmail    earliestDatestamp deletedRecord
-1 admin@datacite.org 2011-01-01T00:00:00Z            no
-2               NULL           2008-07-04            no
-           granularity compression compression.1
-1 YYYY-MM-DDThh:mm:ssZ        gzip       deflate
-2           YYYY-MM-DD        NULL          NULL
-                                                                                                                                                      description
-1 oai, oai.datacite.org, :, oai:oai.datacite.org:12425, http://www.openarchives.org/OAI/2.0/oai-identifier http://www.openarchives.org/OAI/2.0/oai-identifier.xsd
-2                                                                                                                                                            NULL
-</code></pre></div>
-
-
-
-
-<div class="highlight"><pre><code class="r"><span class="lineno">1</span> <span class="c1"># no match for one, two matches for other</span>
-<span class="lineno">2</span> md_identify<span class="p">(</span>provider <span class="o">=</span> c<span class="p">(</span><span class="s">&quot;harvard&quot;</span><span class="p">,</span> <span class="s">&quot;journal&quot;</span><span class="p">))</span>
-</code></pre></div>
-
-
-
-
-<div class="highlight"><pre><code class="text">$harvard
-               x
-1 no match found
-
-$journal
-                                               repo_name
-1       Hrcak - Portal of scientific journals of Croatia
-2 International journal of Power Electronics Engineering
-</code></pre></div>
-
-
-
-
-<div class="highlight"><pre><code class="r"><span class="lineno">1</span> <span class="c1"># let&#39;s pick one from the second</span>
-<span class="lineno">2</span> md_identify<span class="p">(</span>provider <span class="o">=</span> <span class="s">&quot;Hrcak&quot;</span><span class="p">)</span>
-</code></pre></div>
-
-
-
-
-<div class="highlight"><pre><code class="text">                                    repositoryName
-1 Hrcak - Portal of scientific journals of Croatia
-                    baseURL protocolVersion    adminEmail
-1 http://hrcak.srce.hr/oai/             2.0 hrcak@srce.hr
-  earliestDatestamp deletedRecord granularity
-1        2005-12-01            no  YYYY-MM-DD
-                                                                                                                                                                          description
-1 oai, hrcak.srce.hr, :, oai:hrcak.srce.hr:anIdentifier, http://www.openarchives.org/OAI/2.0/oai-identifier                    http://www.openarchives.org/OAI/2.0/oai-identifier.xsd
-</code></pre></div>
-
-
-<h3>There are a variety of metadata formats, depending on the data provider - list them with the <code>ListMetadataFormats</code> verb.</h3>
-
-<div class="highlight"><pre><code class="r"><span class="lineno">1</span> <span class="c1"># List metadata formats for a provider</span>
-<span class="lineno">2</span> md_listmetadataformats<span class="p">(</span>provider <span class="o">=</span> <span class="s">&quot;dryad&quot;</span><span class="p">)</span>
-</code></pre></div>
-
-
-
-
-<div class="highlight"><pre><code class="text">  metadataPrefix
-1         oai_dc
-2            rdf
-3            ore
-4           mets
-                                                       schema
-1              http://www.openarchives.org/OAI/2.0/oai_dc.xsd
-2                 http://www.openarchives.org/OAI/2.0/rdf.xsd
-3 http://tweety.lanl.gov/public/schemas/2008-06/atom-tron.sch
-4                  http://www.loc.gov/standards/mets/mets.xsd
-                            metadataNamespace
-1 http://www.openarchives.org/OAI/2.0/oai_dc/
-2    http://www.openarchives.org/OAI/2.0/rdf/
-3                 http://www.w3.org/2005/Atom
-4                    http://www.loc.gov/METS/
-</code></pre></div>
-
-
-
-
-<div class="highlight"><pre><code class="r"><span class="lineno">1</span> <span class="c1"># List metadata formats for a specific identifier for a provider</span>
-<span class="lineno">2</span> md_listmetadataformats<span class="p">(</span>provider <span class="o">=</span> <span class="s">&quot;pensoft&quot;</span><span class="p">,</span> identifier <span class="o">=</span> <span class="s">&quot;10.3897/zookeys.1.10&quot;</span><span class="p">)</span>
-</code></pre></div>
-
-
-
-
-<div class="highlight"><pre><code class="text">            identifier metadataPrefix
-1 10.3897/zookeys.1.10         oai_dc
-2 10.3897/zookeys.1.10           mods
-                                             schema
-1    http://www.openarchives.org/OAI/2.0/oai_dc.xsd
-2 http://www.loc.gov/standards/mods/v3/mods-3-1.xsd
-                            metadataNamespace
-1 http://www.openarchives.org/OAI/2.0/oai_dc/
-2                  http://www.loc.gov/mods/v3
-</code></pre></div>
-
-
-<h3>The <code>ListRecords</code> verb is used to harvest records from a repository</h3>
-
-<div class="highlight"><pre><code class="r"><span class="lineno">1</span> head<span class="p">(</span>md_listrecords<span class="p">(</span>provider <span class="o">=</span> <span class="s">&quot;datacite&quot;</span><span class="p">)[[</span><span class="m">1</span><span class="p">]][,</span> <span class="m">2</span><span class="o">:</span><span class="m">4</span><span class="p">])</span>
-</code></pre></div>
-
-
-
-
-<div class="highlight"><pre><code class="text">                  identifier            datestamp setSpec
-1 oai:oai.datacite.org:32153 2011-06-08T08:57:11Z     TIB
-2 oai:oai.datacite.org:32200 2011-06-20T08:11:08Z     TIB
-3 oai:oai.datacite.org:32220 2011-06-28T14:11:08Z     TIB
-4 oai:oai.datacite.org:32241 2011-06-30T13:24:45Z     TIB
-5 oai:oai.datacite.org:32255 2011-07-01T12:09:24Z     TIB
-6 oai:oai.datacite.org:32282 2011-07-05T09:08:10Z     TIB
-</code></pre></div>
-
-
-<h3><code>ListIdentifiers</code> is an abbreviated form of <code>ListRecords</code>, retrieving only headers rather than records.</h3>
-
-<div class="highlight"><pre><code class="r"><span class="lineno">1</span> <span class="c1"># Single provider</span>
-<span class="lineno">2</span> md_listidentifiers<span class="p">(</span>provider <span class="o">=</span> <span class="s">&quot;datacite&quot;</span><span class="p">,</span> set <span class="o">=</span> <span class="s">&quot;REFQUALITY&quot;</span><span class="p">)[[</span><span class="m">1</span><span class="p">]][</span><span class="m">1</span><span class="o">:</span><span class="m">10</span><span class="p">]</span>
-</code></pre></div>
-
-
-
-
-<div class="highlight"><pre><code class="text"> [1] &quot;oai:oai.datacite.org:32426&quot; &quot;oai:oai.datacite.org:32152&quot;
- [3] &quot;oai:oai.datacite.org:25453&quot; &quot;oai:oai.datacite.org:25452&quot;
- [5] &quot;oai:oai.datacite.org:25451&quot; &quot;oai:oai.datacite.org:25450&quot;
- [7] &quot;oai:oai.datacite.org:25449&quot; &quot;oai:oai.datacite.org:25407&quot;
- [9] &quot;oai:oai.datacite.org:48328&quot; &quot;oai:oai.datacite.org:48439&quot;
-</code></pre></div>
-
-
-
-
-<div class="highlight"><pre><code class="r"><span class="lineno">1</span> md_listidentifiers<span class="p">(</span>provider <span class="o">=</span> <span class="s">&quot;dryad&quot;</span><span class="p">,</span> from <span class="o">=</span> <span class="s">&quot;2012-07-15&quot;</span><span class="p">)[[</span><span class="m">1</span><span class="p">]][</span><span class="m">1</span><span class="o">:</span><span class="m">10</span><span class="p">]</span>
-</code></pre></div>
-
-
-
-
-<div class="highlight"><pre><code class="text"> [1] &quot;oai:datadryad.org:10255/dryad.9106&quot; 
- [2] &quot;oai:datadryad.org:10255/dryad.33780&quot;
- [3] &quot;oai:datadryad.org:10255/dryad.33901&quot;
- [4] &quot;oai:datadryad.org:10255/dryad.33902&quot;
- [5] &quot;oai:datadryad.org:10255/dryad.34472&quot;
- [6] &quot;oai:datadryad.org:10255/dryad.34558&quot;
- [7] &quot;oai:datadryad.org:10255/dryad.39975&quot;
- [8] &quot;oai:datadryad.org:10255/dryad.35065&quot;
- [9] &quot;oai:datadryad.org:10255/dryad.35081&quot;
-[10] &quot;oai:datadryad.org:10255/dryad.35082&quot;
-</code></pre></div>
-
-
-
-
-<div class="highlight"><pre><code class="r"><span class="lineno">1</span> <span class="c1"># Many providers</span>
-<span class="lineno">2</span> out <span class="o">&lt;-</span> md_listidentifiers<span class="p">(</span>provider <span class="o">=</span> c<span class="p">(</span><span class="s">&quot;datacite&quot;</span><span class="p">,</span> <span class="s">&quot;pensoft&quot;</span><span class="p">),</span> from <span class="o">=</span> <span class="s">&quot;2012-08-21&quot;</span><span class="p">)</span>
-<span class="lineno">3</span> llply<span class="p">(</span>out<span class="p">,</span> <span class="kr">function</span><span class="p">(</span>x<span class="p">)</span> x<span class="p">[</span><span class="m">1</span><span class="o">:</span><span class="m">10</span><span class="p">])</span>  <span class="c1"># display just a few of them</span>
-</code></pre></div>
-
-
-
-
-<div class="highlight"><pre><code class="text">[[1]]
- [1] &quot;oai:oai.datacite.org:1099317&quot; &quot;oai:oai.datacite.org:1099572&quot;
- [3] &quot;oai:oai.datacite.org:1099824&quot; &quot;oai:oai.datacite.org:1099695&quot;
- [5] &quot;oai:oai.datacite.org:1088239&quot; &quot;oai:oai.datacite.org:1088122&quot;
- [7] &quot;oai:oai.datacite.org:1088190&quot; &quot;oai:oai.datacite.org:1175749&quot;
- [9] &quot;oai:oai.datacite.org:1175288&quot; &quot;oai:oai.datacite.org:1115603&quot;
-
-[[2]]
- [1] &quot;10.3897/phytokeys.16.2884&quot; &quot;10.3897/phytokeys.16.3602&quot;
- [3] &quot;10.3897/phytokeys.16.3186&quot; &quot;10.3897/zookeys.216.3407&quot; 
- [5] &quot;10.3897/zookeys.216.3332&quot;  &quot;10.3897/zookeys.216.3224&quot; 
- [7] &quot;10.3897/zookeys.216.3769&quot;  &quot;10.3897/zookeys.216.3360&quot; 
- [9] &quot;10.3897/zookeys.216.3646&quot;  &quot;10.3897/neobiota.14.3140&quot; 
-</code></pre></div>
-
-
-<h3>With <code>ListSets</code> you can retrieve the set structure of a repository.</h3>
-
-<div class="highlight"><pre><code class="r"><span class="lineno">1</span> <span class="c1"># arXiv, returns a data.frame</span>
-<span class="lineno">2</span> head<span class="p">(</span>md_listsets<span class="p">(</span>provider <span class="o">=</span> <span class="s">&quot;arXiv&quot;</span><span class="p">)[[</span><span class="m">1</span><span class="p">]])</span>
-</code></pre></div>
-
-
-
-
-<div class="highlight"><pre><code class="text">             setName          setSpec
-1   Computer Science               cs
-2        Mathematics             math
-3 Nonlinear Sciences             nlin
-4            Physics          physics
-5       Astrophysics physics:astro-ph
-6   Condensed Matter physics:cond-mat
-</code></pre></div>
-
-
-
-
-<div class="highlight"><pre><code class="r"><span class="lineno">1</span> <span class="c1"># many providers, returns a list</span>
-<span class="lineno">2</span> md_listsets<span class="p">(</span>provider <span class="o">=</span> c<span class="p">(</span><span class="s">&quot;pensoft&quot;</span><span class="p">,</span> <span class="s">&quot;arXiv&quot;</span><span class="p">))</span>
-</code></pre></div>
-
-
-
-
-<div class="highlight"><pre><code class="text">[[1]]
-                                  setName            setSpec
-1                                 ZooKeys            zookeys
-2                                 BioRisk            biorisk
-3                               PhytoKeys          phytokeys
-4                                NeoBiota           neobiota
-5         Journal of Hymenoptera Research                jhr
-6  International Journal of Myriapodology                ijm
-7                Comparative Cytogenetics        compcytogen
-8                    Subterranean Biology           subtbiol
-9                     Nature Conservation natureconservation
-10                               MycoKeys           mycokeys
-
-[[2]]
-                                    setName          setSpec
-1                          Computer Science               cs
-2                               Mathematics             math
-3                        Nonlinear Sciences             nlin
-4                                   Physics          physics
-5                              Astrophysics physics:astro-ph
-6                          Condensed Matter physics:cond-mat
-7  General Relativity and Quantum Cosmology    physics:gr-qc
-8          High Energy Physics - Experiment   physics:hep-ex
-9             High Energy Physics - Lattice  physics:hep-lat
-10      High Energy Physics - Phenomenology   physics:hep-ph
-11             High Energy Physics - Theory   physics:hep-th
-12                     Mathematical Physics  physics:math-ph
-13                       Nuclear Experiment  physics:nucl-ex
-14                           Nuclear Theory  physics:nucl-th
-15                          Physics (Other)  physics:physics
-16                          Quantum Physics physics:quant-ph
-17                     Quantitative Biology            q-bio
-18                     Quantitative Finance            q-fin
-19                               Statistics             stat
-</code></pre></div>
-
-
-<h3>Retrieve an individual metadata record from a repository using the <code>GetRecord</code> verb.</h3>
-
-<div class="highlight"><pre><code class="r"><span class="lineno">1</span> <span class="c1"># Single provider, one identifier</span>
-<span class="lineno">2</span> md_getrecord<span class="p">(</span>provider <span class="o">=</span> <span class="s">&quot;pensoft&quot;</span><span class="p">,</span> identifier <span class="o">=</span> <span class="s">&quot;10.3897/zookeys.1.10&quot;</span><span class="p">)</span>
-</code></pre></div>
-
-
-
-
-<div class="highlight"><pre><code class="text">            identifier  datestamp
-1 10.3897/zookeys.1.10 2008-07-04
-                                                                                             dc.title
-1 A new candidate for a Gondwanaland distribution in the Zodariidae (Araneae): Australutica in Africa
-   dc.creator  dc.subject dc.subject.1 dc.subject.2 dc.subject.3
-1 Jocqué,Rudy new species Gondwanaland Soutpansberg      Araneae
-         dc.source
-1 ZooKeys 1: 59-66
-                                                                                                                                                                                                                                                                                                                     dc.description
-1 Two new species of Australutica Jocqué, 1995, a genus formerly only known from Australia, are described from South Africa: A. africana n. sp. from Soutpansberg and A. normanlarseni n. sp. from the Cape Peninsula. The taxonomic position of the new species is discussed and a key to the species of Australutica is provided.
-        dc.publisher dc.date          dc.type dc.format
-1 Pensoft Publishers    2008 Research Article text/html
-                           dc.identifier
-1 http://dx.doi.org/10.3897/zookeys.1.10
-                                      dc.identifier.1 dc.language
-1 http://www.pensoft.net/journals/zookeys/article/10/          en
-                                                                                   dc..attrs
-1 http://www.openarchives.org/OAI/2.0/oai_dc/ http://www.openarchives.org/OAI/2.0/oai_dc.xsd
-</code></pre></div>
-
-
-
-
-<div class="highlight"><pre><code class="r"><span class="lineno">1</span> <span class="c1"># Single provider, multiple identifiers</span>
-<span class="lineno">2</span> md_getrecord<span class="p">(</span>provider <span class="o">=</span> <span class="s">&quot;pensoft&quot;</span><span class="p">,</span> identifier <span class="o">=</span> c<span class="p">(</span><span class="s">&quot;10.3897/zookeys.1.10&quot;</span><span class="p">,</span> <span class="s">&quot;10.3897/zookeys.4.57&quot;</span><span class="p">))</span>
-</code></pre></div>
-
-
-
-
-<div class="highlight"><pre><code class="text">            identifier  datestamp
-1 10.3897/zookeys.1.10 2008-07-04
-2 10.3897/zookeys.4.57 2008-12-17
-                                                                                                dc.title
-1    A new candidate for a Gondwanaland distribution in the Zodariidae (Araneae): Australutica in Africa
-2 Studies of Tiger Beetles. CLXXVIII. A new Lophyra (Lophyra) from Somaliland (Coleoptera, Cicindelidae)
-     dc.creator    dc.subject dc.subject.1 dc.subject.2 dc.subject.3
-1   Jocqué,Rudy   new species Gondwanaland Soutpansberg      Araneae
-2 Cassola,Fabio Tiger Beetles Cicindelidae      Lophyra   Somaliland
-         dc.source
-1 ZooKeys 1: 59-66
-2 ZooKeys 4: 65-69
-                                                                                                                                                                                                                                                                                                                                                                                                                   dc.description
-1                                                                                               Two new species of Australutica Jocqué, 1995, a genus formerly only known from Australia, are described from South Africa: A. africana n. sp. from Soutpansberg and A. normanlarseni n. sp. from the Cape Peninsula. The taxonomic position of the new species is discussed and a key to the species of Australutica is provided.
-2 A new tiger beetle species, Lophyra (Lophyra) praetermissa n. sp. (Coleoptera, Cicindelidae), obviously a close relative of L. (L.) histrio (Tschitschérine, 1903), is described from the environs of Erigavo, Somaliland (northern Somalia). Its discovery thus brings up to 73 the number of the species of this genus presently known worldwide (39 species of which - 29 from Africa - belong to the typonominal subgenus).
-        dc.publisher dc.date          dc.type dc.format
-1 Pensoft Publishers    2008 Research Article text/html
-2 Pensoft Publishers    2008 Research Article text/html
-                           dc.identifier
-1 http://dx.doi.org/10.3897/zookeys.1.10
-2 http://dx.doi.org/10.3897/zookeys.4.57
-                                      dc.identifier.1 dc.language
-1 http://www.pensoft.net/journals/zookeys/article/10/          en
-2 http://www.pensoft.net/journals/zookeys/article/57/          en
-                                                                                   dc..attrs
-1 http://www.openarchives.org/OAI/2.0/oai_dc/ http://www.openarchives.org/OAI/2.0/oai_dc.xsd
-2 http://www.openarchives.org/OAI/2.0/oai_dc/ http://www.openarchives.org/OAI/2.0/oai_dc.xsd
-</code></pre></div>
-
-
-<p>Cool, so I hope people find this post and package useful.  Let me know what you think in comments below, or if you have code specific comments or additions, go to <a href="https://github.com/ropensci/rmetadata">the GitHub repo for <code>rmetadata</code></a>.  In a upcoming post I will show an example  of what you can do with <code>rmetadata</code> in terms of an actual research question.</p>
-
-<hr />
-
-<h4>Get the .Rmd file used to create this post <a href="https://github.com/sckott/sckott.github.io/tree/master/_drafts/2012-09-15-rmetadata.Rmd">at my github account</a> - or <a href="https://github.com/sckott/sckott.github.io/tree/master/_posts/2012-09-17-rmetadata.md">.md file</a>.</h4>
-
-<h4>Written in <a href="http://daringfireball.net/projects/markdown/">Markdown</a>, with help from <a href="http://yihui.name/knitr/">knitr</a>, and nice knitr highlighting/etc. in in <a href="http://rstudio.org/">RStudio</a>.</h4>
 
   </div>
   
