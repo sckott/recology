@@ -1,0 +1,133 @@
+---
+name: rsunlight
+layout: post
+title: rsunlight - v0.3 released
+date: 2014-08-11
+author: Scott Chamberlain
+tags:
+- R
+- API
+- government
+---
+
+```{r, eval=TRUE, echo=FALSE}
+knitr::opts_chunk$set(fig.path="../public/img/2014-08-11-rsunlight/")
+```
+
+My [last blog post on this package](http://recology.info/2014/05/rsunlight/) was so long ago the package wrapped both New York Times APIs and Sunlight Labs APIs and the package was called `govdat`. I split that package up into `rsunlight` for Sunlight Labs APIs and `rtimes` for some New York Times APIs. `rtimes` is [in development at Github](https://github.com/ropengov/rtimes).
+
+We've updated the package to include four sets of functions, one set for each of four Sunlight Labs APIs (with a separate prefix for each API):
+
+* Congress API (`cg_`)
+* Open States API (`os_`)
+* Capitol Words API (`cw_`)
+* Influence Explorer API (`ie_`)
+
+Then there are many methods for each API.
+
+## rsunlight intro
+
+### Installation
+
+First, installation
+
+```{r eval=FALSE}
+devtools::install_github("ropengov/rsunlight")
+```
+
+Load the library
+
+```{r}
+library("rsunlight")
+```
+
+### Congress API
+
+Search for Fed level bills that include the term _health care_ in them.
+
+```{r}
+res <- cg_bills(query='health care')
+head(res$results[,1:4])
+```
+
+Search for bills that have the two terms _transparency_ and _accountability_ within 5 words of each other in the bill.
+
+```{r}
+res <- cg_bills(query='transparency accountability'~5)
+head(res$results[,1:4])
+```
+
+### Open States API
+
+Search State Bills, in this case search for the term _agriculture_ in Texas.
+
+```{r}
+res <- os_billsearch(terms = 'agriculture', state = 'tx')
+head(res)
+```
+
+Search for legislators in California (_ca_) and in the democratic party
+
+```{r}
+res <- os_legislatorsearch(state = 'ca', party = 'democratic', fields = c('full_name','+capitol_office.phone'))
+head(res)
+```
+
+Now you can call each representative, yay!
+
+### Capitol Words API
+
+Search for phrase _climate change_ used by politicians between September 5th and 16th, 2011:
+
+```{r}
+head(cw_text(phrase='climate change', start_date='2011-09-05', end_date='2011-09-16', party='D')[,c('speaker_last','origin_url')])
+```
+
+Plot mentions of the term _climate change_ over time for Democrats vs. Republicans
+
+```{r fig.width=10, fig.height=6} 
+library('ggplot2')
+dat_d <- cw_timeseries(phrase='climate change', party="D")
+dat_d$party <- rep("D", nrow(dat_d))
+dat_r <- cw_timeseries(phrase='climate change', party="R")
+dat_r$party <- rep("R", nrow(dat_r))
+dat_both <- rbind(dat_d, dat_r)
+ggplot(dat_both, aes(day, count, colour=party)) +
+   geom_line() +
+   theme_grey(base_size=20) +
+   scale_colour_manual(values=c("blue","red"))
+```
+
+### Influence Explorer API
+
+Search for contributions of equal to or more than `$20,000,000`.
+
+```{r}
+ie_contr(amount='>|20000000')[,c('amount','recipient_name','contributor_name')]
+```
+
+Top industries, by contributions given. _UNKOWN_ is a very influential industry. Of course _law firms_ are high up there, as well as _real estate_. I'm sure _oil and gas_ is embarrased that they're contributing less than _pulic sector unions_. 
+
+```{r fig.width=10, fig.height=6}
+(res <- ie_industries(method='top_ind', limit=10))
+res$amount <- as.numeric(res$amount)
+ggplot(res, aes(reorder(name, amount), amount)) + 
+  geom_bar(stat = "identity") +
+  coord_flip() +
+  scale_y_continuous(labels=dollar) +
+  theme_grey(base_size = 14) +
+  labs(x='Industry', y='Amount')
+```
+
+-------
+
+## Feedback
+
+Please do use `rsunlight`, and let us know what you want fixed, new features, etc.
+
+## Still to come:
+
+* Functions to visualize data from each API. You can do this yourself, but a few functions will be created to help those that are new to R.
+* Vectorize functions so that you can give many inputs to a function instead of a single input.
+* test suite: embarrasingly, there is no test suite yet, boo me.
+* I plan to push `rsunlight` to CRAN soon as `v0.3`
