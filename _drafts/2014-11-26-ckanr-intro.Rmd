@@ -1,0 +1,119 @@
+---
+name: ckanr-intro
+layout: post
+title: Intro to alpha ckanr - R client for CKAN RESTful API 
+date: 2014-11-26T11:42:36Z
+author: Scott Chamberlain
+tags:
+- R
+- API
+- github
+- database
+---
+
+```{r, echo=FALSE}
+knitr::opts_chunk$set(
+  collapse=TRUE,
+  comment="#>",
+  warning=FALSE, 
+  message=FALSE
+)
+```
+
+Recently I had need to create a client for scraping museum metadata to help out some folks that use that kind of data. It's called [musemeta](https://github.com/ropensci/musemeta). One of the data sources in that package uses the open source _data portal software_ [CKAN](http://ckan.org/), and so we can interact with [the CKAN API](http://docs.ckan.org/en/latest/api/index.html) to get data. Since many groups can use CKAN API/etc infrastucture because it's open source, I thought why not have a general purpose R client for this, since [there are other clients](https://github.com/ckan/ckan/wiki/CKAN-API-Clients) for Python, PHP, Ruby, etc. 
+
+Here's a bit of an intro:
+
+## Setup
+
+Get/load packages
+
+```{r eval=FALSE}
+install.packages("devtools")
+devtools::install_github("ropensci/ckanr")
+```
+
+```{r}
+library("ckanr")
+```
+
+> Note: the default URL is for http://data.techno-science.ca/. You can change that in the `url` parameter
+
+## Some package details
+
+All API alls are `POST` requests, and handled through a helper function called `ckan_POST()`. See `ckanr:::ckan_POST` to see the function.
+
+There are some common parameters across most functions that are worth describing a bit:
+
+* `offset` (numeric) Where to start getting items from (optional, default: 0)
+* `limit` (numeric) The maximum number of items to return (optional, default: 31)
+* `url` Base url to use. Default: [http://data.techno-science.ca](http://data.techno-science.ca)
+* `as` (character) One of `list` (default), `table`, or `json`. Parsing with table option uses `jsonlite::fromJSON(..., simplifyDataFrame = TRUE)`, which attempts to parse data to `data.frame`'s when possible, so the result can vary.
+* `...` Curl args passed on to `httr::POST`
+
+## Changes
+
+```{r}
+changes(limit = 2, as = "table")
+```
+
+## List datasets
+
+```{r}
+datasets(as = "table")
+```
+
+## List tags
+
+```{r}
+tag_list('aviation', as='table')
+```
+
+## Show tags
+
+Subset for readme brevity
+
+```{r}
+tag_show('Aviation')$packages[[1]][1:3]  
+```
+
+## List groups
+
+```{r}
+group_list(as='table')
+```
+
+## Show groups
+
+Subset for readme brevity
+
+```{r}
+group_show('communications', as='table')$users
+```
+
+## Show a package
+
+```{r}
+package_show('34d60b13-1fd5-430e-b0ec-c8bc7f4841cf', as='table')$resources
+```
+
+## Search for packages
+
+```{r}
+out <- package_search(q = '*:*', rows = 2, as="table")$results
+out[, !names(out) %in% 'resources']
+```
+
+## Search for resources
+
+```{r}
+resource_search(q = 'name:data', limit = 2, as='table')
+```
+
+## Future work
+
+* There's already [an issue](https://github.com/ropensci/ckanr/issues/4) to add support for [DataStore](http://docs.ckan.org/en/latest/maintaining/datastore.html)
+* This client needs to be tested against many other CKAN API instances to make sure it's robust
+* Add a test suite
+* Use cases: would be nice to include in the package documentation use cases
+* Other things? Get in touch on twitter `@recology_` or below
