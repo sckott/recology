@@ -6,6 +6,169 @@
 		<link>http://recology.info/</link>
 		
 			<item>
+				<title>Fun with the GitHub API</title>
+				<description>&lt;p&gt;Recently I&#39;ve had fun playing with the GitHub API, and here are some notes to self about this fun having.&lt;/p&gt;
+
+&lt;h2&gt;Setup&lt;/h2&gt;
+
+&lt;p&gt;Get/load packages&lt;/p&gt;
+
+&lt;pre&gt;&lt;code class=&quot;r&quot;&gt;install.packages(c(&#39;devtools&#39;,&#39;jsonlite&#39;,&#39;httr&#39;,&#39;yaml&#39;))
+&lt;/code&gt;&lt;/pre&gt;
+
+&lt;pre&gt;&lt;code class=&quot;r&quot;&gt;library(&quot;devtools&quot;)
+library(&quot;httr&quot;)
+library(&quot;yaml&quot;)
+&lt;/code&gt;&lt;/pre&gt;
+
+&lt;h2&gt;Define a vector of package names&lt;/h2&gt;
+
+&lt;pre&gt;&lt;code class=&quot;r&quot;&gt;pkgs &amp;lt;- c(&quot;alm&quot;, &quot;bmc&quot;, &quot;bold&quot;, &quot;clifro&quot;, &quot;ecoengine&quot;,
+  &quot;elastic&quot;, &quot;fulltext&quot;, &quot;geonames&quot;, &quot;gistr&quot;,
+  &quot;RNeXML&quot;, &quot;rnoaa&quot;, &quot;rnpn&quot;, &quot;traits&quot;, &quot;rplos&quot;, &quot;rsnps&quot;,
+  &quot;rWBclimate&quot;, &quot;solr&quot;, &quot;spocc&quot;, &quot;taxize&quot;, &quot;togeojson&quot;, &quot;treeBASE&quot;)
+pkgs &amp;lt;- sort(pkgs)
+&lt;/code&gt;&lt;/pre&gt;
+
+&lt;h2&gt;Define functions&lt;/h2&gt;
+
+&lt;pre&gt;&lt;code class=&quot;r&quot;&gt;github_auth &amp;lt;- function(appname = getOption(&quot;gh_appname&quot;), key = getOption(&quot;gh_id&quot;),
+                        secret = getOption(&quot;gh_secret&quot;)) {
+  if (is.null(getOption(&quot;gh_token&quot;))) {
+    myapp &amp;lt;- oauth_app(appname, key, secret)
+    token &amp;lt;- oauth2.0_token(oauth_endpoints(&quot;github&quot;), myapp)
+    options(gh_token = token)
+  } else {
+    token &amp;lt;- getOption(&quot;gh_token&quot;)
+  }
+  return(token)
+}
+
+make_url &amp;lt;- function(x, y, z) {
+  sprintf(&quot;https://api.github.com/repos/%s/%s/%s&quot;, x, y, z)
+}
+
+process_result &amp;lt;- function(x) {
+  stop_for_status(x)
+  if (!x$headers$`content-type` == &quot;application/json; charset=utf-8&quot;)
+    stop(&quot;content type mismatch&quot;)
+  tmp &amp;lt;- content(x, as = &quot;text&quot;)
+  jsonlite::fromJSON(tmp, flatten = TRUE)
+}
+
+parse_file &amp;lt;- function(x) {
+  tmp &amp;lt;- gsub(&quot;\n\\s+&quot;, &quot;\n&quot;, 
+              paste(vapply(strsplit(x, &quot;\n&quot;)[[1]], RCurl::base64Decode,
+                           character(1), USE.NAMES = FALSE), collapse = &quot; &quot;))
+  lines &amp;lt;- readLines(textConnection(tmp))
+  vapply(lines, gsub, character(1), pattern = &quot;\\s&quot;, replacement = &quot;&quot;,
+         USE.NAMES = FALSE)
+}
+
+request &amp;lt;- function(owner = &quot;ropensci&quot;, repo, file=&quot;DESCRIPTION&quot;, ...) {
+  req &amp;lt;- GET(make_url(owner, repo, paste0(&quot;contents/&quot;, file)), 
+             config = c(token = github_auth(), ...))
+  if(req$status_code != 200) { NA } else {
+    cts &amp;lt;- process_result(req)$content
+    parse_file(cts)
+  }
+}
+
+has_term &amp;lt;- function(what, ...) any(grepl(what, request(...)))
+has_file &amp;lt;- function(what, ...) if(all(is.na(request(file = what, ...)))) FALSE else TRUE
+&lt;/code&gt;&lt;/pre&gt;
+
+&lt;h2&gt;Do stuff&lt;/h2&gt;
+
+&lt;p&gt;Does a package depend on a particular package? e.g., look for &lt;code&gt;httr&lt;/code&gt; in the &lt;code&gt;DESCRIPTION&lt;/code&gt; file (which is the default file name in &lt;code&gt;request()&lt;/code&gt; above)&lt;/p&gt;
+
+&lt;pre&gt;&lt;code class=&quot;r&quot;&gt;has_term(&quot;httr&quot;, repo=&quot;taxize&quot;)
+#&amp;gt; [1] TRUE
+has_term(&quot;maptools&quot;, repo=&quot;taxize&quot;)
+#&amp;gt; [1] FALSE
+&lt;/code&gt;&lt;/pre&gt;
+
+&lt;p&gt;Do a series of R packages have a file for how to contribute &lt;code&gt;CONTRIBUTING.md&lt;/code&gt;?&lt;/p&gt;
+
+&lt;p&gt;Yes&lt;/p&gt;
+
+&lt;pre&gt;&lt;code class=&quot;r&quot;&gt;has_file(&quot;CONTRIBUTING.md&quot;, repo=&quot;taxize&quot;)
+#&amp;gt; [1] TRUE
+&lt;/code&gt;&lt;/pre&gt;
+
+&lt;p&gt;Many packages&lt;/p&gt;
+
+&lt;pre&gt;&lt;code class=&quot;r&quot;&gt;vapply(pkgs, function(x) has_file(&quot;CONTRIBUTING.md&quot;, repo=x), logical(1))
+#&amp;gt;        alm        bmc       bold     clifro  ecoengine    elastic 
+#&amp;gt;      FALSE      FALSE      FALSE      FALSE      FALSE      FALSE 
+#&amp;gt;   fulltext   geonames      gistr     RNeXML      rnoaa       rnpn 
+#&amp;gt;       TRUE      FALSE      FALSE       TRUE       TRUE      FALSE 
+#&amp;gt;      rplos      rsnps rWBclimate       solr      spocc     taxize 
+#&amp;gt;      FALSE      FALSE      FALSE      FALSE       TRUE       TRUE 
+#&amp;gt;  togeojson     traits   treeBASE 
+#&amp;gt;      FALSE      FALSE      FALSE
+&lt;/code&gt;&lt;/pre&gt;
+
+&lt;h2&gt;Check rate limit&lt;/h2&gt;
+
+&lt;p&gt;Define function&lt;/p&gt;
+
+&lt;pre&gt;&lt;code class=&quot;r&quot;&gt;rate_limit &amp;lt;- function(...) {
+  token &amp;lt;- github_auth()
+  req &amp;lt;- GET(&quot;https://api.github.com/rate_limit&quot;, config = c(token = token, ...))
+  process_result(req)
+}
+&lt;/code&gt;&lt;/pre&gt;
+
+&lt;p&gt;Check it&lt;/p&gt;
+
+&lt;pre&gt;&lt;code class=&quot;r&quot;&gt;rate_limit()
+#&amp;gt; $resources
+#&amp;gt; $resources$core
+#&amp;gt; $resources$core$limit
+#&amp;gt; [1] 5000
+#&amp;gt; 
+#&amp;gt; $resources$core$remaining
+#&amp;gt; [1] 4925
+#&amp;gt; 
+#&amp;gt; $resources$core$reset
+#&amp;gt; [1] 1417031016
+#&amp;gt; 
+#&amp;gt; 
+#&amp;gt; $resources$search
+#&amp;gt; $resources$search$limit
+#&amp;gt; [1] 30
+#&amp;gt; 
+#&amp;gt; $resources$search$remaining
+#&amp;gt; [1] 30
+#&amp;gt; 
+#&amp;gt; $resources$search$reset
+#&amp;gt; [1] 1417028069
+#&amp;gt; 
+#&amp;gt; 
+#&amp;gt; 
+#&amp;gt; $rate
+#&amp;gt; $rate$limit
+#&amp;gt; [1] 5000
+#&amp;gt; 
+#&amp;gt; $rate$remaining
+#&amp;gt; [1] 4925
+#&amp;gt; 
+#&amp;gt; $rate$reset
+#&amp;gt; [1] 1417031016
+&lt;/code&gt;&lt;/pre&gt;
+
+&lt;p&gt;Convert time to reset to human readable form&lt;/p&gt;
+
+&lt;pre&gt;&lt;code class=&quot;r&quot;&gt;as.POSIXct(rate_limit()$rate$reset, origin=&quot;1970-01-01&quot;)
+#&amp;gt; [1] &quot;2014-11-26 11:43:36 PST&quot;
+&lt;/code&gt;&lt;/pre&gt;
+</description>
+				<published>2014-11-26 00:00:00 -0800</published>
+				<link>http://recology.info//2014/11/github-fun/</link>
+			</item>
+		
+			<item>
 				<title>sofa - reboot</title>
 				<description>&lt;p&gt;I&#39;ve reworked &lt;code&gt;sofa&lt;/code&gt; recently after someone reported a bug in the package. Since the last post on this package on 2013-06-21, there&#39;s a bunch of changes:&lt;/p&gt;
 
@@ -2179,90 +2342,6 @@ My second blog post!&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;
 </description>
 				<published>2013-11-20 00:00:00 -0800</published>
 				<link>http://recology.info//2013/11/jekyll-intro/</link>
-			</item>
-		
-			<item>
-				<title>Guide to using rOpenSci packages during the US Gov't shutdown</title>
-				<description>&lt;p&gt;&lt;em&gt;Note: This is cross-posted from the &lt;a href=&quot;http://ropensci.org/blog&quot;&gt;rOpenSci blog&lt;/a&gt;, which will update with this post when our technical snafu is fixed.&lt;/em&gt;&lt;/p&gt;
-
-&lt;p&gt;With the US government shut down, many of the federal government provided data APIs are down. We write R packages to interact with many of these APIs. We have been tweeting about what APIs that are down related to R pacakges we make, but we thought we would write up a proper blog post on the issue.&lt;/p&gt;
-
-&lt;p&gt;NCBI services are still up! NCBI is within NIH, which is within the Department of Health and Human Services. Here is the message on the NCBI page:&lt;/p&gt;
-
-&lt;blockquote&gt;&lt;p&gt;The information on this web site remains accessible; but, due to the lapse in government funding, the information may not be up to date, and the agency may not be able to respond to inquiries until appropriations are enacted. For updates regarding government operating status see USA.gov.&lt;/p&gt;&lt;/blockquote&gt;
-
-&lt;p&gt;Most USGS services are down. Some of the message on the USGS page (ITIS is under USGS, which is under the Department of the Interior):&lt;/p&gt;
-
-&lt;blockquote&gt;&lt;p&gt;Due to the Federal government shutdown, usgs.gov and most associated web sites are unavailable. Only web sites necessary to protect lives and property will be maintained...&lt;/p&gt;&lt;/blockquote&gt;
-
-&lt;p&gt;However, the USGS BISON service is still up for some reason - perhaps a different pot of money than other USGS projects?&lt;/p&gt;
-
-&lt;p&gt;Some of the shutdown message from NOAA, under the Department of Commerce:&lt;/p&gt;
-
-&lt;blockquote&gt;&lt;p&gt;Due to the Federal government shutdown, NOAA.gov and most associated web sites are unavailable. Specific NOAA web sites necessary to protect lives and property are operational and will be maintained.&lt;/p&gt;&lt;/blockquote&gt;
-
-&lt;p&gt;Here&#39;s a table of APIs we interact with, the related R package, and any notes:
-&lt;br&gt;&lt;br&gt;&lt;/p&gt;
-
-&lt;table class=&quot;table table-bordered table-striped&quot;&gt;
-    &lt;thead&gt;
-      &lt;tr&gt;
-        &lt;th&gt;API provider&lt;/th&gt;
-        &lt;th&gt;API still up?&lt;/th&gt;
-        &lt;th&gt;rOpenSci R package&lt;/th&gt;
-      &lt;/tr&gt;
-    &lt;/thead&gt;
-    &lt;tbody&gt;
-      &lt;tr&gt;
-        &lt;td&gt;USGS BISON (Biodiversity Information Serving our Nation) &lt;a href=&quot;http://bison.usgs.ornl.gov/services.html&quot;&gt;link&lt;/a&gt;&lt;/td&gt;
-        &lt;td&gt;Yep!&lt;/td&gt;
-        &lt;td&gt;&lt;a href=&quot;https://github.com/ropensci/rbison&quot;&gt;rbison&lt;/a&gt;&lt;/td&gt;
-      &lt;/tr&gt;
-      &lt;tr&gt;
-        &lt;td&gt;NOAA Climate data &lt;a href=&quot;http://www.ncdc.noaa.gov/cdo-web/webservices&quot;&gt;link&lt;/a&gt;&lt;/td&gt;
-        &lt;td&gt;No :(&lt;/td&gt;
-        &lt;td&gt;&lt;a href=&quot;https://github.com/ropensci/rnoaa&quot;&gt;rnoaa&lt;/a&gt;&lt;/td&gt;
-      &lt;/tr&gt;
-      &lt;tr&gt;
-        &lt;td&gt;USGS ITIS (Integrated Taxonomic Information Service) &lt;a href=&quot;http://www.itis.gov/ws_description.html&quot;&gt;link&lt;/a&gt;&lt;/td&gt;
-        &lt;td&gt;No :(&lt;/td&gt;
-        &lt;td&gt;&lt;a href=&quot;https://github.com/ropensci/taxize_&quot;&gt;taxize&lt;/a&gt;&lt;/td&gt;
-      &lt;/tr&gt;
-      &lt;tr&gt;
-        &lt;td&gt;NCBI Entrez &lt;a href=&quot;http://www.ncbi.nlm.nih.gov/&quot;&gt;link&lt;/a&gt;&lt;/td&gt;
-        &lt;td&gt;No :(&lt;/td&gt;
-        &lt;td&gt;&lt;a href=&quot;https://github.com/ropensci/taxize_&quot;&gt;taxize&lt;/a&gt;,&lt;a href=&quot;https://github.com/ropensci/rentrez&quot;&gt;rentrez&lt;/a&gt;&lt;/td&gt;
-      &lt;/tr&gt;
-      &lt;tr&gt;
-        &lt;td&gt;PubMed &lt;a href=&quot;http://www.ncbi.nlm.nih.gov/pubmed&quot;&gt;link&lt;/a&gt;&lt;/td&gt;
-        &lt;td&gt;No :(&lt;/td&gt;
-        &lt;td&gt;&lt;a href=&quot;https://github.com/ropensci/rpubmed&quot;&gt;rpubmed&lt;/a&gt;&lt;/td&gt;
-      &lt;/tr&gt;
-    &lt;/tbody&gt;
-&lt;/table&gt;
-
-
-&lt;p&gt;&lt;br&gt;&lt;br&gt;
-For those wanting to get NOAA climate data, perhaps check out the &lt;a href=&quot;http://cran.r-project.org/web/packages/RNCEP/index.html&quot;&gt;RNCEP package&lt;/a&gt;.&lt;/p&gt;
-
-&lt;p&gt;For those using taxize, you can grab taxonomic IDs from NCBI using &lt;code&gt;get_uid()&lt;/code&gt; rather than the ITIS version &lt;code&gt;get_tsn()&lt;/code&gt;. With a UID from NCBI, you can do things like get a taxonomic classification using the function &lt;code&gt;classification()&lt;/code&gt;. There are many non-government taxonomic sources in taxize, so you should be able to find what you need without ITIS. Other functions that use ITIS, and that you should avoid until the shutdown is over, are:&lt;/p&gt;
-
-&lt;ul&gt;
-&lt;li&gt;A long list carried over from the itis package that is now within taxize: &lt;code&gt;getacceptednamesfromtsn()&lt;/code&gt;, &lt;code&gt;getanymatchcount()&lt;/code&gt;, &lt;code&gt;getcommentdetailfromtsn()&lt;/code&gt;, &lt;code&gt;getcommonnamesfromtsn()&lt;/code&gt;, &lt;code&gt;getcoremetadatafromtsn()&lt;/code&gt;, &lt;code&gt;getcoveragefromtsn()&lt;/code&gt;, &lt;code&gt;getcredibilityratingfromtsn()&lt;/code&gt;, &lt;code&gt;getcredibilityratings()&lt;/code&gt;, &lt;code&gt;getcurrencyfromtsn()&lt;/code&gt;, &lt;code&gt;getdatedatafromtsn()&lt;/code&gt;, &lt;code&gt;getdescription()&lt;/code&gt;, &lt;code&gt;getexpertsfromtsn()&lt;/code&gt;, &lt;code&gt;getfullhierarchyfromtsn()&lt;/code&gt;, &lt;code&gt;getfullrecordfromlsid()&lt;/code&gt;, &lt;code&gt;getfullrecordfromtsn()&lt;/code&gt;, &lt;code&gt;getgeographicdivisionsfromtsn()&lt;/code&gt;, &lt;code&gt;getgeographicvalues()&lt;/code&gt;, &lt;code&gt;getglobalspeciescompletenessfromtsn()&lt;/code&gt;, &lt;code&gt;gethierarchydownfromtsn()&lt;/code&gt;, &lt;code&gt;gethierarchyupfromtsn()&lt;/code&gt;, &lt;code&gt;getitistermsfromcommonname()&lt;/code&gt;, &lt;code&gt;getitistermsfromscientificname()&lt;/code&gt;, &lt;code&gt;getjurisdictionaloriginfromtsn()&lt;/code&gt;, &lt;code&gt;getjurisdictionoriginvalues()&lt;/code&gt;, &lt;code&gt;getjurisdictionvalues()&lt;/code&gt;, &lt;code&gt;getkingdomnamefromtsn()&lt;/code&gt;, &lt;code&gt;getkingdomnames()&lt;/code&gt;, &lt;code&gt;getlastchangedate()&lt;/code&gt;, &lt;code&gt;getlsidfromtsn()&lt;/code&gt;, &lt;code&gt;getothersourcesfromtsn()&lt;/code&gt;, &lt;code&gt;getparenttsnfromtsn()&lt;/code&gt;, &lt;code&gt;getpublicationsfromtsn()&lt;/code&gt;, &lt;code&gt;getranknames()&lt;/code&gt;, &lt;code&gt;getrecordfromlsid()&lt;/code&gt;, &lt;code&gt;getreviewyearfromtsn()&lt;/code&gt;, &lt;code&gt;getscientificnamefromtsn()&lt;/code&gt;, &lt;code&gt;getsynonymnamesfromtsn()&lt;/code&gt;, &lt;code&gt;gettaxonauthorshipfromtsn()&lt;/code&gt;, &lt;code&gt;gettaxonomicranknamefromtsn()&lt;/code&gt;, &lt;code&gt;gettaxonomicusagefromtsn()&lt;/code&gt;, &lt;code&gt;gettsnbyvernacularlanguage()&lt;/code&gt;, &lt;code&gt;gettsnfromlsid()&lt;/code&gt;, &lt;code&gt;getunacceptabilityreasonfromtsn()&lt;/code&gt;, &lt;code&gt;getvernacularlanguages()&lt;/code&gt;, &lt;code&gt;searchbycommonname()&lt;/code&gt;, &lt;code&gt;searchbycommonnamebeginswith()&lt;/code&gt;, &lt;code&gt;searchbycommonnameendswith()&lt;/code&gt;, &lt;code&gt;searchbyscientificname()&lt;/code&gt;, &lt;code&gt;searchforanymatch()&lt;/code&gt;, &lt;code&gt;searchforanymatchpaged()&lt;/code&gt;&lt;/li&gt;
-&lt;li&gt;&lt;code&gt;itis_acceptname()&lt;/code&gt;&lt;/li&gt;
-&lt;li&gt;&lt;code&gt;itis_downstream()&lt;/code&gt;&lt;/li&gt;
-&lt;li&gt;&lt;code&gt;itis_name()&lt;/code&gt;&lt;/li&gt;
-&lt;li&gt;&lt;code&gt;itis_taxrank()&lt;/code&gt;&lt;/li&gt;
-&lt;li&gt;In &lt;code&gt;tax_agg()&lt;/code&gt;, only use db=&quot;ncbi&quot;&lt;/li&gt;
-&lt;li&gt;In &lt;code&gt;tax_name()&lt;/code&gt;, only use db=&quot;ncbi&quot;&lt;/li&gt;
-&lt;li&gt;In &lt;code&gt;tax_rank()&lt;/code&gt;, only use db=&quot;ncbi&quot;&lt;/li&gt;
-&lt;/ul&gt;
-
-
-&lt;p&gt;Let us know if you have any questions or comments.&lt;/p&gt;
-</description>
-				<published>2013-10-08 00:00:00 -0700</published>
-				<link>http://recology.info//2013/10/shutdown/</link>
 			</item>
 		
 	</channel>

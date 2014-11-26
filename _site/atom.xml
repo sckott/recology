@@ -4,13 +4,177 @@
  <title>Recology</title>
  <link href="http://recology.info//atom.xml" rel="self"/>
  <link href="http://recology.info//"/>
- <updated>2014-11-18T13:21:36-08:00</updated>
+ <updated>2014-11-26T10:53:42-08:00</updated>
  <id>http://recology.info/</id>
  <author>
    <name>Scott Chamberlain</name>
    <email>myrmecocystus@gmail.com</email>
  </author>
 
+ 
+ <entry>
+   <title>Fun with the GitHub API</title>
+   <link href="http://recology.info//2014/11/github-fun/"/>
+   <updated>2014-11-26T00:00:00-08:00</updated>
+   <id>http://recology.info//2014/11/github-fun</id>
+   <content type="html">&lt;p&gt;Recently I&#39;ve had fun playing with the GitHub API, and here are some notes to self about this fun having.&lt;/p&gt;
+
+&lt;h2&gt;Setup&lt;/h2&gt;
+
+&lt;p&gt;Get/load packages&lt;/p&gt;
+
+&lt;pre&gt;&lt;code class=&quot;r&quot;&gt;install.packages(c(&#39;devtools&#39;,&#39;jsonlite&#39;,&#39;httr&#39;,&#39;yaml&#39;))
+&lt;/code&gt;&lt;/pre&gt;
+
+&lt;pre&gt;&lt;code class=&quot;r&quot;&gt;library(&quot;devtools&quot;)
+library(&quot;httr&quot;)
+library(&quot;yaml&quot;)
+&lt;/code&gt;&lt;/pre&gt;
+
+&lt;h2&gt;Define a vector of package names&lt;/h2&gt;
+
+&lt;pre&gt;&lt;code class=&quot;r&quot;&gt;pkgs &amp;lt;- c(&quot;alm&quot;, &quot;bmc&quot;, &quot;bold&quot;, &quot;clifro&quot;, &quot;ecoengine&quot;,
+  &quot;elastic&quot;, &quot;fulltext&quot;, &quot;geonames&quot;, &quot;gistr&quot;,
+  &quot;RNeXML&quot;, &quot;rnoaa&quot;, &quot;rnpn&quot;, &quot;traits&quot;, &quot;rplos&quot;, &quot;rsnps&quot;,
+  &quot;rWBclimate&quot;, &quot;solr&quot;, &quot;spocc&quot;, &quot;taxize&quot;, &quot;togeojson&quot;, &quot;treeBASE&quot;)
+pkgs &amp;lt;- sort(pkgs)
+&lt;/code&gt;&lt;/pre&gt;
+
+&lt;h2&gt;Define functions&lt;/h2&gt;
+
+&lt;pre&gt;&lt;code class=&quot;r&quot;&gt;github_auth &amp;lt;- function(appname = getOption(&quot;gh_appname&quot;), key = getOption(&quot;gh_id&quot;),
+                        secret = getOption(&quot;gh_secret&quot;)) {
+  if (is.null(getOption(&quot;gh_token&quot;))) {
+    myapp &amp;lt;- oauth_app(appname, key, secret)
+    token &amp;lt;- oauth2.0_token(oauth_endpoints(&quot;github&quot;), myapp)
+    options(gh_token = token)
+  } else {
+    token &amp;lt;- getOption(&quot;gh_token&quot;)
+  }
+  return(token)
+}
+
+make_url &amp;lt;- function(x, y, z) {
+  sprintf(&quot;https://api.github.com/repos/%s/%s/%s&quot;, x, y, z)
+}
+
+process_result &amp;lt;- function(x) {
+  stop_for_status(x)
+  if (!x$headers$`content-type` == &quot;application/json; charset=utf-8&quot;)
+    stop(&quot;content type mismatch&quot;)
+  tmp &amp;lt;- content(x, as = &quot;text&quot;)
+  jsonlite::fromJSON(tmp, flatten = TRUE)
+}
+
+parse_file &amp;lt;- function(x) {
+  tmp &amp;lt;- gsub(&quot;\n\\s+&quot;, &quot;\n&quot;, 
+              paste(vapply(strsplit(x, &quot;\n&quot;)[[1]], RCurl::base64Decode,
+                           character(1), USE.NAMES = FALSE), collapse = &quot; &quot;))
+  lines &amp;lt;- readLines(textConnection(tmp))
+  vapply(lines, gsub, character(1), pattern = &quot;\\s&quot;, replacement = &quot;&quot;,
+         USE.NAMES = FALSE)
+}
+
+request &amp;lt;- function(owner = &quot;ropensci&quot;, repo, file=&quot;DESCRIPTION&quot;, ...) {
+  req &amp;lt;- GET(make_url(owner, repo, paste0(&quot;contents/&quot;, file)), 
+             config = c(token = github_auth(), ...))
+  if(req$status_code != 200) { NA } else {
+    cts &amp;lt;- process_result(req)$content
+    parse_file(cts)
+  }
+}
+
+has_term &amp;lt;- function(what, ...) any(grepl(what, request(...)))
+has_file &amp;lt;- function(what, ...) if(all(is.na(request(file = what, ...)))) FALSE else TRUE
+&lt;/code&gt;&lt;/pre&gt;
+
+&lt;h2&gt;Do stuff&lt;/h2&gt;
+
+&lt;p&gt;Does a package depend on a particular package? e.g., look for &lt;code&gt;httr&lt;/code&gt; in the &lt;code&gt;DESCRIPTION&lt;/code&gt; file (which is the default file name in &lt;code&gt;request()&lt;/code&gt; above)&lt;/p&gt;
+
+&lt;pre&gt;&lt;code class=&quot;r&quot;&gt;has_term(&quot;httr&quot;, repo=&quot;taxize&quot;)
+#&amp;gt; [1] TRUE
+has_term(&quot;maptools&quot;, repo=&quot;taxize&quot;)
+#&amp;gt; [1] FALSE
+&lt;/code&gt;&lt;/pre&gt;
+
+&lt;p&gt;Do a series of R packages have a file for how to contribute &lt;code&gt;CONTRIBUTING.md&lt;/code&gt;?&lt;/p&gt;
+
+&lt;p&gt;Yes&lt;/p&gt;
+
+&lt;pre&gt;&lt;code class=&quot;r&quot;&gt;has_file(&quot;CONTRIBUTING.md&quot;, repo=&quot;taxize&quot;)
+#&amp;gt; [1] TRUE
+&lt;/code&gt;&lt;/pre&gt;
+
+&lt;p&gt;Many packages&lt;/p&gt;
+
+&lt;pre&gt;&lt;code class=&quot;r&quot;&gt;vapply(pkgs, function(x) has_file(&quot;CONTRIBUTING.md&quot;, repo=x), logical(1))
+#&amp;gt;        alm        bmc       bold     clifro  ecoengine    elastic 
+#&amp;gt;      FALSE      FALSE      FALSE      FALSE      FALSE      FALSE 
+#&amp;gt;   fulltext   geonames      gistr     RNeXML      rnoaa       rnpn 
+#&amp;gt;       TRUE      FALSE      FALSE       TRUE       TRUE      FALSE 
+#&amp;gt;      rplos      rsnps rWBclimate       solr      spocc     taxize 
+#&amp;gt;      FALSE      FALSE      FALSE      FALSE       TRUE       TRUE 
+#&amp;gt;  togeojson     traits   treeBASE 
+#&amp;gt;      FALSE      FALSE      FALSE
+&lt;/code&gt;&lt;/pre&gt;
+
+&lt;h2&gt;Check rate limit&lt;/h2&gt;
+
+&lt;p&gt;Define function&lt;/p&gt;
+
+&lt;pre&gt;&lt;code class=&quot;r&quot;&gt;rate_limit &amp;lt;- function(...) {
+  token &amp;lt;- github_auth()
+  req &amp;lt;- GET(&quot;https://api.github.com/rate_limit&quot;, config = c(token = token, ...))
+  process_result(req)
+}
+&lt;/code&gt;&lt;/pre&gt;
+
+&lt;p&gt;Check it&lt;/p&gt;
+
+&lt;pre&gt;&lt;code class=&quot;r&quot;&gt;rate_limit()
+#&amp;gt; $resources
+#&amp;gt; $resources$core
+#&amp;gt; $resources$core$limit
+#&amp;gt; [1] 5000
+#&amp;gt; 
+#&amp;gt; $resources$core$remaining
+#&amp;gt; [1] 4925
+#&amp;gt; 
+#&amp;gt; $resources$core$reset
+#&amp;gt; [1] 1417031016
+#&amp;gt; 
+#&amp;gt; 
+#&amp;gt; $resources$search
+#&amp;gt; $resources$search$limit
+#&amp;gt; [1] 30
+#&amp;gt; 
+#&amp;gt; $resources$search$remaining
+#&amp;gt; [1] 30
+#&amp;gt; 
+#&amp;gt; $resources$search$reset
+#&amp;gt; [1] 1417028069
+#&amp;gt; 
+#&amp;gt; 
+#&amp;gt; 
+#&amp;gt; $rate
+#&amp;gt; $rate$limit
+#&amp;gt; [1] 5000
+#&amp;gt; 
+#&amp;gt; $rate$remaining
+#&amp;gt; [1] 4925
+#&amp;gt; 
+#&amp;gt; $rate$reset
+#&amp;gt; [1] 1417031016
+&lt;/code&gt;&lt;/pre&gt;
+
+&lt;p&gt;Convert time to reset to human readable form&lt;/p&gt;
+
+&lt;pre&gt;&lt;code class=&quot;r&quot;&gt;as.POSIXct(rate_limit()$rate$reset, origin=&quot;1970-01-01&quot;)
+#&amp;gt; [1] &quot;2014-11-26 11:43:36 PST&quot;
+&lt;/code&gt;&lt;/pre&gt;
+</content>
+ </entry>
  
  <entry>
    <title>sofa - reboot</title>
