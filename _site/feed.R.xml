@@ -6,6 +6,210 @@
 		<link>http://recology.info/</link>
 		
 			<item>
+				<title>1000 commits to taxize</title>
+				<description>&lt;p&gt;Just today we&#39;ve hit 1000 commits on &lt;code&gt;taxize&lt;/code&gt;!  &lt;code&gt;taxize&lt;/code&gt; is an R client to search across lots of taxonomic databases on the web. In honor of the 1000 commit milestone, here&#39;s some stats on the project.&lt;/p&gt;
+
+&lt;p&gt;Before that, lots of people have contributed to &lt;code&gt;taxize&lt;/code&gt;, it&#39;s a big group effort:&lt;/p&gt;
+
+&lt;ul&gt;
+&lt;li&gt;&lt;a href=&quot;https://github.com/EDiLD&quot;&gt;Eduard Szöcs&lt;/a&gt;&lt;/li&gt;
+&lt;li&gt;&lt;a href=&quot;https://github.com/zachary-foster&quot;&gt;Zachary Foster&lt;/a&gt;&lt;/li&gt;
+&lt;li&gt;&lt;a href=&quot;https://github.com/cboettig&quot;&gt;Carl Boettiger&lt;/a&gt;&lt;/li&gt;
+&lt;li&gt;&lt;a href=&quot;https://github.com/karthik&quot;&gt;Karthik Ram&lt;/a&gt;&lt;/li&gt;
+&lt;li&gt;&lt;a href=&quot;https://github.com/jarioksa&quot;&gt;Jari Oksanen&lt;/a&gt;&lt;/li&gt;
+&lt;li&gt;&lt;a href=&quot;https://github.com/fmichonneau&quot;&gt;Francis Michonneau&lt;/a&gt;&lt;/li&gt;
+&lt;li&gt;&lt;a href=&quot;https://github.com/Ironholds&quot;&gt;Oliver Keyes&lt;/a&gt;&lt;/li&gt;
+&lt;li&gt;&lt;a href=&quot;https://github.com/dlebauer&quot;&gt;David LeBauer&lt;/a&gt;&lt;/li&gt;
+&lt;li&gt;&lt;a href=&quot;https://github.com/benmarwick&quot;&gt;Ben Marwick&lt;/a&gt;&lt;/li&gt;
+&lt;li&gt;&lt;a href=&quot;https://github.com/anirvan&quot;&gt;Anirvan Chatterjee&lt;/a&gt;&lt;/li&gt;
+&lt;/ul&gt;
+
+
+&lt;p&gt;In addition, we&#39;ve had lots of feedback from users, including feature requests and bug reports, making &lt;code&gt;taxize&lt;/code&gt; a lot better.&lt;/p&gt;
+
+&lt;h2&gt;Setup&lt;/h2&gt;
+
+&lt;pre&gt;&lt;code class=&quot;r&quot;&gt;library(&quot;devtools&quot;)
+library(&quot;httr&quot;)
+library(&quot;ggplot2&quot;)
+library(&quot;stringr&quot;)
+library(&quot;plyr&quot;)
+library(&quot;dplyr&quot;)
+&lt;/code&gt;&lt;/pre&gt;
+
+&lt;h2&gt;Define functions&lt;/h2&gt;
+
+&lt;pre&gt;&lt;code class=&quot;r&quot;&gt;github_auth &amp;lt;- function(appname = getOption(&quot;gh_appname&quot;), key = getOption(&quot;gh_id&quot;),
+                        secret = getOption(&quot;gh_secret&quot;)) {
+  if (is.null(getOption(&quot;gh_token&quot;))) {
+    myapp &amp;lt;- oauth_app(appname, key, secret)
+    token &amp;lt;- oauth2.0_token(oauth_endpoints(&quot;github&quot;), myapp)
+    options(gh_token = token)
+  } else {
+    token &amp;lt;- getOption(&quot;gh_token&quot;)
+  }
+  return(token)
+}
+
+make_url &amp;lt;- function(x, y, z) {
+  sprintf(&quot;https://api.github.com/repos/%s/%s/%s&quot;, x, y, z)
+}
+
+process_result &amp;lt;- function(x) {
+  stop_for_status(x)
+  if (!x$headers$`content-type` == &quot;application/json; charset=utf-8&quot;)
+    stop(&quot;content type mismatch&quot;)
+  tmp &amp;lt;- content(x, as = &quot;text&quot;)
+  jsonlite::fromJSON(tmp, flatten = TRUE)
+}
+
+gh_commits &amp;lt;- function(repo, owner = &quot;ropensci&quot;, ...) {
+  token &amp;lt;- github_auth()
+  outout &amp;lt;- list(); iter &amp;lt;- 0; nexturl &amp;lt;- &quot;dontstop&quot;
+  while(nexturl != &quot;stop&quot;){
+    iter &amp;lt;- iter + 1
+    req &amp;lt;- if(grepl(&quot;https:/&quot;, nexturl)) GET(nexturl, config = c(token = token)) else GET(make_url(owner, repo, &quot;commits&quot;), query = list(per_page=100), config = c(token = token))
+    outout[[iter]] &amp;lt;- process_result(req)
+    link &amp;lt;- req$headers$link
+    nexturl &amp;lt;- if(is.null(link)){ &quot;stop&quot; } else {
+      if(grepl(&quot;next&quot;, link)){
+        stringr::str_extract(link, &quot;https://[0-9A-Za-z/?=\\._&amp;amp;]+&quot;)
+      } else {
+        &quot;stop&quot;
+      }
+    }
+  }
+  outout &amp;lt;- outout[sapply(outout, function(x) !identical(x, list()))]
+  dplyr::rbind_all(outout)
+}
+
+gh_issues &amp;lt;- function(repo, owner = &quot;ropensci&quot;, ...) {
+  token &amp;lt;- github_auth()
+  outout &amp;lt;- list(); iter &amp;lt;- 0; nexturl &amp;lt;- &quot;dontstop&quot;
+  while(nexturl != &quot;stop&quot;){
+    iter &amp;lt;- iter + 1
+    req &amp;lt;- if(grepl(&quot;https:/&quot;, nexturl)) GET(nexturl, query=list(state=&quot;all&quot;), config = c(token = token)) else GET(make_url(owner, repo, &quot;issues&quot;), query = list(per_page=100, state=&quot;all&quot;), config = c(token = token))
+    outout[[iter]] &amp;lt;- process_result(req)
+    link &amp;lt;- req$headers$link
+    nexturl &amp;lt;- if(is.null(link)){ &quot;stop&quot; } else {
+      if(grepl(&quot;next&quot;, link)){
+        stringr::str_extract(link, &quot;https://[0-9A-Za-z/?=\\._&amp;amp;]+&quot;)
+      } else {
+        &quot;stop&quot;
+      }
+    }
+  }
+  outout &amp;lt;- outout[sapply(outout, function(x) !identical(x, list()))]
+  dplyr::rbind_all(outout)
+}
+
+gh_commit &amp;lt;- function(sha, repo, owner = &quot;ropensci&quot;, ...) {
+  token &amp;lt;- github_auth()
+  req &amp;lt;- GET(paste0(make_url(owner, repo, &quot;commits&quot;), &quot;/&quot;, sha),
+             config = c(token = token, ...))
+  process_result(req)
+}
+
+gh_verb &amp;lt;- function(owner = &quot;ropensci&quot;, repo, verb, args=list(), ...) {
+  token &amp;lt;- github_auth()
+  req &amp;lt;- GET(make_url(owner, repo, verb), query=args, config = c(token = token, ...))
+  process_result(req)
+}
+&lt;/code&gt;&lt;/pre&gt;
+
+&lt;h2&gt;Commits&lt;/h2&gt;
+
+&lt;p&gt;List of commits&lt;/p&gt;
+
+&lt;pre&gt;&lt;code class=&quot;r&quot;&gt;out &amp;lt;- gh_commits(&quot;taxize&quot;)
+&lt;/code&gt;&lt;/pre&gt;
+
+&lt;p&gt;Get changes for each commit&lt;/p&gt;
+
+&lt;pre&gt;&lt;code class=&quot;r&quot;&gt;changes &amp;lt;- vapply(out$sha, function(x) gh_commit(x, repo=&quot;taxize&quot;)$stats$total, numeric(1))
+changesdf &amp;lt;-  data.frame(changes=unname(changes), sha=names(changes))
+&lt;/code&gt;&lt;/pre&gt;
+
+&lt;p&gt;Combine&lt;/p&gt;
+
+&lt;pre&gt;&lt;code class=&quot;r&quot;&gt;out &amp;lt;- inner_join(out, changesdf)
+&lt;/code&gt;&lt;/pre&gt;
+
+&lt;p&gt;Total changes through time (additions + deletions)&lt;/p&gt;
+
+&lt;pre&gt;&lt;code class=&quot;r&quot;&gt;ct &amp;lt;- function(x) as.POSIXct(x, format=&quot;%Y-%m-%dT%H:%M:%SZ&quot;, tz=&quot;UTC&quot;)
+out %&amp;gt;%
+  mutate(commit.committer.date = ct(commit.committer.date)) %&amp;gt;%
+  ggplot(aes(x=commit.committer.date, y=changes)) +
+    geom_area(fill=&quot;#87D2A0&quot;) +
+    theme_grey(base_size = 20)
+&lt;/code&gt;&lt;/pre&gt;
+
+&lt;p&gt;&lt;img src=&quot;/public/img/2014-11-28-taxize-1000/unnamed-chunk-7-1.png&quot; alt=&quot;&quot; /&gt;&lt;/p&gt;
+
+&lt;p&gt;By Authors&lt;/p&gt;
+
+&lt;pre&gt;&lt;code class=&quot;r&quot;&gt;out %&amp;gt;%
+  group_by(author.login) %&amp;gt;%
+  summarise(n = n()) %&amp;gt;%
+  ggplot(aes(author.login, n)) +
+    geom_bar(stat = &quot;identity&quot;, fill=&quot;#87D2A0&quot;) +
+    coord_flip() +
+    theme_grey(base_size = 20)
+&lt;/code&gt;&lt;/pre&gt;
+
+&lt;p&gt;&lt;img src=&quot;/public/img/2014-11-28-taxize-1000/unnamed-chunk-8-1.png&quot; alt=&quot;&quot; /&gt;&lt;/p&gt;
+
+&lt;h2&gt;Issues&lt;/h2&gt;
+
+&lt;pre&gt;&lt;code class=&quot;r&quot;&gt;out &amp;lt;- gh_issues(&quot;taxize&quot;)
+&lt;/code&gt;&lt;/pre&gt;
+
+&lt;p&gt;Number of issues&lt;/p&gt;
+
+&lt;pre&gt;&lt;code class=&quot;r&quot;&gt;NROW(out)
+#&amp;gt; [1] 382
+&lt;/code&gt;&lt;/pre&gt;
+
+&lt;p&gt;Number of open issues&lt;/p&gt;
+
+&lt;pre&gt;&lt;code class=&quot;r&quot;&gt;out %&amp;gt;%
+  filter(state == &quot;open&quot;) %&amp;gt;%
+  NROW
+#&amp;gt; [1] 35
+&lt;/code&gt;&lt;/pre&gt;
+
+&lt;p&gt;Number of pull requests&lt;/p&gt;
+
+&lt;pre&gt;&lt;code class=&quot;r&quot;&gt;out %&amp;gt;%
+  filter(!is.na(pull_request.url)) %&amp;gt;%
+  NROW
+#&amp;gt; [1] 119
+&lt;/code&gt;&lt;/pre&gt;
+
+&lt;h2&gt;Forks, number of&lt;/h2&gt;
+
+&lt;pre&gt;&lt;code class=&quot;r&quot;&gt;NROW(gh_verb(repo = &quot;taxize&quot;, verb=&quot;forks&quot;))
+#&amp;gt; [1] 16
+&lt;/code&gt;&lt;/pre&gt;
+
+&lt;h2&gt;Stars, number of&lt;/h2&gt;
+
+&lt;pre&gt;&lt;code class=&quot;r&quot;&gt;NROW(gh_verb(repo = &quot;taxize&quot;, verb=&quot;stargazers&quot;, args=list(per_page=100)))
+#&amp;gt; [1] 44
+&lt;/code&gt;&lt;/pre&gt;
+
+&lt;h2&gt;Watchers, number of&lt;/h2&gt;
+
+&lt;pre&gt;&lt;code class=&quot;r&quot;&gt;NROW(gh_verb(repo = &quot;taxize&quot;, verb=&quot;subscribers&quot;, args=list(per_page=100)))
+#&amp;gt; [1] 12
+&lt;/code&gt;&lt;/pre&gt;
+</description>
+				<published>2014-11-28 00:00:00 -0800</published>
+				<link>http://recology.info//2014/11/taxize-1000/</link>
+			</item>
+		
+			<item>
 				<title>Intro to alpha ckanr - R client for CKAN RESTful API</title>
 				<description>&lt;p&gt;Recently I had need to create a client for scraping museum metadata to help out some folks that use that kind of data. It&#39;s called &lt;a href=&quot;https://github.com/ropensci/musemeta&quot;&gt;musemeta&lt;/a&gt;. One of the data sources in that package uses the open source &lt;em&gt;data portal software&lt;/em&gt; &lt;a href=&quot;http://ckan.org/&quot;&gt;CKAN&lt;/a&gt;, and so we can interact with &lt;a href=&quot;http://docs.ckan.org/en/latest/api/index.html&quot;&gt;the CKAN API&lt;/a&gt; to get data. Since many groups can use CKAN API/etc infrastucture because it&#39;s open source, I thought why not have a general purpose R client for this, since &lt;a href=&quot;https://github.com/ckan/ckan/wiki/CKAN-API-Clients&quot;&gt;there are other clients&lt;/a&gt; for Python, PHP, Ruby, etc.&lt;/p&gt;
 
@@ -2261,342 +2465,6 @@ install_github(&quot;cowsay&quot;, &quot;sckott&quot;)
 </description>
 				<published>2014-02-20 00:00:00 -0800</published>
 				<link>http://recology.info//2014/02/cowsay/</link>
-			</item>
-		
-			<item>
-				<title>rgauges - fun with hourly web site analytics</title>
-				<description>&lt;p&gt;&lt;a href=&quot;http://get.gaug.es/&quot;&gt;Gaug.es&lt;/a&gt; is a really nice looking analytics platform as an alternative to Google Analytics. It is a paid service, but not that expensive really.&lt;/p&gt;
-
-&lt;p&gt;We&#39;ve made an R package to interact with the Gaug.es API called &lt;code&gt;rgauges&lt;/code&gt;. Find it &lt;a href=&quot;https://github.com/ropensci/rgauges&quot;&gt;on Github&lt;/a&gt; and &lt;a href=&quot;http://cran.r-project.org/web/packages/rgauges/index.html&quot;&gt;on CRAN&lt;/a&gt;.&lt;/p&gt;
-
-&lt;p&gt;Although working with the Gaug.es API is nice and easy, they don&#39;t keep hourly visit stats and provide those via the API, so that you have to continually collect them yourself if you want them. That&#39;s what I have done for my own website.&lt;/p&gt;
-
-&lt;p&gt;It took a few steps to get this data:&lt;/p&gt;
-
-&lt;ul&gt;
-&lt;li&gt;I wrote a little Ruby script using &lt;a href=&quot;http://rubygems.org/gems/twelve&quot;&gt;Twelve gem&lt;/a&gt; to collect data from the Gaug.es API every day at the same time, which just gets the patst 24 hours of data. This script makes a call to the Gaug.es API and sends the data to a &lt;a href=&quot;http://couchdb.apache.org/&quot;&gt;CouchDB&lt;/a&gt; database hosted on &lt;a href=&quot;https://cloudant.com/&quot;&gt;Cloudant&lt;/a&gt;. In reality, the script is is embeded in a rack app as I don&#39;t think you can throw up a standalone script to Heroku. Here&#39;s the script:&lt;/li&gt;
-&lt;/ul&gt;
-
-
-&lt;pre&gt;&lt;code class=&quot;ruby&quot;&gt;class MyApp
-  require &#39;couchrest&#39;
-  require &#39;twelve&#39;
-  require &#39;date&#39;
-  require &#39;time&#39;
-
-  def self.getgaugesdata_scott
-    bfg = Twelve.new(&#39;&amp;lt;gaugeskey&amp;gt;&#39;)
-    out = bfg.gauges(&#39;&amp;lt;gaugeskey&amp;gt;&#39;)[&#39;recent_hours&#39;]
-    yip = { &quot;from_url&quot;=&amp;gt; &quot;http://sckott.github.io/&quot;, &quot;coll_date&quot;=&amp;gt; Date.today.to_s, &quot;coll_time&quot;=&amp;gt; Time.now.utc.localtime.to_s, &quot;recent_hours&quot;=&amp;gt; out }
-    @db = CouchRest.database!(&quot;https://app16517180.heroku:&amp;lt;key&amp;gt;@app16517180.heroku.cloudant.com/gaugesdb_scott&quot;)
-    @db.save_doc(yip)
-
-  def call env
-    [200, {&quot;Content-Type&quot; =&amp;gt; &quot;text/html&quot;}, [&quot;no output printed here&quot;]] 
-  end
-end
-&lt;/code&gt;&lt;/pre&gt;
-
-&lt;ul&gt;
-&lt;li&gt;&lt;p&gt;One little catch though: I run the Ruby script on Heroku, so I don&#39;t have to do it locally, but Heroku free instance goes down unless it&#39;s doing something. So I used a little service called &lt;a href=&quot;http://uptimerobot.com/&quot;&gt;UptimeRobot&lt;/a&gt; to ping the Heroku app every 5 minutes. UptimeRobot also is giving you uptime stats too on your app, which I don&#39;t really need, but is a cool feature.&lt;/p&gt;&lt;/li&gt;
-&lt;li&gt;&lt;p&gt;And that&#39;s it. Now the data is stored from each day&#39;s collection of visitor stats to a free Cloudant CouchDB database.&lt;/p&gt;&lt;/li&gt;
-&lt;/ul&gt;
-
-
-&lt;h2&gt;Regular Gaug.es data&lt;/h2&gt;
-
-&lt;p&gt;First, let&#39;s look at what you can do with data that Gaug.es does give to you, using the &lt;code&gt;rgauges&lt;/code&gt; R package.&lt;/p&gt;
-
-&lt;hr /&gt;
-
-&lt;h3&gt;Install rgauges&lt;/h3&gt;
-
-&lt;div class=&quot;highlight&quot;&gt;&lt;pre&gt;&lt;code class=&quot;language-r&quot; data-lang=&quot;r&quot;&gt;install.packages&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;s&quot;&gt;&amp;quot;devtools&amp;quot;&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt;
-&lt;span class=&quot;kn&quot;&gt;library&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;devtools&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt;
-install_github&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;s&quot;&gt;&amp;quot;rgauges&amp;quot;&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt; &lt;span class=&quot;s&quot;&gt;&amp;quot;ropensci&amp;quot;&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;
-
-
-&lt;h3&gt;Load rgauges and other dependency libraries&lt;/h3&gt;
-
-&lt;div class=&quot;highlight&quot;&gt;&lt;pre&gt;&lt;code class=&quot;language-r&quot; data-lang=&quot;r&quot;&gt;&lt;span class=&quot;kn&quot;&gt;library&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;rgauges&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt;
-&lt;span class=&quot;kn&quot;&gt;library&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;ggplot2&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;
-
-
-&lt;h3&gt;Your info&lt;/h3&gt;
-
-&lt;div class=&quot;highlight&quot;&gt;&lt;pre&gt;&lt;code class=&quot;language-r&quot; data-lang=&quot;r&quot;&gt;gs_me&lt;span class=&quot;p&quot;&gt;()&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;
-
-
-
-
-&lt;div class=&quot;highlight&quot;&gt;&lt;pre&gt;&lt;code class=&quot;language-text&quot; data-lang=&quot;text&quot;&gt;## $user
-## $user$name
-## [1] &amp;quot;Scott Chamberlain&amp;quot;
-## 
-## $user$email
-## [1] &amp;quot;myrmecocystus@gmail.com&amp;quot;
-## 
-## $user$id
-## [1] &amp;quot;4eddbafb613f5d5139000001&amp;quot;
-## 
-## $user$last_name
-## [1] &amp;quot;Chamberlain&amp;quot;
-## 
-## $user$urls
-## $user$urls$self
-## [1] &amp;quot;https://secure.gaug.es/me&amp;quot;
-## 
-## $user$urls$clients
-## [1] &amp;quot;https://secure.gaug.es/clients&amp;quot;
-## 
-## $user$urls$gauges
-## [1] &amp;quot;https://secure.gaug.es/gauges&amp;quot;
-## 
-## 
-## $user$first_name
-## [1] &amp;quot;Scott&amp;quot;&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;
-
-
-&lt;h4&gt;Traffic&lt;/h4&gt;
-
-&lt;div class=&quot;highlight&quot;&gt;&lt;pre&gt;&lt;code class=&quot;language-r&quot; data-lang=&quot;r&quot;&gt;gs_traffic&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;id &lt;span class=&quot;o&quot;&gt;=&lt;/span&gt; &lt;span class=&quot;s&quot;&gt;&amp;quot;4efd83a6f5a1f5158a000004&amp;quot;&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;
-
-
-
-
-&lt;div class=&quot;highlight&quot;&gt;&lt;pre&gt;&lt;code class=&quot;language-text&quot; data-lang=&quot;text&quot;&gt;## $metadata
-## $metadata$views
-## [1] 386
-## 
-## $metadata$urls
-## $metadata$urls$older
-## [1] &amp;quot;https://secure.gaug.es/gauges/4efd83a6f5a1f5158a000004/traffic?date=2013-12-01&amp;quot;
-## 
-## $metadata$urls$newer
-## NULL
-## 
-## 
-## $metadata$date
-## [1] &amp;quot;2014-01-17&amp;quot;
-## 
-## $metadata$people
-## [1] 208
-## 
-## 
-## $data
-##    views       date people
-## 1      7 2014-01-01      5
-## 2     17 2014-01-02      7
-## 3     39 2014-01-03     17
-## 4     15 2014-01-04      9
-## 5     14 2014-01-05      7
-## 6     33 2014-01-06     22
-## 7     19 2014-01-07     11
-## 8     15 2014-01-08     11
-## 9     53 2014-01-09     24
-## 10    53 2014-01-10     13
-## 11    14 2014-01-11      9
-## 12    11 2014-01-12     10
-## 13    14 2014-01-13     14
-## 14    11 2014-01-14      9
-## 15    23 2014-01-15     16
-## 16    16 2014-01-16     14
-## 17    32 2014-01-17     25&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;
-
-
-&lt;h3&gt;Screen/browser information&lt;/h3&gt;
-
-&lt;div class=&quot;highlight&quot;&gt;&lt;pre&gt;&lt;code class=&quot;language-r&quot; data-lang=&quot;r&quot;&gt;gs_reso&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;id &lt;span class=&quot;o&quot;&gt;=&lt;/span&gt; &lt;span class=&quot;s&quot;&gt;&amp;quot;4efd83a6f5a1f5158a000004&amp;quot;&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;
-
-
-
-
-&lt;div class=&quot;highlight&quot;&gt;&lt;pre&gt;&lt;code class=&quot;language-text&quot; data-lang=&quot;text&quot;&gt;## $browser_height
-##   views title
-## 1   190   600
-## 2    77   768
-## 3    53   900
-## 4    38   480
-## 5    28  1024
-## 
-## $browser_width
-##   views title
-## 1   153  1280
-## 2    91  1024
-## 3    58  1600
-## 4    36   800
-## 5    30  1440
-## 6     6  2000
-## 7     6   320
-## 8     6   480
-## 
-## $screen_width
-##   views title
-## 1   176  1280
-## 2    90  1600
-## 3    55  1440
-## 4    35  1024
-## 5    14  2000
-## 6     6   320
-## 7     6   480
-## 8     4   800&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;
-
-
-&lt;h3&gt;Visualize traffic data&lt;/h3&gt;
-
-&lt;p&gt;You&#39;ll need to load ggplot2&lt;/p&gt;
-
-&lt;div class=&quot;highlight&quot;&gt;&lt;pre&gt;&lt;code class=&quot;language-r&quot; data-lang=&quot;r&quot;&gt;&lt;span class=&quot;kn&quot;&gt;library&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;ggplot2&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt;
-out &lt;span class=&quot;o&quot;&gt;&amp;lt;-&lt;/span&gt; gs_gauge_detail&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;id &lt;span class=&quot;o&quot;&gt;=&lt;/span&gt; &lt;span class=&quot;s&quot;&gt;&amp;quot;4efd83a6f5a1f5158a000004&amp;quot;&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt;
-vis_gauge&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;out&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;
-
-
-
-
-&lt;div class=&quot;highlight&quot;&gt;&lt;pre&gt;&lt;code class=&quot;language-text&quot; data-lang=&quot;text&quot;&gt;## Using hour, time as id variables
-## Using date as id variables
-## Using date as id variables&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;
-
-
-&lt;p&gt;&lt;img src=&quot;/public/img/2014-01-17-rgauges-hourly/unnamed-chunk-4.png&quot; alt=&quot;center&quot; /&gt;&lt;/p&gt;
-
-&lt;div class=&quot;highlight&quot;&gt;&lt;pre&gt;&lt;code class=&quot;language-text&quot; data-lang=&quot;text&quot;&gt;## NULL&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;
-
-
-&lt;hr /&gt;
-
-&lt;hr /&gt;
-
-&lt;h2&gt;Historic hourly Gaug.es data&lt;/h2&gt;
-
-&lt;p&gt;Now let&#39;s play with the hourly data. To do that we aren&#39;t going to use &lt;code&gt;rgauges&lt;/code&gt;, but rather call the Cloudant API. CouchDB provides a RESTful API out of the box, so we can do a call like &lt;code&gt;https://app16517180.heroku.cloudant.com/gaugesdb_scott/_all_docs?limit=20&lt;/code&gt; to get metadata (or other calls to get the documents themselves). (note: that url won&#39;t work for you since you don&#39;t have my login info)&lt;/p&gt;
-
-&lt;h3&gt;Get some data&lt;/h3&gt;
-
-&lt;div class=&quot;highlight&quot;&gt;&lt;pre&gt;&lt;code class=&quot;language-r&quot; data-lang=&quot;r&quot;&gt;&lt;span class=&quot;kn&quot;&gt;library&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;devtools&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt;
-install_github&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;s&quot;&gt;&amp;quot;sckott/sofa&amp;quot;&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt;  &lt;span class=&quot;c1&quot;&gt;# or install_github(&amp;#39;sofa&amp;#39;, &amp;#39;sckott&amp;#39;)&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;
-
-
-
-
-&lt;div class=&quot;highlight&quot;&gt;&lt;pre&gt;&lt;code class=&quot;language-r&quot; data-lang=&quot;r&quot;&gt;&lt;span class=&quot;kn&quot;&gt;library&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;sofa&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt;
-cloudant_name &lt;span class=&quot;o&quot;&gt;&amp;lt;-&lt;/span&gt; &lt;span class=&quot;s&quot;&gt;&amp;quot;app16517180.heroku&amp;quot;&lt;/span&gt;
-cloudant_pwd &lt;span class=&quot;o&quot;&gt;&amp;lt;-&lt;/span&gt; &lt;span class=&quot;kp&quot;&gt;getOption&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;s&quot;&gt;&amp;quot;sofa_cloudant_heroku&amp;quot;&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;)[[&lt;/span&gt;&lt;span class=&quot;m&quot;&gt;2&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;]]&lt;/span&gt;
-cushion&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;sofa_cloudant &lt;span class=&quot;o&quot;&gt;=&lt;/span&gt; &lt;span class=&quot;kt&quot;&gt;c&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;cloudant_name&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt; cloudant_pwd&lt;span class=&quot;p&quot;&gt;))&lt;/span&gt;
-dat &lt;span class=&quot;o&quot;&gt;&amp;lt;-&lt;/span&gt; sofa_alldocs&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;cushion &lt;span class=&quot;o&quot;&gt;=&lt;/span&gt; &lt;span class=&quot;s&quot;&gt;&amp;quot;sofa_cloudant&amp;quot;&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt; dbname &lt;span class=&quot;o&quot;&gt;=&lt;/span&gt; &lt;span class=&quot;s&quot;&gt;&amp;quot;gaugesdb_scott&amp;quot;&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt; include_docs &lt;span class=&quot;o&quot;&gt;=&lt;/span&gt; &lt;span class=&quot;s&quot;&gt;&amp;quot;true&amp;quot;&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;
-
-
-&lt;h3&gt;Manipulate and visualize&lt;/h3&gt;
-
-&lt;div class=&quot;highlight&quot;&gt;&lt;pre&gt;&lt;code class=&quot;language-r&quot; data-lang=&quot;r&quot;&gt;&lt;span class=&quot;kn&quot;&gt;library&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;plyr&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt;
-dates &lt;span class=&quot;o&quot;&gt;&amp;lt;-&lt;/span&gt; ldply&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;dat&lt;span class=&quot;o&quot;&gt;$&lt;/span&gt;rows&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt; &lt;span class=&quot;kr&quot;&gt;function&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;x&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt; x&lt;span class=&quot;o&quot;&gt;$&lt;/span&gt;doc&lt;span class=&quot;o&quot;&gt;$&lt;/span&gt;coll_date&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt;
-&lt;span class=&quot;kp&quot;&gt;min&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;dates&lt;span class=&quot;o&quot;&gt;$&lt;/span&gt;V1&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;
-
-
-
-
-&lt;div class=&quot;highlight&quot;&gt;&lt;pre&gt;&lt;code class=&quot;language-text&quot; data-lang=&quot;text&quot;&gt;## [1] &amp;quot;2013-06-26&amp;quot;&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;
-
-
-
-
-&lt;div class=&quot;highlight&quot;&gt;&lt;pre&gt;&lt;code class=&quot;language-r&quot; data-lang=&quot;r&quot;&gt;&lt;span class=&quot;kp&quot;&gt;max&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;dates&lt;span class=&quot;o&quot;&gt;$&lt;/span&gt;V1&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;
-
-
-
-
-&lt;div class=&quot;highlight&quot;&gt;&lt;pre&gt;&lt;code class=&quot;language-text&quot; data-lang=&quot;text&quot;&gt;## [1] &amp;quot;2014-01-16&amp;quot;&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;
-
-
-
-
-&lt;div class=&quot;highlight&quot;&gt;&lt;pre&gt;&lt;code class=&quot;language-r&quot; data-lang=&quot;r&quot;&gt;&lt;span class=&quot;kp&quot;&gt;length&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;dates&lt;span class=&quot;o&quot;&gt;$&lt;/span&gt;V1&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;
-
-
-
-
-&lt;div class=&quot;highlight&quot;&gt;&lt;pre&gt;&lt;code class=&quot;language-text&quot; data-lang=&quot;text&quot;&gt;## [1] 198&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;
-
-
-&lt;p&gt;So we&#39;ve got 198 days of data, first collected near end of June, and most recent yesterday. Now get actual visits data&lt;/p&gt;
-
-&lt;div class=&quot;highlight&quot;&gt;&lt;pre&gt;&lt;code class=&quot;language-r&quot; data-lang=&quot;r&quot;&gt;df &lt;span class=&quot;o&quot;&gt;&amp;lt;-&lt;/span&gt; ldply&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;dat&lt;span class=&quot;o&quot;&gt;$&lt;/span&gt;rows&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt; &lt;span class=&quot;kr&quot;&gt;function&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;x&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;{&lt;/span&gt;
-    y &lt;span class=&quot;o&quot;&gt;&amp;lt;-&lt;/span&gt; &lt;span class=&quot;kp&quot;&gt;do.call&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;kp&quot;&gt;rbind&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt; &lt;span class=&quot;kp&quot;&gt;lapply&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;x&lt;span class=&quot;o&quot;&gt;$&lt;/span&gt;doc&lt;span class=&quot;o&quot;&gt;$&lt;/span&gt;recent_hours&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt; &lt;span class=&quot;kt&quot;&gt;data.frame&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;))&lt;/span&gt;
-    &lt;span class=&quot;kt&quot;&gt;data.frame&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;date &lt;span class=&quot;o&quot;&gt;=&lt;/span&gt; x&lt;span class=&quot;o&quot;&gt;$&lt;/span&gt;doc&lt;span class=&quot;o&quot;&gt;$&lt;/span&gt;coll_date&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt; y&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt;
-&lt;span class=&quot;p&quot;&gt;})&lt;/span&gt;
-df&lt;span class=&quot;o&quot;&gt;$&lt;/span&gt;date &lt;span class=&quot;o&quot;&gt;&amp;lt;-&lt;/span&gt; &lt;span class=&quot;kp&quot;&gt;as.Date&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;df&lt;span class=&quot;o&quot;&gt;$&lt;/span&gt;&lt;span class=&quot;kp&quot;&gt;date&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt;
-df&lt;span class=&quot;o&quot;&gt;$&lt;/span&gt;hour &lt;span class=&quot;o&quot;&gt;&amp;lt;-&lt;/span&gt; &lt;span class=&quot;kp&quot;&gt;as.numeric&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;df&lt;span class=&quot;o&quot;&gt;$&lt;/span&gt;hour&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt;
-
-&lt;span class=&quot;kn&quot;&gt;library&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;reshape2&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt;
-df_melt &lt;span class=&quot;o&quot;&gt;&amp;lt;-&lt;/span&gt; melt&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;df&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt; id.vars &lt;span class=&quot;o&quot;&gt;=&lt;/span&gt; &lt;span class=&quot;kt&quot;&gt;c&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;s&quot;&gt;&amp;quot;date&amp;quot;&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt; &lt;span class=&quot;s&quot;&gt;&amp;quot;hour&amp;quot;&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;))&lt;/span&gt;
-&lt;span class=&quot;kp&quot;&gt;head&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;df_melt&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;
-
-
-
-
-&lt;div class=&quot;highlight&quot;&gt;&lt;pre&gt;&lt;code class=&quot;language-text&quot; data-lang=&quot;text&quot;&gt;##         date hour variable value
-## 1 2013-09-18    1    views     2
-## 2 2013-09-18    2    views     3
-## 3 2013-09-18    3    views     2
-## 4 2013-09-18    4    views     0
-## 5 2013-09-18    5    views     1
-## 6 2013-09-18    6    views    10&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;
-
-
-&lt;p&gt;We need to combine the date and hour in to one date time string:&lt;/p&gt;
-
-&lt;div class=&quot;highlight&quot;&gt;&lt;pre&gt;&lt;code class=&quot;language-r&quot; data-lang=&quot;r&quot;&gt;df_melt &lt;span class=&quot;o&quot;&gt;&amp;lt;-&lt;/span&gt; &lt;span class=&quot;kp&quot;&gt;transform&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;df_melt&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt; datetime &lt;span class=&quot;o&quot;&gt;=&lt;/span&gt; &lt;span class=&quot;kp&quot;&gt;as.POSIXct&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;kp&quot;&gt;paste&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;kp&quot;&gt;date&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt; &lt;span class=&quot;kp&quot;&gt;sprintf&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;s&quot;&gt;&amp;quot;%s:00:00&amp;quot;&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt; 
-    hour&lt;span class=&quot;p&quot;&gt;))))&lt;/span&gt;
-&lt;span class=&quot;kp&quot;&gt;head&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;df_melt&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;
-
-
-
-
-&lt;div class=&quot;highlight&quot;&gt;&lt;pre&gt;&lt;code class=&quot;language-text&quot; data-lang=&quot;text&quot;&gt;##         date hour variable value            datetime
-## 1 2013-09-18    1    views     2 2013-09-18 01:00:00
-## 2 2013-09-18    2    views     3 2013-09-18 02:00:00
-## 3 2013-09-18    3    views     2 2013-09-18 03:00:00
-## 4 2013-09-18    4    views     0 2013-09-18 04:00:00
-## 5 2013-09-18    5    views     1 2013-09-18 05:00:00
-## 6 2013-09-18    6    views    10 2013-09-18 06:00:00&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;
-
-
-&lt;p&gt;Now plot all data&lt;/p&gt;
-
-&lt;div class=&quot;highlight&quot;&gt;&lt;pre&gt;&lt;code class=&quot;language-r&quot; data-lang=&quot;r&quot;&gt;&lt;span class=&quot;kn&quot;&gt;library&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;ggplot2&lt;span class=&quot;p&quot;&gt;);&lt;/span&gt; &lt;span class=&quot;kn&quot;&gt;library&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;scales&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt;
-
-gauge_theme &lt;span class=&quot;o&quot;&gt;&amp;lt;-&lt;/span&gt; &lt;span class=&quot;kr&quot;&gt;function&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;(){&lt;/span&gt;
-  &lt;span class=&quot;kt&quot;&gt;list&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;theme&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;panel.grid.major &lt;span class=&quot;o&quot;&gt;=&lt;/span&gt; element_blank&lt;span class=&quot;p&quot;&gt;(),&lt;/span&gt;
-             panel.grid.minor &lt;span class=&quot;o&quot;&gt;=&lt;/span&gt; element_blank&lt;span class=&quot;p&quot;&gt;(),&lt;/span&gt;
-             legend.position &lt;span class=&quot;o&quot;&gt;=&lt;/span&gt; &lt;span class=&quot;kt&quot;&gt;c&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;m&quot;&gt;0.85&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt;&lt;span class=&quot;m&quot;&gt;0.85&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;),&lt;/span&gt;
-             legend.key &lt;span class=&quot;o&quot;&gt;=&lt;/span&gt; element_blank&lt;span class=&quot;p&quot;&gt;()))&lt;/span&gt;
-&lt;span class=&quot;p&quot;&gt;}&lt;/span&gt;
-
-ggplot&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;df_melt&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt; aes&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;datetime&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt; value&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt; group&lt;span class=&quot;o&quot;&gt;=&lt;/span&gt;variable&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt; colour&lt;span class=&quot;o&quot;&gt;=&lt;/span&gt;variable&lt;span class=&quot;p&quot;&gt;))&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;+&lt;/span&gt;
-    theme_bw&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;base_size&lt;span class=&quot;o&quot;&gt;=&lt;/span&gt;&lt;span class=&quot;m&quot;&gt;18&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;+&lt;/span&gt; 
-    geom_line&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;size&lt;span class=&quot;o&quot;&gt;=&lt;/span&gt;&lt;span class=&quot;m&quot;&gt;2&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;+&lt;/span&gt;
-    scale_color_brewer&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;name&lt;span class=&quot;o&quot;&gt;=&lt;/span&gt;&lt;span class=&quot;s&quot;&gt;&amp;quot;&amp;quot;&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt; palette&lt;span class=&quot;o&quot;&gt;=&lt;/span&gt;&lt;span class=&quot;m&quot;&gt;3&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;+&lt;/span&gt;
-    labs&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;x&lt;span class=&quot;o&quot;&gt;=&lt;/span&gt;&lt;span class=&quot;s&quot;&gt;&amp;quot;&amp;quot;&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt; y&lt;span class=&quot;o&quot;&gt;=&lt;/span&gt;&lt;span class=&quot;s&quot;&gt;&amp;quot;&amp;quot;&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;+&lt;/span&gt;
-    gauge_theme&lt;span class=&quot;p&quot;&gt;()&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;
-
-
-&lt;p&gt;&lt;img src=&quot;/public/img/2014-01-17-rgauges-hourly/unnamed-chunk-8.png&quot; alt=&quot;center&quot; /&gt;&lt;/p&gt;
-
-&lt;p&gt;And just one day&lt;/p&gt;
-
-&lt;div class=&quot;highlight&quot;&gt;&lt;pre&gt;&lt;code class=&quot;language-r&quot; data-lang=&quot;r&quot;&gt;oneday &lt;span class=&quot;o&quot;&gt;&amp;lt;-&lt;/span&gt; df_melt&lt;span class=&quot;p&quot;&gt;[&lt;/span&gt; &lt;span class=&quot;kp&quot;&gt;as.character&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;df_melt&lt;span class=&quot;o&quot;&gt;$&lt;/span&gt;&lt;span class=&quot;kp&quot;&gt;date&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;%in%&lt;/span&gt; &lt;span class=&quot;s&quot;&gt;&amp;quot;2013-11-12&amp;quot;&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;]&lt;/span&gt;
-ggplot&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;oneday&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt; aes&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;datetime&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt; value&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt; group&lt;span class=&quot;o&quot;&gt;=&lt;/span&gt;variable&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt; colour&lt;span class=&quot;o&quot;&gt;=&lt;/span&gt;variable&lt;span class=&quot;p&quot;&gt;))&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;+&lt;/span&gt;
-    theme_bw&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;base_size&lt;span class=&quot;o&quot;&gt;=&lt;/span&gt;&lt;span class=&quot;m&quot;&gt;18&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;+&lt;/span&gt; 
-    geom_line&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;size&lt;span class=&quot;o&quot;&gt;=&lt;/span&gt;&lt;span class=&quot;m&quot;&gt;2&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;+&lt;/span&gt;
-    scale_color_brewer&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;name&lt;span class=&quot;o&quot;&gt;=&lt;/span&gt;&lt;span class=&quot;s&quot;&gt;&amp;quot;&amp;quot;&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt; palette&lt;span class=&quot;o&quot;&gt;=&lt;/span&gt;&lt;span class=&quot;m&quot;&gt;3&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;+&lt;/span&gt;
-    labs&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;x&lt;span class=&quot;o&quot;&gt;=&lt;/span&gt;&lt;span class=&quot;s&quot;&gt;&amp;quot;&amp;quot;&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt; y&lt;span class=&quot;o&quot;&gt;=&lt;/span&gt;&lt;span class=&quot;s&quot;&gt;&amp;quot;&amp;quot;&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;+&lt;/span&gt;
-    gauge_theme&lt;span class=&quot;p&quot;&gt;()&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;
-
-
-&lt;p&gt;&lt;img src=&quot;/public/img/2014-01-17-rgauges-hourly/unnamed-chunk-9.png&quot; alt=&quot;center&quot; /&gt;&lt;/p&gt;
-</description>
-				<published>2014-01-17 00:00:00 -0800</published>
-				<link>http://recology.info//2014/01/rgauges-hourly/</link>
 			</item>
 		
 	</channel>

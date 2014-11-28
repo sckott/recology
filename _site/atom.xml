@@ -4,13 +4,218 @@
  <title>Recology</title>
  <link href="http://recology.info//atom.xml" rel="self"/>
  <link href="http://recology.info//"/>
- <updated>2014-11-26T11:44:29-08:00</updated>
+ <updated>2014-11-28T10:06:09-08:00</updated>
  <id>http://recology.info/</id>
  <author>
    <name>Scott Chamberlain</name>
    <email>myrmecocystus@gmail.com</email>
  </author>
 
+ 
+ <entry>
+   <title>1000 commits to taxize</title>
+   <link href="http://recology.info//2014/11/taxize-1000/"/>
+   <updated>2014-11-28T00:00:00-08:00</updated>
+   <id>http://recology.info//2014/11/taxize-1000</id>
+   <content type="html">&lt;p&gt;Just today we&#39;ve hit 1000 commits on &lt;code&gt;taxize&lt;/code&gt;!  &lt;code&gt;taxize&lt;/code&gt; is an R client to search across lots of taxonomic databases on the web. In honor of the 1000 commit milestone, here&#39;s some stats on the project.&lt;/p&gt;
+
+&lt;p&gt;Before that, lots of people have contributed to &lt;code&gt;taxize&lt;/code&gt;, it&#39;s a big group effort:&lt;/p&gt;
+
+&lt;ul&gt;
+&lt;li&gt;&lt;a href=&quot;https://github.com/EDiLD&quot;&gt;Eduard Szöcs&lt;/a&gt;&lt;/li&gt;
+&lt;li&gt;&lt;a href=&quot;https://github.com/zachary-foster&quot;&gt;Zachary Foster&lt;/a&gt;&lt;/li&gt;
+&lt;li&gt;&lt;a href=&quot;https://github.com/cboettig&quot;&gt;Carl Boettiger&lt;/a&gt;&lt;/li&gt;
+&lt;li&gt;&lt;a href=&quot;https://github.com/karthik&quot;&gt;Karthik Ram&lt;/a&gt;&lt;/li&gt;
+&lt;li&gt;&lt;a href=&quot;https://github.com/jarioksa&quot;&gt;Jari Oksanen&lt;/a&gt;&lt;/li&gt;
+&lt;li&gt;&lt;a href=&quot;https://github.com/fmichonneau&quot;&gt;Francis Michonneau&lt;/a&gt;&lt;/li&gt;
+&lt;li&gt;&lt;a href=&quot;https://github.com/Ironholds&quot;&gt;Oliver Keyes&lt;/a&gt;&lt;/li&gt;
+&lt;li&gt;&lt;a href=&quot;https://github.com/dlebauer&quot;&gt;David LeBauer&lt;/a&gt;&lt;/li&gt;
+&lt;li&gt;&lt;a href=&quot;https://github.com/benmarwick&quot;&gt;Ben Marwick&lt;/a&gt;&lt;/li&gt;
+&lt;li&gt;&lt;a href=&quot;https://github.com/anirvan&quot;&gt;Anirvan Chatterjee&lt;/a&gt;&lt;/li&gt;
+&lt;/ul&gt;
+
+
+&lt;p&gt;In addition, we&#39;ve had lots of feedback from users, including feature requests and bug reports, making &lt;code&gt;taxize&lt;/code&gt; a lot better.&lt;/p&gt;
+
+&lt;h2&gt;Setup&lt;/h2&gt;
+
+&lt;pre&gt;&lt;code class=&quot;r&quot;&gt;library(&quot;devtools&quot;)
+library(&quot;httr&quot;)
+library(&quot;ggplot2&quot;)
+library(&quot;stringr&quot;)
+library(&quot;plyr&quot;)
+library(&quot;dplyr&quot;)
+&lt;/code&gt;&lt;/pre&gt;
+
+&lt;h2&gt;Define functions&lt;/h2&gt;
+
+&lt;pre&gt;&lt;code class=&quot;r&quot;&gt;github_auth &amp;lt;- function(appname = getOption(&quot;gh_appname&quot;), key = getOption(&quot;gh_id&quot;),
+                        secret = getOption(&quot;gh_secret&quot;)) {
+  if (is.null(getOption(&quot;gh_token&quot;))) {
+    myapp &amp;lt;- oauth_app(appname, key, secret)
+    token &amp;lt;- oauth2.0_token(oauth_endpoints(&quot;github&quot;), myapp)
+    options(gh_token = token)
+  } else {
+    token &amp;lt;- getOption(&quot;gh_token&quot;)
+  }
+  return(token)
+}
+
+make_url &amp;lt;- function(x, y, z) {
+  sprintf(&quot;https://api.github.com/repos/%s/%s/%s&quot;, x, y, z)
+}
+
+process_result &amp;lt;- function(x) {
+  stop_for_status(x)
+  if (!x$headers$`content-type` == &quot;application/json; charset=utf-8&quot;)
+    stop(&quot;content type mismatch&quot;)
+  tmp &amp;lt;- content(x, as = &quot;text&quot;)
+  jsonlite::fromJSON(tmp, flatten = TRUE)
+}
+
+gh_commits &amp;lt;- function(repo, owner = &quot;ropensci&quot;, ...) {
+  token &amp;lt;- github_auth()
+  outout &amp;lt;- list(); iter &amp;lt;- 0; nexturl &amp;lt;- &quot;dontstop&quot;
+  while(nexturl != &quot;stop&quot;){
+    iter &amp;lt;- iter + 1
+    req &amp;lt;- if(grepl(&quot;https:/&quot;, nexturl)) GET(nexturl, config = c(token = token)) else GET(make_url(owner, repo, &quot;commits&quot;), query = list(per_page=100), config = c(token = token))
+    outout[[iter]] &amp;lt;- process_result(req)
+    link &amp;lt;- req$headers$link
+    nexturl &amp;lt;- if(is.null(link)){ &quot;stop&quot; } else {
+      if(grepl(&quot;next&quot;, link)){
+        stringr::str_extract(link, &quot;https://[0-9A-Za-z/?=\\._&amp;amp;]+&quot;)
+      } else {
+        &quot;stop&quot;
+      }
+    }
+  }
+  outout &amp;lt;- outout[sapply(outout, function(x) !identical(x, list()))]
+  dplyr::rbind_all(outout)
+}
+
+gh_issues &amp;lt;- function(repo, owner = &quot;ropensci&quot;, ...) {
+  token &amp;lt;- github_auth()
+  outout &amp;lt;- list(); iter &amp;lt;- 0; nexturl &amp;lt;- &quot;dontstop&quot;
+  while(nexturl != &quot;stop&quot;){
+    iter &amp;lt;- iter + 1
+    req &amp;lt;- if(grepl(&quot;https:/&quot;, nexturl)) GET(nexturl, query=list(state=&quot;all&quot;), config = c(token = token)) else GET(make_url(owner, repo, &quot;issues&quot;), query = list(per_page=100, state=&quot;all&quot;), config = c(token = token))
+    outout[[iter]] &amp;lt;- process_result(req)
+    link &amp;lt;- req$headers$link
+    nexturl &amp;lt;- if(is.null(link)){ &quot;stop&quot; } else {
+      if(grepl(&quot;next&quot;, link)){
+        stringr::str_extract(link, &quot;https://[0-9A-Za-z/?=\\._&amp;amp;]+&quot;)
+      } else {
+        &quot;stop&quot;
+      }
+    }
+  }
+  outout &amp;lt;- outout[sapply(outout, function(x) !identical(x, list()))]
+  dplyr::rbind_all(outout)
+}
+
+gh_commit &amp;lt;- function(sha, repo, owner = &quot;ropensci&quot;, ...) {
+  token &amp;lt;- github_auth()
+  req &amp;lt;- GET(paste0(make_url(owner, repo, &quot;commits&quot;), &quot;/&quot;, sha),
+             config = c(token = token, ...))
+  process_result(req)
+}
+
+gh_verb &amp;lt;- function(owner = &quot;ropensci&quot;, repo, verb, args=list(), ...) {
+  token &amp;lt;- github_auth()
+  req &amp;lt;- GET(make_url(owner, repo, verb), query=args, config = c(token = token, ...))
+  process_result(req)
+}
+&lt;/code&gt;&lt;/pre&gt;
+
+&lt;h2&gt;Commits&lt;/h2&gt;
+
+&lt;p&gt;List of commits&lt;/p&gt;
+
+&lt;pre&gt;&lt;code class=&quot;r&quot;&gt;out &amp;lt;- gh_commits(&quot;taxize&quot;)
+&lt;/code&gt;&lt;/pre&gt;
+
+&lt;p&gt;Get changes for each commit&lt;/p&gt;
+
+&lt;pre&gt;&lt;code class=&quot;r&quot;&gt;changes &amp;lt;- vapply(out$sha, function(x) gh_commit(x, repo=&quot;taxize&quot;)$stats$total, numeric(1))
+changesdf &amp;lt;-  data.frame(changes=unname(changes), sha=names(changes))
+&lt;/code&gt;&lt;/pre&gt;
+
+&lt;p&gt;Combine&lt;/p&gt;
+
+&lt;pre&gt;&lt;code class=&quot;r&quot;&gt;out &amp;lt;- inner_join(out, changesdf)
+&lt;/code&gt;&lt;/pre&gt;
+
+&lt;p&gt;Total changes through time (additions + deletions)&lt;/p&gt;
+
+&lt;pre&gt;&lt;code class=&quot;r&quot;&gt;ct &amp;lt;- function(x) as.POSIXct(x, format=&quot;%Y-%m-%dT%H:%M:%SZ&quot;, tz=&quot;UTC&quot;)
+out %&amp;gt;%
+  mutate(commit.committer.date = ct(commit.committer.date)) %&amp;gt;%
+  ggplot(aes(x=commit.committer.date, y=changes)) +
+    geom_area(fill=&quot;#87D2A0&quot;) +
+    theme_grey(base_size = 20)
+&lt;/code&gt;&lt;/pre&gt;
+
+&lt;p&gt;&lt;img src=&quot;/public/img/2014-11-28-taxize-1000/unnamed-chunk-7-1.png&quot; alt=&quot;&quot; /&gt;&lt;/p&gt;
+
+&lt;p&gt;By Authors&lt;/p&gt;
+
+&lt;pre&gt;&lt;code class=&quot;r&quot;&gt;out %&amp;gt;%
+  group_by(author.login) %&amp;gt;%
+  summarise(n = n()) %&amp;gt;%
+  ggplot(aes(author.login, n)) +
+    geom_bar(stat = &quot;identity&quot;, fill=&quot;#87D2A0&quot;) +
+    coord_flip() +
+    theme_grey(base_size = 20)
+&lt;/code&gt;&lt;/pre&gt;
+
+&lt;p&gt;&lt;img src=&quot;/public/img/2014-11-28-taxize-1000/unnamed-chunk-8-1.png&quot; alt=&quot;&quot; /&gt;&lt;/p&gt;
+
+&lt;h2&gt;Issues&lt;/h2&gt;
+
+&lt;pre&gt;&lt;code class=&quot;r&quot;&gt;out &amp;lt;- gh_issues(&quot;taxize&quot;)
+&lt;/code&gt;&lt;/pre&gt;
+
+&lt;p&gt;Number of issues&lt;/p&gt;
+
+&lt;pre&gt;&lt;code class=&quot;r&quot;&gt;NROW(out)
+#&amp;gt; [1] 382
+&lt;/code&gt;&lt;/pre&gt;
+
+&lt;p&gt;Number of open issues&lt;/p&gt;
+
+&lt;pre&gt;&lt;code class=&quot;r&quot;&gt;out %&amp;gt;%
+  filter(state == &quot;open&quot;) %&amp;gt;%
+  NROW
+#&amp;gt; [1] 35
+&lt;/code&gt;&lt;/pre&gt;
+
+&lt;p&gt;Number of pull requests&lt;/p&gt;
+
+&lt;pre&gt;&lt;code class=&quot;r&quot;&gt;out %&amp;gt;%
+  filter(!is.na(pull_request.url)) %&amp;gt;%
+  NROW
+#&amp;gt; [1] 119
+&lt;/code&gt;&lt;/pre&gt;
+
+&lt;h2&gt;Forks, number of&lt;/h2&gt;
+
+&lt;pre&gt;&lt;code class=&quot;r&quot;&gt;NROW(gh_verb(repo = &quot;taxize&quot;, verb=&quot;forks&quot;))
+#&amp;gt; [1] 16
+&lt;/code&gt;&lt;/pre&gt;
+
+&lt;h2&gt;Stars, number of&lt;/h2&gt;
+
+&lt;pre&gt;&lt;code class=&quot;r&quot;&gt;NROW(gh_verb(repo = &quot;taxize&quot;, verb=&quot;stargazers&quot;, args=list(per_page=100)))
+#&amp;gt; [1] 44
+&lt;/code&gt;&lt;/pre&gt;
+
+&lt;h2&gt;Watchers, number of&lt;/h2&gt;
+
+&lt;pre&gt;&lt;code class=&quot;r&quot;&gt;NROW(gh_verb(repo = &quot;taxize&quot;, verb=&quot;subscribers&quot;, args=list(per_page=100)))
+#&amp;gt; [1] 12
+&lt;/code&gt;&lt;/pre&gt;
+</content>
+ </entry>
  
  <entry>
    <title>Intro to alpha ckanr - R client for CKAN RESTful API</title>
