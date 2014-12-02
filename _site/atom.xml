@@ -4,13 +4,221 @@
  <title>Recology</title>
  <link href="http://recology.info//atom.xml" rel="self"/>
  <link href="http://recology.info//"/>
- <updated>2014-11-28T10:06:09-08:00</updated>
+ <updated>2014-12-02T08:33:05-08:00</updated>
  <id>http://recology.info/</id>
  <author>
    <name>Scott Chamberlain</name>
    <email>myrmecocystus@gmail.com</email>
  </author>
 
+ 
+ <entry>
+   <title>taxize workflows</title>
+   <link href="http://recology.info//2014/12/taxize-workflows/"/>
+   <updated>2014-12-02T00:00:00-08:00</updated>
+   <id>http://recology.info//2014/12/taxize-workflows</id>
+   <content type="html">&lt;p&gt;A missed chat on the rOpenSci website the other day asked:&lt;/p&gt;
+
+&lt;blockquote&gt;&lt;p&gt;Hi there, i am trying to use the taxize package and have a .csv file of species names to run through taxize updating them. What would be the code i would need to run to achieve this?&lt;/p&gt;&lt;/blockquote&gt;
+
+&lt;p&gt;One way to answer this is to talk about the basic approach to importing data, doing stuff to the data, then recombining data. There are many ways to do this, but I&#39;ll go over a few of them.&lt;/p&gt;
+
+&lt;h2&gt;Install taxize&lt;/h2&gt;
+
+&lt;pre&gt;&lt;code class=&quot;r&quot;&gt;install.packages(&quot;taxize&quot;)
+install.packages(&quot;downloader&quot;)
+&lt;/code&gt;&lt;/pre&gt;
+
+&lt;pre&gt;&lt;code class=&quot;r&quot;&gt;library(&quot;taxize&quot;)
+&lt;/code&gt;&lt;/pre&gt;
+
+&lt;h2&gt;Import data&lt;/h2&gt;
+
+&lt;p&gt;We&#39;ll use Winston Chang&#39;s new &lt;code&gt;downloader&lt;/code&gt; package to avoid problems with &lt;code&gt;https&lt;/code&gt;, and get a dataset from our ropensci datasets repo &lt;a href=&quot;https://github.com/ropensci/datasets&quot;&gt;https://github.com/ropensci/datasets&lt;/a&gt;&lt;/p&gt;
+
+&lt;pre&gt;&lt;code class=&quot;r&quot;&gt;downloader::download(&quot;https://raw.githubusercontent.com/ropensci/datasets/master/planttraits/morphological.csv&quot;, &quot;morphological.csv&quot;)
+dat &amp;lt;- read.csv(&quot;morphological.csv&quot;, stringsAsFactors = FALSE)
+head(dat)
+#&amp;gt;                  species log_SLA leaf_water_content log_wood_density
+#&amp;gt; 1         Abies concolor    3.46               0.51            -0.52
+#&amp;gt; 2          Abies grandis    3.58               0.49            -0.51
+#&amp;gt; 3        Abies magnifica    3.87               0.62            -0.53
+#&amp;gt; 4      Acacia farnesiana      NA                 NA               NA
+#&amp;gt; 5           Acer glabrum    5.07               0.69            -0.54
+#&amp;gt; 6 Adenostoma fasciculata    3.56               0.46            -0.31
+#&amp;gt;   log_ht log_N
+#&amp;gt; 1   7.72  0.02
+#&amp;gt; 2   7.51 -0.31
+#&amp;gt; 3   7.58 -0.14
+#&amp;gt; 4   5.70    NA
+#&amp;gt; 5   3.25  1.02
+#&amp;gt; 6   5.33  0.29
+&lt;/code&gt;&lt;/pre&gt;
+
+&lt;p&gt;After importing data, there are a variety of approaches you could take:&lt;/p&gt;
+
+&lt;ol&gt;
+&lt;li&gt;Vector: Take species names as vector from your &lt;code&gt;data.frame&lt;/code&gt;, cleaning them, then re-attching to the &lt;code&gt;data.frame&lt;/code&gt; later, or&lt;/li&gt;
+&lt;li&gt;In-Place: Use for loops or &lt;code&gt;lapply&lt;/code&gt; family functions to iterate over each name while simultaneously re-inserting into the &lt;code&gt;data.frame&lt;/code&gt;&lt;/li&gt;
+&lt;/ol&gt;
+
+
+&lt;h2&gt;1. Vector&lt;/h2&gt;
+
+&lt;p&gt;Make a vector of names&lt;/p&gt;
+
+&lt;pre&gt;&lt;code class=&quot;r&quot;&gt;splist &amp;lt;- dat$species
+&lt;/code&gt;&lt;/pre&gt;
+
+&lt;p&gt;Then proceed to do name cleaning, e.g, we can use the &lt;code&gt;tnrs&lt;/code&gt; function to see if any names are potentially not spelled correctly.&lt;/p&gt;
+
+&lt;pre&gt;&lt;code class=&quot;r&quot;&gt;tnrs_out &amp;lt;- tnrs(splist, source = &quot;iPlant_TNRS&quot;)
+head(tnrs_out)
+#&amp;gt;              submittedname             acceptedname    sourceid score
+#&amp;gt; 1     Ceanothus prostratus     Ceanothus prostratus iPlant_TNRS     1
+#&amp;gt; 2          Abies magnifica          Abies magnifica iPlant_TNRS     1
+#&amp;gt; 3 Arctostaphylos canescens Arctostaphylos canescens iPlant_TNRS     1
+#&amp;gt; 4         Berberis nervosa         Berberis nervosa iPlant_TNRS     1
+#&amp;gt; 5        Arbutus menziesii        Arbutus menziesii iPlant_TNRS     1
+#&amp;gt; 6     Calocedrus decurrens     Calocedrus decurrens iPlant_TNRS     1
+#&amp;gt;                matchedname      authority
+#&amp;gt; 1     Ceanothus prostratus         Benth.
+#&amp;gt; 2          Abies magnifica  A. Murray bis
+#&amp;gt; 3 Arctostaphylos canescens         Eastw.
+#&amp;gt; 4         Berberis nervosa          Pursh
+#&amp;gt; 5        Arbutus menziesii          Pursh
+#&amp;gt; 6     Calocedrus decurrens (Torr.) Florin
+#&amp;gt;                                     uri
+#&amp;gt; 1 http://www.tropicos.org/Name/27500276
+#&amp;gt; 2 http://www.tropicos.org/Name/24900142
+#&amp;gt; 3 http://www.tropicos.org/Name/12302547
+#&amp;gt; 4  http://www.tropicos.org/Name/3500175
+#&amp;gt; 5 http://www.tropicos.org/Name/12302436
+#&amp;gt; 6  http://www.tropicos.org/Name/9400069
+&lt;/code&gt;&lt;/pre&gt;
+
+&lt;p&gt;Those with score of less than 1 may have misspellings&lt;/p&gt;
+
+&lt;pre&gt;&lt;code class=&quot;r&quot;&gt;tnrs_out[ tnrs_out$score &amp;lt; 1, ]
+#&amp;gt;                 submittedname              acceptedname    sourceid score
+#&amp;gt; 23     Adenostoma fasciculata   Adenostoma fasciculatum iPlant_TNRS  0.97
+#&amp;gt; 24 Arctostaphylos glandulosus Arctostaphylos glandulosa iPlant_TNRS  0.97
+#&amp;gt; 36        Chamaebatia foliosa     Chamaebatia foliolosa iPlant_TNRS  0.95
+#&amp;gt; 38     Juniperus californicus     Juniperus californica iPlant_TNRS  0.97
+#&amp;gt; 77         Prunus illicifolia         Prunus ilicifolia iPlant_TNRS  0.99
+#&amp;gt; 78         Prunus subcordatus         Prunus subcordata iPlant_TNRS  0.97
+#&amp;gt;                  matchedname                         authority
+#&amp;gt; 23   Adenostoma fasciculatum                      Hook. &amp;amp; Arn.
+#&amp;gt; 24 Arctostaphylos glandulosa                            Eastw.
+#&amp;gt; 36     Chamaebatia foliolosa                            Benth.
+#&amp;gt; 38     Juniperus californica                          Carrière
+#&amp;gt; 77         Prunus ilicifolia (Nutt. ex Hook. &amp;amp; Arn.) D. Dietr.
+#&amp;gt; 78         Prunus subcordata                            Benth.
+#&amp;gt;                                      uri
+#&amp;gt; 23 http://www.tropicos.org/Name/27801458
+#&amp;gt; 24 http://www.tropicos.org/Name/12300542
+#&amp;gt; 36 http://www.tropicos.org/Name/27801486
+#&amp;gt; 38  http://www.tropicos.org/Name/9400374
+#&amp;gt; 77 http://www.tropicos.org/Name/27801102
+#&amp;gt; 78 http://www.tropicos.org/Name/27801124
+&lt;/code&gt;&lt;/pre&gt;
+
+&lt;p&gt;So let&#39;s take the &lt;code&gt;acceptedname&lt;/code&gt; column as a the new names and assign to a new vector&lt;/p&gt;
+
+&lt;pre&gt;&lt;code class=&quot;r&quot;&gt;cleaned_names &amp;lt;- tnrs_out$acceptedname
+&lt;/code&gt;&lt;/pre&gt;
+
+&lt;p&gt;Then join names back, replacing them, or adding as a new column&lt;/p&gt;
+
+&lt;p&gt;Replace&lt;/p&gt;
+
+&lt;pre&gt;&lt;code class=&quot;r&quot;&gt;dat$species &amp;lt;- cleaned_names
+head(dat)
+#&amp;gt;                    species log_SLA leaf_water_content log_wood_density
+#&amp;gt; 1     Ceanothus prostratus    3.46               0.51            -0.52
+#&amp;gt; 2          Abies magnifica    3.58               0.49            -0.51
+#&amp;gt; 3 Arctostaphylos canescens    3.87               0.62            -0.53
+#&amp;gt; 4         Berberis nervosa      NA                 NA               NA
+#&amp;gt; 5        Arbutus menziesii    5.07               0.69            -0.54
+#&amp;gt; 6     Calocedrus decurrens    3.56               0.46            -0.31
+#&amp;gt;   log_ht log_N
+#&amp;gt; 1   7.72  0.02
+#&amp;gt; 2   7.51 -0.31
+#&amp;gt; 3   7.58 -0.14
+#&amp;gt; 4   5.70    NA
+#&amp;gt; 5   3.25  1.02
+#&amp;gt; 6   5.33  0.29
+&lt;/code&gt;&lt;/pre&gt;
+
+&lt;p&gt;New column&lt;/p&gt;
+
+&lt;pre&gt;&lt;code class=&quot;r&quot;&gt;dat$species_cleaned &amp;lt;- cleaned_names
+head(dat)
+#&amp;gt;                    species log_SLA leaf_water_content log_wood_density
+#&amp;gt; 1     Ceanothus prostratus    3.46               0.51            -0.52
+#&amp;gt; 2          Abies magnifica    3.58               0.49            -0.51
+#&amp;gt; 3 Arctostaphylos canescens    3.87               0.62            -0.53
+#&amp;gt; 4         Berberis nervosa      NA                 NA               NA
+#&amp;gt; 5        Arbutus menziesii    5.07               0.69            -0.54
+#&amp;gt; 6     Calocedrus decurrens    3.56               0.46            -0.31
+#&amp;gt;   log_ht log_N          species_cleaned
+#&amp;gt; 1   7.72  0.02     Ceanothus prostratus
+#&amp;gt; 2   7.51 -0.31          Abies magnifica
+#&amp;gt; 3   7.58 -0.14 Arctostaphylos canescens
+#&amp;gt; 4   5.70    NA         Berberis nervosa
+#&amp;gt; 5   3.25  1.02        Arbutus menziesii
+#&amp;gt; 6   5.33  0.29     Calocedrus decurrens
+&lt;/code&gt;&lt;/pre&gt;
+
+&lt;h2&gt;2. In-place&lt;/h2&gt;
+
+&lt;p&gt;You can use functions from the &lt;code&gt;dplyr&lt;/code&gt; package to &lt;code&gt;split-apply-combine&lt;/code&gt;, where &lt;code&gt;split&lt;/code&gt; is split apart your vector for each taxon, &lt;code&gt;apply&lt;/code&gt; to apply a function or functions to do name cleaning, then &lt;code&gt;combine&lt;/code&gt; to put them back together.&lt;/p&gt;
+
+&lt;p&gt;Here, we&#39;ll attach taxonomic ids from the Catalogue of Life to each species (each row) (with just a subset of the data to save time):&lt;/p&gt;
+
+&lt;pre&gt;&lt;code class=&quot;r&quot;&gt;library(&quot;dplyr&quot;)
+tbl_df(dat)[1:5,] %&amp;gt;%
+  rowwise() %&amp;gt;%
+  mutate(colid = get_colid(species)) %&amp;gt;%
+  select(species, colid)
+#&amp;gt; Source: local data frame [5 x 2]
+#&amp;gt; Groups: &amp;lt;by row&amp;gt;
+#&amp;gt; 
+#&amp;gt;                    species    colid
+#&amp;gt; 1     Ceanothus prostratus 19544732
+#&amp;gt; 2          Abies magnifica 18158318
+#&amp;gt; 3 Arctostaphylos canescens 19358934
+#&amp;gt; 4         Berberis nervosa 19374077
+#&amp;gt; 5        Arbutus menziesii 19358819
+&lt;/code&gt;&lt;/pre&gt;
+
+&lt;p&gt;Let&#39;s do something a bit more complicated. Get common names for each taxon in a new column, if more than 1, concatenate into a single character string for easy inclusion in a &lt;code&gt;data.frame&lt;/code&gt;&lt;/p&gt;
+
+&lt;pre&gt;&lt;code class=&quot;r&quot;&gt;sci2comm_concat &amp;lt;- function(x){
+  temp &amp;lt;- sci2comm(x, db = &quot;eol&quot;)
+  if(length(temp) == 0) NA else paste0(temp[[1]], collapse = &quot;, &quot;)
+}
+
+dat_new &amp;lt;- tbl_df(dat)[1:5,] %&amp;gt;%
+  rowwise() %&amp;gt;%
+  mutate(comm = sci2comm_concat(species))
+&lt;/code&gt;&lt;/pre&gt;
+
+&lt;p&gt;To see the new column, do&lt;/p&gt;
+
+&lt;pre&gt;&lt;code class=&quot;r&quot;&gt;dat_new %&amp;gt;% select(comm)
+#&amp;gt; Source: local data frame [5 x 1]
+#&amp;gt; Groups: &amp;lt;by row&amp;gt;
+#&amp;gt; 
+#&amp;gt;                                                                          comm
+#&amp;gt; 1                      Mahala-mat Ceanothus, prostrate ceanothus, squawcarpet
+#&amp;gt; 2 Prächtige Tanne, Goldtanne (Gold-Tanne), Kalifornische Rot-Tanne, Pracht-Ta
+#&amp;gt; 3                          hoary manzanita, hoary manzanita, Sonoma manzanita
+#&amp;gt; 4 Longleaf Oregon-grape, Cascade barberry, Dull Oregon grape, Oregon grape-ho
+#&amp;gt; 5                   pacific madrone, Madrona, madrone, Kalifornianmansikkapuu
+&lt;/code&gt;&lt;/pre&gt;
+</content>
+ </entry>
  
  <entry>
    <title>1000 commits to taxize</title>
