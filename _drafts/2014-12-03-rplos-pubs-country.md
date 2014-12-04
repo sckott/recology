@@ -20,9 +20,12 @@ Fun! Let's do that. It's a bit complicated because there is no field like geogra
 
 ## Installation
 
+You'll need the GitHub version for the coutry names data, or just use the CRAN version, and get country names elsewhere. 
+
 
 ```r
-install.packages("rplos")
+install.packages("devtools")
+devtools::install_github("rplos")
 ```
 
 
