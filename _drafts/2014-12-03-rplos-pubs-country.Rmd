@@ -1,0 +1,103 @@
+---
+name: rplos-pubs-country
+layout: post
+title: Publications by author country
+date: 2014-12-03
+author: Scott Chamberlain
+tags:
+- R
+- API
+- publications
+---
+
+```{r, echo=FALSE}
+knitr::opts_chunk$set(
+  collapse = TRUE,
+  comment = "#>",
+  warning = FALSE,
+  message = FALSE
+)
+```
+
+I just missed another chat on the rOpenSci website:
+
+> I want to know the number of publications by people from a certain country, but I dont know how to achieve this...
+
+Fun! Let's do that. It's a bit complicated because there is no field like geography of the authors. But there are affiliation fields, from which we can collect data we need.
+
+## Installation
+
+```{r eval=FALSE}
+install.packages("rplos")
+```
+
+```{r}
+library("rplos")
+```
+
+## Get the data
+
+```{r}
+articles <- searchplos(q='*:*', limit = 5,
+    fl=c("id","author_affiliate"), 
+    fq=list('article_type:"Research Article"', "doc_type:full"))
+```
+
+## Search for country names in affilitation field
+
+```{r}
+(countries <- lapply(articles$data$author_affiliate, function(x){
+  out <- sapply(isocodes$name, function(z) grepl(z, x))
+  isocodes$name[out]
+}))
+```
+
+You can combine this data with the previously collected data:
+
+```{r}
+# Helper function
+splitem <- function(x){
+  if(length(x) == 0) { NA } else {
+    if(length(x) > 1) paste0(x, collapse = ", ") else x
+  }
+}
+
+articles$data$countries <- sapply(countries, splitem)
+head(articles$data)
+```
+
+## Bigger data set
+
+Okay, cool, lets do it on a bigger data set:
+
+```{r}
+articles <- searchplos(q='*:*', limit = 200,
+    fl=c("id","counter_total_all","author_affiliate"), 
+    fq=list('article_type:"Research Article"', "doc_type:full"))
+```
+
+Get countries
+
+```{r}
+countries <- lapply(articles$data$author_affiliate, function(x){
+  out <- sapply(isocodes$name, function(z) grepl(z, x))
+  isocodes$name[out]
+})
+df <- articles$data
+df$countries <- sapply(countries, splitem)
+```
+
+Plot data
+
+```{r}
+library("ggplot2")
+df$n_countries <- sapply(countries, length)
+ggplot(df, aes(n_countries, as.numeric(counter_total_all))) +
+  geom_point() +
+  labs(y="total page views") + 
+  theme_grey(base_size = 16)
+```
+
+## Into rplos
+
+We'll probably add a function like this into `rplos`, as a convenient way to get handle this use case.

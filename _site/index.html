@@ -59,6 +59,126 @@
   
   <div class="post">
     <h1>
+      <a href="/2014/12/rplos-pubs-country/">
+        Publications by author country
+      </a>
+    </h1>
+
+    <span class="post-date">03 Dec 2014</span>
+
+    <p>I just missed another chat on the rOpenSci website:</p>
+
+<blockquote><p>I want to know the number of publications by people from a certain country, but I dont know how to achieve this...</p></blockquote>
+
+<p>Fun! Let's do that. It's a bit complicated because there is no field like geography of the authors. But there are affiliation fields, from which we can collect data we need.</p>
+
+<h2>Installation</h2>
+
+<pre><code class="r">install.packages("rplos")
+</code></pre>
+
+<pre><code class="r">library("rplos")
+</code></pre>
+
+<h2>Get the data</h2>
+
+<pre><code class="r">articles &lt;- searchplos(q='*:*', limit = 5,
+    fl=c("id","author_affiliate"), 
+    fq=list('article_type:"Research Article"', "doc_type:full"))
+</code></pre>
+
+<h2>Search for country names in affilitation field</h2>
+
+<pre><code class="r">(countries &lt;- lapply(articles$data$author_affiliate, function(x){
+  out &lt;- sapply(isocodes$name, function(z) grepl(z, x))
+  isocodes$name[out]
+}))
+#&gt; [[1]]
+#&gt; [1] "Netherlands"
+#&gt; 
+#&gt; [[2]]
+#&gt; [1] "China"
+#&gt; 
+#&gt; [[3]]
+#&gt; [1] "Canada"
+#&gt; 
+#&gt; [[4]]
+#&gt; [1] "United States"
+#&gt; 
+#&gt; [[5]]
+#&gt; [1] "Canada"
+</code></pre>
+
+<p>You can combine this data with the previously collected data:</p>
+
+<pre><code class="r"># Helper function
+splitem &lt;- function(x){
+  if(length(x) == 0) { NA } else {
+    if(length(x) &gt; 1) paste0(x, collapse = ", ") else x
+  }
+}
+
+articles$data$countries &lt;- sapply(countries, splitem)
+head(articles$data)
+#&gt;                             id
+#&gt; 1 10.1371/journal.pone.0004237
+#&gt; 2 10.1371/journal.pone.0006239
+#&gt; 3 10.1371/journal.pone.0034856
+#&gt; 4 10.1371/journal.pone.0023490
+#&gt; 5 10.1371/journal.pone.0023141
+#&gt;                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                          author_affiliate
+#&gt; 1                                                                                                                                        Division of General Internal Medicine, Department of Medicine, Radboud University Nijmegen Medical Center, Nijmegen, The Netherlands; Nijmegen Institute of Infection, Inflammation and Immunity (N4i), Nijmegen, The Netherlands; Department of Pharmacology and Toxicology, Nijmegen Center for Molecular Life Sciences, Radboud University Nijmegen Medical Center, Nijmegen, The Netherlands
+#&gt; 2                                                                                                                                                                                                                                                                                                                                                              State Key Laboratory of Cognitive Neuroscience and Learning, Beijing Normal University, Beijing, China; Graduate University of Chinese Academy of Sciences, Beijing, China
+#&gt; 3                                                                                                                                                                                                                                                                                                         Rotman Research Institute of Baycrest, Toronto, Ontario, Canada; Department of Psychology, University of Toronto, Toronto, Ontario, Canada; Dalla Lana School of Public Health, University of Toronto, Toronto, Ontario, Canada
+#&gt; 4 AstraZeneca R&amp;D Boston, Waltham, Massachusetts, United States of America; Department of Biology, Rosenstiel Basic Medical Sciences Research Center, Brandeis University, Waltham, Massachusetts, United States of America; Laboratory of Molecular Carcinogenesis, National Institute of Environmental Health Sciences, National Institutes of Health, Research Triangle Park, North Carolina, United States of America; Molecular Cardiology Research Institute, Tufts Medical Center, Boston, Massachusetts, United States of America
+#&gt; 5                                                                                                                                                                                                                                                                                                                                                                                                                                                                  Department of Medicine, McMaster University, Hamilton, Ontario, Canada
+#&gt;       countries
+#&gt; 1   Netherlands
+#&gt; 2         China
+#&gt; 3        Canada
+#&gt; 4 United States
+#&gt; 5        Canada
+</code></pre>
+
+<h2>Bigger data set</h2>
+
+<p>Okay, cool, lets do it on a bigger data set:</p>
+
+<pre><code class="r">articles &lt;- searchplos(q='*:*', limit = 200,
+    fl=c("id","counter_total_all","author_affiliate"), 
+    fq=list('article_type:"Research Article"', "doc_type:full"))
+</code></pre>
+
+<p>Get countries</p>
+
+<pre><code class="r">countries &lt;- lapply(articles$data$author_affiliate, function(x){
+  out &lt;- sapply(isocodes$name, function(z) grepl(z, x))
+  isocodes$name[out]
+})
+df &lt;- articles$data
+df$countries &lt;- sapply(countries, splitem)
+</code></pre>
+
+<p>Plot data</p>
+
+<pre><code class="r">library("ggplot2")
+df$n_countries &lt;- sapply(countries, length)
+ggplot(df, aes(n_countries, as.numeric(counter_total_all))) +
+  geom_point() +
+  labs(y="total page views") + 
+  theme_grey(base_size = 16)
+</code></pre>
+
+<p><img src="/public/img/2014-12-03-rplos-pubs-country/unnamed-chunk-9-1.png" alt="" /></p>
+
+<h2>Into rplos</h2>
+
+<p>We'll probably add a function like this into <code>rplos</code>, as a convenient way to get handle this use case.</p>
+
+  </div>
+  
+  <div class="post">
+    <h1>
       <a href="/2014/12/http-codes/">
         http codes
       </a>
@@ -502,215 +622,6 @@ dat_new &lt;- tbl_df(dat)[1:5,] %&gt;%
 #&gt; 3                          hoary manzanita, hoary manzanita, Sonoma manzanita
 #&gt; 4 Longleaf Oregon-grape, Cascade barberry, Dull Oregon grape, Oregon grape-ho
 #&gt; 5                   pacific madrone, Madrona, madrone, Kalifornianmansikkapuu
-</code></pre>
-
-  </div>
-  
-  <div class="post">
-    <h1>
-      <a href="/2014/11/taxize-1000/">
-        1000 commits to taxize
-      </a>
-    </h1>
-
-    <span class="post-date">28 Nov 2014</span>
-
-    <p>Just today we've hit 1000 commits on <code>taxize</code>!  <code>taxize</code> is an R client to search across lots of taxonomic databases on the web. In honor of the 1000 commit milestone, here's some stats on the project.</p>
-
-<p>Before that, lots of people have contributed to <code>taxize</code>, it's a big group effort:</p>
-
-<ul>
-<li><a href="https://github.com/EDiLD">Eduard Szöcs</a></li>
-<li><a href="https://github.com/zachary-foster">Zachary Foster</a></li>
-<li><a href="https://github.com/cboettig">Carl Boettiger</a></li>
-<li><a href="https://github.com/karthik">Karthik Ram</a></li>
-<li><a href="https://github.com/jarioksa">Jari Oksanen</a></li>
-<li><a href="https://github.com/fmichonneau">Francis Michonneau</a></li>
-<li><a href="https://github.com/Ironholds">Oliver Keyes</a></li>
-<li><a href="https://github.com/dlebauer">David LeBauer</a></li>
-<li><a href="https://github.com/benmarwick">Ben Marwick</a></li>
-<li><a href="https://github.com/anirvan">Anirvan Chatterjee</a></li>
-</ul>
-
-
-<p>In addition, we've had lots of feedback from users, including feature requests and bug reports, making <code>taxize</code> a lot better.</p>
-
-<h2>Setup</h2>
-
-<pre><code class="r">library("devtools")
-library("httr")
-library("ggplot2")
-library("stringr")
-library("plyr")
-library("dplyr")
-</code></pre>
-
-<h2>Define functions</h2>
-
-<pre><code class="r">github_auth &lt;- function(appname = getOption("gh_appname"), key = getOption("gh_id"),
-                        secret = getOption("gh_secret")) {
-  if (is.null(getOption("gh_token"))) {
-    myapp &lt;- oauth_app(appname, key, secret)
-    token &lt;- oauth2.0_token(oauth_endpoints("github"), myapp)
-    options(gh_token = token)
-  } else {
-    token &lt;- getOption("gh_token")
-  }
-  return(token)
-}
-
-make_url &lt;- function(x, y, z) {
-  sprintf("https://api.github.com/repos/%s/%s/%s", x, y, z)
-}
-
-process_result &lt;- function(x) {
-  stop_for_status(x)
-  if (!x$headers$`content-type` == "application/json; charset=utf-8")
-    stop("content type mismatch")
-  tmp &lt;- content(x, as = "text")
-  jsonlite::fromJSON(tmp, flatten = TRUE)
-}
-
-gh_commits &lt;- function(repo, owner = "ropensci", ...) {
-  token &lt;- github_auth()
-  outout &lt;- list(); iter &lt;- 0; nexturl &lt;- "dontstop"
-  while(nexturl != "stop"){
-    iter &lt;- iter + 1
-    req &lt;- if(grepl("https:/", nexturl)) GET(nexturl, config = c(token = token)) else GET(make_url(owner, repo, "commits"), query = list(per_page=100), config = c(token = token))
-    outout[[iter]] &lt;- process_result(req)
-    link &lt;- req$headers$link
-    nexturl &lt;- if(is.null(link)){ "stop" } else {
-      if(grepl("next", link)){
-        stringr::str_extract(link, "https://[0-9A-Za-z/?=\\._&amp;]+")
-      } else {
-        "stop"
-      }
-    }
-  }
-  outout &lt;- outout[sapply(outout, function(x) !identical(x, list()))]
-  dplyr::rbind_all(outout)
-}
-
-gh_issues &lt;- function(repo, owner = "ropensci", ...) {
-  token &lt;- github_auth()
-  outout &lt;- list(); iter &lt;- 0; nexturl &lt;- "dontstop"
-  while(nexturl != "stop"){
-    iter &lt;- iter + 1
-    req &lt;- if(grepl("https:/", nexturl)) GET(nexturl, query=list(state="all"), config = c(token = token)) else GET(make_url(owner, repo, "issues"), query = list(per_page=100, state="all"), config = c(token = token))
-    outout[[iter]] &lt;- process_result(req)
-    link &lt;- req$headers$link
-    nexturl &lt;- if(is.null(link)){ "stop" } else {
-      if(grepl("next", link)){
-        stringr::str_extract(link, "https://[0-9A-Za-z/?=\\._&amp;]+")
-      } else {
-        "stop"
-      }
-    }
-  }
-  outout &lt;- outout[sapply(outout, function(x) !identical(x, list()))]
-  dplyr::rbind_all(outout)
-}
-
-gh_commit &lt;- function(sha, repo, owner = "ropensci", ...) {
-  token &lt;- github_auth()
-  req &lt;- GET(paste0(make_url(owner, repo, "commits"), "/", sha),
-             config = c(token = token, ...))
-  process_result(req)
-}
-
-gh_verb &lt;- function(owner = "ropensci", repo, verb, args=list(), ...) {
-  token &lt;- github_auth()
-  req &lt;- GET(make_url(owner, repo, verb), query=args, config = c(token = token, ...))
-  process_result(req)
-}
-</code></pre>
-
-<h2>Commits</h2>
-
-<p>List of commits</p>
-
-<pre><code class="r">out &lt;- gh_commits("taxize")
-</code></pre>
-
-<p>Get changes for each commit</p>
-
-<pre><code class="r">changes &lt;- vapply(out$sha, function(x) gh_commit(x, repo="taxize")$stats$total, numeric(1))
-changesdf &lt;-  data.frame(changes=unname(changes), sha=names(changes))
-</code></pre>
-
-<p>Combine</p>
-
-<pre><code class="r">out &lt;- inner_join(out, changesdf)
-</code></pre>
-
-<p>Total changes through time (additions + deletions)</p>
-
-<pre><code class="r">ct &lt;- function(x) as.POSIXct(x, format="%Y-%m-%dT%H:%M:%SZ", tz="UTC")
-out %&gt;%
-  mutate(commit.committer.date = ct(commit.committer.date)) %&gt;%
-  ggplot(aes(x=commit.committer.date, y=changes)) +
-    geom_area(fill="#87D2A0") +
-    theme_grey(base_size = 20)
-</code></pre>
-
-<p><img src="/public/img/2014-11-28-taxize-1000/unnamed-chunk-7-1.png" alt="" /></p>
-
-<p>By Authors</p>
-
-<pre><code class="r">out %&gt;%
-  group_by(author.login) %&gt;%
-  summarise(n = n()) %&gt;%
-  ggplot(aes(author.login, n)) +
-    geom_bar(stat = "identity", fill="#87D2A0") +
-    coord_flip() +
-    theme_grey(base_size = 20)
-</code></pre>
-
-<p><img src="/public/img/2014-11-28-taxize-1000/unnamed-chunk-8-1.png" alt="" /></p>
-
-<h2>Issues</h2>
-
-<pre><code class="r">out &lt;- gh_issues("taxize")
-</code></pre>
-
-<p>Number of issues</p>
-
-<pre><code class="r">NROW(out)
-#&gt; [1] 382
-</code></pre>
-
-<p>Number of open issues</p>
-
-<pre><code class="r">out %&gt;%
-  filter(state == "open") %&gt;%
-  NROW
-#&gt; [1] 35
-</code></pre>
-
-<p>Number of pull requests</p>
-
-<pre><code class="r">out %&gt;%
-  filter(!is.na(pull_request.url)) %&gt;%
-  NROW
-#&gt; [1] 119
-</code></pre>
-
-<h2>Forks, number of</h2>
-
-<pre><code class="r">NROW(gh_verb(repo = "taxize", verb="forks"))
-#&gt; [1] 16
-</code></pre>
-
-<h2>Stars, number of</h2>
-
-<pre><code class="r">NROW(gh_verb(repo = "taxize", verb="stargazers", args=list(per_page=100)))
-#&gt; [1] 44
-</code></pre>
-
-<h2>Watchers, number of</h2>
-
-<pre><code class="r">NROW(gh_verb(repo = "taxize", verb="subscribers", args=list(per_page=100)))
-#&gt; [1] 12
 </code></pre>
 
   </div>
