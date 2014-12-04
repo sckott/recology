@@ -60,10 +60,10 @@ articles <- searchplos(q='*:*', limit = 5,
 #> [1] "Canada"
 #> 
 #> [[4]]
-#> [1] "United States"
+#> [1] "China"
 #> 
 #> [[5]]
-#> [1] "Canada"
+#> [1] "Germany"
 ```
 
 You can combine this data with the previously collected data:
@@ -83,31 +83,33 @@ head(articles$data)
 #> 1 10.1371/journal.pone.0004237
 #> 2 10.1371/journal.pone.0006239
 #> 3 10.1371/journal.pone.0034856
-#> 4 10.1371/journal.pone.0023490
-#> 5 10.1371/journal.pone.0023141
-#>                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                          author_affiliate
-#> 1                                                                                                                                        Division of General Internal Medicine, Department of Medicine, Radboud University Nijmegen Medical Center, Nijmegen, The Netherlands; Nijmegen Institute of Infection, Inflammation and Immunity (N4i), Nijmegen, The Netherlands; Department of Pharmacology and Toxicology, Nijmegen Center for Molecular Life Sciences, Radboud University Nijmegen Medical Center, Nijmegen, The Netherlands
-#> 2                                                                                                                                                                                                                                                                                                                                                              State Key Laboratory of Cognitive Neuroscience and Learning, Beijing Normal University, Beijing, China; Graduate University of Chinese Academy of Sciences, Beijing, China
-#> 3                                                                                                                                                                                                                                                                                                         Rotman Research Institute of Baycrest, Toronto, Ontario, Canada; Department of Psychology, University of Toronto, Toronto, Ontario, Canada; Dalla Lana School of Public Health, University of Toronto, Toronto, Ontario, Canada
-#> 4 AstraZeneca R&D Boston, Waltham, Massachusetts, United States of America; Department of Biology, Rosenstiel Basic Medical Sciences Research Center, Brandeis University, Waltham, Massachusetts, United States of America; Laboratory of Molecular Carcinogenesis, National Institute of Environmental Health Sciences, National Institutes of Health, Research Triangle Park, North Carolina, United States of America; Molecular Cardiology Research Institute, Tufts Medical Center, Boston, Massachusetts, United States of America
-#> 5                                                                                                                                                                                                                                                                                                                                                                                                                                                                  Department of Medicine, McMaster University, Hamilton, Ontario, Canada
-#>       countries
-#> 1   Netherlands
-#> 2         China
-#> 3        Canada
-#> 4 United States
-#> 5        Canada
+#> 4 10.1371/journal.pone.0021965
+#> 5 10.1371/journal.pone.0008295
+#>                                                                                                                                                                                                                                                                                                                                                                                   author_affiliate
+#> 1 Division of General Internal Medicine, Department of Medicine, Radboud University Nijmegen Medical Center, Nijmegen, The Netherlands; Nijmegen Institute of Infection, Inflammation and Immunity (N4i), Nijmegen, The Netherlands; Department of Pharmacology and Toxicology, Nijmegen Center for Molecular Life Sciences, Radboud University Nijmegen Medical Center, Nijmegen, The Netherlands
+#> 2                                                                                                                                                                                                                       State Key Laboratory of Cognitive Neuroscience and Learning, Beijing Normal University, Beijing, China; Graduate University of Chinese Academy of Sciences, Beijing, China
+#> 3                                                                                                                                                                  Rotman Research Institute of Baycrest, Toronto, Ontario, Canada; Department of Psychology, University of Toronto, Toronto, Ontario, Canada; Dalla Lana School of Public Health, University of Toronto, Toronto, Ontario, Canada
+#> 4                                                                                                                             Hefei National Laboratory for Physical Sciences at Microscale, School of Life Sciences, University of Science and Technology of China, Hefei, Anhui, People's Republic of China; School of Life Sciences, Anhui University, Hefei, Anhui, People's Republic of China
+#> 5                                                                                                                                                                                                                                                                                                                   Institute of Biochemistry, Charité-Universitätsmedizin Berlin, Berlin, Germany
+#>     countries
+#> 1 Netherlands
+#> 2       China
+#> 3      Canada
+#> 4       China
+#> 5     Germany
 ```
 
 ## Bigger data set
 
-Okay, cool, lets do it on a bigger data set:
+Okay, cool, lets do it on a bigger data set, and this time, we'll get another variable `counter_total_all`, which is the combination of page views/pdf downloads for each article. This will allow us to ask _Is number of countries included in the authors related to page views?_. I have no idea if this question makes sense, but nonetheless, it is a question :)
 
 
 ```r
-articles <- searchplos(q='*:*', limit = 200,
+articles <- searchplos(q='*:*', limit = 1000,
     fl=c("id","counter_total_all","author_affiliate"), 
     fq=list('article_type:"Research Article"', "doc_type:full"))
+#> 1 
+#> 2
 ```
 
 Get countries
@@ -122,20 +124,29 @@ df <- articles$data
 df$countries <- sapply(countries, splitem)
 ```
 
+Let's remove those rows with 0 countries, since the authors must be from somewhere, so the country name matching must have errored. 
+
+
+```r
+df$n_countries <- sapply(countries, length)
+df <- df[ df$n_countries > 0, ]
+```
+
 Plot data
 
 
 ```r
 library("ggplot2")
-df$n_countries <- sapply(countries, length)
 ggplot(df, aes(n_countries, as.numeric(counter_total_all))) +
   geom_point() +
   labs(y="total page views") + 
   theme_grey(base_size = 16)
 ```
 
-![plot of chunk unnamed-chunk-9](figure/unnamed-chunk-9-1.png) 
+![plot of chunk unnamed-chunk-10](figure/unnamed-chunk-10-1.png) 
+
+Conclusion: meh, maybe, maybe not
 
 ## Into rplos
 
-We'll probably add a function like this into `rplos`, as a convenient way to get handle this use case.
+We'll probably add a function like this into `rplos`, as a convenient way to handle this use case.
