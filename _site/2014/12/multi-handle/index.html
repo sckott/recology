@@ -1,0 +1,220 @@
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en" lang="en-us">
+
+  <head>
+  <meta http-equiv="content-type" content="text/html; charset=utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1">
+  <link href="http://gmpg.org/xfn/11" rel="profile">
+
+  <title>
+    Dealing with multi handle errors &middot; 
+    Recology, R ecology
+  </title>
+
+  <!-- CSS -->
+  <link rel="stylesheet" href="/public/css/hyde.css">
+  <link rel="stylesheet" href="/public/css/syntax.css">
+  <link rel="stylesheet" href="http://fonts.googleapis.com/css?family=Open+Sans:300,400italic,400,600,700|Abril+Fatface">
+
+
+  <!-- Icons -->
+  <link rel="apple-touch-icon-precomposed" sizes="144x144" href="/public/favicon.ico">
+  <link rel="shortcut icon" href="/public/favicon.ico">
+  <link href="//netdna.bootstrapcdn.com/font-awesome/4.1.0/css/font-awesome.css" rel="stylesheet">
+
+  <!-- RSS -->
+  <link rel="alternate" type="application/rss+xml" title="RSS" href="/atom.xml">
+</head>
+
+
+  <body class="theme-base-0f layout-reverse">
+
+    <header class="masthead">
+      <div class="masthead-inner">
+        <h1>Recology</h1>
+        <!-- <h1> <a href="http://recology.info/">Recology</a></h1> -->
+        <p class="lead">R/etc.</p>
+
+        <div class="colophon">
+          <ul class="colophon-links">
+            <li>
+              <a href="/"><i class="fa fa-home fa-lg"></i></a>&nbsp;
+              <a href="/about"><i class="fa fa-info-circle fa-lg"></i></a>&nbsp;
+              <a href="/archives"><i class="fa fa-archive fa-lg"></i></a>&nbsp;
+              <a href="/rresources"><i class="fa fa-book fa-lg"></i></a>&nbsp;
+              <a href="http://rforcats.net/" rel><i class="fa fa-graduation-cap fa-lg"></i></a>&nbsp;
+              <a href="http://feeds.feedburner.com/github/wpna"><i class="fa fa-rss fa-lg"></i></a>&nbsp;
+              <a href="https://twitter.com/recology_"><i class="fa fa-twitter fa-lg"></i></a>&nbsp;
+              <a href="/fork"><i class="fa fa-spinner fa-lg"></i></a>
+            </li>
+          </ul>
+          <!-- <small><a href="https://github.com/mdo/hyde">Hyde</a> from <a href="https://twitter.com/mdo" target="_blank">@mdo</a>.</small> -->
+        </div>
+      </div>
+    </header>
+
+    <div class="content container">
+      <div class="post">
+  <h1>Dealing with multi handle errors</h1><a style="float:right;" href="/archives"><i class="fa fa-archive fa-lg"></i></a>
+  <span class="post-date">08 Dec 2014</span>
+  <i class="fa fa-tags fa-large"></i>&nbsp;
+     <a href="/tags/R" class="badge" rel="tooltip" data-placement="bottom" title="View posts tagged with &quot;R&quot;"><span class="blog_tag">R</span></a>    <a href="/tags/API" class="badge" rel="tooltip" data-placement="bottom" title="View posts tagged with &quot;API&quot;"><span class="blog_tag">API</span></a>    <a href="/tags/http" class="badge" rel="tooltip" data-placement="bottom" title="View posts tagged with &quot;http&quot;"><span class="blog_tag">http</span></a>    <a href="/tags/httr" class="badge" rel="tooltip" data-placement="bottom" title="View posts tagged with &quot;httr&quot;"><span class="blog_tag">httr</span></a>  
+  <br>
+  <p>At rOpenSci we occasssionally hear from our users that they run into an error like:</p>
+
+<pre><code class="r">Error in function (type, msg, asError = TRUE)  : 
+  easy handled already used in multi handle
+</code></pre>
+
+<p>This error occurs in the <code>httr</code> package that we use to do http requests to sources of data on the web. It happens when e.g., you make a lot of requests to a resource, then it gets interrupted somehow - then you make another call, and you get the error above. Let's try it with the an version of <code>httr</code> (<code>v0.5</code>):</p>
+
+<pre><code class="r">library("httr")
+# run, then esc to cause multi handle error
+replicate(50, GET("http://google.com/"))
+# then retry single call, which trows multi handle error
+GET("http://google.com/")
+#&gt; Error in function (type, msg, asError = TRUE)  : 
+#&gt;   easy handled already used in multi handle
+</code></pre>
+
+<p>There are any number of reasons why your session may get interrupted, including an internet outage, the web service you are requesesting data from times out, etc.  There hasn't been a straight-forward way to handle this, until recently.</p>
+
+<p>In <code>httr</code> version <code>0.6</code>, there are two new functions <code>handle_find()</code> and <code>handle_reset()</code> to help deal with this error.</p>
+
+<p>First, install newest httr from Github</p>
+
+<pre><code class="r">install.packages("devtools")
+devtools::install_github("hadley/httr")
+</code></pre>
+
+<pre><code class="r">library("httr")
+</code></pre>
+
+<p>Make a bunch of requests to google, interrupting part way through</p>
+
+<pre><code class="r">replicate(50, HEAD("http://google.com/"))
+</code></pre>
+
+<p>Then retry single call, which trows multi handle error</p>
+
+<pre><code class="r">HEAD("http://google.com/")
+#&gt; Error in function (type, msg, asError = TRUE)  : 
+#&gt;   easy handled already used in multi handle
+</code></pre>
+
+<p>Find handle</p>
+
+<pre><code class="r">handle_find("http://google.com/")
+#&gt; Host: http://google.com/ &lt;0x10f3d1600&gt;
+</code></pre>
+
+<p>Reset handle</p>
+
+<pre><code class="r">handle_reset("http://google.com/")
+</code></pre>
+
+<p>Try call again, this time it should work</p>
+
+<pre><code class="r">HEAD("http://google.com/")
+#&gt; Response [http://www.google.com/]
+#&gt;   Date: 2014-12-08 13:37
+#&gt;   Status: 200
+#&gt;   Content-Type: text/html; charset=ISO-8859-1
+#&gt; &lt;EMPTY BODY&gt;
+</code></pre>
+
+<h2>Usage in ropensci packages</h2>
+
+<p>We have more work to do yet to integrate this into our packages. It's great you can reset a handle as above, but to reset the handle you need to search for the URL used in the request, which our users would have to dig into the code for the function they are using. That is easy-ish to do, but perhaps not everyone knows they can get to the code easily.  So, we may try seting a parameter in functions that would let reset the handle to clear this error.</p>
+
+<h2>Note</h2>
+
+<p>Note that Hadley is planning on eliminating <code>RCurl</code> dependency (https://github.com/hadley/httr/issues/172), so there may be a different solution in the future.</p>
+
+</div>
+
+<div id="disqus_thread"></div>
+<script type="text/javascript">
+    /* * * CONFIGURATION VARIABLES: EDIT BEFORE PASTING INTO YOUR WEBPAGE * * */
+    var disqus_shortname = 'coffeehaus'; // required: replace example with your forum shortname
+
+    /* * * DON'T EDIT BELOW THIS LINE * * */
+    (function() {
+        var dsq = document.createElement('script'); dsq.type = 'text/javascript'; dsq.async = true;
+        dsq.src = '//' + disqus_shortname + '.disqus.com/embed.js';
+        (document.getElementsByTagName('head')[0] || document.getElementsByTagName('body')[0]).appendChild(dsq);
+    })();
+</script>
+<noscript>Please enable JavaScript to view the <a href="http://disqus.com/?ref_noscript">comments powered by Disqus.</a></noscript>
+<a href="http://disqus.com" class="dsq-brlink">comments powered by <span class="logo-disqus">Disqus</span></a>
+
+<!-- <div class="related">
+  <h2>Related Posts</h2>
+  <ul class="related-posts">
+    
+      <li>
+        <h3>
+          <a href="/2014/12/rplos-pubs-country/">
+            Publications by author country
+            <small>03 Dec 2014</small>
+          </a>
+        </h3>
+      </li>
+    
+      <li>
+        <h3>
+          <a href="/2014/12/http-codes/">
+            http codes
+            <small>02 Dec 2014</small>
+          </a>
+        </h3>
+      </li>
+    
+      <li>
+        <h3>
+          <a href="/2014/12/taxize-workflows/">
+            taxize workflows
+            <small>02 Dec 2014</small>
+          </a>
+        </h3>
+      </li>
+    
+  </ul>
+</div>
+ -->
+
+    </div>
+
+  </body>
+
+  <footer>  
+  <!-- Disqus code -->
+  <script type="text/javascript">
+      /* * * CONFIGURATION VARIABLES: EDIT BEFORE PASTING INTO YOUR WEBPAGE * * */
+      var disqus_shortname = 'recology'; // required: replace example with your forum shortname
+
+      /* * * DON'T EDIT BELOW THIS LINE * * */
+      (function () {
+          var s = document.createElement('script'); s.async = true;
+          s.type = 'text/javascript';
+          s.src = 'http://' + disqus_shortname + '.disqus.com/count.js';
+          (document.getElementsByTagName('HEAD')[0] || document.getElementsByTagName('BODY')[0]).appendChild(s);
+      }());
+  </script>
+
+  <!-- Gaug.es Analytics -->
+  <script type="text/javascript">
+    var _gauges = _gauges || [];
+    (function() {
+      var t   = document.createElement('script');
+      t.type  = 'text/javascript';
+      t.async = true;
+      t.id    = 'gauges-tracker';
+      t.setAttribute('data-site-id', '4efd83a6f5a1f5158a000004');
+      t.src = '//secure.gaug.es/track.js';
+      var s = document.getElementsByTagName('script')[0];
+      s.parentNode.insertBefore(t, s);
+    })();
+  </script>
+</footer>
+</html>
