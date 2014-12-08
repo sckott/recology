@@ -25,7 +25,7 @@ You'll need the GitHub version for the coutry names data, or just use the CRAN v
 
 ```r
 install.packages("devtools")
-devtools::install_github("rplos")
+devtools::install_github("ropensci/rplos")
 ```
 
 
@@ -51,19 +51,19 @@ articles <- searchplos(q='*:*', limit = 5,
   isocodes$name[out]
 }))
 #> [[1]]
-#> [1] "Netherlands"
+#> character(0)
 #> 
 #> [[2]]
-#> [1] "China"
+#> [1] "Jersey"        "United States"
 #> 
 #> [[3]]
-#> [1] "Canada"
+#> [1] "China"   "Germany"
 #> 
 #> [[4]]
-#> [1] "China"
+#> character(0)
 #> 
 #> [[5]]
-#> [1] "Germany"
+#> [1] "Argentina"      "United Kingdom"
 ```
 
 You can combine this data with the previously collected data:
@@ -80,23 +80,23 @@ splitem <- function(x){
 articles$data$countries <- sapply(countries, splitem)
 head(articles$data)
 #>                             id
-#> 1 10.1371/journal.pone.0004237
-#> 2 10.1371/journal.pone.0006239
-#> 3 10.1371/journal.pone.0034856
-#> 4 10.1371/journal.pone.0021965
-#> 5 10.1371/journal.pone.0008295
-#>                                                                                                                                                                                                                                                                                                                                                                                   author_affiliate
-#> 1 Division of General Internal Medicine, Department of Medicine, Radboud University Nijmegen Medical Center, Nijmegen, The Netherlands; Nijmegen Institute of Infection, Inflammation and Immunity (N4i), Nijmegen, The Netherlands; Department of Pharmacology and Toxicology, Nijmegen Center for Molecular Life Sciences, Radboud University Nijmegen Medical Center, Nijmegen, The Netherlands
-#> 2                                                                                                                                                                                                                       State Key Laboratory of Cognitive Neuroscience and Learning, Beijing Normal University, Beijing, China; Graduate University of Chinese Academy of Sciences, Beijing, China
-#> 3                                                                                                                                                                  Rotman Research Institute of Baycrest, Toronto, Ontario, Canada; Department of Psychology, University of Toronto, Toronto, Ontario, Canada; Dalla Lana School of Public Health, University of Toronto, Toronto, Ontario, Canada
-#> 4                                                                                                                             Hefei National Laboratory for Physical Sciences at Microscale, School of Life Sciences, University of Science and Technology of China, Hefei, Anhui, People's Republic of China; School of Life Sciences, Anhui University, Hefei, Anhui, People's Republic of China
-#> 5                                                                                                                                                                                                                                                                                                                   Institute of Biochemistry, Charité-Universitätsmedizin Berlin, Berlin, Germany
-#>     countries
-#> 1 Netherlands
-#> 2       China
-#> 3      Canada
-#> 4       China
-#> 5     Germany
+#> 1 10.1371/journal.pone.0095870
+#> 2 10.1371/journal.pone.0110535
+#> 3 10.1371/journal.pone.0110991
+#> 4 10.1371/journal.pone.0111234
+#> 5 10.1371/journal.pone.0111388
+#>                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                author_affiliate
+#> 1 Institute of Epidemiology and Preventive Medicine, College of Public Health, National Taiwan University, Taipei, Taiwan; Department of Clinical Laboratory Sciences and Medical Biotechnology, College of Medicine, National Taiwan University, Taipei, Taiwan; Department of Gastroenterology, Ren-Ai Branch, Taipei City Hospital, Taipei, Taiwan; Division of Gastroenterology, Department of Internal Medicine, National Taiwan University Hospital and National Taiwan University College of Medicine, Taipei, Taiwan; Liver Research Unit, Chang Gung Memorial Hospital, Chang Gung University College of Medicine, Taipei, Taiwan; Division of Gastroenterology, Department of Medicine, Taipei Veterans General Hospital, Taipei, Taiwan; Cheng Hsin General Hospital, Taipei, Taiwan
+#> 2    Durham Nephrology Associates, Durham, North Carolina, United States of America; Scientific Activities Department, The National Kidney Foundation, Inc., New York, New York, United States of America; Covance Inc., Princeton, New Jersey, United States of America; Departments of Medicine and Population Health Sciences, University of Wisconsin School of Medicine and Public Health, Madison, Wisconsin, United States of America; Department of Family Medicine, University at Buffalo, Buffalo, New York, United States of America; Baylor Health Care System, Baylor Heart and Vascular Institute, Dallas, Texas, United States of America; Department of Medicine, Division of Nephrology, Icahn School of Medicine at Mount Sinai, New York, New York, United States of America
+#> 3                                                                                                                                                                                                                                                                                                                                                                                                                                  State Key Laboratory of Electronic Thin Films and Integrated Devices, School of Microelectronics and Solid-State electronics, University of Electronic Science and Technology of China, Sichuan, China; Electrical and Computer Engineering, Kaiserslautern University of Technology, Kaiserslautern German Gottlieb-Daimler-Strabe, Kaiserslautern, Germany
+#> 4                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         SB RAS Institute of Chemical Biology and Fundamental Medicine, Novosibirsk, Russia; Pacific Institute of Bioorganic Chemistry, Far East Division, Russian Academy of Sciences, Vladivostok, Russia; Novosibirsk State University, Novosibirsk, Russia
+#> 5                                                                                                                                                                                                                                                                                                                                                                                   CONICET, Consejo Nacional de Investigaciones Científicas y Técnicas, Ciudad Autónoma de Buenos Aires, Buenos Aires, Argentina; INGEO, Instituto de Geología, Facultad de Ciencias Exactas, Físicas y Naturales, Universidad Nacional de San Juan, San Juan, San Juan, Argentina; School of Geography, Earth and Environmental Sciences, University of Birmingham, Birmingham, West Midlands, United Kingdom
+#>                   countries
+#> 1                      <NA>
+#> 2     Jersey, United States
+#> 3            China, Germany
+#> 4                      <NA>
+#> 5 Argentina, United Kingdom
 ```
 
 ## Bigger data set
@@ -108,6 +108,8 @@ Okay, cool, lets do it on a bigger data set, and this time, we'll get another va
 articles <- searchplos(q='*:*', limit = 1000,
     fl=c("id","counter_total_all","author_affiliate"), 
     fq=list('article_type:"Research Article"', "doc_type:full"))
+#> 1 
+#> 2
 ```
 
 Get countries
@@ -141,7 +143,7 @@ ggplot(df, aes(n_countries, as.numeric(counter_total_all))) +
   theme_grey(base_size = 16)
 ```
 
-![](/public/img/2014-12-03-rplos-pubs-country/unnamed-chunk-10-1.png) 
+![plot of chunk unnamed-chunk-10](figure/unnamed-chunk-10-1.png) 
 
 Conclusion: meh, maybe, maybe not
 
