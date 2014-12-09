@@ -59,6 +59,576 @@
   
   <div class="post">
     <h1>
+      <a href="/2012/09/rmetadata/">
+        Scholarly metadata from R
+      </a>
+    </h1>
+
+    <span class="post-date">17 Sep 2012</span>
+
+    <p>Metadata!  Metadata is very cool.  It's super hot right now - everybody is talking about it.  Okay, maybe not everyone, but it's an important part of archiving scholarly work.</p>
+
+<p>We are working on <a href="https://github.com/ropensci/rmetadata">a repo on GitHub <code>rmetadata</code></a> to be a one stop shop for querying metadata from around the web.  Various repos on GitHub we have started - <a href="https://github.com/ropensci/rpmc">rpmc</a>, <a href="https://github.com/ropensci/rpmc">rdatacite</a>, <a href="https://github.com/ropensci/rpmc">rdryad</a>, <a href="https://github.com/ropensci/rpmc">rpensoft</a>, <a href="https://github.com/ropensci/rpmc">rhindawi</a> - will at least in part be folded into <code>rmetadata</code>.</p>
+
+<p>As a start we are writing functions to hit any metadata services that use the <a href="http://www.openarchives.org/OAI/openarchivesprotocol.html">OAI-PMH: "Open Archives Initiative Protocol for Metadata Harvesting"</a> framework.  <code>OAI-PMH</code> has six methods (or verbs as they are called) for data harvesting that are the same across different metadata providers:</p>
+
+<ul>
+<li><code>GetRecord</code></li>
+<li><code>Identify</code></li>
+<li><code>ListIdentifiers</code></li>
+<li><code>ListMetadataFormats</code></li>
+<li><code>ListRecords</code></li>
+<li><code>ListSets</code></li>
+</ul>
+
+
+<p><code>OAI-PMH</code> provides an updating list of data providers, which we can easily use to get the base URLs for their data.  Then we just use one of the six above methods to query their metadata.</p>
+
+<h3>Let's install rmetadata first.</h3>
+
+<div class="highlight"><pre><code class="language-r" data-lang="r"><span class="lineno">1</span> install_github<span class="p">(</span><span class="s">&quot;rmetadata&quot;</span><span class="p">,</span> <span class="s">&quot;ropensci&quot;</span><span class="p">)</span>
+<span class="lineno">2</span> <span class="kn">library</span><span class="p">(</span>rmetadata<span class="p">)</span></code></pre></div>
+
+
+<h3>The most basic thing you can do with <code>OAI-PMH</code> is identify the data provider, getting their basic information. The <code>Identify</code> verb.</h3>
+
+<div class="highlight"><pre><code class="language-r" data-lang="r"><span class="lineno">1</span> <span class="c1"># one provider</span>
+<span class="lineno">2</span> md_identify<span class="p">(</span>provider <span class="o">=</span> <span class="s">&quot;datacite&quot;</span><span class="p">)</span></code></pre></div>
+
+
+
+
+<div class="highlight"><pre><code class="language-text" data-lang="text">repositoryName                     baseURL protocolVersion
+1   DataCite MDS http://oai.datacite.org/oai             2.0
+          adminEmail    earliestDatestamp deletedRecord
+1 admin@datacite.org 2011-01-01T00:00:00Z            no
+           granularity compression compression.1
+1 YYYY-MM-DDThh:mm:ssZ        gzip       deflate
+                                                                                                                                                      description
+1 oai, oai.datacite.org, :, oai:oai.datacite.org:12425, http://www.openarchives.org/OAI/2.0/oai-identifier http://www.openarchives.org/OAI/2.0/oai-identifier.xsd</code></pre></div>
+
+
+
+
+<div class="highlight"><pre><code class="language-r" data-lang="r"><span class="lineno">1</span> <span class="c1"># many providers</span>
+<span class="lineno">2</span> md_identify<span class="p">(</span>provider <span class="o">=</span> <span class="kt">c</span><span class="p">(</span><span class="s">&quot;datacite&quot;</span><span class="p">,</span> <span class="s">&quot;pensoft&quot;</span><span class="p">))</span></code></pre></div>
+
+
+
+
+<div class="highlight"><pre><code class="language-text" data-lang="text">repositoryName                     baseURL protocolVersion
+1       DataCite MDS http://oai.datacite.org/oai             2.0
+2 Pensoft Publishers       http://oai.pensoft.eu             2.0
+          adminEmail    earliestDatestamp deletedRecord
+1 admin@datacite.org 2011-01-01T00:00:00Z            no
+2               NULL           2008-07-04            no
+           granularity compression compression.1
+1 YYYY-MM-DDThh:mm:ssZ        gzip       deflate
+2           YYYY-MM-DD        NULL          NULL
+                                                                                                                                                      description
+1 oai, oai.datacite.org, :, oai:oai.datacite.org:12425, http://www.openarchives.org/OAI/2.0/oai-identifier http://www.openarchives.org/OAI/2.0/oai-identifier.xsd
+2                                                                                                                                                            NULL</code></pre></div>
+
+
+
+
+<div class="highlight"><pre><code class="language-r" data-lang="r"><span class="lineno">1</span> <span class="c1"># no match for one, two matches for other</span>
+<span class="lineno">2</span> md_identify<span class="p">(</span>provider <span class="o">=</span> <span class="kt">c</span><span class="p">(</span><span class="s">&quot;harvard&quot;</span><span class="p">,</span> <span class="s">&quot;journal&quot;</span><span class="p">))</span></code></pre></div>
+
+
+
+
+<div class="highlight"><pre><code class="language-text" data-lang="text">$harvard
+               x
+1 no match found
+
+$journal
+                                               repo_name
+1       Hrcak - Portal of scientific journals of Croatia
+2 International journal of Power Electronics Engineering</code></pre></div>
+
+
+
+
+<div class="highlight"><pre><code class="language-r" data-lang="r"><span class="lineno">1</span> <span class="c1"># let&#39;s pick one from the second</span>
+<span class="lineno">2</span> md_identify<span class="p">(</span>provider <span class="o">=</span> <span class="s">&quot;Hrcak&quot;</span><span class="p">)</span></code></pre></div>
+
+
+
+
+<div class="highlight"><pre><code class="language-text" data-lang="text">repositoryName
+1 Hrcak - Portal of scientific journals of Croatia
+                    baseURL protocolVersion    adminEmail
+1 http://hrcak.srce.hr/oai/             2.0 hrcak@srce.hr
+  earliestDatestamp deletedRecord granularity
+1        2005-12-01            no  YYYY-MM-DD
+                                                                                                                                                                          description
+1 oai, hrcak.srce.hr, :, oai:hrcak.srce.hr:anIdentifier, http://www.openarchives.org/OAI/2.0/oai-identifier                    http://www.openarchives.org/OAI/2.0/oai-identifier.xsd</code></pre></div>
+
+
+<h3>There are a variety of metadata formats, depending on the data provider - list them with the <code>ListMetadataFormats</code> verb.</h3>
+
+<div class="highlight"><pre><code class="language-r" data-lang="r"><span class="lineno">1</span> <span class="c1"># List metadata formats for a provider</span>
+<span class="lineno">2</span> md_listmetadataformats<span class="p">(</span>provider <span class="o">=</span> <span class="s">&quot;dryad&quot;</span><span class="p">)</span></code></pre></div>
+
+
+
+
+<div class="highlight"><pre><code class="language-text" data-lang="text">metadataPrefix
+1         oai_dc
+2            rdf
+3            ore
+4           mets
+                                                       schema
+1              http://www.openarchives.org/OAI/2.0/oai_dc.xsd
+2                 http://www.openarchives.org/OAI/2.0/rdf.xsd
+3 http://tweety.lanl.gov/public/schemas/2008-06/atom-tron.sch
+4                  http://www.loc.gov/standards/mets/mets.xsd
+                            metadataNamespace
+1 http://www.openarchives.org/OAI/2.0/oai_dc/
+2    http://www.openarchives.org/OAI/2.0/rdf/
+3                 http://www.w3.org/2005/Atom
+4                    http://www.loc.gov/METS/</code></pre></div>
+
+
+
+
+<div class="highlight"><pre><code class="language-r" data-lang="r"><span class="lineno">1</span> <span class="c1"># List metadata formats for a specific identifier for a provider</span>
+<span class="lineno">2</span> md_listmetadataformats<span class="p">(</span>provider <span class="o">=</span> <span class="s">&quot;pensoft&quot;</span><span class="p">,</span> identifier <span class="o">=</span> <span class="s">&quot;10.3897/zookeys.1.10&quot;</span><span class="p">)</span></code></pre></div>
+
+
+
+
+<div class="highlight"><pre><code class="language-text" data-lang="text">identifier metadataPrefix
+1 10.3897/zookeys.1.10         oai_dc
+2 10.3897/zookeys.1.10           mods
+                                             schema
+1    http://www.openarchives.org/OAI/2.0/oai_dc.xsd
+2 http://www.loc.gov/standards/mods/v3/mods-3-1.xsd
+                            metadataNamespace
+1 http://www.openarchives.org/OAI/2.0/oai_dc/
+2                  http://www.loc.gov/mods/v3</code></pre></div>
+
+
+<h3>The <code>ListRecords</code> verb is used to harvest records from a repository</h3>
+
+<div class="highlight"><pre><code class="language-r" data-lang="r"><span class="lineno">1</span> <span class="kp">head</span><span class="p">(</span>md_listrecords<span class="p">(</span>provider <span class="o">=</span> <span class="s">&quot;datacite&quot;</span><span class="p">)[[</span><span class="m">1</span><span class="p">]][,</span> <span class="m">2</span><span class="o">:</span><span class="m">4</span><span class="p">])</span></code></pre></div>
+
+
+
+
+<div class="highlight"><pre><code class="language-text" data-lang="text">identifier            datestamp setSpec
+1 oai:oai.datacite.org:32153 2011-06-08T08:57:11Z     TIB
+2 oai:oai.datacite.org:32200 2011-06-20T08:11:08Z     TIB
+3 oai:oai.datacite.org:32220 2011-06-28T14:11:08Z     TIB
+4 oai:oai.datacite.org:32241 2011-06-30T13:24:45Z     TIB
+5 oai:oai.datacite.org:32255 2011-07-01T12:09:24Z     TIB
+6 oai:oai.datacite.org:32282 2011-07-05T09:08:10Z     TIB</code></pre></div>
+
+
+<h3><code>ListIdentifiers</code> is an abbreviated form of <code>ListRecords</code>, retrieving only headers rather than records.</h3>
+
+<div class="highlight"><pre><code class="language-r" data-lang="r"><span class="lineno">1</span> <span class="c1"># Single provider</span>
+<span class="lineno">2</span> md_listidentifiers<span class="p">(</span>provider <span class="o">=</span> <span class="s">&quot;datacite&quot;</span><span class="p">,</span> set <span class="o">=</span> <span class="s">&quot;REFQUALITY&quot;</span><span class="p">)[[</span><span class="m">1</span><span class="p">]][</span><span class="m">1</span><span class="o">:</span><span class="m">10</span><span class="p">]</span></code></pre></div>
+
+
+
+
+<div class="highlight"><pre><code class="language-text" data-lang="text">[1] &quot;oai:oai.datacite.org:32426&quot; &quot;oai:oai.datacite.org:32152&quot;
+ [3] &quot;oai:oai.datacite.org:25453&quot; &quot;oai:oai.datacite.org:25452&quot;
+ [5] &quot;oai:oai.datacite.org:25451&quot; &quot;oai:oai.datacite.org:25450&quot;
+ [7] &quot;oai:oai.datacite.org:25449&quot; &quot;oai:oai.datacite.org:25407&quot;
+ [9] &quot;oai:oai.datacite.org:48328&quot; &quot;oai:oai.datacite.org:48439&quot;</code></pre></div>
+
+
+
+
+<div class="highlight"><pre><code class="language-r" data-lang="r"><span class="lineno">1</span> md_listidentifiers<span class="p">(</span>provider <span class="o">=</span> <span class="s">&quot;dryad&quot;</span><span class="p">,</span> from <span class="o">=</span> <span class="s">&quot;2012-07-15&quot;</span><span class="p">)[[</span><span class="m">1</span><span class="p">]][</span><span class="m">1</span><span class="o">:</span><span class="m">10</span><span class="p">]</span></code></pre></div>
+
+
+
+
+<div class="highlight"><pre><code class="language-text" data-lang="text">[1] &quot;oai:datadryad.org:10255/dryad.9106&quot; 
+ [2] &quot;oai:datadryad.org:10255/dryad.33780&quot;
+ [3] &quot;oai:datadryad.org:10255/dryad.33901&quot;
+ [4] &quot;oai:datadryad.org:10255/dryad.33902&quot;
+ [5] &quot;oai:datadryad.org:10255/dryad.34472&quot;
+ [6] &quot;oai:datadryad.org:10255/dryad.34558&quot;
+ [7] &quot;oai:datadryad.org:10255/dryad.39975&quot;
+ [8] &quot;oai:datadryad.org:10255/dryad.35065&quot;
+ [9] &quot;oai:datadryad.org:10255/dryad.35081&quot;
+[10] &quot;oai:datadryad.org:10255/dryad.35082&quot;</code></pre></div>
+
+
+
+
+<div class="highlight"><pre><code class="language-r" data-lang="r"><span class="lineno">1</span> <span class="c1"># Many providers</span>
+<span class="lineno">2</span> out <span class="o">&lt;-</span> md_listidentifiers<span class="p">(</span>provider <span class="o">=</span> <span class="kt">c</span><span class="p">(</span><span class="s">&quot;datacite&quot;</span><span class="p">,</span> <span class="s">&quot;pensoft&quot;</span><span class="p">),</span> from <span class="o">=</span> <span class="s">&quot;2012-08-21&quot;</span><span class="p">)</span>
+<span class="lineno">3</span> llply<span class="p">(</span>out<span class="p">,</span> <span class="kr">function</span><span class="p">(</span>x<span class="p">)</span> x<span class="p">[</span><span class="m">1</span><span class="o">:</span><span class="m">10</span><span class="p">])</span>  <span class="c1"># display just a few of them</span></code></pre></div>
+
+
+
+
+<div class="highlight"><pre><code class="language-text" data-lang="text">[[1]]
+ [1] &quot;oai:oai.datacite.org:1099317&quot; &quot;oai:oai.datacite.org:1099572&quot;
+ [3] &quot;oai:oai.datacite.org:1099824&quot; &quot;oai:oai.datacite.org:1099695&quot;
+ [5] &quot;oai:oai.datacite.org:1088239&quot; &quot;oai:oai.datacite.org:1088122&quot;
+ [7] &quot;oai:oai.datacite.org:1088190&quot; &quot;oai:oai.datacite.org:1175749&quot;
+ [9] &quot;oai:oai.datacite.org:1175288&quot; &quot;oai:oai.datacite.org:1115603&quot;
+
+[[2]]
+ [1] &quot;10.3897/phytokeys.16.2884&quot; &quot;10.3897/phytokeys.16.3602&quot;
+ [3] &quot;10.3897/phytokeys.16.3186&quot; &quot;10.3897/zookeys.216.3407&quot; 
+ [5] &quot;10.3897/zookeys.216.3332&quot;  &quot;10.3897/zookeys.216.3224&quot; 
+ [7] &quot;10.3897/zookeys.216.3769&quot;  &quot;10.3897/zookeys.216.3360&quot; 
+ [9] &quot;10.3897/zookeys.216.3646&quot;  &quot;10.3897/neobiota.14.3140&quot;</code></pre></div>
+
+
+<h3>With <code>ListSets</code> you can retrieve the set structure of a repository.</h3>
+
+<div class="highlight"><pre><code class="language-r" data-lang="r"><span class="lineno">1</span> <span class="c1"># arXiv, returns a data.frame</span>
+<span class="lineno">2</span> <span class="kp">head</span><span class="p">(</span>md_listsets<span class="p">(</span>provider <span class="o">=</span> <span class="s">&quot;arXiv&quot;</span><span class="p">)[[</span><span class="m">1</span><span class="p">]])</span></code></pre></div>
+
+
+
+
+<div class="highlight"><pre><code class="language-text" data-lang="text">setName          setSpec
+1   Computer Science               cs
+2        Mathematics             math
+3 Nonlinear Sciences             nlin
+4            Physics          physics
+5       Astrophysics physics:astro-ph
+6   Condensed Matter physics:cond-mat</code></pre></div>
+
+
+
+
+<div class="highlight"><pre><code class="language-r" data-lang="r"><span class="lineno">1</span> <span class="c1"># many providers, returns a list</span>
+<span class="lineno">2</span> md_listsets<span class="p">(</span>provider <span class="o">=</span> <span class="kt">c</span><span class="p">(</span><span class="s">&quot;pensoft&quot;</span><span class="p">,</span> <span class="s">&quot;arXiv&quot;</span><span class="p">))</span></code></pre></div>
+
+
+
+
+<div class="highlight"><pre><code class="language-text" data-lang="text">[[1]]
+                                  setName            setSpec
+1                                 ZooKeys            zookeys
+2                                 BioRisk            biorisk
+3                               PhytoKeys          phytokeys
+4                                NeoBiota           neobiota
+5         Journal of Hymenoptera Research                jhr
+6  International Journal of Myriapodology                ijm
+7                Comparative Cytogenetics        compcytogen
+8                    Subterranean Biology           subtbiol
+9                     Nature Conservation natureconservation
+10                               MycoKeys           mycokeys
+
+[[2]]
+                                    setName          setSpec
+1                          Computer Science               cs
+2                               Mathematics             math
+3                        Nonlinear Sciences             nlin
+4                                   Physics          physics
+5                              Astrophysics physics:astro-ph
+6                          Condensed Matter physics:cond-mat
+7  General Relativity and Quantum Cosmology    physics:gr-qc
+8          High Energy Physics - Experiment   physics:hep-ex
+9             High Energy Physics - Lattice  physics:hep-lat
+10      High Energy Physics - Phenomenology   physics:hep-ph
+11             High Energy Physics - Theory   physics:hep-th
+12                     Mathematical Physics  physics:math-ph
+13                       Nuclear Experiment  physics:nucl-ex
+14                           Nuclear Theory  physics:nucl-th
+15                          Physics (Other)  physics:physics
+16                          Quantum Physics physics:quant-ph
+17                     Quantitative Biology            q-bio
+18                     Quantitative Finance            q-fin
+19                               Statistics             stat</code></pre></div>
+
+
+<h3>Retrieve an individual metadata record from a repository using the <code>GetRecord</code> verb.</h3>
+
+<div class="highlight"><pre><code class="language-r" data-lang="r"><span class="lineno">1</span> <span class="c1"># Single provider, one identifier</span>
+<span class="lineno">2</span> md_getrecord<span class="p">(</span>provider <span class="o">=</span> <span class="s">&quot;pensoft&quot;</span><span class="p">,</span> identifier <span class="o">=</span> <span class="s">&quot;10.3897/zookeys.1.10&quot;</span><span class="p">)</span></code></pre></div>
+
+
+
+
+<div class="highlight"><pre><code class="language-text" data-lang="text">identifier  datestamp
+1 10.3897/zookeys.1.10 2008-07-04
+                                                                                             dc.title
+1 A new candidate for a Gondwanaland distribution in the Zodariidae (Araneae): Australutica in Africa
+   dc.creator  dc.subject dc.subject.1 dc.subject.2 dc.subject.3
+1 Jocqué,Rudy new species Gondwanaland Soutpansberg      Araneae
+         dc.source
+1 ZooKeys 1: 59-66
+                                                                                                                                                                                                                                                                                                                     dc.description
+1 Two new species of Australutica Jocqué, 1995, a genus formerly only known from Australia, are described from South Africa: A. africana n. sp. from Soutpansberg and A. normanlarseni n. sp. from the Cape Peninsula. The taxonomic position of the new species is discussed and a key to the species of Australutica is provided.
+        dc.publisher dc.date          dc.type dc.format
+1 Pensoft Publishers    2008 Research Article text/html
+                           dc.identifier
+1 http://dx.doi.org/10.3897/zookeys.1.10
+                                      dc.identifier.1 dc.language
+1 http://www.pensoft.net/journals/zookeys/article/10/          en
+                                                                                   dc..attrs
+1 http://www.openarchives.org/OAI/2.0/oai_dc/ http://www.openarchives.org/OAI/2.0/oai_dc.xsd</code></pre></div>
+
+
+
+
+<div class="highlight"><pre><code class="language-r" data-lang="r"><span class="lineno">1</span> <span class="c1"># Single provider, multiple identifiers</span>
+<span class="lineno">2</span> md_getrecord<span class="p">(</span>provider <span class="o">=</span> <span class="s">&quot;pensoft&quot;</span><span class="p">,</span> identifier <span class="o">=</span> <span class="kt">c</span><span class="p">(</span><span class="s">&quot;10.3897/zookeys.1.10&quot;</span><span class="p">,</span> <span class="s">&quot;10.3897/zookeys.4.57&quot;</span><span class="p">))</span></code></pre></div>
+
+
+
+
+<div class="highlight"><pre><code class="language-text" data-lang="text">identifier  datestamp
+1 10.3897/zookeys.1.10 2008-07-04
+2 10.3897/zookeys.4.57 2008-12-17
+                                                                                                dc.title
+1    A new candidate for a Gondwanaland distribution in the Zodariidae (Araneae): Australutica in Africa
+2 Studies of Tiger Beetles. CLXXVIII. A new Lophyra (Lophyra) from Somaliland (Coleoptera, Cicindelidae)
+     dc.creator    dc.subject dc.subject.1 dc.subject.2 dc.subject.3
+1   Jocqué,Rudy   new species Gondwanaland Soutpansberg      Araneae
+2 Cassola,Fabio Tiger Beetles Cicindelidae      Lophyra   Somaliland
+         dc.source
+1 ZooKeys 1: 59-66
+2 ZooKeys 4: 65-69
+                                                                                                                                                                                                                                                                                                                                                                                                                   dc.description
+1                                                                                               Two new species of Australutica Jocqué, 1995, a genus formerly only known from Australia, are described from South Africa: A. africana n. sp. from Soutpansberg and A. normanlarseni n. sp. from the Cape Peninsula. The taxonomic position of the new species is discussed and a key to the species of Australutica is provided.
+2 A new tiger beetle species, Lophyra (Lophyra) praetermissa n. sp. (Coleoptera, Cicindelidae), obviously a close relative of L. (L.) histrio (Tschitschérine, 1903), is described from the environs of Erigavo, Somaliland (northern Somalia). Its discovery thus brings up to 73 the number of the species of this genus presently known worldwide (39 species of which - 29 from Africa - belong to the typonominal subgenus).
+        dc.publisher dc.date          dc.type dc.format
+1 Pensoft Publishers    2008 Research Article text/html
+2 Pensoft Publishers    2008 Research Article text/html
+                           dc.identifier
+1 http://dx.doi.org/10.3897/zookeys.1.10
+2 http://dx.doi.org/10.3897/zookeys.4.57
+                                      dc.identifier.1 dc.language
+1 http://www.pensoft.net/journals/zookeys/article/10/          en
+2 http://www.pensoft.net/journals/zookeys/article/57/          en
+                                                                                   dc..attrs
+1 http://www.openarchives.org/OAI/2.0/oai_dc/ http://www.openarchives.org/OAI/2.0/oai_dc.xsd
+2 http://www.openarchives.org/OAI/2.0/oai_dc/ http://www.openarchives.org/OAI/2.0/oai_dc.xsd</code></pre></div>
+
+
+<p>Cool, so I hope people find this post and package useful.  Let me know what you think in comments below, or if you have code specific comments or additions, go to <a href="https://github.com/ropensci/rmetadata">the GitHub repo for <code>rmetadata</code></a>.  In a upcoming post I will show an example  of what you can do with <code>rmetadata</code> in terms of an actual research question.</p>
+
+<hr />
+
+<h4>Get the .Rmd file used to create this post <a href="https://github.com/sckott/sckott.github.io/tree/master/_drafts/2012-09-15-rmetadata.Rmd">at my github account</a> - or <a href="https://github.com/sckott/sckott.github.io/tree/master/_posts/2012-09-17-rmetadata.md">.md file</a>.</h4>
+
+<h4>Written in <a href="http://daringfireball.net/projects/markdown/">Markdown</a>, with help from <a href="http://yihui.name/knitr/">knitr</a>, and nice knitr highlighting/etc. in in <a href="http://rstudio.org/">RStudio</a>.</h4>
+
+  </div>
+  
+  <div class="post">
+    <h1>
+      <a href="/2012/09/gov-dat/">
+        Getting data on your government
+      </a>
+    </h1>
+
+    <span class="post-date">01 Sep 2012</span>
+
+    <hr />
+
+<p>I created an R package a while back to interact with some APIs that serve up data on what our elected represenatives are up to, including the <a href="http://developer.nytimes.com/">New York Times Congress API</a>, and the <a href="http://services.sunlightlabs.com/">Sunlight Labs API</a>.</p>
+
+<p>What kinds of things can you do with <code>govdat</code>?  Here are a few examples.</p>
+
+<hr />
+
+<h3>How do the two major parties differ in the use of certain words (searches the congressional record using the Sunlight Labs Capitol Words API)?</h3>
+
+<div class="highlight"><pre><code class="language-r" data-lang="r"><span class="lineno"> 1</span> <span class="c1"># install_github(&#39;govdat&#39;, &#39;sckott&#39;)</span>
+<span class="lineno"> 2</span> <span class="kn">library</span><span class="p">(</span>govdat<span class="p">)</span>
+<span class="lineno"> 3</span> <span class="kn">library</span><span class="p">(</span>reshape2<span class="p">)</span>
+<span class="lineno"> 4</span> <span class="kn">library</span><span class="p">(</span>ggplot2<span class="p">)</span>
+<span class="lineno"> 5</span> 
+<span class="lineno"> 6</span> dems <span class="o">&lt;-</span> sll_cw_dates<span class="p">(</span>phrase <span class="o">=</span> <span class="s">&quot;science&quot;</span><span class="p">,</span> start_date <span class="o">=</span> <span class="s">&quot;1996-01-20&quot;</span><span class="p">,</span> end_date <span class="o">=</span> <span class="s">&quot;2012-09-01&quot;</span><span class="p">,</span> 
+<span class="lineno"> 7</span>     granularity <span class="o">=</span> <span class="s">&quot;year&quot;</span><span class="p">,</span> party <span class="o">=</span> <span class="s">&quot;D&quot;</span><span class="p">,</span> printdf <span class="o">=</span> <span class="kc">TRUE</span><span class="p">)</span>
+<span class="lineno"> 8</span> repubs <span class="o">&lt;-</span> sll_cw_dates<span class="p">(</span>phrase <span class="o">=</span> <span class="s">&quot;science&quot;</span><span class="p">,</span> start_date <span class="o">=</span> <span class="s">&quot;1996-01-20&quot;</span><span class="p">,</span> end_date <span class="o">=</span> <span class="s">&quot;2012-09-01&quot;</span><span class="p">,</span> 
+<span class="lineno"> 9</span>     granularity <span class="o">=</span> <span class="s">&quot;year&quot;</span><span class="p">,</span> party <span class="o">=</span> <span class="s">&quot;R&quot;</span><span class="p">,</span> printdf <span class="o">=</span> <span class="kc">TRUE</span><span class="p">)</span>
+<span class="lineno">10</span> df <span class="o">&lt;-</span> melt<span class="p">(</span><span class="kp">rbind</span><span class="p">(</span><span class="kt">data.frame</span><span class="p">(</span>party <span class="o">=</span> <span class="kp">rep</span><span class="p">(</span><span class="s">&quot;D&quot;</span><span class="p">,</span> <span class="kp">nrow</span><span class="p">(</span>dems<span class="p">)),</span> dems<span class="p">),</span> <span class="kt">data.frame</span><span class="p">(</span>party <span class="o">=</span> <span class="kp">rep</span><span class="p">(</span><span class="s">&quot;R&quot;</span><span class="p">,</span> 
+<span class="lineno">11</span>     <span class="kp">nrow</span><span class="p">(</span>repubs<span class="p">)),</span> repubs<span class="p">)))</span>
+<span class="lineno">12</span> df<span class="o">$</span>count <span class="o">&lt;-</span> <span class="kp">as.numeric</span><span class="p">(</span>df<span class="o">$</span>count<span class="p">)</span>
+<span class="lineno">13</span> 
+<span class="lineno">14</span> ggplot<span class="p">(</span>df<span class="p">,</span> aes<span class="p">(</span>yearmonth<span class="p">,</span> count<span class="p">,</span> colour <span class="o">=</span> party<span class="p">,</span> group <span class="o">=</span> party<span class="p">))</span> <span class="o">+</span> geom_line<span class="p">()</span> <span class="o">+</span> 
+<span class="lineno">15</span>     scale_colour_manual<span class="p">(</span>values <span class="o">=</span> <span class="kt">c</span><span class="p">(</span><span class="s">&quot;blue&quot;</span><span class="p">,</span> <span class="s">&quot;red&quot;</span><span class="p">))</span> <span class="o">+</span> labs<span class="p">(</span>y <span class="o">=</span> <span class="s">&quot;use of the word &#39;Science&#39;&quot;</span><span class="p">)</span> <span class="o">+</span> 
+<span class="lineno">16</span>     theme_bw<span class="p">(</span>base_size <span class="o">=</span> <span class="m">18</span><span class="p">)</span> <span class="o">+</span> opts<span class="p">(</span>axis.text.x <span class="o">=</span> theme_text<span class="p">(</span>size <span class="o">=</span> <span class="m">10</span><span class="p">),</span> panel.grid.major <span class="o">=</span> theme_blank<span class="p">(),</span> 
+<span class="lineno">17</span>     panel.grid.minor <span class="o">=</span> theme_blank<span class="p">(),</span> legend.position <span class="o">=</span> <span class="kt">c</span><span class="p">(</span><span class="m">0.2</span><span class="p">,</span> <span class="m">0.8</span><span class="p">))</span></code></pre></div>
+
+
+<p><img src="/public/img/unnamed-chunk-1.png" alt="center" /></p>
+
+<hr />
+
+<h3>Let's get some data on donations to individual elected representatives.</h3>
+
+<div class="highlight"><pre><code class="language-r" data-lang="r"><span class="lineno">1</span> <span class="kn">library</span><span class="p">(</span>plyr<span class="p">)</span>
+<span class="lineno">2</span> 
+<span class="lineno">3</span> <span class="c1"># Let&#39;s get Nancy Pelosi&#39;s entity ID</span>
+<span class="lineno">4</span> sll_ts_aggregatesearch<span class="p">(</span><span class="s">&quot;Nancy Pelosi&quot;</span><span class="p">)[[</span><span class="m">1</span><span class="p">]]</span></code></pre></div>
+
+
+
+
+<div class="highlight"><pre><code class="language-text" data-lang="text">$name
+[1] &quot;Nancy Pelosi (D)&quot;
+
+$count_given
+[1] 0
+
+$firm_income
+[1] 0
+
+$count_lobbied
+[1] 0
+
+$seat
+[1] &quot;federal:house&quot;
+
+$total_received
+[1] 13769274
+
+$state
+[1] &quot;CA&quot;
+
+$lobbying_firm
+NULL
+
+$count_received
+[1] 9852
+
+$party
+[1] &quot;D&quot;
+
+$total_given
+[1] 0
+
+$type
+[1] &quot;politician&quot;
+
+$id
+[1] &quot;85ab2e74589a414495d18cc7a9233981&quot;
+
+$non_firm_spending
+[1] 0
+
+$is_superpac
+NULL</code></pre></div>
+
+
+
+
+<div class="highlight"><pre><code class="language-r" data-lang="r"><span class="lineno">1</span> <span class="c1"># Her entity ID</span>
+<span class="lineno">2</span> sll_ts_aggregatesearch<span class="p">(</span><span class="s">&quot;Nancy Pelosi&quot;</span><span class="p">)[[</span><span class="m">1</span><span class="p">]]</span><span class="o">$</span>id</code></pre></div>
+
+
+
+
+<div class="highlight"><pre><code class="language-text" data-lang="text">[1] &quot;85ab2e74589a414495d18cc7a9233981&quot;</code></pre></div>
+
+
+
+
+<div class="highlight"><pre><code class="language-r" data-lang="r"><span class="lineno">1</span> <span class="c1"># And search for her top donors by sector</span>
+<span class="lineno">2</span> nancy <span class="o">&lt;-</span> ldply<span class="p">(</span>sll_ts_aggregatetopsectors<span class="p">(</span>sll_ts_aggregatesearch<span class="p">(</span><span class="s">&quot;Nancy Pelosi&quot;</span><span class="p">)[[</span><span class="m">1</span><span class="p">]]</span><span class="o">$</span>id<span class="p">))</span>
+<span class="lineno">3</span> nancy  <span class="c1"># but just abbreviations for sectors</span></code></pre></div>
+
+
+
+
+<div class="highlight"><pre><code class="language-text" data-lang="text">sector count     amount
+1       F  1847 2698672.00
+2       P   981 2243050.00
+3       H   829 1412700.00
+4       K  1345 1409836.00
+5       Q  1223 1393154.00
+6       N   829 1166187.00
+7       B   537  932044.00
+8       W   724  760800.00
+9       Y   820  664926.00
+10      E   201  283575.00</code></pre></div>
+
+
+
+
+<div class="highlight"><pre><code class="language-r" data-lang="r"><span class="lineno">1</span> data<span class="p">(</span>sll_ts_sectors<span class="p">)</span>  <span class="c1"># load sectors abbrevations data</span>
+<span class="lineno">2</span> nancy2 <span class="o">&lt;-</span> <span class="kp">merge</span><span class="p">(</span>nancy<span class="p">,</span> sll_ts_sectors<span class="p">,</span> by <span class="o">=</span> <span class="s">&quot;sector&quot;</span><span class="p">)</span>  <span class="c1"># attach full sector names</span>
+<span class="lineno">3</span> nancy2_melt <span class="o">&lt;-</span> melt<span class="p">(</span>nancy2<span class="p">[,</span> <span class="m">-1</span><span class="p">],</span> id.vars <span class="o">=</span> <span class="m">3</span><span class="p">)</span>
+<span class="lineno">4</span> nancy2_melt<span class="o">$</span>value <span class="o">&lt;-</span> <span class="kp">as.numeric</span><span class="p">(</span>nancy2_melt<span class="o">$</span>value<span class="p">)</span>
+<span class="lineno">5</span> 
+<span class="lineno">6</span> <span class="c1"># and lets plot some results</span>
+<span class="lineno">7</span> ggplot<span class="p">(</span>nancy2_melt<span class="p">,</span> aes<span class="p">(</span>sector_name<span class="p">,</span> value<span class="p">))</span> <span class="o">+</span> geom_bar<span class="p">()</span> <span class="o">+</span> coord_flip<span class="p">()</span> <span class="o">+</span> facet_wrap<span class="p">(</span><span class="o">~</span>variable<span class="p">,</span> 
+<span class="lineno">8</span>     scales <span class="o">=</span> <span class="s">&quot;free&quot;</span><span class="p">,</span> ncol <span class="o">=</span> <span class="m">1</span><span class="p">)</span></code></pre></div>
+
+
+<p><img src="/public/img/unnamed-chunk-2.png" alt="center" /></p>
+
+<div class="highlight"><pre><code class="language-r" data-lang="r"><span class="lineno">1</span> <span class="c1">## It looks like a lot of individual donations (the count facet) by</span>
+<span class="lineno">2</span> <span class="c1">## finance/insurance/realestate, but by amount, the most (by slim margin)</span>
+<span class="lineno">3</span> <span class="c1">## is from labor organizations.</span></code></pre></div>
+
+
+<hr />
+
+<h3>Or we may want to get a bio of a congressperson. Here we get Todd Akin of MO. And some twitter searching too? Indeed.</h3>
+
+<div class="highlight"><pre><code class="language-r" data-lang="r"><span class="lineno">1</span> out <span class="o">&lt;-</span> nyt_cg_memberbioroles<span class="p">(</span><span class="s">&quot;A000358&quot;</span><span class="p">)</span>  <span class="c1"># cool, lots of info, output cutoff for brevity</span>
+<span class="lineno">2</span> out<span class="p">[[</span><span class="m">3</span><span class="p">]][[</span><span class="m">1</span><span class="p">]][</span><span class="m">1</span><span class="o">:</span><span class="m">2</span><span class="p">]</span></code></pre></div>
+
+
+
+
+<div class="highlight"><pre><code class="language-text" data-lang="text">$member_id
+[1] &quot;A000358&quot;
+
+$first_name
+[1] &quot;Todd&quot;</code></pre></div>
+
+
+
+
+<div class="highlight"><pre><code class="language-r" data-lang="r"><span class="lineno">1</span> <span class="c1"># we can get her twitter id from this bio, and search twitter using</span>
+<span class="lineno">2</span> <span class="c1"># twitteR package</span>
+<span class="lineno">3</span> akintwitter <span class="o">&lt;-</span> out<span class="p">[[</span><span class="m">3</span><span class="p">]][[</span><span class="m">1</span><span class="p">]]</span><span class="o">$</span>twitter_id
+<span class="lineno">4</span> 
+<span class="lineno">5</span> <span class="c1"># install.packages(&#39;twitteR&#39;)</span>
+<span class="lineno">6</span> <span class="kn">library</span><span class="p">(</span>twitteR<span class="p">)</span>
+<span class="lineno">7</span> tweets <span class="o">&lt;-</span> userTimeline<span class="p">(</span>akintwitter<span class="p">,</span> n <span class="o">=</span> <span class="m">100</span><span class="p">)</span>
+<span class="lineno">8</span> tweets<span class="p">[</span><span class="m">1</span><span class="o">:</span><span class="m">5</span><span class="p">]</span>  <span class="c1"># there&#39;s some gems in there no doubt</span></code></pre></div>
+
+
+
+
+<div class="highlight"><pre><code class="language-text" data-lang="text">[[1]]
+[1] &quot;RepToddAkin: Do you receive my Akin Alert e-newsletter?  Pick the issues you’d like to get updates on and sign up here!\nhttp://t.co/nZfiRjTF&quot;
+
+[[2]]
+[1] &quot;RepToddAkin: If the 2001 &amp;amp; 2003 tax policies expire, taxes will increase over $4 trillion in the next 10 years. America can&#39;t afford it. #stopthetaxhike&quot;
+
+[[3]]
+[1] &quot;RepToddAkin: A govt agency&#39;s order shouldn&#39;t defy constitutional rights. I&#39;m still working for #religiousfreedom and repealing the HHS mandate. #prolife&quot;
+
+[[4]]
+[1] &quot;RepToddAkin: I am a cosponsor of the bill being considered today to limit abortions in DC. RT if you agree! #prolife http://t.co/Mesrjl0w&quot;
+
+[[5]]
+[1] &quot;RepToddAkin: We need to #StopTheTaxHike. Raising taxes like the President wants would destroy more than 700,000 jobs. #4jobs http://t.co/KUTd0M7U&quot;</code></pre></div>
+
+
+<hr />
+
+<h3>Get the .Rmd file used to create this post <a href="https://github.com/sckott/sckott.github.io/tree/master/_drafts/2012-09-01-gov-dat.Rmd">at my github account</a> - or <a href="https://github.com/sckott/sckott.github.io/tree/master/_posts/2012-09-01-gov-dat.md">.md file</a>.</h3>
+
+<hr />
+
+<h3>Written in <a href="http://daringfireball.net/projects/markdown/">Markdown</a>, with help from <a href="http://yihui.name/knitr/">knitr</a>, and nice knitr highlighting/etc. in in <a href="http://rstudio.org/">RStudio</a>.</h3>
+
+  </div>
+  
+  <div class="post">
+    <h1>
       <a href="/2012/08/get-ecoevo-journal-titles/">
         Getting ecology and evolution journal titles from R
       </a>
@@ -180,220 +750,6 @@
 <hr />
 
 <h3>Get the .Rmd file used to create this post <a href="https://github.com/sckott/sckott.github.io/tree/master/_drafts/2012-08-30-get-ecoevo-journal-titles.Rmd">at my github account</a>.</h3>
-
-<hr />
-
-<h3>Written in <a href="http://daringfireball.net/projects/markdown/">Markdown</a>, with help from <a href="http://yihui.name/knitr/">knitr</a>, and nice knitr highlighting/etc. in in <a href="http://rstudio.org/">RStudio</a>.</h3>
-
-  </div>
-  
-  <div class="post">
-    <h1>
-      <a href="/2012/08/ecology-unconference/">
-        Ecology unconference at ESA 2013
-      </a>
-    </h1>
-
-    <span class="post-date">30 Aug 2012</span>
-
-    <hr />
-
-<p>So I heard many people say after or during the recent ESA conference in Portland that they really enjoyed the converstations more than listening to talks or looking at posters.</p>
-
-<p>There was some chatter about doing an unconference associated with next year's ESA conference in Minneapolis. And Sandra Chung (@sandramchung) got on it and started a wiki that we can all conribute ideas to. The wiki is here: <a href="http://ecologyunconference.wikispaces.com/">http://ecologyunconference.wikispaces.com/</a></p>
-
-<p>What is an unconference? The idea of an unconference is to have a community organized meetup in which interactions among people are emphasized over the traditional lecture and poster format. For example, many sessions may just be organized a single idea, and people attending have a discussion around the topic. The format can be decided by the community.</p>
-
-<p>What will we do there? The broadest restriction is that topics should be about science that happens online. You may say, "Well, real ecology happens in the field!". Yes, but a lot of the products of ecology are put online, and increasingly the discussion of the practice of ecology happens online. Check out the <a href="http://scienceonline2012.com/">Science Online 2012 website</a> for a little taste of what we hope to achieve next year.</p>
-
-<p>How do I get involved? Go to the wiki and start contributing: <a href="http://ecologyunconference.wikispaces.com/">http://ecologyunconference.wikispaces.com/</a>. There are already some suggestions for topics...Here's a screenshot of the ideas for Session Proposals page:</p>
-
-<p><img src="/public/img/ecologyunconf.png" alt="ecologyunconf" /></p>
-
-<hr />
-
-<h3>Important!  Use the #esaun13 hashtag to talk about this unconference on Twitter, G+, and app.net.</h3>
-
-<hr />
-
-<h3>Get the .Rmd file used to create this post <a href="https://github.com/sckott/sckott.github.io/tree/master/_drafts/2012-08-30-making-matrices.Rmd">at my github account</a>.</h3>
-
-<hr />
-
-<h3>Written in <a href="http://daringfireball.net/projects/markdown/">Markdown</a>, with help from <a href="http://yihui.name/knitr/">knitr</a>.</h3>
-
-  </div>
-  
-  <div class="post">
-    <h1>
-      <a href="/2012/08/making-matrices/">
-        Making matrices with zeros and ones
-      </a>
-    </h1>
-
-    <span class="post-date">30 Aug 2012</span>
-
-    <hr />
-
-<h2>So I was trying to figure out a fast way to make matrices with randomly allocated 0 or 1 in each cell of the matrix. I reached out on Twitter, and got many responses (thanks tweeps!).</h2>
-
-<hr />
-
-<h3>Here is the solution I came up with. See if you can tell why it would be slow.</h3>
-
-<div class="highlight"><pre><code class="language-r" data-lang="r"><span class="lineno">1</span> mm <span class="o">&lt;-</span> <span class="kt">matrix</span><span class="p">(</span><span class="m">0</span><span class="p">,</span> <span class="m">10</span><span class="p">,</span> <span class="m">5</span><span class="p">)</span>
-<span class="lineno">2</span> <span class="kp">apply</span><span class="p">(</span>mm<span class="p">,</span> <span class="kt">c</span><span class="p">(</span><span class="m">1</span><span class="p">,</span> <span class="m">2</span><span class="p">),</span> <span class="kr">function</span><span class="p">(</span>x<span class="p">)</span> <span class="kp">sample</span><span class="p">(</span><span class="kt">c</span><span class="p">(</span><span class="m">0</span><span class="p">,</span> <span class="m">1</span><span class="p">),</span> <span class="m">1</span><span class="p">))</span></code></pre></div>
-
-
-
-
-<div class="highlight"><pre><code class="language-text" data-lang="text">[,1] [,2] [,3] [,4] [,5]
- [1,]    1    0    1    0    1
- [2,]    0    0    1    1    1
- [3,]    0    0    0    0    1
- [4,]    0    1    1    0    1
- [5,]    0    1    1    1    1
- [6,]    1    0    1    1    1
- [7,]    0    1    0    1    0
- [8,]    0    0    1    0    1
- [9,]    1    0    1    1    1
-[10,]    1    0    0    1    1</code></pre></div>
-
-
-<hr />
-
-<h3>Ted Hart (@distribecology) replied first with:</h3>
-
-<div class="highlight"><pre><code class="language-r" data-lang="r"><span class="lineno">1</span> <span class="kt">matrix</span><span class="p">(</span>rbinom<span class="p">(</span><span class="m">10</span> <span class="o">*</span> <span class="m">5</span><span class="p">,</span> <span class="m">1</span><span class="p">,</span> <span class="m">0.5</span><span class="p">),</span> ncol <span class="o">=</span> <span class="m">5</span><span class="p">,</span> nrow <span class="o">=</span> <span class="m">10</span><span class="p">)</span></code></pre></div>
-
-
-
-
-<div class="highlight"><pre><code class="language-text" data-lang="text">[,1] [,2] [,3] [,4] [,5]
- [1,]    1    1    0    1    1
- [2,]    1    0    0    1    0
- [3,]    0    1    0    0    0
- [4,]    0    0    1    0    0
- [5,]    1    0    1    0    0
- [6,]    0    0    0    0    1
- [7,]    1    0    0    0    0
- [8,]    0    1    0    1    0
- [9,]    1    1    1    1    0
-[10,]    0    1    1    0    0</code></pre></div>
-
-
-<hr />
-
-<h3>Next, David Smith (@revodavid) and Rafael Maia (@hylospar) came up with about the same solution.</h3>
-
-<div class="highlight"><pre><code class="language-r" data-lang="r"><span class="lineno">1</span> m <span class="o">&lt;-</span> <span class="m">10</span>
-<span class="lineno">2</span> n <span class="o">&lt;-</span> <span class="m">5</span>
-<span class="lineno">3</span> <span class="kt">matrix</span><span class="p">(</span><span class="kp">sample</span><span class="p">(</span><span class="m">0</span><span class="o">:</span><span class="m">1</span><span class="p">,</span> m <span class="o">*</span> n<span class="p">,</span> replace <span class="o">=</span> <span class="kc">TRUE</span><span class="p">),</span> m<span class="p">,</span> n<span class="p">)</span></code></pre></div>
-
-
-
-
-<div class="highlight"><pre><code class="language-text" data-lang="text">[,1] [,2] [,3] [,4] [,5]
- [1,]    0    0    0    0    1
- [2,]    0    0    0    0    0
- [3,]    0    1    1    0    1
- [4,]    1    0    0    1    0
- [5,]    0    0    0    0    1
- [6,]    1    0    1    1    1
- [7,]    1    1    1    1    0
- [8,]    0    0    0    1    1
- [9,]    1    0    0    0    1
-[10,]    0    1    0    1    1</code></pre></div>
-
-
-<hr />
-
-<h3>Then there was the solution by Luis Apiolaza (@zentree).</h3>
-
-<div class="highlight"><pre><code class="language-r" data-lang="r"><span class="lineno">1</span> m <span class="o">&lt;-</span> <span class="m">10</span>
-<span class="lineno">2</span> n <span class="o">&lt;-</span> <span class="m">5</span>
-<span class="lineno">3</span> <span class="kp">round</span><span class="p">(</span><span class="kt">matrix</span><span class="p">(</span>runif<span class="p">(</span>m <span class="o">*</span> n<span class="p">),</span> m<span class="p">,</span> n<span class="p">))</span></code></pre></div>
-
-
-
-
-<div class="highlight"><pre><code class="language-text" data-lang="text">[,1] [,2] [,3] [,4] [,5]
- [1,]    0    1    1    0    0
- [2,]    1    0    1    1    0
- [3,]    1    0    1    0    0
- [4,]    1    0    0    0    1
- [5,]    1    0    1    1    0
- [6,]    1    0    0    0    0
- [7,]    1    0    0    0    0
- [8,]    1    1    1    0    0
- [9,]    0    0    0    0    1
-[10,]    1    0    0    1    1</code></pre></div>
-
-
-<hr />
-
-<h3>Last, a solution was proposed using <code>RcppArmadillo</code>, but I couldn't get it to work on my machine, but here is the function anyway if someone can.</h3>
-
-<div class="highlight"><pre><code class="language-r" data-lang="r"><span class="lineno">1</span> <span class="kn">library</span><span class="p">(</span>inline<span class="p">)</span>
-<span class="lineno">2</span> <span class="kn">library</span><span class="p">(</span>RcppArmadillo<span class="p">)</span>
-<span class="lineno">3</span> f <span class="o">&lt;-</span> cxxfunction<span class="p">(</span>body <span class="o">=</span> <span class="s">&quot;return wrap(arma::randu(5,10));&quot;</span><span class="p">,</span> plugin <span class="o">=</span> <span class="s">&quot;RcppArmadillo&quot;</span><span class="p">)</span></code></pre></div>
-
-
-<hr />
-
-<h3>And here is the comparison of system.time for each solution.</h3>
-
-<div class="highlight"><pre><code class="language-r" data-lang="r"><span class="lineno">1</span> mm <span class="o">&lt;-</span> <span class="kt">matrix</span><span class="p">(</span><span class="m">0</span><span class="p">,</span> <span class="m">10</span><span class="p">,</span> <span class="m">5</span><span class="p">)</span>
-<span class="lineno">2</span> m <span class="o">&lt;-</span> <span class="m">10</span>
-<span class="lineno">3</span> n <span class="o">&lt;-</span> <span class="m">5</span>
-<span class="lineno">4</span> 
-<span class="lineno">5</span> <span class="kp">system.time</span><span class="p">(</span><span class="kp">replicate</span><span class="p">(</span><span class="m">1000</span><span class="p">,</span> <span class="kp">apply</span><span class="p">(</span>mm<span class="p">,</span> <span class="kt">c</span><span class="p">(</span><span class="m">1</span><span class="p">,</span> <span class="m">2</span><span class="p">),</span> <span class="kr">function</span><span class="p">(</span>x<span class="p">)</span> <span class="kp">sample</span><span class="p">(</span><span class="kt">c</span><span class="p">(</span><span class="m">0</span><span class="p">,</span> <span class="m">1</span><span class="p">),</span> <span class="m">1</span><span class="p">))))</span>  <span class="c1"># @recology_</span></code></pre></div>
-
-
-
-
-<div class="highlight"><pre><code class="language-text" data-lang="text">user  system elapsed 
-  0.470   0.002   0.471</code></pre></div>
-
-
-
-
-<div class="highlight"><pre><code class="language-r" data-lang="r"><span class="lineno">1</span> <span class="kp">system.time</span><span class="p">(</span><span class="kp">replicate</span><span class="p">(</span><span class="m">1000</span><span class="p">,</span> <span class="kt">matrix</span><span class="p">(</span>rbinom<span class="p">(</span><span class="m">10</span> <span class="o">*</span> <span class="m">5</span><span class="p">,</span> <span class="m">1</span><span class="p">,</span> <span class="m">0.5</span><span class="p">),</span> ncol <span class="o">=</span> <span class="m">5</span><span class="p">,</span> nrow <span class="o">=</span> <span class="m">10</span><span class="p">)))</span>  <span class="c1"># @distribecology</span></code></pre></div>
-
-
-
-
-<div class="highlight"><pre><code class="language-text" data-lang="text">user  system elapsed 
-  0.014   0.000   0.015</code></pre></div>
-
-
-
-
-<div class="highlight"><pre><code class="language-r" data-lang="r"><span class="lineno">1</span> <span class="kp">system.time</span><span class="p">(</span><span class="kp">replicate</span><span class="p">(</span><span class="m">1000</span><span class="p">,</span> <span class="kt">matrix</span><span class="p">(</span><span class="kp">sample</span><span class="p">(</span><span class="m">0</span><span class="o">:</span><span class="m">1</span><span class="p">,</span> m <span class="o">*</span> n<span class="p">,</span> replace <span class="o">=</span> <span class="kc">TRUE</span><span class="p">),</span> m<span class="p">,</span> n<span class="p">)))</span>  <span class="c1"># @revodavid &amp; @hylospar</span></code></pre></div>
-
-
-
-
-<div class="highlight"><pre><code class="language-text" data-lang="text">user  system elapsed 
-  0.015   0.000   0.014</code></pre></div>
-
-
-
-
-<div class="highlight"><pre><code class="language-r" data-lang="r"><span class="lineno">1</span> <span class="kp">system.time</span><span class="p">(</span><span class="kp">replicate</span><span class="p">(</span><span class="m">1000</span><span class="p">,</span> <span class="kp">round</span><span class="p">(</span><span class="kt">matrix</span><span class="p">(</span>runif<span class="p">(</span>m <span class="o">*</span> n<span class="p">),</span> m<span class="p">,</span> n<span class="p">)),</span> <span class="p">))</span>  <span class="c1"># @zentree</span></code></pre></div>
-
-
-
-
-<div class="highlight"><pre><code class="language-text" data-lang="text">user  system elapsed 
-  0.014   0.000   0.014</code></pre></div>
-
-
-<h3>If you want to take the time to learn C++ or already know it, the RcppArmadillo option would likely be the fastest, but I think (IMO) for many scientists, especially ecologists, we probably don't already know C++, so will stick to the next fastest options.</h3>
-
-<hr />
-
-<h3>Get the .Rmd file used to create this post <a href="https://github.com/sckott/sckott.github.io/tree/master/_drafts/2012-08-30-making-matrices.Rmd">at my github account</a>.</h3>
 
 <hr />
 

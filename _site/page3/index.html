@@ -59,6 +59,606 @@
   
   <div class="post">
     <h1>
+      <a href="/2014/11/taxize-1000/">
+        1000 commits to taxize
+      </a>
+    </h1>
+
+    <span class="post-date">28 Nov 2014</span>
+
+    <p>Just today we've hit 1000 commits on <code>taxize</code>!  <code>taxize</code> is an R client to search across lots of taxonomic databases on the web. In honor of the 1000 commit milestone, here's some stats on the project.</p>
+
+<p>Before that, lots of people have contributed to <code>taxize</code>, it's a big group effort:</p>
+
+<ul>
+<li><a href="https://github.com/EDiLD">Eduard Szöcs</a></li>
+<li><a href="https://github.com/zachary-foster">Zachary Foster</a></li>
+<li><a href="https://github.com/cboettig">Carl Boettiger</a></li>
+<li><a href="https://github.com/karthik">Karthik Ram</a></li>
+<li><a href="https://github.com/jarioksa">Jari Oksanen</a></li>
+<li><a href="https://github.com/fmichonneau">Francis Michonneau</a></li>
+<li><a href="https://github.com/Ironholds">Oliver Keyes</a></li>
+<li><a href="https://github.com/dlebauer">David LeBauer</a></li>
+<li><a href="https://github.com/benmarwick">Ben Marwick</a></li>
+<li><a href="https://github.com/anirvan">Anirvan Chatterjee</a></li>
+</ul>
+
+
+<p>In addition, we've had lots of feedback from users, including feature requests and bug reports, making <code>taxize</code> a lot better.</p>
+
+<h2>Setup</h2>
+
+<pre><code class="r">library("devtools")
+library("httr")
+library("ggplot2")
+library("stringr")
+library("plyr")
+library("dplyr")
+</code></pre>
+
+<h2>Define functions</h2>
+
+<pre><code class="r">github_auth &lt;- function(appname = getOption("gh_appname"), key = getOption("gh_id"),
+                        secret = getOption("gh_secret")) {
+  if (is.null(getOption("gh_token"))) {
+    myapp &lt;- oauth_app(appname, key, secret)
+    token &lt;- oauth2.0_token(oauth_endpoints("github"), myapp)
+    options(gh_token = token)
+  } else {
+    token &lt;- getOption("gh_token")
+  }
+  return(token)
+}
+
+make_url &lt;- function(x, y, z) {
+  sprintf("https://api.github.com/repos/%s/%s/%s", x, y, z)
+}
+
+process_result &lt;- function(x) {
+  stop_for_status(x)
+  if (!x$headers$`content-type` == "application/json; charset=utf-8")
+    stop("content type mismatch")
+  tmp &lt;- content(x, as = "text")
+  jsonlite::fromJSON(tmp, flatten = TRUE)
+}
+
+gh_commits &lt;- function(repo, owner = "ropensci", ...) {
+  token &lt;- github_auth()
+  outout &lt;- list(); iter &lt;- 0; nexturl &lt;- "dontstop"
+  while(nexturl != "stop"){
+    iter &lt;- iter + 1
+    req &lt;- if(grepl("https:/", nexturl)) GET(nexturl, config = c(token = token)) else GET(make_url(owner, repo, "commits"), query = list(per_page=100), config = c(token = token))
+    outout[[iter]] &lt;- process_result(req)
+    link &lt;- req$headers$link
+    nexturl &lt;- if(is.null(link)){ "stop" } else {
+      if(grepl("next", link)){
+        stringr::str_extract(link, "https://[0-9A-Za-z/?=\\._&amp;]+")
+      } else {
+        "stop"
+      }
+    }
+  }
+  outout &lt;- outout[sapply(outout, function(x) !identical(x, list()))]
+  dplyr::rbind_all(outout)
+}
+
+gh_issues &lt;- function(repo, owner = "ropensci", ...) {
+  token &lt;- github_auth()
+  outout &lt;- list(); iter &lt;- 0; nexturl &lt;- "dontstop"
+  while(nexturl != "stop"){
+    iter &lt;- iter + 1
+    req &lt;- if(grepl("https:/", nexturl)) GET(nexturl, query=list(state="all"), config = c(token = token)) else GET(make_url(owner, repo, "issues"), query = list(per_page=100, state="all"), config = c(token = token))
+    outout[[iter]] &lt;- process_result(req)
+    link &lt;- req$headers$link
+    nexturl &lt;- if(is.null(link)){ "stop" } else {
+      if(grepl("next", link)){
+        stringr::str_extract(link, "https://[0-9A-Za-z/?=\\._&amp;]+")
+      } else {
+        "stop"
+      }
+    }
+  }
+  outout &lt;- outout[sapply(outout, function(x) !identical(x, list()))]
+  dplyr::rbind_all(outout)
+}
+
+gh_commit &lt;- function(sha, repo, owner = "ropensci", ...) {
+  token &lt;- github_auth()
+  req &lt;- GET(paste0(make_url(owner, repo, "commits"), "/", sha),
+             config = c(token = token, ...))
+  process_result(req)
+}
+
+gh_verb &lt;- function(owner = "ropensci", repo, verb, args=list(), ...) {
+  token &lt;- github_auth()
+  req &lt;- GET(make_url(owner, repo, verb), query=args, config = c(token = token, ...))
+  process_result(req)
+}
+</code></pre>
+
+<h2>Commits</h2>
+
+<p>List of commits</p>
+
+<pre><code class="r">out &lt;- gh_commits("taxize")
+</code></pre>
+
+<p>Get changes for each commit</p>
+
+<pre><code class="r">changes &lt;- vapply(out$sha, function(x) gh_commit(x, repo="taxize")$stats$total, numeric(1))
+changesdf &lt;-  data.frame(changes=unname(changes), sha=names(changes))
+</code></pre>
+
+<p>Combine</p>
+
+<pre><code class="r">out &lt;- inner_join(out, changesdf)
+</code></pre>
+
+<p>Total changes through time (additions + deletions)</p>
+
+<pre><code class="r">ct &lt;- function(x) as.POSIXct(x, format="%Y-%m-%dT%H:%M:%SZ", tz="UTC")
+out %&gt;%
+  mutate(commit.committer.date = ct(commit.committer.date)) %&gt;%
+  ggplot(aes(x=commit.committer.date, y=changes)) +
+    geom_area(fill="#87D2A0") +
+    theme_grey(base_size = 20)
+</code></pre>
+
+<p><img src="/public/img/2014-11-28-taxize-1000/unnamed-chunk-7-1.png" alt="" /></p>
+
+<p>By Authors</p>
+
+<pre><code class="r">out %&gt;%
+  group_by(author.login) %&gt;%
+  summarise(n = n()) %&gt;%
+  ggplot(aes(author.login, n)) +
+    geom_bar(stat = "identity", fill="#87D2A0") +
+    coord_flip() +
+    theme_grey(base_size = 20)
+</code></pre>
+
+<p><img src="/public/img/2014-11-28-taxize-1000/unnamed-chunk-8-1.png" alt="" /></p>
+
+<h2>Issues</h2>
+
+<pre><code class="r">out &lt;- gh_issues("taxize")
+</code></pre>
+
+<p>Number of issues</p>
+
+<pre><code class="r">NROW(out)
+#&gt; [1] 382
+</code></pre>
+
+<p>Number of open issues</p>
+
+<pre><code class="r">out %&gt;%
+  filter(state == "open") %&gt;%
+  NROW
+#&gt; [1] 35
+</code></pre>
+
+<p>Number of pull requests</p>
+
+<pre><code class="r">out %&gt;%
+  filter(!is.na(pull_request.url)) %&gt;%
+  NROW
+#&gt; [1] 119
+</code></pre>
+
+<h2>Forks, number of</h2>
+
+<pre><code class="r">NROW(gh_verb(repo = "taxize", verb="forks"))
+#&gt; [1] 16
+</code></pre>
+
+<h2>Stars, number of</h2>
+
+<pre><code class="r">NROW(gh_verb(repo = "taxize", verb="stargazers", args=list(per_page=100)))
+#&gt; [1] 44
+</code></pre>
+
+<h2>Watchers, number of</h2>
+
+<pre><code class="r">NROW(gh_verb(repo = "taxize", verb="subscribers", args=list(per_page=100)))
+#&gt; [1] 12
+</code></pre>
+
+  </div>
+  
+  <div class="post">
+    <h1>
+      <a href="/2014/11/ckanr-intro/">
+        Intro to alpha ckanr - R client for CKAN RESTful API
+      </a>
+    </h1>
+
+    <span class="post-date">26 Nov 2014</span>
+
+    <p>Recently I had need to create a client for scraping museum metadata to help out some folks that use that kind of data. It's called <a href="https://github.com/ropensci/musemeta">musemeta</a>. One of the data sources in that package uses the open source <em>data portal software</em> <a href="http://ckan.org/">CKAN</a>, and so we can interact with <a href="http://docs.ckan.org/en/latest/api/index.html">the CKAN API</a> to get data. Since many groups can use CKAN API/etc infrastucture because it's open source, I thought why not have a general purpose R client for this, since <a href="https://github.com/ckan/ckan/wiki/CKAN-API-Clients">there are other clients</a> for Python, PHP, Ruby, etc.</p>
+
+<p>Here's a bit of an intro:</p>
+
+<h2>Setup</h2>
+
+<p>Get/load packages</p>
+
+<pre><code class="r">install.packages("devtools")
+devtools::install_github("ropensci/ckanr")
+</code></pre>
+
+<pre><code class="r">library("ckanr")
+</code></pre>
+
+<blockquote><p>Note: the default URL is for http://data.techno-science.ca/. You can change that in the <code>url</code> parameter</p></blockquote>
+
+<h2>Some package details</h2>
+
+<p>All API alls are <code>POST</code> requests, and handled through a helper function called <code>ckan_POST()</code>. See <code>ckanr:::ckan_POST</code> to see the function.</p>
+
+<p>There are some common parameters across most functions that are worth describing a bit:</p>
+
+<ul>
+<li><code>offset</code> (numeric) Where to start getting items from (optional, default: 0)</li>
+<li><code>limit</code> (numeric) The maximum number of items to return (optional, default: 31)</li>
+<li><code>url</code> Base url to use. Default: <a href="http://data.techno-science.ca">http://data.techno-science.ca</a></li>
+<li><code>as</code> (character) One of <code>list</code> (default), <code>table</code>, or <code>json</code>. Parsing with table option uses <code>jsonlite::fromJSON(..., simplifyDataFrame = TRUE)</code>, which attempts to parse data to <code>data.frame</code>'s when possible, so the result can vary.</li>
+<li><code>...</code> Curl args passed on to <code>httr::POST</code></li>
+</ul>
+
+
+<h2>Changes</h2>
+
+<pre><code class="r">changes(limit = 2, as = "table")
+#&gt;                                user_id                  timestamp
+#&gt; 1 b50449ea-1dcc-4d52-b620-fc95bf56034b 2014-11-06T18:58:08.001743
+#&gt; 2 b50449ea-1dcc-4d52-b620-fc95bf56034b 2014-11-06T18:55:55.059527
+#&gt;                              object_id
+#&gt; 1 cc6a523c-cecf-4a95-836b-295a11ce2bce
+#&gt; 2 cc6a523c-cecf-4a95-836b-295a11ce2bce
+#&gt;                            revision_id data.package.maintainer
+#&gt; 1 5d11079e-fc05-4121-9fd5-fe086f5e5f33                        
+#&gt; 2 4a591538-0584-487b-8ed1-3260d1d09d77                        
+#&gt;   data.package.name data.package.metadata_modified data.package.author
+#&gt; 1              test     2014-11-06T18:55:54.772675                    
+#&gt; 2              test     2014-11-06T18:55:54.772675                    
+#&gt;   data.package.url data.package.notes               data.package.owner_org
+#&gt; 1                                     fafa260d-e2bf-46cd-9c35-34c1dfa46c57
+#&gt; 2                                     fafa260d-e2bf-46cd-9c35-34c1dfa46c57
+#&gt;   data.package.private data.package.maintainer_email
+#&gt; 1                FALSE                              
+#&gt; 2                FALSE                              
+#&gt;   data.package.author_email data.package.state data.package.version
+#&gt; 1                                      deleted                     
+#&gt; 2                                       active                     
+#&gt;           data.package.creator_user_id
+#&gt; 1 b50449ea-1dcc-4d52-b620-fc95bf56034b
+#&gt; 2 b50449ea-1dcc-4d52-b620-fc95bf56034b
+#&gt;                        data.package.id data.package.title
+#&gt; 1 cc6a523c-cecf-4a95-836b-295a11ce2bce               test
+#&gt; 2 cc6a523c-cecf-4a95-836b-295a11ce2bce               test
+#&gt;               data.package.revision_id data.package.type
+#&gt; 1 5d11079e-fc05-4121-9fd5-fe086f5e5f33           dataset
+#&gt; 2 4a591538-0584-487b-8ed1-3260d1d09d77           dataset
+#&gt;   data.package.license_id                                   id
+#&gt; 1            notspecified 59c308c8-68b2-4b92-bc57-129378d31882
+#&gt; 2            notspecified a8577e2c-f742-49c2-bef3-ca3299e58704
+#&gt;     activity_type
+#&gt; 1 deleted package
+#&gt; 2 changed package
+</code></pre>
+
+<h2>List datasets</h2>
+
+<pre><code class="r">datasets(as = "table")
+#&gt;  [1] "artifact-data-agriculture"                                  
+#&gt;  [2] "artifact-data-aviation"                                     
+#&gt;  [3] "artifact-data-bookbinding"                                  
+#&gt;  [4] "artifact-data-chemistry"                                    
+#&gt;  [5] "artifact-data-communications"                               
+#&gt;  [6] "artifact-data-computing-technology"                         
+#&gt;  [7] "artifact-data-domestic-technology"                          
+#&gt;  [8] "artifact-data-energy-electric"                              
+#&gt;  [9] "artifact-data-exploration-and-survey"                       
+#&gt; [10] "artifact-data-fisheries"                                    
+#&gt; [11] "artifact-data-forestry"                                     
+#&gt; [12] "artifact-data-horology"                                     
+#&gt; [13] "artifact-data-industrial-technology"                        
+#&gt; [14] "artifact-data-lighting-technology"                          
+#&gt; [15] "artifact-data-location-canada-agriculture-and-food-museum"  
+#&gt; [16] "artifact-data-location-canada-aviation-and-space-museum"    
+#&gt; [17] "artifact-data-location-canada-science-and-technology-museum"
+#&gt; [18] "artifact-data-marine-transportation"                        
+#&gt; [19] "artifact-data-mathematics"                                  
+#&gt; [20] "artifact-data-medical-technology"                           
+#&gt; [21] "artifact-data-meteorology"                                  
+#&gt; [22] "artifact-data-metrology"                                    
+#&gt; [23] "artifact-data-mining-and-metallurgy"                        
+#&gt; [24] "artifact-data-motorized-ground-transportation"              
+#&gt; [25] "artifact-data-non-motorized-ground-transportation"          
+#&gt; [26] "artifact-data-on-loan"                                      
+#&gt; [27] "artifact-data-photography"                                  
+#&gt; [28] "artifact-data-physics"                                      
+#&gt; [29] "artifact-data-printing"                                     
+#&gt; [30] "artifact-data-railway-transportation"                       
+#&gt; [31] "artifact-dataset-fire-fighting"
+</code></pre>
+
+<h2>List tags</h2>
+
+<pre><code class="r">tag_list('aviation', as='table')
+#&gt;   vocabulary_id                     display_name
+#&gt; 1            NA                         Aviation
+#&gt; 2            NA Canada Aviation and Space Museum
+#&gt;                                     id                             name
+#&gt; 1 cc1db2db-b08b-4888-897f-a17eade2461b                         Aviation
+#&gt; 2 8d05a650-bc7b-4b89-bcc8-c10177e60119 Canada Aviation and Space Museum
+</code></pre>
+
+<h2>Show tags</h2>
+
+<p>Subset for readme brevity</p>
+
+<pre><code class="r">tag_show('Aviation')$packages[[1]][1:3]  
+#&gt; $owner_org
+#&gt; [1] "fafa260d-e2bf-46cd-9c35-34c1dfa46c57"
+#&gt; 
+#&gt; $maintainer
+#&gt; [1] ""
+#&gt; 
+#&gt; $relationships_as_object
+#&gt; list()
+</code></pre>
+
+<h2>List groups</h2>
+
+<pre><code class="r">group_list(as='table')
+#&gt;                         display_name description
+#&gt; 1                     Communications            
+#&gt; 2 Domestic and Industrial Technology            
+#&gt; 3                         Everything            
+#&gt; 4                           Location            
+#&gt; 5                          Resources            
+#&gt; 6         Scientific Instrumentation            
+#&gt; 7                     Transportation            
+#&gt;                                title
+#&gt; 1                     Communications
+#&gt; 2 Domestic and Industrial Technology
+#&gt; 3                         Everything
+#&gt; 4                           Location
+#&gt; 5                          Resources
+#&gt; 6         Scientific Instrumentation
+#&gt; 7                     Transportation
+#&gt;                                                                   image_display_url
+#&gt; 1       http://data.techno-science.ca/uploads/group/20141024-162305.6896412comm.jpg
+#&gt; 2    http://data.techno-science.ca/uploads/group/20141024-162324.3636615domtech.jpg
+#&gt; 3 http://data.techno-science.ca/uploads/group/20141024-162448.0656596everything.jpg
+#&gt; 4   http://data.techno-science.ca/uploads/group/20141024-162528.8786547location.jpg
+#&gt; 5     http://data.techno-science.ca/uploads/group/20141024-162608.3732604resour.jpg
+#&gt; 6    http://data.techno-science.ca/uploads/group/20141024-162549.1925831sciinst.jpg
+#&gt; 7  http://data.techno-science.ca/uploads/group/20141024-162624.1872823transport.jpg
+#&gt;   approval_status is_organization  state
+#&gt; 1        approved           FALSE active
+#&gt; 2        approved           FALSE active
+#&gt; 3        approved           FALSE active
+#&gt; 4        approved           FALSE active
+#&gt; 5        approved           FALSE active
+#&gt; 6        approved           FALSE active
+#&gt; 7        approved           FALSE active
+#&gt;                               image_url
+#&gt; 1       20141024-162305.6896412comm.jpg
+#&gt; 2    20141024-162324.3636615domtech.jpg
+#&gt; 3 20141024-162448.0656596everything.jpg
+#&gt; 4   20141024-162528.8786547location.jpg
+#&gt; 5     20141024-162608.3732604resour.jpg
+#&gt; 6    20141024-162549.1925831sciinst.jpg
+#&gt; 7  20141024-162624.1872823transport.jpg
+#&gt;                            revision_id packages  type
+#&gt; 1 cc302424-2e68-4fcc-9a3a-6de60748c2e4        5 group
+#&gt; 2 b7d95b87-5999-45f9-8775-c64094842551        2 group
+#&gt; 3 c2f0c59a-a543-4d67-a61f-4f387068ba53        1 group
+#&gt; 4 6816d571-d2bd-4131-b99d-80e7e6797492        4 group
+#&gt; 5 e37ee30d-577b-4349-8f0e-eaa4543497e8        6 group
+#&gt; 6 74eba42e-08b3-4400-b40f-3d6159ae6e9d       10 group
+#&gt; 7 a6cc4aab-eae9-42ba-9ab4-cbf45d5c6a0e        7 group
+#&gt;                                     id                               name
+#&gt; 1 5268ce18-e3b8-4802-b29e-30740b46e52d                     communications
+#&gt; 2 5a9a8095-9e0c-485e-84f6-77f577607991 domestic-and-industrial-technology
+#&gt; 3 d7dd233e-a1cc-43da-8152-f7ed15d26756                         everything
+#&gt; 4 770fc9c0-d4f3-48b0-a4ee-e00c6882df1d                           location
+#&gt; 5 f6c205de-cc95-4308-ac9f-5a63f1a5c7ee                          resources
+#&gt; 6 b98ff457-2031-48b6-b681-9adb3afc501b         scientific-instrumentation
+#&gt; 7 a73bf7be-310d-472e-83e1-43a3d87602ba                     transportation
+</code></pre>
+
+<h2>Show groups</h2>
+
+<p>Subset for readme brevity</p>
+
+<pre><code class="r">group_show('communications', as='table')$users
+#&gt;   openid about capacity     name                    created
+#&gt; 1     NA  &lt;NA&gt;    admin     marc 2014-10-24T14:44:29.885262
+#&gt; 2     NA          admin sepandar 2014-10-23T19:40:42.056418
+#&gt;                         email_hash sysadmin
+#&gt; 1 a32002c960476614370a16e9fb81f436    FALSE
+#&gt; 2 10b930a228afd1da2647d62e70b71bf8     TRUE
+#&gt;   activity_streams_email_notifications  state number_of_edits
+#&gt; 1                                FALSE active             376
+#&gt; 2                                FALSE active              44
+#&gt;   number_administered_packages display_name fullname
+#&gt; 1                           39         marc     &lt;NA&gt;
+#&gt; 2                            1     sepandar         
+#&gt;                                     id
+#&gt; 1 27778230-2e90-4818-9f00-bbf778c8fa09
+#&gt; 2 b50449ea-1dcc-4d52-b620-fc95bf56034b
+</code></pre>
+
+<h2>Show a package</h2>
+
+<pre><code class="r">package_show('34d60b13-1fd5-430e-b0ec-c8bc7f4841cf', as='table')$resources
+#&gt;                      resource_group_id cache_last_updated
+#&gt; 1 ea8533d9-cdc6-4e0e-97b9-894e06d50b92                 NA
+#&gt; 2 ea8533d9-cdc6-4e0e-97b9-894e06d50b92                 NA
+#&gt; 3 ea8533d9-cdc6-4e0e-97b9-894e06d50b92                 NA
+#&gt; 4 ea8533d9-cdc6-4e0e-97b9-894e06d50b92                 NA
+#&gt;           revision_timestamp webstore_last_updated
+#&gt; 1 2014-10-28T18:13:22.213530                    NA
+#&gt; 2 2014-11-04T02:59:50.567068                    NA
+#&gt; 3 2014-11-05T21:23:58.533397                    NA
+#&gt; 4 2014-11-05T21:25:16.848423                    NA
+#&gt;                                     id size  state hash
+#&gt; 1 be2b0af8-24a8-4a55-8b30-89f5459b713a   NA active     
+#&gt; 2 7d65910e-4bdc-4f06-a213-e24e36762767   NA active     
+#&gt; 3 97622ad7-1507-4f6a-8acb-14e826447389   NA active     
+#&gt; 4 7a72498a-c49c-4e84-8b10-58991de10df6   NA active     
+#&gt;                                    description format
+#&gt; 1                                  XML Dataset    XML
+#&gt; 2 Data dictionary for CSTMC artifact datasets.    XLS
+#&gt; 3       Tips for using the artifacts datasets.   .php
+#&gt; 4       Tips for using the artifacts datasets.   .php
+#&gt;   tracking_summary.total tracking_summary.recent mimetype_inner url_type
+#&gt; 1                      0                       0             NA       NA
+#&gt; 2                      0                       0             NA       NA
+#&gt; 3                      0                       0             NA       NA
+#&gt; 4                      0                       0             NA       NA
+#&gt;   mimetype cache_url                               name
+#&gt; 1       NA        NA Artifact Data - Vacuum Tubes (XML)
+#&gt; 2       NA        NA                    Data Dictionary
+#&gt; 3       NA        NA                     Tips (English)
+#&gt; 4       NA        NA                      Tips (French)
+#&gt;                      created
+#&gt; 1 2014-10-28T18:13:22.240393
+#&gt; 2 2014-11-04T02:59:50.643658
+#&gt; 3 2014-11-04T18:14:23.952937
+#&gt; 4 2014-11-05T21:25:16.887796
+#&gt;                                                                                                                                                    url
+#&gt; 1                         http://source.techno-science.ca/datasets-donn%C3%A9es/artifacts-artefacts/groups-groupes/vacuum-tubes-tubes-electronique.xml
+#&gt; 2 http://source.techno-science.ca/datasets-donn%C3%A9es/artifacts-artefacts/cstmc-artifact-data-dictionary-dictionnaire-de-donnees-artefacts-smstc.xls
+#&gt; 3                                                                          http://techno-science.ca/en/open-data/tips-using-artifact-open-data-set.php
+#&gt; 4                                                                 http://techno-science.ca/fr/donnees-ouvertes/conseils-donnees-ouvertes-artefacts.php
+#&gt;   webstore_url last_modified position                          revision_id
+#&gt; 1           NA            NA        0 9a27d884-f181-4842-ab47-cda35a8bf99a
+#&gt; 2           NA            NA        1 5d27b3e6-7870-4c12-a122-9e9f5adee4a0
+#&gt; 3           NA            NA        2 40993f16-402b-439c-9288-2f2b177e4b8f
+#&gt; 4           NA            NA        3 57f1488e-a140-4eb6-9329-fc13202a73af
+#&gt;   resource_type
+#&gt; 1            NA
+#&gt; 2            NA
+#&gt; 3            NA
+#&gt; 4            NA
+</code></pre>
+
+<h2>Search for packages</h2>
+
+<pre><code class="r">out &lt;- package_search(q = '*:*', rows = 2, as="table")$results
+out[, !names(out) %in% 'resources']
+#&gt;                      license_title maintainer relationships_as_object
+#&gt; 1 Open Government Licence - Canada                               NULL
+#&gt; 2 Open Government Licence - Canada                               NULL
+#&gt;   private maintainer_email         revision_timestamp
+#&gt; 1   FALSE                  2014-11-05T23:17:46.220002
+#&gt; 2   FALSE                  2014-11-05T23:17:04.923594
+#&gt;                                     id           metadata_created
+#&gt; 1 35d5484d-38ce-495e-8722-7857c4fd17bf 2014-10-28T20:13:11.572558
+#&gt; 2 da65507d-b018-4d3b-bde3-5419cf29d144 2014-10-28T14:59:21.386177
+#&gt;            metadata_modified author author_email  state version
+#&gt; 1 2014-11-05T23:17:46.220657                     active        
+#&gt; 2 2014-11-05T23:17:04.924229                     active        
+#&gt;                        creator_user_id    type num_resources
+#&gt; 1 27778230-2e90-4818-9f00-bbf778c8fa09 dataset             4
+#&gt; 2 27778230-2e90-4818-9f00-bbf778c8fa09 dataset             4
+#&gt;                                                                                                                       tags
+#&gt; 1                         NA, Location, Location, 2014-10-28T20:13:11.572558, active, da88c5a2-3766-41ea-a75b-9c87047cc528
+#&gt; 2 NA, Computing Technology, Computing Technology, 2014-10-28T14:59:21.386177, active, 5371dc28-9ce8-4f21-9afb-1f155f132bfe
+#&gt;   tracking_summary.total tracking_summary.recent
+#&gt; 1                     35                      10
+#&gt; 2                     24                       8
+#&gt;                                                                                                                                                                                                       groups
+#&gt; 1                                                      Location, , http://data.techno-science.ca/uploads/group/20141024-162528.8786547location.jpg, Location, 770fc9c0-d4f3-48b0-a4ee-e00c6882df1d, location
+#&gt; 2 Scientific Instrumentation, , http://data.techno-science.ca/uploads/group/20141024-162549.1925831sciinst.jpg, Scientific Instrumentation, b98ff457-2031-48b6-b681-9adb3afc501b, scientific-instrumentation
+#&gt;   license_id relationships_as_subject num_tags organization.description
+#&gt; 1 ca-ogl-lgo                     NULL        1                         
+#&gt; 2 ca-ogl-lgo                     NULL        1                         
+#&gt;         organization.created organization.title organization.name
+#&gt; 1 2014-10-24T14:49:36.878579              CSTMC             cstmc
+#&gt; 2 2014-10-24T14:49:36.878579              CSTMC             cstmc
+#&gt;   organization.revision_timestamp organization.is_organization
+#&gt; 1      2014-10-24T14:49:36.813670                         TRUE
+#&gt; 2      2014-10-24T14:49:36.813670                         TRUE
+#&gt;   organization.state organization.image_url
+#&gt; 1             active                       
+#&gt; 2             active                       
+#&gt;               organization.revision_id organization.type
+#&gt; 1 7a325a56-46f1-419c-b7b2-ec7501edb35a      organization
+#&gt; 2 7a325a56-46f1-419c-b7b2-ec7501edb35a      organization
+#&gt;                        organization.id organization.approval_status
+#&gt; 1 fafa260d-e2bf-46cd-9c35-34c1dfa46c57                     approved
+#&gt; 2 fafa260d-e2bf-46cd-9c35-34c1dfa46c57                     approved
+#&gt;                                                          name isopen url
+#&gt; 1 artifact-data-location-canada-science-and-technology-museum  FALSE    
+#&gt; 2                          artifact-data-computing-technology  FALSE    
+#&gt;                                                                                                                                                                        notes
+#&gt; 1 This dataset includes artifacts in the collection of the Canada Science and Technology Museums Corporation that are currently in the Canada Science and Technology Museum.
+#&gt; 2                                This dataset includes artifacts in the collection of the Canada Science and Technology Museums Corporation related to computing technology.
+#&gt;                              owner_org extras
+#&gt; 1 fafa260d-e2bf-46cd-9c35-34c1dfa46c57   NULL
+#&gt; 2 fafa260d-e2bf-46cd-9c35-34c1dfa46c57   NULL
+#&gt;                                            license_url
+#&gt; 1 http://data.gc.ca/eng/open-government-licence-canada
+#&gt; 2 http://data.gc.ca/eng/open-government-licence-canada
+#&gt;                                                             title
+#&gt; 1 Artifact Data - Location - Canada Science and Technology Museum
+#&gt; 2                            Artifact Data - Computing Technology
+#&gt;                            revision_id
+#&gt; 1 694a977a-c238-47a4-8671-caddca4edfca
+#&gt; 2 858cb240-76a0-406a-800c-e4ae6cc56ab9
+</code></pre>
+
+<h2>Search for resources</h2>
+
+<pre><code class="r">resource_search(q = 'name:data', limit = 2, as='table')
+#&gt; $count
+#&gt; [1] 71
+#&gt; 
+#&gt; $results
+#&gt;                      resource_group_id cache_last_updated
+#&gt; 1 01a82e52-01bf-4a9c-9b45-c4f9b92529fa                 NA
+#&gt; 2 01a82e52-01bf-4a9c-9b45-c4f9b92529fa                 NA
+#&gt;   webstore_last_updated                                   id size  state
+#&gt; 1                    NA e179e910-27fb-44f4-a627-99822af49ffa   NA active
+#&gt; 2                    NA ba84e8b7-b388-4d2a-873a-7b107eb7f135   NA active
+#&gt;   last_modified hash                                  description format
+#&gt; 1            NA                                       XML Dataset    XML
+#&gt; 2            NA      Data dictionary for CSTMC artifact datasets.    XLS
+#&gt;   mimetype_inner url_type mimetype cache_url
+#&gt; 1             NA       NA       NA        NA
+#&gt; 2             NA       NA       NA        NA
+#&gt;                                           name                    created
+#&gt; 1 Artifact Data - Exploration and Survey (XML) 2014-10-28T15:50:35.374303
+#&gt; 2                              Data Dictionary 2014-11-03T18:01:02.094210
+#&gt;                                                                                                                                                    url
+#&gt; 1              http://source.techno-science.ca/datasets-donn%C3%A9es/artifacts-artefacts/groups-groupes/exploration-and-survey-exploration-et-leve.xml
+#&gt; 2 http://source.techno-science.ca/datasets-donn%C3%A9es/artifacts-artefacts/cstmc-artifact-data-dictionary-dictionnaire-de-donnees-artefacts-smstc.xls
+#&gt;   webstore_url position                          revision_id resource_type
+#&gt; 1           NA        0 a22e6741-3e89-4db0-a802-ba594b1c1fad            NA
+#&gt; 2           NA        1 da1f8585-521d-47ef-8ead-7832474a3421            NA
+</code></pre>
+
+<h2>Future work</h2>
+
+<ul>
+<li>There's already <a href="https://github.com/ropensci/ckanr/issues/4">an issue</a> to add support for <a href="http://docs.ckan.org/en/latest/maintaining/datastore.html">DataStore</a></li>
+<li>This client needs to be tested against many other CKAN API instances to make sure it's robust</li>
+<li>Add a test suite</li>
+<li>Use cases: would be nice to include in the package documentation use cases</li>
+<li>Other things? Get in touch on twitter <code>@recology_</code> or below</li>
+</ul>
+
+
+  </div>
+  
+  <div class="post">
+    <h1>
       <a href="/2014/11/github-fun/">
         Fun with the GitHub API
       </a>
@@ -222,497 +822,6 @@ has_term("maptools", repo="taxize")
 <pre><code class="r">as.POSIXct(rate_limit()$rate$reset, origin="1970-01-01")
 #&gt; [1] "2014-11-26 11:43:36 PST"
 </code></pre>
-
-  </div>
-  
-  <div class="post">
-    <h1>
-      <a href="/2014/11/sofa/">
-        sofa - reboot
-      </a>
-    </h1>
-
-    <span class="post-date">18 Nov 2014</span>
-
-    <p>I've reworked <code>sofa</code> recently after someone reported a bug in the package. Since the last post on this package on 2013-06-21, there's a bunch of changes:</p>
-
-<ul>
-<li>Removed the <code>sofa_</code> prefix from all functions as it wasn't really necessary.</li>
-<li>Replaced <code>rjson</code>/<code>RJSONIO</code> with <code>jsonlite</code> for JSON I/O.</li>
-<li>New functions:
-
-<ul>
-<li><code>revisions()</code> - to get the revision numbers for a document.</li>
-<li><code>uuids()</code> - get any number of UUIDs - e.g., if you want to set document IDs with UUIDs</li>
-</ul>
-</li>
-<li>Most functions that deal with documents are prefixed with <code>doc_</code></li>
-<li>Functions that deal with databases are prefixed with <code>db_</code></li>
-<li>Simplified all code, reducing duplication</li>
-<li>All functions take <code>cushion</code> as the first parameter, for consistency sake.</li>
-<li>Changed <code>cushion()</code> function so that you can only register one cushion with each function call,
-and the function takes parameters for each element now, <code>name</code> (name of the cushion, whatever you want), <code>user</code> (user name, if applicable), <code>pwd</code> (password, if applicable), <code>type</code> (one of localhost, cloudant, or iriscouch), and <code>port</code> (if applicable).</li>
-<li>Changed package license from <code>CC0</code> to <code>MIT</code></li>
-</ul>
-
-
-<p>There's still more to do, but I'm pretty happy with the recent changes, and I hope at least some find the package useful. Also, would love people to try it out as all bugs are shallow and all that...</p>
-
-<p>The following are a few examples of package use.</p>
-
-<h2>Install CouchDB</h2>
-
-<p>Instructions <a href="http://wiki.apache.org/couchdb/Installation">here</a></p>
-
-<h2>Start CouchDB</h2>
-
-<p>In your terminal</p>
-
-<pre><code class="sh">couchdb
-</code></pre>
-
-<p>You can interact with your CouchDB databases as well in your browser. Navigate to <a href="http://localhost:5984/_utils">http://localhost:5984/_utils</a></p>
-
-<h2>Install sofa</h2>
-
-<pre><code class="r">install.packages("devtools")
-devtools::install_github("sckott/sofa")
-</code></pre>
-
-<pre><code class="r">library('sofa')
-</code></pre>
-
-<h2>Authenticate - Cushions</h2>
-
-<p>As an example, here's how I set up details for connecting to my Cloudant couch:</p>
-
-<pre><code class="r">cushion(name = 'cloudant', user = '&lt;user name&gt;', pwd = '&lt;password&gt;', type = "cloudant")
-</code></pre>
-
-<p>By default there is a built-in <code>cushion</code> for localhost so you don't have to do that, unless you want to change those details, e.g., the port number. Right now cushions aren't preserved across R sessions, but working on that.</p>
-
-<p>For example, I'll lay down a cushion for Cloudant, then I can call <code>cushions()</code> to see my cushions:</p>
-
-<pre><code class="r">cushion(name = 'cloudant', user = '&lt;user name&gt;', pwd = '&lt;pwd&gt;', type = "cloudant")
-cushions()
-</code></pre>
-
-<p>By default, if you don't provide a cushion name, you are using localhost.</p>
-
-<h2>Ping the server</h2>
-
-<pre><code class="r">ping()
-#&gt; $couchdb
-#&gt; [1] "Welcome"
-#&gt; 
-#&gt; $uuid
-#&gt; [1] "2c10f0c6d9bd17205b692ae93cd4cf1d"
-#&gt; 
-#&gt; $version
-#&gt; [1] "1.6.0"
-#&gt; 
-#&gt; $vendor
-#&gt; $vendor$version
-#&gt; [1] "1.6.0-1"
-#&gt; 
-#&gt; $vendor$name
-#&gt; [1] "Homebrew"
-</code></pre>
-
-<p>Nice, it's working.</p>
-
-<h2>Create a new database, and list available databases</h2>
-
-<pre><code class="r">db_create(dbname='sofadb')
-#&gt; $ok
-#&gt; [1] TRUE
-</code></pre>
-
-<p>see if its there now</p>
-
-<pre><code class="r">db_list()
-#&gt;  [1] "_replicator" "_users"      "alm_couchdb" "cachecall"   "hello_earth"
-#&gt;  [6] "leothelion"  "mran"        "mydb"        "newdbs"      "sofadb"
-</code></pre>
-
-<h2>Create documents</h2>
-
-<p>Create a document WITH a name (uses PUT)</p>
-
-<pre><code class="r">doc1 &lt;- '{"name":"sofa","beer":"IPA"}'
-doc_create(dbname="sofadb", doc=doc1, docid="a_beer")
-#&gt; $ok
-#&gt; [1] TRUE
-#&gt; 
-#&gt; $id
-#&gt; [1] "a_beer"
-#&gt; 
-#&gt; $rev
-#&gt; [1] "1-a48c98c945bcc05d482bc6f938c89882"
-</code></pre>
-
-<p>Create a document WITHOUT a name (uses POST)</p>
-
-<pre><code class="r">doc2 &lt;- '{"name":"sofa","icecream":"rocky road"}'
-doc_create(dbname="sofadb", doc=doc2)
-#&gt; $ok
-#&gt; [1] TRUE
-#&gt; 
-#&gt; $id
-#&gt; [1] "c5c5c332c25cf62cc584647a81006f6d"
-#&gt; 
-#&gt; $rev
-#&gt; [1] "1-fd0da7fcb8d3afbfc5757d065c92362c"
-</code></pre>
-
-<h2>List documents</h2>
-
-<p>List them</p>
-
-<pre><code class="r">alldocs(dbname="sofadb")
-#&gt;                                 id                              key
-#&gt; 1                           a_beer                           a_beer
-#&gt; 2 c5c5c332c25cf62cc584647a81006f6d c5c5c332c25cf62cc584647a81006f6d
-#&gt;                                  rev
-#&gt; 1 1-a48c98c945bcc05d482bc6f938c89882
-#&gt; 2 1-fd0da7fcb8d3afbfc5757d065c92362c
-</code></pre>
-
-<p>Optionally include the documents, returned as a list by default as it would be hard to parse an endless number of document formats.</p>
-
-<pre><code class="r">alldocs(dbname="sofadb", include_docs = TRUE)
-#&gt; $total_rows
-#&gt; [1] 2
-#&gt; 
-#&gt; $offset
-#&gt; [1] 0
-#&gt; 
-#&gt; $rows
-#&gt; $rows[[1]]
-#&gt; $rows[[1]]$id
-#&gt; [1] "a_beer"
-#&gt; 
-#&gt; $rows[[1]]$key
-#&gt; [1] "a_beer"
-#&gt; 
-#&gt; $rows[[1]]$value
-#&gt; $rows[[1]]$value$rev
-#&gt; [1] "1-a48c98c945bcc05d482bc6f938c89882"
-#&gt; 
-#&gt; 
-#&gt; $rows[[1]]$doc
-#&gt; $rows[[1]]$doc$`_id`
-#&gt; [1] "a_beer"
-#&gt; 
-#&gt; $rows[[1]]$doc$`_rev`
-#&gt; [1] "1-a48c98c945bcc05d482bc6f938c89882"
-#&gt; 
-#&gt; $rows[[1]]$doc$name
-#&gt; [1] "sofa"
-#&gt; 
-#&gt; $rows[[1]]$doc$beer
-#&gt; [1] "IPA"
-#&gt; 
-#&gt; 
-#&gt; 
-#&gt; $rows[[2]]
-#&gt; $rows[[2]]$id
-#&gt; [1] "c5c5c332c25cf62cc584647a81006f6d"
-#&gt; 
-#&gt; $rows[[2]]$key
-#&gt; [1] "c5c5c332c25cf62cc584647a81006f6d"
-#&gt; 
-#&gt; $rows[[2]]$value
-#&gt; $rows[[2]]$value$rev
-#&gt; [1] "1-fd0da7fcb8d3afbfc5757d065c92362c"
-#&gt; 
-#&gt; 
-#&gt; $rows[[2]]$doc
-#&gt; $rows[[2]]$doc$`_id`
-#&gt; [1] "c5c5c332c25cf62cc584647a81006f6d"
-#&gt; 
-#&gt; $rows[[2]]$doc$`_rev`
-#&gt; [1] "1-fd0da7fcb8d3afbfc5757d065c92362c"
-#&gt; 
-#&gt; $rows[[2]]$doc$name
-#&gt; [1] "sofa"
-#&gt; 
-#&gt; $rows[[2]]$doc$icecream
-#&gt; [1] "rocky road"
-</code></pre>
-
-<h2>Update a document</h2>
-
-<p>Change <em>IPA</em> (india pale ale) to <em>IPL</em> (india pale lager). We need to get revisions first as we need to include revision number when we update a document.</p>
-
-<pre><code class="r">(revs &lt;- revisions(dbname = "sofadb", docid = "a_beer"))
-#&gt; [1] "1-a48c98c945bcc05d482bc6f938c89882"
-</code></pre>
-
-<pre><code class="r">newdoc &lt;- '{"name":"sofa","beer":"IPL"}'
-doc_update(dbname = "sofadb", doc = newdoc, docid = "a_beer", rev = revs[1])
-#&gt; $ok
-#&gt; [1] TRUE
-#&gt; 
-#&gt; $id
-#&gt; [1] "a_beer"
-#&gt; 
-#&gt; $rev
-#&gt; [1] "2-f2390eb18b8f9a870c915c6712a7f65e"
-</code></pre>
-
-<p>Should be two revisions now</p>
-
-<pre><code class="r">revisions(dbname = "sofadb", docid = "a_beer")
-#&gt; [1] "2-f2390eb18b8f9a870c915c6712a7f65e"
-#&gt; [2] "1-a48c98c945bcc05d482bc6f938c89882"
-</code></pre>
-
-<h2>Get headers for a document</h2>
-
-<pre><code class="r">doc_head(dbname = "sofadb", docid = "a_beer")
-#&gt; [[1]]
-#&gt; [[1]]$status
-#&gt; [1] 200
-#&gt; 
-#&gt; [[1]]$version
-#&gt; [1] "HTTP/1.1"
-#&gt; 
-#&gt; [[1]]$headers
-#&gt; $server
-#&gt; [1] "CouchDB/1.6.0 (Erlang OTP/17)"
-#&gt; 
-#&gt; $etag
-#&gt; [1] "\"2-f2390eb18b8f9a870c915c6712a7f65e\""
-#&gt; 
-#&gt; $date
-#&gt; [1] "Tue, 18 Nov 2014 21:19:16 GMT"
-#&gt; 
-#&gt; $`content-type`
-#&gt; [1] "application/json"
-#&gt; 
-#&gt; $`content-length`
-#&gt; [1] "88"
-#&gt; 
-#&gt; $`cache-control`
-#&gt; [1] "must-revalidate"
-#&gt; 
-#&gt; attr(,"class")
-#&gt; [1] "insensitive" "list"
-</code></pre>
-
-<h2>JSON vs. list</h2>
-
-<p>Across all/most functions you can request json or list as output with the <code>as</code> parameter.</p>
-
-<pre><code class="r">db_list(as = "list")
-#&gt;  [1] "_replicator" "_users"      "alm_couchdb" "cachecall"   "hello_earth"
-#&gt;  [6] "leothelion"  "mran"        "mydb"        "newdbs"      "sofadb"
-</code></pre>
-
-<pre><code class="r">db_list(as = "json")
-#&gt; [1] "[\"_replicator\",\"_users\",\"alm_couchdb\",\"cachecall\",\"hello_earth\",\"leothelion\",\"mran\",\"mydb\",\"newdbs\",\"sofadb\"]\n"
-</code></pre>
-
-<h2>Curl options</h2>
-
-<p>Across all functions you can pass in curl options. We're using <code>httr</code> internally, so you can use <code>httr</code> helper functions to make some curl options easier. Examples:</p>
-
-<p>Verbose output</p>
-
-<pre><code class="r">library("httr")
-db_list(config=verbose())
-#&gt;  [1] "_replicator" "_users"      "alm_couchdb" "cachecall"   "hello_earth"
-#&gt;  [6] "leothelion"  "mran"        "mydb"        "newdbs"      "sofadb"
-</code></pre>
-
-<p>Progress</p>
-
-<pre><code class="r">db_list(config=progress())
-#&gt;   |                                                                         |                                                                 |   0%  |                                                                         |=================================================================| 100%
-#&gt;  [1] "_replicator" "_users"      "alm_couchdb" "cachecall"   "hello_earth"
-#&gt;  [6] "leothelion"  "mran"        "mydb"        "newdbs"      "sofadb"
-</code></pre>
-
-<p>Set a timeout</p>
-
-<pre><code class="r">db_list(config=timeout(seconds = 0.001))
-#&gt; 
-#&gt; Error in function (type, msg, asError = TRUE)  : 
-#&gt;    Operation timed out after 3 milliseconds with 0 out of -1 bytes received
-</code></pre>
-
-<h2>Full text search</h2>
-
-<p>I'm working on an R client for Elaticsearch called <code>elastic</code> - find it at <a href="https://github.com/ropensci/elastic">https://github.com/ropensci/elastic</a></p>
-
-<p>Thinking about where to include functions to allow <code>elastic</code> and <code>sofa</code> to work together...if you have any thoughts hit up the issues. I'll probably include helper functions for CouchDB search in the <code>elastic</code> package, interfacing with the <a href="https://github.com/elasticsearch/elasticsearch-river-couchdb">CouchDB plugin for Elasticsearch</a>.</p>
-
-  </div>
-  
-  <div class="post">
-    <h1>
-      <a href="/2014/10/conditionality-meta-analysis/">
-        Conditionality meta-analysis data
-      </a>
-    </h1>
-
-    <span class="post-date">06 Oct 2014</span>
-
-    <h2>The paper</h2>
-
-<p>One paper from my graduate work asked most generally ~ "How much does the variation in magnitudes and signs of species interaction outcomes vary?". More specifically, we wanted to know if variation differed among species interaction classes (mutualism, competition, predation), and among various "gradients" (space, time, etc.). To answer this question, we used a meta-analysis approach (rather than e.g., a field experiment). We <a href="http://scottchamberlain.info/publications/">published the paper</a> recently.</p>
-
-<blockquote><p>p.s. I really really wish we would have put it in an open access journal...</p></blockquote>
-
-<h2>The data</h2>
-
-<p>Anyway, I'm here to talk about the <strong>data</strong>. We didn't get the data up with the paper, but it is <a href="http://figshare.com/articles/Conditionality_data/1097657">up on Figshare</a> now. The files there are the following:</p>
-
-<ul>
-<li><code>coniditionality.R</code> - script used to process the data from <code>variables_prelim.csv</code></li>
-<li><code>variables_prelim.csv</code> - description of variables in the preliminary data set, matches <code>conditionality_data_prelim.csv</code></li>
-<li><code>variables_used.csv</code> - description of variables in the used data set, matches <code>conditionality_data_used.csv</code></li>
-<li><code>conditionality_data_prelim.csv</code> - preliminary data, the raw data</li>
-<li><code>conditionality_data_used.csv</code> - the data used for our paper</li>
-<li><code>README.md</code> - the readme</li>
-<li><code>paper_selection.csv</code> - the list of papers we went through, with remarks about paper selection</li>
-</ul>
-
-
-<p>Please do play with the data, publish some papers, etc, etc. It took 6 of us about 4 years to collect this data; we skimmed through ~11,000 papers on the first pass (aka. skimming through abstracts in Google Scholar and Web of Science), then decided on nearly 500 papers to get data from, and narrowed down to 247 papers for the publication mentioned above. Now, there was no funding for this, so it was sort of done in between other projects, but still, it was simply <strong>A LOT</strong> of tables to digitize, and graphs to extract data points from. <strong>Anyway</strong>, hopefully you will find this data useful :p</p>
-
-<h2>EML</h2>
-
-<p>I think this dataset would be a great introduction to the potential power of EML (<a href="https://knb.ecoinformatics.org/#external//emlparser/docs/index.html">Ecological Metadata Langauge</a>). At <a href="http://ropensci.org/">rOpenSci</a>, one of our team <a href="http://www.carlboettiger.info/">Carl Boettiger</a>, along with Claas-Thido Pfaff, Duncan Temple Lang, Karthik Ram, and Matt Jones, have created an R client for EML, to parse EML files and to create and publish them.</p>
-
-<h2>What is EML?/Why EML?</h2>
-
-<p>A demonstration is in order...</p>
-
-<h2>Example using EML with this dataset</h2>
-
-<h3>Install EML</h3>
-
-<pre><code class="r">library("devtools")
-install.packages("RHTMLForms", repos = "http://www.omegahat.org/R/", type="source")
-install_github("ropensci/EML", build=FALSE, dependencies=c("DEPENDS", "IMPORTS"))
-</code></pre>
-
-<p>Load <code>EML</code></p>
-
-<pre><code class="r">library('EML')
-</code></pre>
-
-<h3>Prepare metadata</h3>
-
-<pre><code class="r"># dataset
-prelim_dat &lt;- read.csv("conditionality_data_prelim.csv")
-# variable descriptions for each column
-prelim_vars &lt;- read.csv("variables_prelim.csv", stringsAsFactors = FALSE)
-</code></pre>
-
-<p>Get column definitions in a vector</p>
-
-<pre><code class="r">col_defs &lt;- prelim_vars$description
-</code></pre>
-
-<p>Create unit definitions for each column</p>
-
-<pre><code class="r">unit_defs &lt;- list(
-  c(unit = "number",
-    bounds = c(0, Inf)),
-  c(unit = "number",
-    bounds = c(0, Inf)),
-  "independent replicates",
-  c(unit = "number",
-    bounds = c(0, Inf)),
-
-  ... &lt;CUTOFF&gt;
-)
-</code></pre>
-
-<h3>Write an EML file</h3>
-
-<pre><code class="r">eml_write(prelim_dat,
-          unit.defs = unit_defs,
-          col.defs = col_defs,
-          creator = "Scott Chamberlain",
-          contact = "myrmecocystus@gmail.com",
-          file = "conditionality_data_prelim_eml.xml")
-</code></pre>
-
-<pre><code>## [1] "conditionality_data_prelim_eml.xml"
-</code></pre>
-
-<h3>Validate the EML file</h3>
-
-<pre><code class="r">eml_validate("conditionality_data_prelim_eml.xml")
-</code></pre>
-
-<pre><code>## EML specific tests XML specific tests 
-##               TRUE               TRUE
-</code></pre>
-
-<h3>Read data and metadata</h3>
-
-<pre><code class="r">gg &lt;- eml_read("conditionality_data_prelim_eml.xml")
-eml_get(gg, "contact")
-</code></pre>
-
-<pre><code>## [1] "myrmecocystus@gmail.com"
-</code></pre>
-
-<pre><code class="r">eml_get(gg, "citation_info")
-</code></pre>
-
-<pre><code>## Chamberlain S (2014-10-06). _metadata_.
-</code></pre>
-
-<pre><code class="r">dat &lt;- eml_get(gg, "data.frame")
-head(dat[,c(1:10)])
-</code></pre>
-
-<pre><code>##   order i indrep avg author_last  finit_1 finit_2 finit_abv co_author
-## 1     1 1      a   1      Devall margaret       s        ms     Thein
-## 2     2 1      a   2      Devall margaret       s        ms     Thein
-## 3     3 1      a   3      Devall margaret       s        ms     Thein
-## 4     4 1      a   4      Devall margaret       s        ms     Thein
-## 5     5 1      a   5      Devall margaret       s        ms     Thein
-## 6     6 1      a   6      Devall margaret       s        ms     Thein
-##   sinit_1
-## 1 leonard
-## 2 leonard
-## 3 leonard
-## 4 leonard
-## 5 leonard
-## 6 leonard
-</code></pre>
-
-<h3>Publish</h3>
-
-<p>We can also use the <code>EML</code> package to publish the data, here to <a href="http://figshare.com">Figshare</a>.</p>
-
-<p>First, install <code>rfigshare</code></p>
-
-<pre><code class="r">install.packages("rfigshare")
-library('rfigshare')
-</code></pre>
-
-<p>Then publish using <code>eml_publish()</code></p>
-
-<pre><code class="r">figid &lt;- eml_publish(
-            file = "conditionality_data_prelim_eml.xml",
-            description = "EML file for Chamberlain, S.A., J.A. Rudgers, and J.L. Bronstein. 2014. How context-dependent are species interactions. Ecology Letters",
-            categories = "Ecology",
-            tags = "EML",
-            destination = "figshare",
-            visibility = "public",
-            title = "condionality data, EML")
-fs_make_public(figid)
-</code></pre>
-
-<p><img src="/public/img/2014-10-06-conditionality-meta-analysis/figshare_conditional.png" alt="" /></p>
 
   </div>
   

@@ -59,6 +59,517 @@
   
   <div class="post">
     <h1>
+      <a href="/2013/06/couch/">
+        Stashing and playing with raw data locally from the web
+      </a>
+    </h1>
+
+    <span class="post-date">17 Jun 2013</span>
+
+    <p>It is getting easier to get data directly into R from the web. Often R packages that retrieve data from the web return useful R data structures to users like a data.frame. This is a good thing of course to make things user friendly.</p>
+
+<p>However, what if you want to drill down into the data that's returned from a query to a database in R?  What if you want to get that nice data.frame in R, but you think you may want to look at the raw data later? The raw data from web queries are often JSON or XML data. This type of data, especially JSON, can be easily stored in schemaless so-called NoSQL databases, and queried later.</p>
+
+<p>A brief aside: What are JSON and XML? This is what JSON looks like (ps if you ever wonder if your JSON is correct, go <a href="http://jsonlint.com/">here</a>):</p>
+
+<div class="highlight"><pre><code class="language-bash" data-lang="bash"><span class="o">{</span>
+  <span class="s2">&quot;name&quot;</span>: <span class="s2">&quot;joe&quot;</span>,
+  <span class="s2">&quot;hobby&quot;</span>: <span class="s2">&quot;codemonkey&quot;</span>,
+  <span class="s2">&quot;lives&quot;</span>: <span class="o">[</span>
+      <span class="o">{</span>
+          <span class="s2">&quot;city&quot;</span>: <span class="s2">&quot;San Jose&quot;</span>,
+          <span class="s2">&quot;state&quot;</span>: <span class="s2">&quot;CA&quot;</span>
+      <span class="o">}</span>
+  <span class="o">]</span>
+<span class="o">}</span></code></pre></div>
+
+
+<p>This is what XML looks like:</p>
+
+<div class="highlight"><pre><code class="language-bash" data-lang="bash">&lt;?xml <span class="nv">version</span><span class="o">=</span><span class="s2">&quot;1.0&quot;</span> <span class="nv">encoding</span><span class="o">=</span><span class="s2">&quot;UTF-8&quot;</span> ?&gt;
+  &lt;name&gt;joe&lt;/name&gt;
+    &lt;hobby&gt;codemonkey&lt;/hobby&gt;
+    &lt;lives&gt;
+        &lt;city&gt;San Jose&lt;/city&gt;
+        &lt;state&gt;CA&lt;/state&gt;
+    &lt;/lives&gt;</code></pre></div>
+
+
+<p>But don't worry if it looks complicated - the project I talk about below, sofa, tries to make the interface to JSON and XML easy. Web APIs almost always return either JSON or XML, so this is the raw data.</p>
+
+<p>So here's the use case I imagine, or workflow:</p>
+
+<ul>
+<li>Query a database on the web, and choose to write the raw data to a local database.</li>
+<li>Do whatever you want with the output R object - analyze, visualize, etc.</li>
+<li>Now you want to go back and search through some of the raw data. But, that query took an hour. Since you wrote it to a local database, you can search the data.</li>
+<li>If you hadn't written it locally, you would have to make a new web call.</li>
+</ul>
+
+
+<p>Note that if you are doing calls to web APIs that get small amounts of data you don't need to worry too much as you can easily just do the call again.</p>
+
+<p>I've started an R package to interact with the NoSQL database <a href="http://couchdb.apache.org/">CouchDB</a>. CouchDB is a schemaless database that speaks JSON, so you can store JSON and get back JSON (don't worry XML, we got you covered - we can just wrap the XML in JSON before putting it in CouchDB). What's especially cool is you can interact with CouchDB via <a href="http://docs.couchdb.org/en/latest/api-basics.html">a RESTful API</a>. CouchDB doesn't have full text search built in (though you can build map-reduce <em>Views</em>, basically preset queries on the database), so I added functions (and docs to help) to interact with the <a href="https://github.com/elasticsearch/elasticsearch-river-couchdb/blob/master/README.md">CouchDB River plugin</a> for <a href="http://www.elasticsearch.org/">Elasticsearch</a>, which provides powerful full text search via an API interface. But nevermind the tech details - all this just means you can search on the full text of your stored data.</p>
+
+<p>There are plenty of databases you can interact with from R, so why CouchDB? For one, it makes a lot of sense to write to a NoSQL database since this blog post is dealing with a use case writing JSON, which isn't a good fit for databases like MySQL, SQLite, PostgreSQL, etc. (<a href="http://wiki.postgresql.org/wiki/What's_new_in_PostgreSQL_9.2#JSON_datatype">though postgres allows you to write JSON</a>). It didn't have to be CouchDB, but at least to me it seems relatively easy to install, you can interact with it via an HTTP API (if you're into that, which I am), and it has a nice web interface (navigate to <a href="http://localhost:5984/_utils/">http://localhost:5984/_utils/</a> after starting <code>couchdb</code>).</p>
+
+<p>Is this for the casual R user? Probably not. But, I imagine there are R users out there that want some more flexibility when it comes to interacting with web data in R. It is nice and tidy to get back an R data.frame from a web call, but having the raw data at your fingertips could be super powerful. I'll describe using an R package to interact with a web database with <code>sofa</code> baked in, and discuss a bit about the functions within <code>sofa</code>.</p>
+
+<hr />
+
+<h3>First start CouchDB in your terminal</h3>
+
+<p>You can do this from anywhere in your directory. See <a href="http://couchdb.apache.org/">here</a> for instructions on how to install CouchDB.</p>
+
+<pre><code class="bash">couchdb
+</code></pre>
+
+<h3>Then start elasticsearch in your terminal</h3>
+
+<p>See <a href="https://github.com/sckott/sofa">here</a> for instructions on how to install Elasticsearch and the River CouchDB plugin.</p>
+
+<pre><code class="bash">cd /usr/local/elasticsearch
+bin/elasticsearch -f
+</code></pre>
+
+<hr />
+
+<h3>Install sofa</h3>
+
+<div class="highlight"><pre><code class="language-r" data-lang="r"><span class="c1"># Uncomment these lines if you don&#39;t have these packages installed</span>
+<span class="c1"># install.packages(&#39;devtools&#39;) library(devtools) install_github(&#39;sofa&#39;,</span>
+<span class="c1"># &#39;schamberlain&#39;) install_github(&#39;alm&#39;, &#39;ropensci&#39;, ref=&#39;couch&#39;)</span>
+<span class="kn">library</span><span class="p">(</span>sofa<span class="p">)</span>
+<span class="kn">library</span><span class="p">(</span>alm<span class="p">)</span></code></pre></div>
+
+
+<hr />
+
+<h3>Simultaneously write data to CouchDB along with API calls using the alm package to get altmetrics data on PLoS papers. Ping to make sure CouchDB is on</h3>
+
+<div class="highlight"><pre><code class="language-r" data-lang="r">sofa_ping<span class="p">()</span></code></pre></div>
+
+
+
+
+<div class="highlight"><pre><code class="language-text" data-lang="text">couchdb   version 
+&quot;Welcome&quot;   &quot;1.2.1&quot;</code></pre></div>
+
+
+<hr />
+
+<h3>Create a new database</h3>
+
+<div class="highlight"><pre><code class="language-r" data-lang="r">sofa_createdb<span class="p">(</span>dbname <span class="o">=</span> <span class="s">&quot;alm_db&quot;</span><span class="p">)</span></code></pre></div>
+
+
+
+
+<div class="highlight"><pre><code class="language-text" data-lang="text">ok 
+TRUE</code></pre></div>
+
+
+<hr />
+
+<h3>Write couchdb database name to options</h3>
+
+<div class="highlight"><pre><code class="language-r" data-lang="r"><span class="kp">options</span><span class="p">(</span>couch_db_name <span class="o">=</span> <span class="s">&quot;alm_db&quot;</span><span class="p">)</span></code></pre></div>
+
+
+<hr />
+
+<h3>List the databases</h3>
+
+<div class="highlight"><pre><code class="language-r" data-lang="r">sofa_listdbs<span class="p">()</span></code></pre></div>
+
+
+
+
+<div class="highlight"><pre><code class="language-text" data-lang="text">[1] &quot;_replicator&quot;                &quot;_users&quot;                    
+ [3] &quot;alm_couchdb&quot;                &quot;alm_db&quot;                    
+ [5] &quot;dudedb&quot;                     &quot;example&quot;                   
+ [7] &quot;poop&quot;                       &quot;rplos_db&quot;                  
+ [9] &quot;shit&quot;                       &quot;shitty&quot;                    
+[11] &quot;shitty2&quot;                    &quot;test_suite_db&quot;             
+[13] &quot;test_suite_db/with_slashes&quot; &quot;test_suite_reports&quot;        
+[15] &quot;testr2couch&quot;                &quot;twitter_db&quot;</code></pre></div>
+
+
+<hr />
+
+<h3>Search for altmetrics normally, w/o writing to a database</h3>
+
+<div class="highlight"><pre><code class="language-r" data-lang="r"><span class="kp">head</span><span class="p">(</span>alm<span class="p">(</span>doi <span class="o">=</span> <span class="s">&quot;10.1371/journal.pone.0029797&quot;</span><span class="p">))</span></code></pre></div>
+
+
+
+
+<div class="highlight"><pre><code class="language-text" data-lang="text">.id pdf html shares groups comments likes citations total
+1   bloglines  NA   NA     NA     NA       NA    NA         0     0
+2   citeulike  NA   NA      1     NA       NA    NA        NA     1
+3    connotea  NA   NA     NA     NA       NA    NA         0     0
+4    crossref  NA   NA     NA     NA       NA    NA         6     6
+5      nature  NA   NA     NA     NA       NA    NA         4     4
+6 postgenomic  NA   NA     NA     NA       NA    NA         0     0</code></pre></div>
+
+
+<hr />
+
+<h3>Search for altmetrics normally, while writing to a database</h3>
+
+<div class="highlight"><pre><code class="language-r" data-lang="r"><span class="kp">head</span><span class="p">(</span>alm<span class="p">(</span>doi <span class="o">=</span> <span class="s">&quot;10.1371/journal.pone.0029797&quot;</span><span class="p">,</span> write2couch <span class="o">=</span> <span class="kc">TRUE</span><span class="p">))</span></code></pre></div>
+
+
+
+
+<div class="highlight"><pre><code class="language-text" data-lang="text">.id pdf html shares groups comments likes citations total
+1   bloglines  NA   NA     NA     NA       NA    NA         0     0
+2   citeulike  NA   NA      1     NA       NA    NA        NA     1
+3    connotea  NA   NA     NA     NA       NA    NA         0     0
+4    crossref  NA   NA     NA     NA       NA    NA         6     6
+5      nature  NA   NA     NA     NA       NA    NA         4     4
+6 postgenomic  NA   NA     NA     NA       NA    NA         0     0</code></pre></div>
+
+
+<hr />
+
+<h3>Make lots of calls, and write them simultaneously</h3>
+
+<div class="highlight"><pre><code class="language-r" data-lang="r"><span class="c1"># install_github(&#39;rplos&#39;, &#39;ropensci&#39;)</span>
+<span class="kn">library</span><span class="p">(</span>rplos<span class="p">)</span>
+dois <span class="o">&lt;-</span> searchplos<span class="p">(</span>terms <span class="o">=</span> <span class="s">&quot;evolution&quot;</span><span class="p">,</span> fields <span class="o">=</span> <span class="s">&quot;id&quot;</span><span class="p">,</span> limit <span class="o">=</span> <span class="m">100</span><span class="p">)</span>
+out <span class="o">&lt;-</span> alm<span class="p">(</span>doi <span class="o">=</span> <span class="kp">as.character</span><span class="p">(</span>dois<span class="p">[,</span> <span class="m">1</span><span class="p">]),</span> write2couch <span class="o">=</span> <span class="kc">TRUE</span><span class="p">)</span>
+<span class="kp">lapply</span><span class="p">(</span>out<span class="p">[</span><span class="m">1</span><span class="o">:</span><span class="m">2</span><span class="p">],</span> <span class="kp">head</span><span class="p">)</span></code></pre></div>
+
+
+
+
+<div class="highlight"><pre><code class="language-text" data-lang="text">$`01`
+          .id pdf html shares groups comments likes citations total
+1   bloglines  NA   NA     NA     NA       NA    NA         0     0
+2   citeulike  NA   NA      0     NA       NA    NA        NA     0
+3    connotea  NA   NA     NA     NA       NA    NA         0     0
+4    crossref  NA   NA     NA     NA       NA    NA         0     0
+5      nature  NA   NA     NA     NA       NA    NA         0     0
+6 postgenomic  NA   NA     NA     NA       NA    NA         0     0
+
+$`02`
+          .id pdf html shares groups comments likes citations total
+1   bloglines  NA   NA     NA     NA       NA    NA         0     0
+2   citeulike  NA   NA      1     NA       NA    NA        NA     1
+3    connotea  NA   NA     NA     NA       NA    NA         0     0
+4    crossref  NA   NA     NA     NA       NA    NA         2     2
+5      nature  NA   NA     NA     NA       NA    NA         0     0
+6 postgenomic  NA   NA     NA     NA       NA    NA         0     0</code></pre></div>
+
+
+<hr />
+
+<h3>Writing data to CouchDB does take a bit longer</h3>
+
+<div class="highlight"><pre><code class="language-r" data-lang="r"><span class="kp">system.time</span><span class="p">(</span>alm<span class="p">(</span>doi <span class="o">=</span> <span class="kp">as.character</span><span class="p">(</span>dois<span class="p">[,</span> <span class="m">1</span><span class="p">])[</span><span class="m">1</span><span class="o">:</span><span class="m">60</span><span class="p">],</span> write2couch <span class="o">=</span> <span class="kc">FALSE</span><span class="p">))</span></code></pre></div>
+
+
+
+
+<div class="highlight"><pre><code class="language-text" data-lang="text">user  system elapsed 
+  1.739   0.016   4.554</code></pre></div>
+
+
+
+
+<div class="highlight"><pre><code class="language-r" data-lang="r"><span class="kp">system.time</span><span class="p">(</span>alm<span class="p">(</span>doi <span class="o">=</span> <span class="kp">as.character</span><span class="p">(</span>dois<span class="p">[,</span> <span class="m">1</span><span class="p">])[</span><span class="m">1</span><span class="o">:</span><span class="m">60</span><span class="p">],</span> write2couch <span class="o">=</span> <span class="kc">TRUE</span><span class="p">))</span></code></pre></div>
+
+
+
+
+<div class="highlight"><pre><code class="language-text" data-lang="text">user  system elapsed 
+  3.579   0.062   6.460</code></pre></div>
+
+
+<hr />
+
+<h3>Search using elasticsearch</h3>
+
+<h4>tell elasticsearch to start indexing your database</h4>
+
+<div class="highlight"><pre><code class="language-r" data-lang="r">elastic_start<span class="p">(</span>dbname <span class="o">=</span> <span class="s">&quot;alm_db&quot;</span><span class="p">)</span></code></pre></div>
+
+
+
+
+<div class="highlight"><pre><code class="language-text" data-lang="text">$ok
+[1] TRUE</code></pre></div>
+
+
+<hr />
+
+<h4>Search your database</h4>
+
+<div class="highlight"><pre><code class="language-r" data-lang="r">out <span class="o">&lt;-</span> elastic_search<span class="p">(</span>dbname <span class="o">=</span> <span class="s">&quot;alm_db&quot;</span><span class="p">,</span> q <span class="o">=</span> <span class="s">&quot;twitter&quot;</span><span class="p">,</span> parse_ <span class="o">=</span> <span class="kc">TRUE</span><span class="p">)</span>
+out<span class="o">$</span>hits<span class="o">$</span>total</code></pre></div>
+
+
+
+
+<div class="highlight"><pre><code class="language-text" data-lang="text">[1] 679</code></pre></div>
+
+
+<hr />
+
+<h3>Using views</h3>
+
+<h4>Write a view - here letting key be the default of null</h4>
+
+<div class="highlight"><pre><code class="language-r" data-lang="r">sofa_view_put<span class="p">(</span>dbname <span class="o">=</span> <span class="s">&quot;alm_db&quot;</span><span class="p">,</span> design_name <span class="o">=</span> <span class="s">&quot;myview&quot;</span><span class="p">,</span> value <span class="o">=</span> <span class="s">&quot;doc.baseurl&quot;</span><span class="p">)</span></code></pre></div>
+
+
+
+
+<div class="highlight"><pre><code class="language-text" data-lang="text">$ok
+[1] TRUE
+
+$id
+[1] &quot;_design/myview&quot;
+
+$rev
+[1] &quot;1-e7c17cff1b96e4595c3781da53e16ad8&quot;</code></pre></div>
+
+
+<hr />
+
+<h4>Get info on your new view</h4>
+
+<div class="highlight"><pre><code class="language-r" data-lang="r">sofa_view_get<span class="p">(</span>dbname <span class="o">=</span> <span class="s">&quot;alm_db&quot;</span><span class="p">,</span> design_name <span class="o">=</span> <span class="s">&quot;myview&quot;</span><span class="p">)</span></code></pre></div>
+
+
+
+
+<div class="highlight"><pre><code class="language-text" data-lang="text">$`_id`
+[1] &quot;_design/myview&quot;
+
+$`_rev`
+[1] &quot;1-e7c17cff1b96e4595c3781da53e16ad8&quot;
+
+$views
+$views$foo
+                                    map 
+&quot;function(doc){emit(null,doc.baseurl)}&quot;</code></pre></div>
+
+
+<hr />
+
+<h4>Get data using a view</h4>
+
+<div class="highlight"><pre><code class="language-r" data-lang="r">out <span class="o">&lt;-</span> sofa_view_search<span class="p">(</span>dbname <span class="o">=</span> <span class="s">&quot;alm_db&quot;</span><span class="p">,</span> design_name <span class="o">=</span> <span class="s">&quot;myview&quot;</span><span class="p">)</span>
+<span class="kp">length</span><span class="p">(</span>out<span class="o">$</span>rows<span class="p">)</span>  <span class="c1"># 160 results</span></code></pre></div>
+
+
+
+
+<div class="highlight"><pre><code class="language-text" data-lang="text">[1] 161</code></pre></div>
+
+
+
+
+<div class="highlight"><pre><code class="language-r" data-lang="r"><span class="kp">sapply</span><span class="p">(</span>out<span class="o">$</span>rows<span class="p">,</span> <span class="kr">function</span><span class="p">(</span>x<span class="p">)</span> x<span class="o">$</span>value<span class="p">)[</span><span class="m">1</span><span class="o">:</span><span class="m">5</span><span class="p">]</span>  <span class="c1"># the values, just the API call URLs</span></code></pre></div>
+
+
+
+
+<div class="highlight"><pre><code class="language-text" data-lang="text">[1] &quot;http://alm.plos.org/api/v3/articles&quot;
+[2] &quot;http://alm.plos.org/api/v3/articles&quot;
+[3] &quot;http://alm.plos.org/api/v3/articles&quot;
+[4] &quot;http://alm.plos.org/api/v3/articles&quot;
+[5] &quot;http://alm.plos.org/api/v3/articles&quot;</code></pre></div>
+
+
+<hr />
+
+<h4>Delete the view</h4>
+
+<div class="highlight"><pre><code class="language-r" data-lang="r">sofa_view_del<span class="p">(</span>dbname <span class="o">=</span> <span class="s">&quot;alm_db&quot;</span><span class="p">,</span> design_name <span class="o">=</span> <span class="s">&quot;myview&quot;</span><span class="p">)</span></code></pre></div>
+
+
+
+
+<div class="highlight"><pre><code class="language-text" data-lang="text">[1] &quot;&quot;</code></pre></div>
+
+
+<hr />
+
+<h2>What now?</h2>
+
+<p>Well, if no one uses this, then probably nothing. Though, if people think this could be useful:</p>
+
+<ul>
+<li>It would be cool to make easy hooks into any package making web calls to allow users to write data to CouchDB if they choose to, sort of like the example above with rplos.</li>
+<li>Perhaps automate some of the setup for CouchDB for users, making system calls so they don't have to.</li>
+<li>Performance: As shown above, simultaneously writing data to CouchDB takes longer than not doing so - removing this time difference will make writing to couch more palatable.</li>
+</ul>
+
+
+<h2>What do you think?</h2>
+
+<p>What is your reaction to this post?  Do you have a need for this sort of tool?  Do you have similar use cases that could be addressed with <code>sofa</code>?</p>
+
+  </div>
+  
+  <div class="post">
+    <h1>
+      <a href="/2013/06/fylopic/">
+        Fylopic, an R wrapper to Phylopic
+      </a>
+    </h1>
+
+    <span class="post-date">01 Jun 2013</span>
+
+    <h2>What is PhyloPic?</h2>
+
+<p>PhyloPic is an awesome new service - I'll let the creator, <a href="http://tmkeesey.net/">Mike Keesey</a>, explain what it is (paraphrasing here):</p>
+
+<blockquote><p>PhyloPic stores silhouette images of organisms, and each image is associated with taxonomic names, and stores the taxonomy of all taxa, allowing searching by taxonomic names. Anyone can submit silhouettes to PhyloPic.</p></blockquote>
+
+<p>What is a silhouette?  It's like this:</p>
+
+<p><img src="http://phylopic.org/assets/images/submissions/bedd622a-4de2-4067-8c70-4aa44326d229.128.png" alt="A silhouette" /></p>
+
+<p><em>by Gareth Monger</em></p>
+
+<p>What makes PhyloPic not just awesome, but super awesome? All or most images are licensed under <a href="http://creativecommons.org/">Creative Commons licenses</a>. This means you can use the silhouettes without having to ask or pay - just attribute.</p>
+
+<hr />
+
+<h2>What is fylopic?</h2>
+
+<p>The idea behind Fylopic is to create modular bits and pieces (i.e., functions) to allow you to add silhouettes to not only ggplot2 plots, but base plots as well. That is, you can simply load fylopic in your R session, and add some silhouettes to your phylogeny, or your barchart, etc. - that is, <code>fylopic</code> is meant to be a helper in your workflow to add in silhouettes to visualizations.</p>
+
+<p>Some people prefer base plots while others prefer ggplot2 plots (me!), so it would be nice to have both options. Phylogenies at the moment render faster in base plots. I don't yet have implementations for base plots, but will come soon, or you can send a pull request to add it.</p>
+
+<p>One interesting use case could be to be able to get a set of silhouettes, then get a phylogeny for taxa associatd with the silhouettess using the NCBI taxonomy, but it's not easily available yet (though I may be able to use <a href="https://github.com/bendmorris/phylocommons">Ben Morris' phylocommons</a> soon. This isn't doable yet, so in the example below the function <code>make_phylo</code> creates a phylogeny using <code>ape::rcoal</code>.</p>
+
+<p>You could also do the reverse -> you have a phylogeny and then you could search Phylopic for silhouettes.</p>
+
+<hr />
+
+<h2>Info</h2>
+
+<p>Check out the Phylopic website <a href="http://phylopic.org/">here</a>, and Phylopic API developer documentation <a href="http://phylopic.org/api/">here</a>.</p>
+
+<p>Also check out Ben Morris' Python wrapper to Phylopic <a href="https://github.com/bendmorris/python-phylopic">here</a>.</p>
+
+<hr />
+
+<h2>What can you do with fylopic?</h2>
+
+<hr />
+
+<h4>Install fylopic</h4>
+
+<div class="highlight"><pre><code class="language-r" data-lang="r">install.packages<span class="p">(</span><span class="s">&quot;devtools&quot;</span><span class="p">)</span>
+<span class="kn">library</span><span class="p">(</span>devtools<span class="p">)</span>
+install_github<span class="p">(</span><span class="s">&quot;fylopic&quot;</span><span class="p">,</span> <span class="s">&quot;sckott&quot;</span><span class="p">)</span></code></pre></div>
+
+
+
+
+<div class="highlight"><pre><code class="language-r" data-lang="r"><span class="kn">library</span><span class="p">(</span>fylopic<span class="p">,</span> quietly <span class="o">=</span> <span class="kc">TRUE</span><span class="p">)</span></code></pre></div>
+
+
+<hr />
+
+<h4>Plot a phylogeny with silhouettes at the tips</h4>
+
+<p>Here, I search for names based on keyword <em>Homo sapiens</em> - which returns many matche codes. With those results we search for any silhouettes associated with those codes. Then we download images. Finally, make a phylogeny with the silhouettes at the tips. Note that in this eample the phylogeny is just a random coalescent tree made using <code>ape::rcoal</code> - obviously, in the real world you'd want to do something more useful.</p>
+
+<div class="highlight"><pre><code class="language-r" data-lang="r"><span class="c1">## search on Homo sapiens</span>
+searchres <span class="o">&lt;-</span> search_text<span class="p">(</span>text <span class="o">=</span> <span class="s">&quot;Homo sapiens&quot;</span><span class="p">,</span> options <span class="o">=</span> <span class="s">&quot;names&quot;</span><span class="p">)</span>
+
+<span class="c1">### which returns UUIDs</span>
+searchres<span class="p">[</span><span class="m">1</span><span class="o">:</span><span class="m">3</span><span class="p">]</span></code></pre></div>
+
+
+
+
+<div class="highlight"><pre><code class="language-text" data-lang="text">[1] &quot;74aea16b-666b-497a-b2cb-72201ad75a8e&quot;
+[2] &quot;1ee65cf3-53db-4a52-9960-a9f7093d845d&quot;
+[3] &quot;cc9ad8ee-3a82-4add-8d50-bc78f4ff6956&quot;</code></pre></div>
+
+
+
+
+<div class="highlight"><pre><code class="language-r" data-lang="r"><span class="c1">## search for images based on the UUIds</span>
+output <span class="o">&lt;-</span> search_images<span class="p">(</span>uuid <span class="o">=</span> searchres<span class="p">,</span> options <span class="o">=</span> <span class="kt">c</span><span class="p">(</span><span class="s">&quot;pngFiles&quot;</span><span class="p">,</span> <span class="s">&quot;credit&quot;</span><span class="p">,</span> 
+    <span class="s">&quot;canonicalName&quot;</span><span class="p">))</span>
+
+<span class="c1">### we got eight matches</span>
+output</code></pre></div>
+
+
+
+
+<div class="highlight"><pre><code class="language-text" data-lang="text">$`15444b9c-f17f-4d6e-89b5-5990096bcfb0`
+$`15444b9c-f17f-4d6e-89b5-5990096bcfb0`$supertaxa
+[1] &quot;e547cd01-7dd1-495b-8239-52cf9971a609&quot;
+[2] &quot;bd88f674-6976-4cb2-a46e-e6a12a8ba463&quot;
+
+
+$`fedf0e5f-f20a-442c-accf-eb84a3af8c6b`
+$`fedf0e5f-f20a-442c-accf-eb84a3af8c6b`$supertaxa
+[1] &quot;e547cd01-7dd1-495b-8239-52cf9971a609&quot;
+[2] &quot;bd88f674-6976-4cb2-a46e-e6a12a8ba463&quot;
+
+
+$`a88d3a4c-44d3-409e-87b6-516bd188c709`
+$`a88d3a4c-44d3-409e-87b6-516bd188c709`$supertaxa
+[1] &quot;e547cd01-7dd1-495b-8239-52cf9971a609&quot;
+[2] &quot;bd88f674-6976-4cb2-a46e-e6a12a8ba463&quot;
+
+
+$`d88164ec-3152-444b-b41c-4757a344a764`
+$`d88164ec-3152-444b-b41c-4757a344a764`$supertaxa
+[1] &quot;9c6af553-390c-4bdd-baeb-6992cbc540b1&quot;
+
+
+$`da5eaeb7-1ed2-4b2e-ad4a-49993881d706`
+$`da5eaeb7-1ed2-4b2e-ad4a-49993881d706`$supertaxa
+[1] &quot;9c6af553-390c-4bdd-baeb-6992cbc540b1&quot;</code></pre></div>
+
+
+
+
+<div class="highlight"><pre><code class="language-r" data-lang="r"><span class="c1">## download images</span>
+myobjs <span class="o">&lt;-</span> get_image<span class="p">(</span>uuids <span class="o">=</span> output<span class="p">,</span> size <span class="o">=</span> <span class="s">&quot;128&quot;</span><span class="p">)</span>
+
+<span class="c1">## make the phylogeny</span>
+make_phylo<span class="p">(</span>pngobj <span class="o">=</span> myobjs<span class="p">)</span></code></pre></div>
+
+
+<p><img src="/public/img/2013-06-01-fylopic/unnamed-chunk-1.png" alt="center" /></p>
+
+<hr />
+
+<h4>Plot a silhouette behind a plot</h4>
+
+<p>Notice in the below example that you can use normal <code>ggplot2</code> syntax, and simply add another layer (<code>add_phylopic</code> from <code>fylopic</code>) to the plot.</p>
+
+<div class="highlight"><pre><code class="language-r" data-lang="r"><span class="kn">library</span><span class="p">(</span>ggplot2<span class="p">)</span>
+img <span class="o">&lt;-</span> get_image<span class="p">(</span><span class="s">&quot;27356f15-3cf8-47e8-ab41-71c6260b2724&quot;</span><span class="p">,</span> size <span class="o">=</span> <span class="s">&quot;512&quot;</span><span class="p">)[[</span><span class="m">1</span><span class="p">]]</span>
+qplot<span class="p">(</span>x <span class="o">=</span> Sepal.Length<span class="p">,</span> y <span class="o">=</span> Sepal.Width<span class="p">,</span> data <span class="o">=</span> iris<span class="p">,</span> geom <span class="o">=</span> <span class="s">&quot;point&quot;</span><span class="p">)</span> <span class="o">+</span> add_phylopic<span class="p">(</span>img<span class="p">)</span></code></pre></div>
+
+
+<p><img src="/public/img/2013-06-01-fylopic/unnamed-chunk-2.png" alt="center" /></p>
+
+<hr />
+
+<h2>What's next?</h2>
+
+<p>This is a side project, so if anyone has interest in helping please do contribute code, report bugs, request features, etc.</p>
+
+  </div>
+  
+  <div class="post">
+    <h1>
       <a href="/2013/05/rbison/">
         BISON USGS species occurrence data
       </a>
@@ -233,468 +744,6 @@ bisonmap<span class="p">(</span>input <span class="o">=</span> out<span class="p
 <hr />
 
 <h4>Let us know if you have any feature requests or find bugs at <a href="https://github.com/ropensci/rbison/issues">our GitHub Issues page</a>.</h4>
-
-  </div>
-  
-  <div class="post">
-    <h1>
-      <a href="/2013/03/r-metadata/">
-        Scholarly metadata in R
-      </a>
-    </h1>
-
-    <span class="post-date">16 Mar 2013</span>
-
-    <p>Scholarly metadata - the meta-information surrounding articles - can be super useful.  Although metadata does not contain the full content of articles, it contains a lot of useful information, including title, authors, abstract, URL to the article, etc.</p>
-
-<p>One of the largest sources of metadata is provided via the Open Archives Initiative Protocol for Metadata Harvesting or <a href="http://www.openarchives.org/OAI/openarchivesprotocol.html">OAI-PMH</a>. Many publishers, provide their metadata through their own endpoint, and implement the standard OAI-PMH methods: <a href="http://www.openarchives.org/OAI/openarchivesprotocol.html#GetRecord">GetRecord</a>, <a href="http://www.openarchives.org/OAI/openarchivesprotocol.html#Identify">Identify</a>, <a href="http://www.openarchives.org/OAI/openarchivesprotocol.html#ListIdentifiers">ListIdentifiers</a>, <a href="http://www.openarchives.org/OAI/openarchivesprotocol.html#ListMetadataFormats">ListMetadataFormats</a>, <a href="http://www.openarchives.org/OAI/openarchivesprotocol.html#ListRecords">ListRecords</a>, and <a href="http://www.openarchives.org/OAI/openarchivesprotocol.html#ListSets">ListSets</a>. Many providers use OAI-PMH, including <a href="http://oai.datacite.org/">DataCite</a>, <a href="http://wiki.datadryad.org/Data_Access#OAI-PMH">Dryad</a>, and <a href="http://www.ncbi.nlm.nih.gov/pmc/tools/oai/">PubMed</a>.</p>
-
-<p>Some data-/article-providers provide their metadata via their own APIs. For example, Nature Publishing Group provides their own metadata API <a href="http://developers.nature.com/docs">here</a> in non OAI-PMH format; you can get PLoS metadata through their <a href="http://api.plos.org/">search API</a>, and the BHL (see below) provides their own custom metadata service.</p>
-
-<p>In addition, CrossRef provides a number of metadata search services: <a href="http://search.labs.crossref.org/help/api">metadata search</a> and <a href="http://labs.crossref.org/openurl/">openurl</a>.</p>
-
-<p>What about the other publishers? (please tell me if I'm wrong about these three)</p>
-
-<ul>
-<li>Springer has <a href="http://dev.springer.com/docs">a metadata API</a>, but it is terrible, soooo...</li>
-<li>Elsevier, are you kidding? Well, they do have some sort of API service, but its a pain in the ass.</li>
-<li>Wiley, no better than Elsevier.</li>
-</ul>
-
-
-<p>Note that metadata can live in other places:</p>
-
-<ul>
-<li>Another package being developed by David Springate, <a href="https://github.com/ropensci/rpubmed">rpubmed</a> can get PubMed metadata.</li>
-<li>Our wrapper to the Mendeley API, <a href="https://github.com/ropensci/rmendeley">RMendeley</a>, gets article metadata via Mendeley's database.</li>
-<li>Our wrapper to the Biodiversity Heritage Library API <a href="http://www.biodiversitylibrary.org/api2/docs/docs.html">here</a> gets their metadata.</li>
-</ul>
-
-
-<p>No, you can't get metadata via Google Scholar - the don't allow scraping, and don't have expose their data via an API.</p>
-
-<p>I have discussed this package <a href="http://sckott.github.io/2012/09/rmetadata/">in a previous blog post</a>, but have since worked on the code a bit, and thought it deserved a new post.</p>
-
-<p>You can see a tutorial for this package <a href="http://ropensci.github.com/rmetadata/">here</a>, and contribute to the code <a href="https://github.com/ropensci/rmetadata">here</a>.</p>
-
-<hr />
-
-<h3>Install rmetadata</h3>
-
-<div class="highlight"><pre><code class="language-r" data-lang="r"><span class="c1"># install_github(&#39;rmetadata&#39;, &#39;ropensci&#39;) # uncomment to install</span>
-<span class="kn">library</span><span class="p">(</span>rmetadata<span class="p">)</span></code></pre></div>
-
-
-<hr />
-
-<h3>Count OAI-PMH identifiers for a data provider.</h3>
-
-<div class="highlight"><pre><code class="language-r" data-lang="r"><span class="c1"># For DataCite.</span>
-count_identifiers<span class="p">(</span><span class="s">&quot;datacite&quot;</span><span class="p">)</span>
-
-  provider   count
-<span class="m">1</span> datacite <span class="m">1216193</span></code></pre></div>
-
-
-<hr />
-
-<h3>Lookup article info via CrossRef with DOI and get a citation.</h3>
-
-<h4>As Bibtex</h4>
-
-<div class="highlight"><pre><code class="language-r" data-lang="r"><span class="kp">print</span><span class="p">(</span>crossref_citation<span class="p">(</span><span class="s">&quot;10.3998/3336451.0009.101&quot;</span><span class="p">),</span> style <span class="o">=</span> <span class="s">&quot;Bibtex&quot;</span><span class="p">)</span>
-
-<span class="o">@</span>Article<span class="p">{,</span>
-  title <span class="o">=</span> <span class="p">{</span>In Google We Trust<span class="o">?</span><span class="p">},</span>
-  author <span class="o">=</span> <span class="p">{</span>Geoffrey Bilder<span class="p">},</span>
-  journal <span class="o">=</span> <span class="p">{</span>The Journal of Electronic Publishing<span class="p">},</span>
-  year <span class="o">=</span> <span class="p">{</span><span class="m">2006</span><span class="p">},</span>
-  month <span class="o">=</span> <span class="p">{</span><span class="m">01</span><span class="p">},</span>
-  volume <span class="o">=</span> <span class="p">{</span><span class="m">9</span><span class="p">},</span>
-  doi <span class="o">=</span> <span class="p">{</span><span class="m">10.3998</span><span class="o">/</span><span class="m">3336451.0009.101</span><span class="p">},</span>
-<span class="p">}</span></code></pre></div>
-
-
-<h4>As regular text</h4>
-
-<div class="highlight"><pre><code class="language-r" data-lang="r"><span class="kp">print</span><span class="p">(</span>crossref_citation<span class="p">(</span><span class="s">&quot;10.3998/3336451.0009.101&quot;</span><span class="p">),</span> style <span class="o">=</span> <span class="s">&quot;text&quot;</span><span class="p">)</span>
-
-Bilder G <span class="p">(</span><span class="m">2006</span><span class="p">)</span><span class="m">.</span> <span class="s">&quot;In Google We Trust?&quot;</span> _The Journal of Electronic
-Publishing_<span class="p">,</span> <span class="o">*</span><span class="m">9</span><span class="o">*</span><span class="m">.</span> <span class="o">&lt;</span>URL<span class="o">:</span>
-http<span class="o">://</span>dx.doi.org<span class="o">/</span><span class="m">10.3998</span><span class="o">/</span><span class="m">3336451.0009.101</span><span class="o">&gt;</span><span class="m">.</span></code></pre></div>
-
-
-<hr />
-
-<h3>Search the CrossRef Metatdata for DOIs using free form references.</h3>
-
-<h4>Search with title, author, year, and journal</h4>
-
-<div class="highlight"><pre><code class="language-r" data-lang="r">crossref_search_free<span class="p">(</span>query <span class="o">=</span> <span class="s">&quot;Piwowar Sharing Detailed Research Data Is Associated with Increased Citation Rate PLOS one 2007&quot;</span><span class="p">)</span>
-
-                                                                                             text
-<span class="m">1</span> Piwowar Sharing Detailed Research Data Is Associated with Increased Citation Rate PLOS one <span class="m">2007</span>
-  match                   doi score
-<span class="m">1</span>  <span class="kc">TRUE</span> <span class="m">10.1038</span><span class="o">/</span>npre.2007.361 <span class="m">4.905</span></code></pre></div>
-
-
-<h4>Get a DOI and get the citation using \code{crossref_search}</h4>
-
-<div class="highlight"><pre><code class="language-r" data-lang="r"><span class="c1"># Get a DOI for a paper</span>
-doi <span class="o">&lt;-</span> crossref_search_free<span class="p">(</span>query <span class="o">=</span> <span class="s">&quot;Piwowar sharing data PLOS one&quot;</span><span class="p">)</span><span class="o">$</span>doi
-
-<span class="c1"># Get the metadata</span>
-crossref_search<span class="p">(</span>doi <span class="o">=</span> doi<span class="p">)[,</span> <span class="m">1</span><span class="o">:</span><span class="m">3</span><span class="p">]</span>
-
-                           doi score normalizedScore
-<span class="m">1</span> <span class="m">10.1371</span><span class="o">/</span>journal.pone.0000308 <span class="m">18.19</span>             <span class="m">100</span></code></pre></div>
-
-
-<hr />
-
-<h3>Get a random set of DOI's through CrossRef.</h3>
-
-<div class="highlight"><pre><code class="language-r" data-lang="r"><span class="c1"># Default search gets 20 random DOIs</span>
-crossref_r<span class="p">()</span>
-
- <span class="p">[</span><span class="m">1</span><span class="p">]</span> <span class="s">&quot;10.4028/www.scientific.net/MSF.126-128.467&quot;</span>
- <span class="p">[</span><span class="m">2</span><span class="p">]</span> <span class="s">&quot;10.2139/ssrn.548523&quot;</span>                       
- <span class="p">[</span><span class="m">3</span><span class="p">]</span> <span class="s">&quot;10.1016/S0012-821X(02)00562-9&quot;</span>             
- <span class="p">[</span><span class="m">4</span><span class="p">]</span> <span class="s">&quot;10.1093/rsq/13.2-3.167&quot;</span>                    
- <span class="p">[</span><span class="m">5</span><span class="p">]</span> <span class="s">&quot;10.5772/55055&quot;</span>                             
- <span class="p">[</span><span class="m">6</span><span class="p">]</span> <span class="s">&quot;10.1515/BC.1999.050&quot;</span>                       
- <span class="p">[</span><span class="m">7</span><span class="p">]</span> <span class="s">&quot;10.1016/S0020-7292(98)90160-6&quot;</span>             
- <span class="p">[</span><span class="m">8</span><span class="p">]</span> <span class="s">&quot;10.1111/j.1439-0418.1985.tb02788.x&quot;</span>        
- <span class="p">[</span><span class="m">9</span><span class="p">]</span> <span class="s">&quot;10.1089/aid.2012.0115&quot;</span>                     
-<span class="p">[</span><span class="m">10</span><span class="p">]</span> <span class="s">&quot;10.1016/0002-9378(95)90155-8&quot;</span>              
-<span class="p">[</span><span class="m">11</span><span class="p">]</span> <span class="s">&quot;10.1001/jama.1949.02900490055028&quot;</span>          
-<span class="p">[</span><span class="m">12</span><span class="p">]</span> <span class="s">&quot;10.1051/jphyscol:1989172&quot;</span>                  
-<span class="p">[</span><span class="m">13</span><span class="p">]</span> <span class="s">&quot;10.1016/s0301-2115(03)00298-7&quot;</span>             
-<span class="p">[</span><span class="m">14</span><span class="p">]</span> <span class="s">&quot;10.1007/BF02735292&quot;</span>                        
-<span class="p">[</span><span class="m">15</span><span class="p">]</span> <span class="s">&quot;10.1016/0003-4916(65)90026-6&quot;</span>              
-<span class="p">[</span><span class="m">16</span><span class="p">]</span> <span class="s">&quot;10.4156/jdcta.vol5.issue5.12&quot;</span>              
-<span class="p">[</span><span class="m">17</span><span class="p">]</span> <span class="s">&quot;10.1007/s10904-009-9316-2&quot;</span>                 
-<span class="p">[</span><span class="m">18</span><span class="p">]</span> <span class="s">&quot;10.1023/A:1021690001832&quot;</span>                   
-<span class="p">[</span><span class="m">19</span><span class="p">]</span> <span class="s">&quot;10.1007/s12262-012-0724-0&quot;</span>                 
-<span class="p">[</span><span class="m">20</span><span class="p">]</span> <span class="s">&quot;10.1007/bf02192860&quot;</span></code></pre></div>
-
-
-
-
-<div class="highlight"><pre><code class="language-r" data-lang="r"><span class="c1"># Specify you want journal articles only</span>
-crossref_r<span class="p">(</span>type <span class="o">=</span> <span class="s">&quot;journal_article&quot;</span><span class="p">)</span>
-
- <span class="p">[</span><span class="m">1</span><span class="p">]</span> <span class="s">&quot;10.1016/j.jacc.2011.09.055&quot;</span>                                 
- <span class="p">[</span><span class="m">2</span><span class="p">]</span> <span class="s">&quot;10.1002/dev.420170603&quot;</span>                                      
- <span class="p">[</span><span class="m">3</span><span class="p">]</span> <span class="s">&quot;10.4315/0362-028X.JFP-10-403&quot;</span>                               
- <span class="p">[</span><span class="m">4</span><span class="p">]</span> <span class="s">&quot;10.1016/S0925-4927(98)00016-X&quot;</span>                              
- <span class="p">[</span><span class="m">5</span><span class="p">]</span> <span class="s">&quot;10.1111/j.1933-1592.2002.tb00141.x&quot;</span>                         
- <span class="p">[</span><span class="m">6</span><span class="p">]</span> <span class="s">&quot;10.1541/ieejfms.127.629&quot;</span>                                    
- <span class="p">[</span><span class="m">7</span><span class="p">]</span> <span class="s">&quot;10.5539/enrr.v3n1p62&quot;</span>                                       
- <span class="p">[</span><span class="m">8</span><span class="p">]</span> <span class="s">&quot;10.1016/S0960-9776(96)90038-7&quot;</span>                              
- <span class="p">[</span><span class="m">9</span><span class="p">]</span> <span class="s">&quot;10.1016/0925-9635(94)05240-9&quot;</span>                               
-<span class="p">[</span><span class="m">10</span><span class="p">]</span> <span class="s">&quot;10.1016/s0929-693x(97)86846-7&quot;</span>                              
-<span class="p">[</span><span class="m">11</span><span class="p">]</span> <span class="s">&quot;10.1002/(SICI)1096-9071(199601)48:1&lt;53::AID-JMV9&gt;3.0.CO;2-K&quot;</span>
-<span class="p">[</span><span class="m">12</span><span class="p">]</span> <span class="s">&quot;10.1016/s0267-7261(01)00016-1&quot;</span>                              
-<span class="p">[</span><span class="m">13</span><span class="p">]</span> <span class="s">&quot;10.1111/j.1748-0361.2003.tb00575.x&quot;</span>                         
-<span class="p">[</span><span class="m">14</span><span class="p">]</span> <span class="s">&quot;10.1097/00005721-197701000-00011&quot;</span>                           
-<span class="p">[</span><span class="m">15</span><span class="p">]</span> <span class="s">&quot;10.1007/s00894-009-0593-z&quot;</span>                                  
-<span class="p">[</span><span class="m">16</span><span class="p">]</span> <span class="s">&quot;10.1071/AR9830063&quot;</span>                                          
-<span class="p">[</span><span class="m">17</span><span class="p">]</span> <span class="s">&quot;10.1186/gb-2009-10-4-r39&quot;</span>                                   
-<span class="p">[</span><span class="m">18</span><span class="p">]</span> <span class="s">&quot;10.2165/00128415-201113540-00038&quot;</span>                           
-<span class="p">[</span><span class="m">19</span><span class="p">]</span> <span class="s">&quot;10.1007/BF00522986&quot;</span>                                         
-<span class="p">[</span><span class="m">20</span><span class="p">]</span> <span class="s">&quot;10.1080/19407963.2011.539385&quot;</span></code></pre></div>
-
-
-<hr />
-
-<h3>Search the CrossRef Metatdata API.</h3>
-
-<div class="highlight"><pre><code class="language-r" data-lang="r"><span class="c1"># Search for two different query terms</span>
-crossref_search<span class="p">(</span>query <span class="o">=</span> <span class="kt">c</span><span class="p">(</span><span class="s">&quot;renear&quot;</span><span class="p">,</span> <span class="s">&quot;palmer&quot;</span><span class="p">),</span> rows <span class="o">=</span> <span class="m">4</span><span class="p">)[,</span> <span class="m">1</span><span class="o">:</span><span class="m">3</span><span class="p">]</span>
-
-                            doi score normalizedScore
-<span class="m">1</span>       <span class="m">10.1126</span><span class="o">/</span>science.1157784 <span class="m">3.253</span>             <span class="m">100</span>
-<span class="m">2</span>  <span class="m">10.1002</span><span class="o">/</span>meet.2009.1450460141 <span class="m">2.169</span>              <span class="m">66</span>
-<span class="m">3</span> <span class="m">10.4242</span><span class="o">/</span>BalisageVol3.Renear01 <span class="m">2.102</span>              <span class="m">64</span>
-<span class="m">4</span> <span class="m">10.4242</span><span class="o">/</span>BalisageVol5.Renear01 <span class="m">2.102</span>              <span class="m">64</span></code></pre></div>
-
-
-
-
-<div class="highlight"><pre><code class="language-r" data-lang="r"><span class="c1"># Get results for a certain year</span>
-crossref_search<span class="p">(</span>query <span class="o">=</span> <span class="kt">c</span><span class="p">(</span><span class="s">&quot;renear&quot;</span><span class="p">,</span> <span class="s">&quot;palmer&quot;</span><span class="p">),</span> year <span class="o">=</span> <span class="m">2010</span><span class="p">)[,</span> <span class="m">1</span><span class="o">:</span><span class="m">3</span><span class="p">]</span>
-
-                                  doi  score normalizedScore
-<span class="m">1</span>            <span class="m">10.1002</span><span class="o">/</span>meet.14504701218 <span class="m">1.0509</span>             <span class="m">100</span>
-<span class="m">2</span>            <span class="m">10.1002</span><span class="o">/</span>meet.14504701240 <span class="m">1.0509</span>             <span class="m">100</span>
-<span class="m">3</span>           <span class="m">10.5270</span><span class="o">/</span>OceanObs09.cwp.68 <span class="m">1.0442</span>              <span class="m">99</span>
-<span class="m">4</span>               <span class="m">10.1353</span><span class="o">/</span>mpq.2010.0003 <span class="m">0.6890</span>              <span class="m">65</span>
-<span class="m">5</span>                  <span class="m">10.1353</span><span class="o">/</span>mpq.0.0041 <span class="m">0.6890</span>              <span class="m">65</span>
-<span class="m">6</span>                  <span class="m">10.1353</span><span class="o">/</span>mpq.0.0044 <span class="m">0.6890</span>              <span class="m">65</span>
-<span class="m">7</span>                  <span class="m">10.1353</span><span class="o">/</span>mpq.0.0057 <span class="m">0.6890</span>              <span class="m">65</span>
-<span class="m">8</span>                    <span class="m">10.1386</span><span class="o">/</span>fm.1.1.2 <span class="m">0.6890</span>              <span class="m">65</span>
-<span class="m">9</span>                    <span class="m">10.1386</span><span class="o">/</span>fm.1.2.2 <span class="m">0.6890</span>              <span class="m">65</span>
-<span class="m">10</span>                   <span class="m">10.1386</span><span class="o">/</span>fm.1.3.2 <span class="m">0.6890</span>              <span class="m">65</span>
-<span class="m">11</span>       <span class="m">10.1097</span><span class="o">/</span>ALN.0b013e3181f09404 <span class="m">0.6090</span>              <span class="m">57</span>
-<span class="m">12</span>      <span class="m">10.1016</span><span class="o">/</span>j.urology.2010.02.033 <span class="m">0.6090</span>              <span class="m">57</span>
-<span class="m">13</span>              <span class="m">10.1353</span><span class="o">/</span>ect.2010.0025 <span class="m">0.6090</span>              <span class="m">57</span>
-<span class="m">14</span>               <span class="m">10.1117</span><span class="o">/</span><span class="m">2.4201001.04</span> <span class="m">0.6090</span>              <span class="m">57</span>
-<span class="m">15</span> <span class="m">10.1111</span><span class="o">/</span>j.1835<span class="m">-9310.1977.</span>tb01159.x <span class="m">0.6090</span>              <span class="m">57</span>
-<span class="m">16</span>    <span class="m">10.4067</span><span class="o">/</span>S0717<span class="m">-69962010000100001</span> <span class="m">0.6090</span>              <span class="m">57</span>
-<span class="m">17</span>    <span class="m">10.4067</span><span class="o">/</span>S0717<span class="m">-69962010000200001</span> <span class="m">0.6090</span>              <span class="m">57</span>
-<span class="m">18</span>           <span class="m">10.2105</span><span class="o">/</span>AJPH.2009.191098 <span class="m">0.6029</span>              <span class="m">57</span>
-<span class="m">19</span>              <span class="m">10.1353</span><span class="o">/</span>mpq.2010.0004 <span class="m">0.5167</span>              <span class="m">49</span>
-<span class="m">20</span>                 <span class="m">10.1353</span><span class="o">/</span>mpq.0.0048 <span class="m">0.5167</span>              <span class="m">49</span></code></pre></div>
-
-
-<hr />
-
-<h3>Get a short DOI from shortdoi.org.</h3>
-
-<div class="highlight"><pre><code class="language-r" data-lang="r"><span class="c1"># Geta a short DOI, just the short DOI returned</span>
-short_doi<span class="p">(</span>doi <span class="o">=</span> <span class="s">&quot;10.1371/journal.pone.0042793&quot;</span><span class="p">)</span>
-
-<span class="p">[</span><span class="m">1</span><span class="p">]</span> <span class="s">&quot;10/f2bfz9&quot;</span></code></pre></div>
-
-
-
-
-<div class="highlight"><pre><code class="language-r" data-lang="r"><span class="c1"># Geta a short DOI, all data returned</span>
-short_doi<span class="p">(</span>doi <span class="o">=</span> <span class="s">&quot;10.1371/journal.pone.0042793&quot;</span><span class="p">,</span> justshort <span class="o">=</span> <span class="kc">FALSE</span><span class="p">)</span>
-
-<span class="o">$</span>DOI
-<span class="p">[</span><span class="m">1</span><span class="p">]</span> <span class="s">&quot;10.1371/journal.pone.0042793&quot;</span>
-
-<span class="o">$</span>ShortDOI
-<span class="p">[</span><span class="m">1</span><span class="p">]</span> <span class="s">&quot;10/f2bfz9&quot;</span>
-
-<span class="o">$</span>IsNew
-<span class="p">[</span><span class="m">1</span><span class="p">]</span> <span class="kc">FALSE</span></code></pre></div>
-
-
-<hr />
-
-<h3>Get a record from a OAI-PMH data provider.</h3>
-
-<div class="highlight"><pre><code class="language-r" data-lang="r"><span class="c1"># Single provider, one identifier</span>
-md_getrecord<span class="p">(</span>provider <span class="o">=</span> <span class="s">&quot;pensoft&quot;</span><span class="p">,</span> identifier <span class="o">=</span> <span class="s">&quot;10.3897/zookeys.1.10&quot;</span><span class="p">)</span>
-
-                                                                                                title
-<span class="m">1</span> A new candidate <span class="kr">for</span> a Gondwanaland distribution <span class="kr">in</span> the Zodariidae <span class="p">(</span>Araneae<span class="p">)</span><span class="o">:</span> Australutica <span class="kr">in</span> Africa
-      creator date             type
-<span class="m">1</span> Jocqué<span class="p">,</span>Rudy <span class="m">2008</span> Research Article</code></pre></div>
-
-
-
-
-<div class="highlight"><pre><code class="language-r" data-lang="r"><span class="c1"># Single provider, multiple identifiers</span>
-md_getrecord<span class="p">(</span>provider <span class="o">=</span> <span class="s">&quot;pensoft&quot;</span><span class="p">,</span> identifier <span class="o">=</span> <span class="kt">c</span><span class="p">(</span><span class="s">&quot;10.3897/zookeys.1.10&quot;</span><span class="p">,</span> <span class="s">&quot;10.3897/zookeys.4.57&quot;</span><span class="p">))</span>
-
-                                                                                                   title
-<span class="m">1</span>    A new candidate <span class="kr">for</span> a Gondwanaland distribution <span class="kr">in</span> the Zodariidae <span class="p">(</span>Araneae<span class="p">)</span><span class="o">:</span> Australutica <span class="kr">in</span> Africa
-<span class="m">2</span> Studies of Tiger Beetles. CLXXVIII. A new Lophyra <span class="p">(</span>Lophyra<span class="p">)</span> from Somaliland <span class="p">(</span>Coleoptera<span class="p">,</span> Cicindelidae<span class="p">)</span>
-        creator date             type
-<span class="m">1</span>   Jocqué<span class="p">,</span>Rudy <span class="m">2008</span> Research Article
-<span class="m">2</span> Cassola<span class="p">,</span>Fabio <span class="m">2008</span> Research Article</code></pre></div>
-
-
-<hr />
-
-<h3>List available metadata formats from various providers.</h3>
-
-<div class="highlight"><pre><code class="language-r" data-lang="r"><span class="c1"># List metadata formats for a provider</span>
-md_listmetadataformats<span class="p">(</span>provider <span class="o">=</span> <span class="s">&quot;dryad&quot;</span><span class="p">)</span>
-
-  metadataPrefix
-<span class="m">1</span>         oai_dc
-<span class="m">2</span>            rdf
-<span class="m">3</span>            ore
-<span class="m">4</span>           mets
-                                                       schema
-<span class="m">1</span>              http<span class="o">://</span>www.openarchives.org<span class="o">/</span>OAI<span class="o">/</span><span class="m">2.0</span><span class="o">/</span>oai_dc.xsd
-<span class="m">2</span>                 http<span class="o">://</span>www.openarchives.org<span class="o">/</span>OAI<span class="o">/</span><span class="m">2.0</span><span class="o">/</span>rdf.xsd
-<span class="m">3</span> http<span class="o">://</span>tweety.lanl.gov<span class="o">/</span>public<span class="o">/</span>schemas<span class="o">/</span><span class="m">2008-06</span><span class="o">/</span>atom<span class="o">-</span>tron.sch
-<span class="m">4</span>                  http<span class="o">://</span>www.loc.gov<span class="o">/</span>standards<span class="o">/</span>mets<span class="o">/</span>mets.xsd
-                            metadataNamespace
-<span class="m">1</span> http<span class="o">://</span>www.openarchives.org<span class="o">/</span>OAI<span class="o">/</span><span class="m">2.0</span><span class="o">/</span>oai_dc<span class="o">/</span>
-<span class="m">2</span>    http<span class="o">://</span>www.openarchives.org<span class="o">/</span>OAI<span class="o">/</span><span class="m">2.0</span><span class="o">/</span>rdf<span class="o">/</span>
-<span class="m">3</span>                 http<span class="o">://</span>www.w3.org<span class="o">/</span><span class="m">2005</span><span class="o">/</span>Atom
-<span class="m">4</span>                    http<span class="o">://</span>www.loc.gov<span class="o">/</span>METS<span class="o">/</span></code></pre></div>
-
-
-
-
-<div class="highlight"><pre><code class="language-r" data-lang="r"><span class="c1"># List metadata formats for a specific identifier for a provider</span>
-md_listmetadataformats<span class="p">(</span>provider <span class="o">=</span> <span class="s">&quot;pensoft&quot;</span><span class="p">,</span> identifier <span class="o">=</span> <span class="s">&quot;10.3897/zookeys.1.10&quot;</span><span class="p">)</span>
-
-            identifier metadataPrefix
-<span class="m">1</span> <span class="m">10.3897</span><span class="o">/</span>zookeys.1.10         oai_dc
-<span class="m">2</span> <span class="m">10.3897</span><span class="o">/</span>zookeys.1.10           mods
-                                             schema
-<span class="m">1</span>    http<span class="o">://</span>www.openarchives.org<span class="o">/</span>OAI<span class="o">/</span><span class="m">2.0</span><span class="o">/</span>oai_dc.xsd
-<span class="m">2</span> http<span class="o">://</span>www.loc.gov<span class="o">/</span>standards<span class="o">/</span>mods<span class="o">/</span>v3<span class="o">/</span>mods<span class="m">-3-1.</span>xsd
-                            metadataNamespace
-<span class="m">1</span> http<span class="o">://</span>www.openarchives.org<span class="o">/</span>OAI<span class="o">/</span><span class="m">2.0</span><span class="o">/</span>oai_dc<span class="o">/</span>
-<span class="m">2</span>                  http<span class="o">://</span>www.loc.gov<span class="o">/</span>mods<span class="o">/</span>v3</code></pre></div>
-
-
-<hr />
-
-<h3>Some plotting - mean number of authors per paper</h3>
-
-<p>Okay, so this isn't a super useful visualization, but you can surely think of something better.</p>
-
-<div class="highlight"><pre><code class="language-r" data-lang="r"><span class="kn">library</span><span class="p">(</span>ggplot2<span class="p">)</span>
-<span class="kn">library</span><span class="p">(</span>ggthemes<span class="p">)</span>
-<span class="kn">library</span><span class="p">(</span>reshape<span class="p">)</span>
-
-
-temp <span class="o">&lt;-</span> md_listrecords<span class="p">(</span>provider <span class="o">=</span> <span class="s">&quot;pensoft&quot;</span><span class="p">,</span> from <span class="o">=</span> <span class="s">&quot;2011-10-01&quot;</span><span class="p">,</span> until <span class="o">=</span> <span class="s">&quot;2012-01-01&quot;</span><span class="p">)</span>
-temp2 <span class="o">&lt;-</span> ldply<span class="p">(</span>temp<span class="p">)[,</span> <span class="m">-1</span><span class="p">]</span>
-auths <span class="o">&lt;-</span> <span class="kp">sapply</span><span class="p">(</span>temp2<span class="o">$</span>creator<span class="p">,</span> <span class="kr">function</span><span class="p">(</span>x<span class="p">)</span> <span class="kp">length</span><span class="p">(</span><span class="kp">strsplit</span><span class="p">(</span><span class="kp">as.character</span><span class="p">(</span>x<span class="p">),</span> 
-    <span class="s">&quot;;&quot;</span><span class="p">)[[</span><span class="m">1</span><span class="p">]]))</span>
-toplot <span class="o">&lt;-</span> <span class="kt">data.frame</span><span class="p">(</span>authors <span class="o">=</span> auths<span class="p">,</span> articletype <span class="o">=</span> temp2<span class="o">$</span>type<span class="p">)</span>
-toplot_ <span class="o">&lt;-</span> ddply<span class="p">(</span>toplot<span class="p">,</span> <span class="m">.</span><span class="p">(</span>articletype<span class="p">),</span> summarise<span class="p">,</span> authors <span class="o">=</span> <span class="kp">mean</span><span class="p">(</span>authors<span class="p">))</span>
-toplot_<span class="o">$</span>articletype <span class="o">&lt;-</span> reorder<span class="p">(</span>toplot_<span class="o">$</span>articletype<span class="p">,</span> toplot_<span class="o">$</span>authors<span class="p">)</span>
-
-ggplot<span class="p">(</span>toplot_<span class="p">,</span> aes<span class="p">(</span>articletype<span class="p">,</span> authors<span class="p">))</span> <span class="o">+</span> theme_tufte<span class="p">(</span>base_size <span class="o">=</span> <span class="m">16</span><span class="p">)</span> <span class="o">+</span> geom_bar<span class="p">(</span>stat <span class="o">=</span> <span class="s">&quot;identity&quot;</span><span class="p">)</span> <span class="o">+</span> 
-    coord_flip<span class="p">()</span></code></pre></div>
-
-
-<p><img src="/public/img/someplotting.png" alt="center" /></p>
-
-<hr />
-
-<h4>Get the .Rmd file used to create this post <a href="https://github.com/sckott/sckott.github.io/tree/master/_drafts/2013-03-16-r-metadata.Rmd">at my github account</a> - or <a href="https://github.com/sckott/sckott.github.io/tree/master/_posts/2013-03-16-r-metadata.md">.md file</a>.</h4>
-
-<h4>Written in <a href="http://daringfireball.net/projects/markdown/">Markdown</a>, with help from <a href="http://yihui.name/knitr/">knitr</a>, and <a href="https://github.com/cboettig/knitcitations">knitcitations</a>.</h4>
-
-  </div>
-  
-  <div class="post">
-    <h1>
-      <a href="/2013/03/ropensci-collaboration/">
-        Visualizing rOpenSci collaboration
-      </a>
-    </h1>
-
-    <span class="post-date">08 Mar 2013</span>
-
-    <p>We (<a href="http://ropensci.org/">rOpenSci</a>) have been writing code for R packages for a couple years, so it is time to take a look back at the data. What data you ask? The commits data from GitHub ~ data that records who did what and when.</p>
-
-<p>Using the <a href="http://developer.github.com/v3/repos/commits/">Github commits API</a> we can gather data on who commited code to a Github repository, and when they did it. Then we can visualize this hitorical record.</p>
-
-<hr />
-
-<h3>Install some functions for interacting with the Github API via R</h3>
-
-<div class="highlight"><pre><code class="language-r" data-lang="r">install_github<span class="p">(</span><span class="s">&#39;sandbox&#39;</span><span class="p">,</span> <span class="s">&#39;ropensci&#39;</span><span class="p">)</span> 
-
-<span class="kn">library</span><span class="p">(</span>sandbox<span class="p">)</span>
-<span class="kn">library</span><span class="p">(</span>httr<span class="p">)</span>
-<span class="kn">library</span><span class="p">(</span>ggplot2<span class="p">)</span>
-<span class="kn">library</span><span class="p">(</span>scales<span class="p">)</span>
-<span class="kn">library</span><span class="p">(</span>reshape2<span class="p">)</span>
-<span class="kn">library</span><span class="p">(</span>bipartite<span class="p">)</span>
-<span class="kn">library</span><span class="p">(</span>doMC<span class="p">)</span>
-<span class="kn">library</span><span class="p">(</span>plyr<span class="p">)</span>
-<span class="kn">library</span><span class="p">(</span>ggthemes<span class="p">)</span>
-<span class="kn">library</span><span class="p">(</span>picante<span class="p">)</span>
-
-<span class="c1"># And authenticate - pops open a page in your default browser, then tells </span>
-<span class="c1"># you authentication was successful</span>
-github_auth<span class="p">()</span></code></pre></div>
-
-
-<hr />
-
-<h3>Get all repos for an organization, here ropensci of course</h3>
-
-<div class="highlight"><pre><code class="language-r" data-lang="r">ropensci_repos <span class="o">&lt;-</span> github_allrepos<span class="p">(</span>userorg <span class="o">=</span> <span class="s">&quot;ropensci&quot;</span><span class="p">)</span></code></pre></div>
-
-
-<hr />
-
-<h3>Get commits broken down in to additions and deletions, though below we just collapse them to all commits</h3>
-
-<div class="highlight"><pre><code class="language-r" data-lang="r">registerDoMC<span class="p">(</span>cores <span class="o">=</span> <span class="m">4</span><span class="p">)</span>
-github_commits_safe <span class="o">&lt;-</span> plyr<span class="o">::</span>failwith<span class="p">(</span><span class="kc">NULL</span><span class="p">,</span> github_commits<span class="p">)</span>
-out <span class="o">&lt;-</span> llply<span class="p">(</span>ropensci_repos<span class="p">,</span> <span class="kr">function</span><span class="p">(</span>x<span class="p">)</span> github_commits_safe<span class="p">(</span><span class="s">&quot;ropensci&quot;</span><span class="p">,</span> x<span class="p">,</span> 
-    since <span class="o">=</span> <span class="s">&quot;2009-01-01T&quot;</span><span class="p">,</span> limit <span class="o">=</span> <span class="m">500</span><span class="p">),</span> <span class="m">.</span>parallel <span class="o">=</span> <span class="kc">TRUE</span><span class="p">)</span>
-<span class="kp">names</span><span class="p">(</span>out<span class="p">)</span> <span class="o">&lt;-</span> ropensci_repos
-out2 <span class="o">&lt;-</span> compact<span class="p">(</span>out<span class="p">)</span>
-outdf <span class="o">&lt;-</span> ldply<span class="p">(</span>out2<span class="p">)</span></code></pre></div>
-
-
-<hr />
-
-<h3>Plot commits by date and repo</h3>
-
-<div class="highlight"><pre><code class="language-r" data-lang="r">outdf_subset <span class="o">&lt;-</span> outdf<span class="p">[</span><span class="o">!</span>outdf<span class="o">$</span><span class="m">.i</span>d <span class="o">%in%</span> <span class="kt">c</span><span class="p">(</span><span class="s">&quot;citeulike&quot;</span><span class="p">,</span> <span class="s">&quot;challenge&quot;</span><span class="p">,</span> <span class="s">&quot;docs&quot;</span><span class="p">,</span> <span class="s">&quot;ropensci-book&quot;</span><span class="p">,</span> 
-    <span class="s">&quot;usecases&quot;</span><span class="p">,</span> <span class="s">&quot;textmine&quot;</span><span class="p">,</span> <span class="s">&quot;usgs&quot;</span><span class="p">,</span> <span class="s">&quot;ropenscitoolkit&quot;</span><span class="p">,</span> <span class="s">&quot;neotoma&quot;</span><span class="p">,</span> <span class="s">&quot;rEWDB&quot;</span><span class="p">,</span> <span class="s">&quot;rgauges&quot;</span><span class="p">,</span> 
-    <span class="s">&quot;rodash&quot;</span><span class="p">,</span> <span class="s">&quot;ropensci.github.com&quot;</span><span class="p">,</span> <span class="s">&quot;ROAuth&quot;</span><span class="p">),</span> <span class="p">]</span>
-outdf_subset<span class="o">$</span><span class="m">.i</span>d <span class="o">&lt;-</span> <span class="kp">tolower</span><span class="p">(</span>outdf_subset<span class="o">$</span><span class="m">.i</span>d<span class="p">)</span>
-outdf_subset <span class="o">&lt;-</span> ddply<span class="p">(</span>outdf_subset<span class="p">,</span> <span class="m">.</span><span class="p">(</span><span class="m">.i</span>d<span class="p">,</span> <span class="kp">date</span><span class="p">),</span> summarise<span class="p">,</span> value <span class="o">=</span> <span class="kp">sum</span><span class="p">(</span>value<span class="p">))</span>
-
-mindates <span class="o">&lt;-</span> llply<span class="p">(</span><span class="kp">unique</span><span class="p">(</span>outdf_subset<span class="o">$</span><span class="m">.i</span>d<span class="p">),</span> <span class="kr">function</span><span class="p">(</span>x<span class="p">)</span> <span class="kp">min</span><span class="p">(</span>outdf_subset<span class="p">[</span>outdf_subset<span class="o">$</span><span class="m">.i</span>d <span class="o">==</span> 
-    x<span class="p">,</span> <span class="s">&quot;date&quot;</span><span class="p">]))</span>
-<span class="kp">names</span><span class="p">(</span>mindates<span class="p">)</span> <span class="o">&lt;-</span> <span class="kp">unique</span><span class="p">(</span>outdf_subset<span class="o">$</span><span class="m">.i</span>d<span class="p">)</span>
-mindates <span class="o">&lt;-</span> <span class="kp">sort</span><span class="p">(</span><span class="kp">do.call</span><span class="p">(</span><span class="kt">c</span><span class="p">,</span> mindates<span class="p">))</span>
-outdf_subset<span class="o">$</span><span class="m">.i</span>d <span class="o">&lt;-</span> <span class="kp">factor</span><span class="p">(</span>outdf_subset<span class="o">$</span><span class="m">.i</span>d<span class="p">,</span> levels <span class="o">=</span> <span class="kp">names</span><span class="p">(</span>mindates<span class="p">))</span>
-
-ggplot<span class="p">(</span>outdf_subset<span class="p">,</span> aes<span class="p">(</span><span class="kp">date</span><span class="p">,</span> value<span class="p">,</span> fill <span class="o">=</span> <span class="m">.i</span>d<span class="p">))</span> <span class="o">+</span> 
-    geom_bar<span class="p">(</span>stat <span class="o">=</span> <span class="s">&quot;identity&quot;</span><span class="p">,</span> width <span class="o">=</span> <span class="m">0.5</span><span class="p">)</span> <span class="o">+</span> 
-    geom_rangeframe<span class="p">(</span>sides <span class="o">=</span> <span class="s">&quot;b&quot;</span><span class="p">,</span> colour <span class="o">=</span> <span class="s">&quot;grey&quot;</span><span class="p">)</span> <span class="o">+</span> 
-    theme_bw<span class="p">(</span>base_size <span class="o">=</span> <span class="m">9</span><span class="p">)</span> <span class="o">+</span> 
-    scale_x_date<span class="p">(</span>labels <span class="o">=</span> date_format<span class="p">(</span><span class="s">&quot;%Y&quot;</span><span class="p">),</span> breaks <span class="o">=</span> date_breaks<span class="p">(</span><span class="s">&quot;year&quot;</span><span class="p">))</span> <span class="o">+</span> 
-    scale_y_log10<span class="p">()</span> <span class="o">+</span> 
-    facet_grid<span class="p">(</span><span class="m">.i</span>d <span class="o">~</span> <span class="m">.</span><span class="p">)</span> <span class="o">+</span> 
-    labs<span class="p">(</span>x <span class="o">=</span> <span class="s">&quot;&quot;</span><span class="p">,</span> y <span class="o">=</span> <span class="s">&quot;&quot;</span><span class="p">)</span> <span class="o">+</span> 
-    theme<span class="p">(</span>axis.text.y <span class="o">=</span> element_blank<span class="p">(),</span> 
-        axis.text.x <span class="o">=</span> element_text<span class="p">(</span>colour <span class="o">=</span> <span class="s">&quot;black&quot;</span><span class="p">),</span> 
-        axis.ticks.y <span class="o">=</span> element_blank<span class="p">(),</span> 
-        strip.text.y <span class="o">=</span> element_text<span class="p">(</span>angle <span class="o">=</span> <span class="m">0</span><span class="p">,</span> size <span class="o">=</span> <span class="m">8</span><span class="p">,</span> <span class="p">),</span> 
-        strip.background <span class="o">=</span> element_rect<span class="p">(</span>size <span class="o">=</span> <span class="m">0</span><span class="p">),</span> 
-        panel.grid.major <span class="o">=</span> element_blank<span class="p">(),</span> 
-        panel.grid.minor <span class="o">=</span> element_blank<span class="p">(),</span> 
-        legend.text <span class="o">=</span> element_text<span class="p">(</span>size <span class="o">=</span> <span class="m">8</span><span class="p">),</span> 
-        legend.position <span class="o">=</span> <span class="s">&quot;none&quot;</span><span class="p">,</span> 
-        panel.border <span class="o">=</span> element_blank<span class="p">())</span></code></pre></div>
-
-
-<p><img src="/public/img/commitsbydate.png" alt="center" /></p>
-
-<p>The plot above plots the sum of additions+deletions, and is sorted by the first commit date of reach repo, with the first being <a href="https://github.com/ropensci/treeBASE">treebase</a>, which wraps the <a href="http://treebase.org/treebase-web/urlAPI.html">Treebase API</a>, and the most recent being <a href="https://github.com/ropensci/rWBclimate">rwbclimate</a>, which wraps the <a href="http://data.worldbank.org/developers/climate-data-api">World Blank climate data API</a>.</p>
-
-<p>You can see that some repos have recieved commits more or less consistently over their life time, while others have seen a little development here and there.</p>
-
-<hr />
-
-<p>w</p>
-
-<h3>In addition, there are quite a few people that have committed code now to rOpenSci repos, calling for a network vizualization of course.</h3>
-
-<div class="highlight"><pre><code class="language-r" data-lang="r">outdf_network <span class="o">&lt;-</span> <span class="kp">droplevels</span><span class="p">(</span>outdf<span class="p">[</span><span class="o">!</span>outdf<span class="o">$</span><span class="m">.i</span>d <span class="o">%in%</span> <span class="kt">c</span><span class="p">(</span><span class="s">&quot;citeulike&quot;</span><span class="p">,</span> <span class="s">&quot;challenge&quot;</span><span class="p">,</span> 
-    <span class="s">&quot;docs&quot;</span><span class="p">,</span> <span class="s">&quot;ropensci-book&quot;</span><span class="p">,</span> <span class="s">&quot;usecases&quot;</span><span class="p">,</span> <span class="s">&quot;textmine&quot;</span><span class="p">,</span> <span class="s">&quot;usgs&quot;</span><span class="p">,</span> <span class="s">&quot;ropenscitoolkit&quot;</span><span class="p">,</span> 
-    <span class="s">&quot;retriever&quot;</span><span class="p">,</span> <span class="s">&quot;rodash&quot;</span><span class="p">,</span> <span class="s">&quot;ropensci.github.com&quot;</span><span class="p">,</span> <span class="s">&quot;ROAuth&quot;</span><span class="p">,</span> <span class="s">&quot;rgauges&quot;</span><span class="p">,</span> <span class="s">&quot;sandbox&quot;</span><span class="p">,</span> 
-    <span class="s">&quot;rfna&quot;</span><span class="p">,</span> <span class="s">&quot;rmetadata&quot;</span><span class="p">,</span> <span class="s">&quot;rhindawi&quot;</span><span class="p">,</span> <span class="s">&quot;rpmc&quot;</span><span class="p">,</span> <span class="s">&quot;rpensoft&quot;</span><span class="p">,</span> <span class="s">&quot;ritis&quot;</span><span class="p">),</span> <span class="p">])</span>
-casted <span class="o">&lt;-</span> dcast<span class="p">(</span>outdf_network<span class="p">,</span> <span class="m">.i</span>d <span class="o">+</span> date <span class="o">+</span> name <span class="o">~</span> variable<span class="p">,</span> fun.aggregate <span class="o">=</span> <span class="kp">length</span><span class="p">,</span> 
-    value.var <span class="o">=</span> <span class="s">&quot;value&quot;</span><span class="p">)</span>
-<span class="kp">names</span><span class="p">(</span>casted<span class="p">)[</span><span class="m">1</span><span class="p">]</span> <span class="o">&lt;-</span> <span class="s">&quot;repo&quot;</span>
-casted2 <span class="o">&lt;-</span> ddply<span class="p">(</span>casted<span class="p">,</span> <span class="m">.</span><span class="p">(</span>repo<span class="p">,</span> name<span class="p">),</span> summarise<span class="p">,</span> commits <span class="o">=</span> <span class="kp">sum</span><span class="p">(</span>additions<span class="p">))</span>
-casted2 <span class="o">&lt;-</span> <span class="kt">data.frame</span><span class="p">(</span>repo <span class="o">=</span> casted2<span class="o">$</span>repo<span class="p">,</span> weight <span class="o">=</span> casted2<span class="o">$</span>commits<span class="p">,</span> name <span class="o">=</span> casted2<span class="o">$</span>name<span class="p">)</span>
-mat <span class="o">&lt;-</span> sample2matrix<span class="p">(</span>casted2<span class="p">)</span>
-plotweb<span class="p">(</span>sortweb<span class="p">(</span>mat<span class="p">,</span> sort.order <span class="o">=</span> <span class="s">&quot;dec&quot;</span><span class="p">),</span> method <span class="o">=</span> <span class="s">&quot;normal&quot;</span><span class="p">,</span> text.rot <span class="o">=</span> <span class="m">90</span><span class="p">,</span> 
-    adj.high <span class="o">=</span> <span class="kt">c</span><span class="p">(</span><span class="m">-0.3</span><span class="p">,</span> <span class="m">0</span><span class="p">),</span> adj.low <span class="o">=</span> <span class="kt">c</span><span class="p">(</span><span class="m">1</span><span class="p">,</span> <span class="m">-0.3</span><span class="p">),</span> y.width.low <span class="o">=</span> <span class="m">0.05</span><span class="p">,</span> y.width.high <span class="o">=</span> <span class="m">0.05</span><span class="p">,</span> 
-    ybig <span class="o">=</span> <span class="m">0.09</span><span class="p">,</span> labsize <span class="o">=</span> <span class="m">0.7</span><span class="p">)</span></code></pre></div>
-
-
-<p><img src="/public/img/collabnetwork.png" alt="center" /></p>
-
-<p>The plot above shows repos on one side and contributors on the other. Some folks (the core rOpenSci team: cboettig, karthikram, emhart, and schamberlain) have committed quite a lot to many packages. We also have amny awesome contributors to our packages (some contributors and repos have been removed for clarity).</p>
-
-<p>rOpenSci is truly a collaborative effort to develop tools for open science, so thanks to all our contributors - keep on forking, pull requesting, and commiting.</p>
 
   </div>
   
