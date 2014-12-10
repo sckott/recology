@@ -59,6 +59,218 @@
   
   <div class="post">
     <h1>
+      <a href="/2014/12/taxize-workflows/">
+        taxize workflows
+      </a>
+    </h1>
+
+    <span class="post-date">02 Dec 2014</span>
+
+    <p>A missed chat on the rOpenSci website the other day asked:</p>
+
+<blockquote><p>Hi there, i am trying to use the taxize package and have a .csv file of species names to run through taxize updating them. What would be the code i would need to run to achieve this?</p></blockquote>
+
+<p>One way to answer this is to talk about the basic approach to importing data, doing stuff to the data, then recombining data. There are many ways to do this, but I'll go over a few of them.</p>
+
+<h2>Install taxize</h2>
+
+<pre><code class="r">install.packages("taxize")
+install.packages("downloader")
+</code></pre>
+
+<pre><code class="r">library("taxize")
+</code></pre>
+
+<h2>Import data</h2>
+
+<p>We'll use Winston Chang's new <code>downloader</code> package to avoid problems with <code>https</code>, and get a dataset from our ropensci datasets repo <a href="https://github.com/ropensci/datasets">https://github.com/ropensci/datasets</a></p>
+
+<pre><code class="r">downloader::download("https://raw.githubusercontent.com/ropensci/datasets/master/planttraits/morphological.csv", "morphological.csv")
+dat &lt;- read.csv("morphological.csv", stringsAsFactors = FALSE)
+head(dat)
+#&gt;                  species log_SLA leaf_water_content log_wood_density
+#&gt; 1         Abies concolor    3.46               0.51            -0.52
+#&gt; 2          Abies grandis    3.58               0.49            -0.51
+#&gt; 3        Abies magnifica    3.87               0.62            -0.53
+#&gt; 4      Acacia farnesiana      NA                 NA               NA
+#&gt; 5           Acer glabrum    5.07               0.69            -0.54
+#&gt; 6 Adenostoma fasciculata    3.56               0.46            -0.31
+#&gt;   log_ht log_N
+#&gt; 1   7.72  0.02
+#&gt; 2   7.51 -0.31
+#&gt; 3   7.58 -0.14
+#&gt; 4   5.70    NA
+#&gt; 5   3.25  1.02
+#&gt; 6   5.33  0.29
+</code></pre>
+
+<p>After importing data, there are a variety of approaches you could take:</p>
+
+<ol>
+<li>Vector: Take species names as vector from your <code>data.frame</code>, cleaning them, then re-attching to the <code>data.frame</code> later, or</li>
+<li>In-Place: Use for loops or <code>lapply</code> family functions to iterate over each name while simultaneously re-inserting into the <code>data.frame</code></li>
+</ol>
+
+
+<h2>1. Vector</h2>
+
+<p>Make a vector of names</p>
+
+<pre><code class="r">splist &lt;- dat$species
+</code></pre>
+
+<p>Then proceed to do name cleaning, e.g, we can use the <code>tnrs</code> function to see if any names are potentially not spelled correctly.</p>
+
+<pre><code class="r">tnrs_out &lt;- tnrs(splist, source = "iPlant_TNRS")
+head(tnrs_out)
+#&gt;              submittedname             acceptedname    sourceid score
+#&gt; 1     Ceanothus prostratus     Ceanothus prostratus iPlant_TNRS     1
+#&gt; 2          Abies magnifica          Abies magnifica iPlant_TNRS     1
+#&gt; 3 Arctostaphylos canescens Arctostaphylos canescens iPlant_TNRS     1
+#&gt; 4         Berberis nervosa         Berberis nervosa iPlant_TNRS     1
+#&gt; 5        Arbutus menziesii        Arbutus menziesii iPlant_TNRS     1
+#&gt; 6     Calocedrus decurrens     Calocedrus decurrens iPlant_TNRS     1
+#&gt;                matchedname      authority
+#&gt; 1     Ceanothus prostratus         Benth.
+#&gt; 2          Abies magnifica  A. Murray bis
+#&gt; 3 Arctostaphylos canescens         Eastw.
+#&gt; 4         Berberis nervosa          Pursh
+#&gt; 5        Arbutus menziesii          Pursh
+#&gt; 6     Calocedrus decurrens (Torr.) Florin
+#&gt;                                     uri
+#&gt; 1 http://www.tropicos.org/Name/27500276
+#&gt; 2 http://www.tropicos.org/Name/24900142
+#&gt; 3 http://www.tropicos.org/Name/12302547
+#&gt; 4  http://www.tropicos.org/Name/3500175
+#&gt; 5 http://www.tropicos.org/Name/12302436
+#&gt; 6  http://www.tropicos.org/Name/9400069
+</code></pre>
+
+<p>Those with score of less than 1 may have misspellings</p>
+
+<pre><code class="r">tnrs_out[ tnrs_out$score &lt; 1, ]
+#&gt;                 submittedname              acceptedname    sourceid score
+#&gt; 23     Adenostoma fasciculata   Adenostoma fasciculatum iPlant_TNRS  0.97
+#&gt; 24 Arctostaphylos glandulosus Arctostaphylos glandulosa iPlant_TNRS  0.97
+#&gt; 36        Chamaebatia foliosa     Chamaebatia foliolosa iPlant_TNRS  0.95
+#&gt; 38     Juniperus californicus     Juniperus californica iPlant_TNRS  0.97
+#&gt; 77         Prunus illicifolia         Prunus ilicifolia iPlant_TNRS  0.99
+#&gt; 78         Prunus subcordatus         Prunus subcordata iPlant_TNRS  0.97
+#&gt;                  matchedname                         authority
+#&gt; 23   Adenostoma fasciculatum                      Hook. &amp; Arn.
+#&gt; 24 Arctostaphylos glandulosa                            Eastw.
+#&gt; 36     Chamaebatia foliolosa                            Benth.
+#&gt; 38     Juniperus californica                          Carrière
+#&gt; 77         Prunus ilicifolia (Nutt. ex Hook. &amp; Arn.) D. Dietr.
+#&gt; 78         Prunus subcordata                            Benth.
+#&gt;                                      uri
+#&gt; 23 http://www.tropicos.org/Name/27801458
+#&gt; 24 http://www.tropicos.org/Name/12300542
+#&gt; 36 http://www.tropicos.org/Name/27801486
+#&gt; 38  http://www.tropicos.org/Name/9400374
+#&gt; 77 http://www.tropicos.org/Name/27801102
+#&gt; 78 http://www.tropicos.org/Name/27801124
+</code></pre>
+
+<p>So let's take the <code>acceptedname</code> column as a the new names and assign to a new vector</p>
+
+<pre><code class="r">cleaned_names &lt;- tnrs_out$acceptedname
+</code></pre>
+
+<p>Then join names back, replacing them, or adding as a new column</p>
+
+<p>Replace</p>
+
+<pre><code class="r">dat$species &lt;- cleaned_names
+head(dat)
+#&gt;                    species log_SLA leaf_water_content log_wood_density
+#&gt; 1     Ceanothus prostratus    3.46               0.51            -0.52
+#&gt; 2          Abies magnifica    3.58               0.49            -0.51
+#&gt; 3 Arctostaphylos canescens    3.87               0.62            -0.53
+#&gt; 4         Berberis nervosa      NA                 NA               NA
+#&gt; 5        Arbutus menziesii    5.07               0.69            -0.54
+#&gt; 6     Calocedrus decurrens    3.56               0.46            -0.31
+#&gt;   log_ht log_N
+#&gt; 1   7.72  0.02
+#&gt; 2   7.51 -0.31
+#&gt; 3   7.58 -0.14
+#&gt; 4   5.70    NA
+#&gt; 5   3.25  1.02
+#&gt; 6   5.33  0.29
+</code></pre>
+
+<p>New column</p>
+
+<pre><code class="r">dat$species_cleaned &lt;- cleaned_names
+head(dat)
+#&gt;                    species log_SLA leaf_water_content log_wood_density
+#&gt; 1     Ceanothus prostratus    3.46               0.51            -0.52
+#&gt; 2          Abies magnifica    3.58               0.49            -0.51
+#&gt; 3 Arctostaphylos canescens    3.87               0.62            -0.53
+#&gt; 4         Berberis nervosa      NA                 NA               NA
+#&gt; 5        Arbutus menziesii    5.07               0.69            -0.54
+#&gt; 6     Calocedrus decurrens    3.56               0.46            -0.31
+#&gt;   log_ht log_N          species_cleaned
+#&gt; 1   7.72  0.02     Ceanothus prostratus
+#&gt; 2   7.51 -0.31          Abies magnifica
+#&gt; 3   7.58 -0.14 Arctostaphylos canescens
+#&gt; 4   5.70    NA         Berberis nervosa
+#&gt; 5   3.25  1.02        Arbutus menziesii
+#&gt; 6   5.33  0.29     Calocedrus decurrens
+</code></pre>
+
+<h2>2. In-place</h2>
+
+<p>You can use functions from the <code>dplyr</code> package to <code>split-apply-combine</code>, where <code>split</code> is split apart your vector for each taxon, <code>apply</code> to apply a function or functions to do name cleaning, then <code>combine</code> to put them back together.</p>
+
+<p>Here, we'll attach taxonomic ids from the Catalogue of Life to each species (each row) (with just a subset of the data to save time):</p>
+
+<pre><code class="r">library("dplyr")
+tbl_df(dat)[1:5,] %&gt;%
+  rowwise() %&gt;%
+  mutate(colid = get_colid(species)) %&gt;%
+  select(species, colid)
+#&gt; Source: local data frame [5 x 2]
+#&gt; Groups: &lt;by row&gt;
+#&gt; 
+#&gt;                    species    colid
+#&gt; 1     Ceanothus prostratus 19544732
+#&gt; 2          Abies magnifica 18158318
+#&gt; 3 Arctostaphylos canescens 19358934
+#&gt; 4         Berberis nervosa 19374077
+#&gt; 5        Arbutus menziesii 19358819
+</code></pre>
+
+<p>Let's do something a bit more complicated. Get common names for each taxon in a new column, if more than 1, concatenate into a single character string for easy inclusion in a <code>data.frame</code></p>
+
+<pre><code class="r">sci2comm_concat &lt;- function(x){
+  temp &lt;- sci2comm(x, db = "eol")
+  if(length(temp) == 0) NA else paste0(temp[[1]], collapse = ", ")
+}
+
+dat_new &lt;- tbl_df(dat)[1:5,] %&gt;%
+  rowwise() %&gt;%
+  mutate(comm = sci2comm_concat(species))
+</code></pre>
+
+<p>To see the new column, do</p>
+
+<pre><code class="r">dat_new %&gt;% select(comm)
+#&gt; Source: local data frame [5 x 1]
+#&gt; Groups: &lt;by row&gt;
+#&gt; 
+#&gt;                                                                          comm
+#&gt; 1                      Mahala-mat Ceanothus, prostrate ceanothus, squawcarpet
+#&gt; 2 Prächtige Tanne, Goldtanne (Gold-Tanne), Kalifornische Rot-Tanne, Pracht-Ta
+#&gt; 3                          hoary manzanita, hoary manzanita, Sonoma manzanita
+#&gt; 4 Longleaf Oregon-grape, Cascade barberry, Dull Oregon grape, Oregon grape-ho
+#&gt; 5                   pacific madrone, Madrona, madrone, Kalifornianmansikkapuu
+</code></pre>
+
+  </div>
+  
+  <div class="post">
+    <h1>
       <a href="/2014/11/taxize-1000/">
         1000 commits to taxize
       </a>
@@ -654,174 +866,6 @@ out[, !names(out) %in% 'resources']
 <li>Other things? Get in touch on twitter <code>@recology_</code> or below</li>
 </ul>
 
-
-  </div>
-  
-  <div class="post">
-    <h1>
-      <a href="/2014/11/github-fun/">
-        Fun with the GitHub API
-      </a>
-    </h1>
-
-    <span class="post-date">26 Nov 2014</span>
-
-    <p>Recently I've had fun playing with the GitHub API, and here are some notes to self about this fun having.</p>
-
-<h2>Setup</h2>
-
-<p>Get/load packages</p>
-
-<pre><code class="r">install.packages(c('devtools','jsonlite','httr','yaml'))
-</code></pre>
-
-<pre><code class="r">library("devtools")
-library("httr")
-library("yaml")
-</code></pre>
-
-<h2>Define a vector of package names</h2>
-
-<pre><code class="r">pkgs &lt;- c("alm", "bmc", "bold", "clifro", "ecoengine",
-  "elastic", "fulltext", "geonames", "gistr",
-  "RNeXML", "rnoaa", "rnpn", "traits", "rplos", "rsnps",
-  "rWBclimate", "solr", "spocc", "taxize", "togeojson", "treeBASE")
-pkgs &lt;- sort(pkgs)
-</code></pre>
-
-<h2>Define functions</h2>
-
-<pre><code class="r">github_auth &lt;- function(appname = getOption("gh_appname"), key = getOption("gh_id"),
-                        secret = getOption("gh_secret")) {
-  if (is.null(getOption("gh_token"))) {
-    myapp &lt;- oauth_app(appname, key, secret)
-    token &lt;- oauth2.0_token(oauth_endpoints("github"), myapp)
-    options(gh_token = token)
-  } else {
-    token &lt;- getOption("gh_token")
-  }
-  return(token)
-}
-
-make_url &lt;- function(x, y, z) {
-  sprintf("https://api.github.com/repos/%s/%s/%s", x, y, z)
-}
-
-process_result &lt;- function(x) {
-  stop_for_status(x)
-  if (!x$headers$`content-type` == "application/json; charset=utf-8")
-    stop("content type mismatch")
-  tmp &lt;- content(x, as = "text")
-  jsonlite::fromJSON(tmp, flatten = TRUE)
-}
-
-parse_file &lt;- function(x) {
-  tmp &lt;- gsub("\n\\s+", "\n", 
-              paste(vapply(strsplit(x, "\n")[[1]], RCurl::base64Decode,
-                           character(1), USE.NAMES = FALSE), collapse = " "))
-  lines &lt;- readLines(textConnection(tmp))
-  vapply(lines, gsub, character(1), pattern = "\\s", replacement = "",
-         USE.NAMES = FALSE)
-}
-
-request &lt;- function(owner = "ropensci", repo, file="DESCRIPTION", ...) {
-  req &lt;- GET(make_url(owner, repo, paste0("contents/", file)), 
-             config = c(token = github_auth(), ...))
-  if(req$status_code != 200) { NA } else {
-    cts &lt;- process_result(req)$content
-    parse_file(cts)
-  }
-}
-
-has_term &lt;- function(what, ...) any(grepl(what, request(...)))
-has_file &lt;- function(what, ...) if(all(is.na(request(file = what, ...)))) FALSE else TRUE
-</code></pre>
-
-<h2>Do stuff</h2>
-
-<p>Does a package depend on a particular package? e.g., look for <code>httr</code> in the <code>DESCRIPTION</code> file (which is the default file name in <code>request()</code> above)</p>
-
-<pre><code class="r">has_term("httr", repo="taxize")
-#&gt; [1] TRUE
-has_term("maptools", repo="taxize")
-#&gt; [1] FALSE
-</code></pre>
-
-<p>Do a series of R packages have a file for how to contribute <code>CONTRIBUTING.md</code>?</p>
-
-<p>Yes</p>
-
-<pre><code class="r">has_file("CONTRIBUTING.md", repo="taxize")
-#&gt; [1] TRUE
-</code></pre>
-
-<p>Many packages</p>
-
-<pre><code class="r">vapply(pkgs, function(x) has_file("CONTRIBUTING.md", repo=x), logical(1))
-#&gt;        alm        bmc       bold     clifro  ecoengine    elastic 
-#&gt;      FALSE      FALSE      FALSE      FALSE      FALSE      FALSE 
-#&gt;   fulltext   geonames      gistr     RNeXML      rnoaa       rnpn 
-#&gt;       TRUE      FALSE      FALSE       TRUE       TRUE      FALSE 
-#&gt;      rplos      rsnps rWBclimate       solr      spocc     taxize 
-#&gt;      FALSE      FALSE      FALSE      FALSE       TRUE       TRUE 
-#&gt;  togeojson     traits   treeBASE 
-#&gt;      FALSE      FALSE      FALSE
-</code></pre>
-
-<h2>Check rate limit</h2>
-
-<p>Define function</p>
-
-<pre><code class="r">rate_limit &lt;- function(...) {
-  token &lt;- github_auth()
-  req &lt;- GET("https://api.github.com/rate_limit", config = c(token = token, ...))
-  process_result(req)
-}
-</code></pre>
-
-<p>Check it</p>
-
-<pre><code class="r">rate_limit()
-#&gt; $resources
-#&gt; $resources$core
-#&gt; $resources$core$limit
-#&gt; [1] 5000
-#&gt; 
-#&gt; $resources$core$remaining
-#&gt; [1] 4925
-#&gt; 
-#&gt; $resources$core$reset
-#&gt; [1] 1417031016
-#&gt; 
-#&gt; 
-#&gt; $resources$search
-#&gt; $resources$search$limit
-#&gt; [1] 30
-#&gt; 
-#&gt; $resources$search$remaining
-#&gt; [1] 30
-#&gt; 
-#&gt; $resources$search$reset
-#&gt; [1] 1417028069
-#&gt; 
-#&gt; 
-#&gt; 
-#&gt; $rate
-#&gt; $rate$limit
-#&gt; [1] 5000
-#&gt; 
-#&gt; $rate$remaining
-#&gt; [1] 4925
-#&gt; 
-#&gt; $rate$reset
-#&gt; [1] 1417031016
-</code></pre>
-
-<p>Convert time to reset to human readable form</p>
-
-<pre><code class="r">as.POSIXct(rate_limit()$rate$reset, origin="1970-01-01")
-#&gt; [1] "2014-11-26 11:43:36 PST"
-</code></pre>
 
   </div>
   
