@@ -59,6 +59,324 @@
   
   <div class="post">
     <h1>
+      <a href="/2015/01/gistr-github-gists/">
+        gistr - R client for GitHub gists
+      </a>
+    </h1>
+
+    <span class="post-date">05 Jan 2015</span>
+
+    <p>GitHub has this site https://gist.github.com/ in which we can share code, text, images, maps, plots, etc super easily, without having to open up a repo, etc. GitHub gists are a great way to throw up an example use case to show someone, or show code that&#39;s throwing errors to a support person, etc. In addition, there&#39;s API access, which means we can interact with Gists not just from their web interface, but from the command line, or any programming language. There are clients for <a href="https://github.com/mbostock/gistup">Node.js</a>, <a href="https://rubygems.org/gems/gist">Ruby</a>, <a href="https://pypi.python.org/pypi/gists/0.4.6">Python</a>, and on and on. But AFAIK there wasn&#39;t one for R. Along with Ramnath and others, we&#39;ve been working on an R client for gists. <code>v0.1</code> has just been pushed to CRAN. Below is an overview. </p>
+
+<p>One useful thing about this package in terms of other R packages is that you can now depend on <code>gistr</code> to easily share results as Gists. For example, you can share maps as gists (via geojson, rendered as interactive map), or code, or plots, etc. That is, you don&#39;t have to re-write an interface to Github Gists yourself. </p>
+
+<h2>Installation</h2>
+
+<p>Install from CRAN</p>
+<div class="highlight"><pre><code class="language-r" data-lang="r">install.packages<span class="p">(</span><span class="s">&quot;gistr&quot;</span><span class="p">)</span>
+</code></pre></div>
+<p>Or the development version from GitHub</p>
+<div class="highlight"><pre><code class="language-r" data-lang="r">install.packages<span class="p">(</span><span class="s">&quot;devtools&quot;</span><span class="p">)</span>
+devtools<span class="o">::</span>install_github<span class="p">(</span><span class="s">&quot;ropensci/gistr&quot;</span><span class="p">)</span>
+</code></pre></div><div class="highlight"><pre><code class="language-r" data-lang="r"><span class="kn">library</span><span class="p">(</span><span class="s">&quot;gistr&quot;</span><span class="p">)</span>
+</code></pre></div>
+<h2>Authentication</h2>
+
+<p>There are two ways to authorise <code>gistr</code> to work with your GitHub account:</p>
+
+<ul>
+<li>Generate a personal access token (PAT) at <a href="https://help.github.com/articles/creating-an-access-token-for-command-line-use">https://help.github.com/articles/creating-an-access-token-for-command-line-use</a> and record it in the <code>GITHUB_PAT</code> envar.</li>
+<li>Interactively login into your GitHub account and authorise with OAuth.</li>
+</ul>
+
+<p>Using the PAT is recommended.</p>
+
+<p>Using the <code>gist_auth()</code> function you can authenticate seperately first, or if you&#39;re not authenticated, this function will run internally with each functionn call. If you have a PAT, that will be used, if not, OAuth will be used.</p>
+<div class="highlight"><pre><code class="language-r" data-lang="r">gist_auth<span class="p">()</span>
+</code></pre></div>
+<h2>Workflow</h2>
+
+<p>In <code>gistr</code> you can use pipes to pass outputs from one function to another. If you have used <code>dplyr</code> with pipes you can see the difference, and perhaps the utility, of this workflow over the traditional workflow in R. You can use a non-piping or a piping workflow with <code>gistr</code>. Examples below use a mix of both workflows. Here is an example of a piping wofklow (with some explanation):</p>
+<div class="highlight"><pre><code class="language-r" data-lang="r">gists<span class="p">(</span>what <span class="o">=</span> <span class="s">&quot;minepublic&quot;</span><span class="p">)[[</span><span class="m">6</span><span class="p">]]</span> <span class="o">%&gt;%</span> <span class="c1"># List my public gists, and index 1st</span>
+  add_files<span class="p">(</span><span class="s">&quot;~/alm_othersources.md&quot;</span><span class="p">)</span> <span class="o">%&gt;%</span> <span class="c1"># Add new file to that gist</span>
+  update<span class="p">()</span> <span class="c1"># update sends a PATCH command to Gists API to add file to your gist</span>
+</code></pre></div>
+<p>And a non-piping workflow that does the same exact thing:</p>
+<div class="highlight"><pre><code class="language-r" data-lang="r">g <span class="o">&lt;-</span> gists<span class="p">(</span>what <span class="o">=</span> <span class="s">&quot;minepublic&quot;</span><span class="p">)[[</span><span class="m">1</span><span class="p">]]</span>
+g <span class="o">&lt;-</span> add_files<span class="p">(</span>g<span class="p">,</span> <span class="s">&quot;~/alm_othersources.md&quot;</span><span class="p">)</span>
+update<span class="p">(</span>g<span class="p">)</span>
+</code></pre></div>
+<p>Or you could string them all together in one line (but it&#39;s rather difficult to follow what&#39;s going on because you have to read from the inside out)</p>
+<div class="highlight"><pre><code class="language-r" data-lang="r">update<span class="p">(</span>add_files<span class="p">(</span>gists<span class="p">(</span>what <span class="o">=</span> <span class="s">&quot;minepublic&quot;</span><span class="p">)[[</span><span class="m">1</span><span class="p">]],</span> <span class="s">&quot;~/alm_othersources.md&quot;</span><span class="p">))</span>
+</code></pre></div>
+<h2>Rate limit information</h2>
+<div class="highlight"><pre><code class="language-r" data-lang="r">rate_limit<span class="p">()</span>
+<span class="c1">#&gt; Rate limit: 5000</span>
+<span class="c1">#&gt; Remaining:  4948</span>
+<span class="c1">#&gt; Resets in:  46 minutes</span>
+</code></pre></div>
+<h2>List gists</h2>
+
+<p>Limiting to a few results here to keep it brief</p>
+<div class="highlight"><pre><code class="language-r" data-lang="r">gists<span class="p">(</span>per_page <span class="o">=</span> <span class="m">2</span><span class="p">)</span>
+<span class="c1">#&gt; [[1]]</span>
+<span class="c1">#&gt; &lt;gist&gt;575fd0342ae15f89645f</span>
+<span class="c1">#&gt;   URL: https://gist.github.com/575fd0342ae15f89645f</span>
+<span class="c1">#&gt;   Description: Script to disable the mouse acceleration on Ubuntu (and probably also other distributions). Read the &#39;usage&#39; section.</span>
+<span class="c1">#&gt;   Public: TRUE</span>
+<span class="c1">#&gt;   Created/Edited: 2015-01-04T17:41:49Z / 2015-01-04T17:41:50Z</span>
+<span class="c1">#&gt;   Files: disable-mouse-accel.sh</span>
+<span class="c1">#&gt; </span>
+<span class="c1">#&gt; [[2]]</span>
+<span class="c1">#&gt; &lt;gist&gt;1ebff1af906f214f98cd</span>
+<span class="c1">#&gt;   URL: https://gist.github.com/1ebff1af906f214f98cd</span>
+<span class="c1">#&gt;   Description: Ladda</span>
+<span class="c1">#&gt;   Public: TRUE</span>
+<span class="c1">#&gt;   Created/Edited: 2015-01-04T17:41:45Z / 2015-01-04T17:41:45Z</span>
+<span class="c1">#&gt;   Files: Ladda.markdown, index.html, script.js, style.css</span>
+</code></pre></div>
+<p>Since a certain date/time</p>
+<div class="highlight"><pre><code class="language-r" data-lang="r">gists<span class="p">(</span>since<span class="o">=</span><span class="s">&#39;2014-05-26T00:00:00Z&#39;</span><span class="p">,</span> per_page <span class="o">=</span> <span class="m">2</span><span class="p">)</span>
+<span class="c1">#&gt; [[1]]</span>
+<span class="c1">#&gt; &lt;gist&gt;575fd0342ae15f89645f</span>
+<span class="c1">#&gt;   URL: https://gist.github.com/575fd0342ae15f89645f</span>
+<span class="c1">#&gt;   Description: Script to disable the mouse acceleration on Ubuntu (and probably also other distributions). Read the &#39;usage&#39; section.</span>
+<span class="c1">#&gt;   Public: TRUE</span>
+<span class="c1">#&gt;   Created/Edited: 2015-01-04T17:41:49Z / 2015-01-04T17:41:50Z</span>
+<span class="c1">#&gt;   Files: disable-mouse-accel.sh</span>
+<span class="c1">#&gt; </span>
+<span class="c1">#&gt; [[2]]</span>
+<span class="c1">#&gt; &lt;gist&gt;1ebff1af906f214f98cd</span>
+<span class="c1">#&gt;   URL: https://gist.github.com/1ebff1af906f214f98cd</span>
+<span class="c1">#&gt;   Description: Ladda</span>
+<span class="c1">#&gt;   Public: TRUE</span>
+<span class="c1">#&gt;   Created/Edited: 2015-01-04T17:41:45Z / 2015-01-04T17:41:45Z</span>
+<span class="c1">#&gt;   Files: Ladda.markdown, index.html, script.js, style.css</span>
+</code></pre></div>
+<p>Request different types of gists, one of public, minepublic, mineall, or starred.</p>
+<div class="highlight"><pre><code class="language-r" data-lang="r">gists<span class="p">(</span><span class="s">&#39;minepublic&#39;</span><span class="p">,</span> per_page <span class="o">=</span> <span class="m">2</span><span class="p">)</span>
+<span class="c1">#&gt; [[1]]</span>
+<span class="c1">#&gt; &lt;gist&gt;588921d4111e00551bcf</span>
+<span class="c1">#&gt;   URL: https://gist.github.com/588921d4111e00551bcf</span>
+<span class="c1">#&gt;   Description: </span>
+<span class="c1">#&gt;   Public: TRUE</span>
+<span class="c1">#&gt;   Created/Edited: 2015-01-04T17:33:47Z / 2015-01-04T17:33:56Z</span>
+<span class="c1">#&gt;   Files: code.R</span>
+<span class="c1">#&gt; </span>
+<span class="c1">#&gt; [[2]]</span>
+<span class="c1">#&gt; &lt;gist&gt;54c0195ee8753c7aaf9f</span>
+<span class="c1">#&gt;   URL: https://gist.github.com/54c0195ee8753c7aaf9f</span>
+<span class="c1">#&gt;   Description: a new cool gist</span>
+<span class="c1">#&gt;   Public: TRUE</span>
+<span class="c1">#&gt;   Created/Edited: 2015-01-04T17:33:47Z / 2015-01-04T17:33:47Z</span>
+<span class="c1">#&gt;   Files: stuff.md</span>
+</code></pre></div>
+<h2>List a single gist</h2>
+<div class="highlight"><pre><code class="language-r" data-lang="r">gist<span class="p">(</span>id <span class="o">=</span> <span class="s">&#39;f1403260eb92f5dfa7e1&#39;</span><span class="p">)</span>
+<span class="c1">#&gt; &lt;gist&gt;f1403260eb92f5dfa7e1</span>
+<span class="c1">#&gt;   URL: https://gist.github.com/f1403260eb92f5dfa7e1</span>
+<span class="c1">#&gt;   Description: Querying bitly from R </span>
+<span class="c1">#&gt;   Public: TRUE</span>
+<span class="c1">#&gt;   Created/Edited: 2014-10-15T20:40:12Z / 2014-10-15T21:54:29Z</span>
+<span class="c1">#&gt;   Files: bitly_r.md</span>
+</code></pre></div>
+<h2>Create gist</h2>
+
+<p>You can pass in files</p>
+
+<p>First, get a file to work with</p>
+<div class="highlight"><pre><code class="language-r" data-lang="r">stuffpath <span class="o">&lt;-</span> <span class="kp">system.file</span><span class="p">(</span><span class="s">&quot;examples&quot;</span><span class="p">,</span> <span class="s">&quot;stuff.md&quot;</span><span class="p">,</span> package <span class="o">=</span> <span class="s">&quot;gistr&quot;</span><span class="p">)</span>
+</code></pre></div><div class="highlight"><pre><code class="language-r" data-lang="r">gist_create<span class="p">(</span>files<span class="o">=</span>stuffpath<span class="p">,</span> description<span class="o">=</span><span class="s">&#39;a new cool gist&#39;</span><span class="p">)</span>
+</code></pre></div><div class="highlight"><pre><code class="language-r" data-lang="r">gist_create<span class="p">(</span>files<span class="o">=</span>stuffpath<span class="p">,</span> description<span class="o">=</span><span class="s">&#39;a new cool gist&#39;</span><span class="p">,</span> browse <span class="o">=</span> <span class="kc">FALSE</span><span class="p">)</span>
+<span class="c1">#&gt; &lt;gist&gt;aa391404638f2f368b99</span>
+<span class="c1">#&gt;   URL: https://gist.github.com/aa391404638f2f368b99</span>
+<span class="c1">#&gt;   Description: a new cool gist</span>
+<span class="c1">#&gt;   Public: TRUE</span>
+<span class="c1">#&gt;   Created/Edited: 2015-01-04T17:42:37Z / 2015-01-04T17:42:37Z</span>
+<span class="c1">#&gt;   Files: stuff.md</span>
+</code></pre></div>
+<p>Or, wrap <code>gist_create()</code> around some code in your R session/IDE, like so, with just the function name, and a <code>{&#39;</code> at the start and a <code>}&#39;</code> at the end.</p>
+<div class="highlight"><pre><code class="language-r" data-lang="r">gist_create<span class="p">(</span>code<span class="o">=</span><span class="p">{</span><span class="s">&#39;</span>
+<span class="s">x &lt;- letters</span>
+<span class="s">numbers &lt;- runif(8)</span>
+<span class="s">numbers</span>
+
+<span class="s">[1] 0.3229318 0.5933054 0.7778408 0.3898947 0.1309717 0.7501378 0.3206379 0.3379005</span>
+<span class="s">&#39;</span><span class="p">},</span> browse<span class="o">=</span><span class="kc">FALSE</span><span class="p">)</span>
+<span class="c1">#&gt; &lt;gist&gt;85158117880f197df422</span>
+<span class="c1">#&gt;   URL: https://gist.github.com/85158117880f197df422</span>
+<span class="c1">#&gt;   Description: </span>
+<span class="c1">#&gt;   Public: TRUE</span>
+<span class="c1">#&gt;   Created/Edited: 2015-01-04T17:42:37Z / 2015-01-04T17:42:37Z</span>
+<span class="c1">#&gt;   Files: code.R</span>
+</code></pre></div>
+<p>You can also knit an input file before posting as a gist:</p>
+<div class="highlight"><pre><code class="language-r" data-lang="r">file <span class="o">&lt;-</span> <span class="kp">system.file</span><span class="p">(</span><span class="s">&quot;examples&quot;</span><span class="p">,</span> <span class="s">&quot;stuff.Rmd&quot;</span><span class="p">,</span> package <span class="o">=</span> <span class="s">&quot;gistr&quot;</span><span class="p">)</span>
+gist_create<span class="p">(</span><span class="kp">file</span><span class="p">,</span> description<span class="o">=</span><span class="s">&#39;a new cool gist&#39;</span><span class="p">,</span> knit<span class="o">=</span><span class="kc">TRUE</span><span class="p">)</span>
+<span class="c1">#&gt; &lt;gist&gt;4162b9c53479fbc298db</span>
+<span class="c1">#&gt;   URL: https://gist.github.com/4162b9c53479fbc298db</span>
+<span class="c1">#&gt;   Description: a new cool gist</span>
+<span class="c1">#&gt;   Public: TRUE</span>
+<span class="c1">#&gt;   Created/Edited: 2014-10-27T16:07:31Z / 2014-10-27T16:07:31Z</span>
+<span class="c1">#&gt;   Files: stuff.md</span>
+</code></pre></div>
+<p>Or code blocks before (note that code blocks without knitr block demarcations will result in unexecuted code):</p>
+<div class="highlight"><pre><code class="language-r" data-lang="r">gist_create<span class="p">(</span>code<span class="o">=</span><span class="p">{</span><span class="s">&#39;</span>
+<span class="s">x &lt;- letters</span>
+<span class="s">(numbers &lt;- runif(8))</span>
+<span class="s">&#39;</span><span class="p">},</span> knit<span class="o">=</span><span class="kc">TRUE</span><span class="p">)</span>
+<span class="c1">#&gt; &lt;gist&gt;ec45c396dee4aa492139</span>
+<span class="c1">#&gt;   URL: https://gist.github.com/ec45c396dee4aa492139</span>
+<span class="c1">#&gt;   Description:</span>
+<span class="c1">#&gt;   Public: TRUE</span>
+<span class="c1">#&gt;   Created/Edited: 2014-10-27T16:09:09Z / 2014-10-27T16:09:09Z</span>
+<span class="c1">#&gt;   Files: file81720d1ceff.md</span>
+</code></pre></div>
+<h2>knit code from file path, code block, or gist file</h2>
+
+<p>knit a local file</p>
+<div class="highlight"><pre><code class="language-r" data-lang="r">file <span class="o">&lt;-</span> <span class="kp">system.file</span><span class="p">(</span><span class="s">&quot;examples&quot;</span><span class="p">,</span> <span class="s">&quot;stuff.Rmd&quot;</span><span class="p">,</span> package <span class="o">=</span> <span class="s">&quot;gistr&quot;</span><span class="p">)</span>
+run<span class="p">(</span><span class="kp">file</span><span class="p">,</span> knitopts <span class="o">=</span> <span class="kt">list</span><span class="p">(</span>quiet<span class="o">=</span><span class="kc">TRUE</span><span class="p">))</span> <span class="o">%&gt;%</span> gist_create<span class="p">(</span>browse <span class="o">=</span> <span class="kc">FALSE</span><span class="p">)</span>
+<span class="c1">#&gt; &lt;gist&gt;d5d86e11964c36cb4f1e</span>
+<span class="c1">#&gt;   URL: https://gist.github.com/d5d86e11964c36cb4f1e</span>
+<span class="c1">#&gt;   Description: </span>
+<span class="c1">#&gt;   Public: TRUE</span>
+<span class="c1">#&gt;   Created/Edited: 2015-01-04T17:42:38Z / 2015-01-04T17:42:38Z</span>
+<span class="c1">#&gt;   Files: stuff.md</span>
+</code></pre></div>
+<p>knit a code block (<code>knitr</code> code block notation missing, do add that in) (result not shown)</p>
+<div class="highlight"><pre><code class="language-r" data-lang="r">run<span class="p">({</span><span class="s">&#39;</span>
+<span class="s">x &lt;- letters</span>
+<span class="s">(numbers &lt;- runif(8))</span>
+<span class="s">&#39;</span><span class="p">})</span> <span class="o">%&gt;%</span> gist_create
+</code></pre></div>
+<p>knit a file from a gist, has to get file first (result not shown)</p>
+<div class="highlight"><pre><code class="language-r" data-lang="r">gists<span class="p">(</span><span class="s">&#39;minepublic&#39;</span><span class="p">)[[</span><span class="m">1</span><span class="p">]]</span> <span class="o">%&gt;%</span> run<span class="p">()</span> <span class="o">%&gt;%</span> update<span class="p">()</span>
+</code></pre></div>
+<h2>List commits on a gist</h2>
+<div class="highlight"><pre><code class="language-r" data-lang="r">gists<span class="p">()[[</span><span class="m">1</span><span class="p">]]</span> <span class="o">%&gt;%</span> commits<span class="p">()</span>
+<span class="c1">#&gt; [[1]]</span>
+<span class="c1">#&gt; &lt;commit&gt;</span>
+<span class="c1">#&gt;   Version: faa7a40f4b55aa7914be7685c75d5c80731971bb</span>
+<span class="c1">#&gt;   User: sckott</span>
+<span class="c1">#&gt;   Commited: 2015-01-04T17:42:37Z</span>
+<span class="c1">#&gt;   Commits [total, additions, deletions]: [5,5,0]</span>
+</code></pre></div>
+<h2>Star a gist</h2>
+
+<p>Star</p>
+<div class="highlight"><pre><code class="language-r" data-lang="r">gist<span class="p">(</span><span class="s">&#39;7ddb9810fc99c84c65ec&#39;</span><span class="p">)</span> <span class="o">%&gt;%</span> star<span class="p">()</span>
+<span class="c1">#&gt; &lt;gist&gt;7ddb9810fc99c84c65ec</span>
+<span class="c1">#&gt;   URL: https://gist.github.com/7ddb9810fc99c84c65ec</span>
+<span class="c1">#&gt;   Description: </span>
+<span class="c1">#&gt;   Public: TRUE</span>
+<span class="c1">#&gt;   Created/Edited: 2014-06-27T17:50:37Z / 2014-06-27T17:50:37Z</span>
+<span class="c1">#&gt;   Files: code.R, manifest.yml, rrt_manifest.yml</span>
+</code></pre></div>
+<p>Unstar</p>
+<div class="highlight"><pre><code class="language-r" data-lang="r">gist<span class="p">(</span><span class="s">&#39;7ddb9810fc99c84c65ec&#39;</span><span class="p">)</span> <span class="o">%&gt;%</span> unstar<span class="p">()</span>
+<span class="c1">#&gt; &lt;gist&gt;7ddb9810fc99c84c65ec</span>
+<span class="c1">#&gt;   URL: https://gist.github.com/7ddb9810fc99c84c65ec</span>
+<span class="c1">#&gt;   Description: </span>
+<span class="c1">#&gt;   Public: TRUE</span>
+<span class="c1">#&gt;   Created/Edited: 2014-06-27T17:50:37Z / 2014-06-27T17:50:37Z</span>
+<span class="c1">#&gt;   Files: code.R, manifest.yml, rrt_manifest.yml</span>
+</code></pre></div>
+<h2>Update a gist</h2>
+
+<p>Add files</p>
+
+<p>First, path to file</p>
+<div class="highlight"><pre><code class="language-r" data-lang="r">file <span class="o">&lt;-</span> <span class="kp">system.file</span><span class="p">(</span><span class="s">&quot;examples&quot;</span><span class="p">,</span> <span class="s">&quot;alm_othersources.md&quot;</span><span class="p">,</span> package <span class="o">=</span> <span class="s">&quot;gistr&quot;</span><span class="p">)</span>
+</code></pre></div><div class="highlight"><pre><code class="language-r" data-lang="r">gists<span class="p">(</span>what <span class="o">=</span> <span class="s">&quot;minepublic&quot;</span><span class="p">)[[</span><span class="m">1</span><span class="p">]]</span> <span class="o">%&gt;%</span>
+  add_files<span class="p">(</span><span class="kp">file</span><span class="p">)</span> <span class="o">%&gt;%</span>
+  update<span class="p">()</span>
+<span class="c1">#&gt; &lt;gist&gt;85158117880f197df422</span>
+<span class="c1">#&gt;   URL: https://gist.github.com/85158117880f197df422</span>
+<span class="c1">#&gt;   Description: </span>
+<span class="c1">#&gt;   Public: TRUE</span>
+<span class="c1">#&gt;   Created/Edited: 2015-01-04T17:42:37Z / 2015-01-04T17:42:42Z</span>
+<span class="c1">#&gt;   Files: alm_othersources.md, code.R</span>
+</code></pre></div>
+<p>Delete files</p>
+<div class="highlight"><pre><code class="language-r" data-lang="r">gists<span class="p">(</span>what <span class="o">=</span> <span class="s">&quot;minepublic&quot;</span><span class="p">)[[</span><span class="m">1</span><span class="p">]]</span> <span class="o">%&gt;%</span>
+  delete_files<span class="p">(</span><span class="kp">file</span><span class="p">)</span> <span class="o">%&gt;%</span>
+  update<span class="p">()</span>
+<span class="c1">#&gt; &lt;gist&gt;85158117880f197df422</span>
+<span class="c1">#&gt;   URL: https://gist.github.com/85158117880f197df422</span>
+<span class="c1">#&gt;   Description: </span>
+<span class="c1">#&gt;   Public: TRUE</span>
+<span class="c1">#&gt;   Created/Edited: 2015-01-04T17:42:37Z / 2015-01-04T17:42:42Z</span>
+<span class="c1">#&gt;   Files: code.R</span>
+</code></pre></div>
+<h2>Open a gist in your default browser</h2>
+<div class="highlight"><pre><code class="language-r" data-lang="r">gists<span class="p">()[[</span><span class="m">1</span><span class="p">]]</span> <span class="o">%&gt;%</span> browse<span class="p">()</span>
+</code></pre></div>
+<blockquote>
+<p>Opens the gist in your default browser</p>
+</blockquote>
+
+<h2>Get embed script</h2>
+<div class="highlight"><pre><code class="language-r" data-lang="r">gists<span class="p">()[[</span><span class="m">1</span><span class="p">]]</span> <span class="o">%&gt;%</span> embed<span class="p">()</span>
+<span class="c1">#&gt; [1] &quot;&lt;script src=\&quot;https://gist.github.com/sckott/85158117880f197df422.js\&quot;&gt;&lt;/script&gt;&quot;</span>
+</code></pre></div>
+<h3>List forks</h3>
+
+<p>Returns a list of <code>gist</code> objects, just like <code>gists()</code></p>
+<div class="highlight"><pre><code class="language-r" data-lang="r">gist<span class="p">(</span>id<span class="o">=</span><span class="s">&#39;1642874&#39;</span><span class="p">)</span> <span class="o">%&gt;%</span> forks<span class="p">(</span>per_page<span class="o">=</span><span class="m">2</span><span class="p">)</span>
+<span class="c1">#&gt; [[1]]</span>
+<span class="c1">#&gt; &lt;gist&gt;1642989</span>
+<span class="c1">#&gt;   URL: https://gist.github.com/1642989</span>
+<span class="c1">#&gt;   Description: Spline Transition</span>
+<span class="c1">#&gt;   Public: TRUE</span>
+<span class="c1">#&gt;   Created/Edited: 2012-01-19T21:45:20Z / 2014-12-10T03:25:19Z</span>
+<span class="c1">#&gt;   Files: </span>
+<span class="c1">#&gt; </span>
+<span class="c1">#&gt; [[2]]</span>
+<span class="c1">#&gt; &lt;gist&gt;1643051</span>
+<span class="c1">#&gt;   URL: https://gist.github.com/1643051</span>
+<span class="c1">#&gt;   Description: Line Transition (Broken)</span>
+<span class="c1">#&gt;   Public: TRUE</span>
+<span class="c1">#&gt;   Created/Edited: 2012-01-19T21:51:30Z / 2014-04-09T03:11:36Z</span>
+<span class="c1">#&gt;   Files:</span>
+</code></pre></div>
+<h2>Fork a gist</h2>
+
+<p>Returns a <code>gist</code> object</p>
+<div class="highlight"><pre><code class="language-r" data-lang="r">g <span class="o">&lt;-</span> gists<span class="p">()</span>
+<span class="p">(</span>forked <span class="o">&lt;-</span> g<span class="p">[[</span> <span class="kp">sample</span><span class="p">(</span><span class="kp">seq_along</span><span class="p">(</span>g<span class="p">),</span> <span class="m">1</span><span class="p">)</span> <span class="p">]]</span> <span class="o">%&gt;%</span> fork<span class="p">())</span>
+<span class="c1">#&gt; &lt;gist&gt;62b05dd4ebc2d29add15</span>
+<span class="c1">#&gt;   URL: https://gist.github.com/62b05dd4ebc2d29add15</span>
+<span class="c1">#&gt;   Description: Solution to level 1 in Untrusted: http://alex.nisnevich.com/untrusted/</span>
+<span class="c1">#&gt;   Public: TRUE</span>
+<span class="c1">#&gt;   Created/Edited: 2015-01-04T17:42:43Z / 2015-01-04T17:42:43Z</span>
+<span class="c1">#&gt;   Files: untrusted-lvl1-solution.js</span>
+</code></pre></div>
+<h2>Example use case</h2>
+
+<p><em>Working with the Mapzen Pelias geocoding API</em></p>
+
+<p>The API is described at <a href="https://github.com/pelias/pelias">https://github.com/pelias/pelias</a>, and is still in alpha they say. The steps: get data, make a gist. The data is returned from Mapzen as geojson, so all we have to do is literally push it up to GitHub gists and we&#39;re done b/c GitHub renders the map.</p>
+<div class="highlight"><pre><code class="language-r" data-lang="r"><span class="kn">library</span><span class="p">(</span><span class="s">&#39;httr&#39;</span><span class="p">)</span>
+base <span class="o">&lt;-</span> <span class="s">&quot;http://pelias.mapzen.com/search&quot;</span>
+res <span class="o">&lt;-</span> GET<span class="p">(</span>base<span class="p">,</span> query <span class="o">=</span> <span class="kt">list</span><span class="p">(</span>input <span class="o">=</span> <span class="s">&#39;coffee shop&#39;</span><span class="p">,</span> lat <span class="o">=</span> <span class="m">45.5</span><span class="p">,</span> lon <span class="o">=</span> <span class="m">-122.6</span><span class="p">))</span>
+json <span class="o">&lt;-</span> content<span class="p">(</span>res<span class="p">,</span> as <span class="o">=</span> <span class="s">&quot;text&quot;</span><span class="p">)</span>
+gist_create<span class="p">(</span>code <span class="o">=</span> json<span class="p">,</span> filename <span class="o">=</span> <span class="s">&quot;pelias_test.geojson&quot;</span><span class="p">)</span>
+<span class="c1">#&gt; &lt;gist&gt;017214637bcfeb198070</span>
+<span class="c1">#&gt;   URL: https://gist.github.com/017214637bcfeb198070</span>
+<span class="c1">#&gt;   Description:</span>
+<span class="c1">#&gt;   Public: TRUE</span>
+<span class="c1">#&gt;   Created/Edited: 2014-10-28T14:42:36Z / 2014-10-28T14:42:36Z</span>
+<span class="c1">#&gt;   Files: pelias_test.geojson</span>
+</code></pre></div>
+<p>And here&#39;s that gist: <a href="https://gist.github.com/sckott/017214637bcfeb198070">https://gist.github.com/sckott/017214637bcfeb198070</a></p>
+
+<p><img src="/public/img/2015-01-05-gistr-github-gists/gistr_ss.png" alt="image"></p>
+
+  </div>
+  
+  <div class="post">
+    <h1>
       <a href="/2014/12/pytaxize-itis/">
         pytaxize - low level ITIS functions
       </a>
@@ -296,154 +614,6 @@ devtools<span class="o">::</span>install_github<span class="p">(</span><span cla
 
 <p>The others sources in <code>musemeta</code> mostly work the same way as the above.</p>
 
-  </div>
-  
-  <div class="post">
-    <h1>
-      <a href="/2014/12/icanhaz-altmetrics/">
-        icanhaz altmetrics
-      </a>
-    </h1>
-
-    <span class="post-date">08 Dec 2014</span>
-
-    <p>The Lagotto application is a Rails app that collects and serves up via RESTful API article level metrics data for research objects. So far, this application has only been applied to scholarly articles, but will <a href="http://articlemetrics.github.io/MDC/">see action on datasets soon</a>. </p>
-
-<p><a href="http://blog.martinfenner.org/">Martin Fenner</a> has lead the development of Lagotto. He recently set up <a href="http://discuss.lagotto.io/">a discussion site</a> if you want to chat about it.</p>
-
-<p>The application has a <a href="http://alm.plos.org/">nice GUI interface</a>, and a quite nice <a href="http://alm.plos.org/docs/api">RESTful API</a>. </p>
-
-<p>Lagotto is open source! Because of this, and the quality of the software, other publishers have started using it to gather and deliver publicly article level metrics data, including:</p>
-
-<ul>
-<li><a href="http://lagotto.svr.elifesciences.org/">eLife</a></li>
-<li><a href="http://pkp-alm.lib.sfu.ca/">Public Knowledge Project (PKP)</a></li>
-<li><a href="http://metricus.copernicus.org/">Copernicus</a></li>
-<li><a href="http://det.labs.crossref.org/">Crossref</a></li>
-<li><a href="http://alm.pensoft.net:81/">Pensoft</a></li>
-</ul>
-
-<p>The PLOS instance at <a href="http://alm.plos.org/">http://alm.plos.org/</a> is always the most up to date with the Lagotto software, but <a href="http://det.labs.crossref.org/">Crossref</a> has the largest number of articles. </p>
-
-<p>I&#39;ve been working on three clients for the Lagotto REST API, including for a while now on <code>R</code>, recently on <code>Python</code>, and just last week on <code>Ruby</code>. </p>
-
-<p>Please do try the clients, report bugs, request features - you know the open source drill...</p>
-
-<p>I&#39;d say the R client is the most mature, while Python is less so, end the Ruby gem the least mature. </p>
-
-<h2>Installation</h2>
-
-<p>R</p>
-<div class="highlight"><pre><code class="language-r" data-lang="r">install.packages<span class="p">(</span><span class="s">&quot;devtools&quot;</span><span class="p">)</span>
-devtools<span class="o">::</span>install_github<span class="p">(</span><span class="s">&quot;ropensci/alm&quot;</span><span class="p">)</span>
-</code></pre></div>
-<p>Python</p>
-<div class="highlight"><pre><code class="language-r" data-lang="r">git clone https<span class="o">://</span>github.com<span class="o">/</span>cameronneylon<span class="o">/</span>pyalm.git
-cd pyalm
-git checkout scott
-python setup.py install
-</code></pre></div>
-<p>Ruby</p>
-<div class="highlight"><pre><code class="language-r" data-lang="r">gem install httparty json rake
-git clone https<span class="o">://</span>github.com<span class="o">/</span>sckott<span class="o">/</span>alm.git
-cd alm
-make <span class="c1"># which runs build and install tasks</span>
-</code></pre></div>
-<p>If you don&#39;t have <code>make</code>, then just run <code>gem build alm.gemspec</code> and     <code>gem install alm-0.1.0.gem</code> seperately.</p>
-
-<h2>Example</h2>
-
-<p>In this example, we&#39;ll get altmetrics data for two DOIs: <a href="http://www.plosone.org/article/info%3Adoi%2F10.1371%2Fjournal.pone.0029797">10.1371/journal.pone.0029797</a>, and <a href="http://www.plosone.org/article/info%3Adoi%2F10.1371%2Fjournal.pone.0029798">10.1371/journal.pone.0029798</a> (click on links to go to paper).</p>
-
-<h3>R</h3>
-<div class="highlight"><pre><code class="language-r" data-lang="r"><span class="kn">library</span><span class="p">(</span><span class="s">&#39;alm&#39;</span><span class="p">)</span>
-ids <span class="o">&lt;-</span> <span class="kt">c</span><span class="p">(</span><span class="s">&quot;10.1371/journal.pone.0029797&quot;</span><span class="p">,</span><span class="s">&quot;10.1371/journal.pone.0029798&quot;</span><span class="p">)</span>
-alm_ids<span class="p">(</span>ids<span class="p">,</span> info<span class="o">=</span><span class="s">&quot;summary&quot;</span><span class="p">)</span>
-<span class="c1">#&gt; $meta</span>
-<span class="c1">#&gt;   total total_pages page error</span>
-<span class="c1">#&gt; 1     2           1    1    NA</span>
-<span class="c1">#&gt; </span>
-<span class="c1">#&gt; $data</span>
-<span class="c1">#&gt; $data$`10.1371/journal.pone.0029798`</span>
-<span class="c1">#&gt; $data$`10.1371/journal.pone.0029798`$info</span>
-<span class="c1">#&gt;                            doi</span>
-<span class="c1">#&gt; 1 10.1371/journal.pone.0029798</span>
-<span class="c1">#&gt;                                                                                     title</span>
-<span class="c1">#&gt; 1 Mitochondrial Electron Transport Is the Cellular Target of the Oncology Drug Elesclomol</span>
-<span class="c1">#&gt;                                                                canonical_url</span>
-<span class="c1">#&gt; 1 http://www.plosone.org/article/info%3Adoi%2F10.1371%2Fjournal.pone.0029798</span>
-<span class="c1">#&gt;       pmid   pmcid                        mendeley_uuid</span>
-<span class="c1">#&gt; 1 22253786 3256171 b08cc99e-b526-3f0c-adaa-d5ee6d0d978a</span>
-<span class="c1">#&gt;            update_date     issued</span>
-<span class="c1">#&gt; 1 2014-12-09T02:52:47Z 2012-01-11</span>
-<span class="c1">#&gt; </span>
-<span class="c1">#&gt; $data$`10.1371/journal.pone.0029798`$signposts</span>
-<span class="c1">#&gt;                            doi viewed saved discussed cited</span>
-<span class="c1">#&gt; 1 10.1371/journal.pone.0029798   4346    14         2    26</span>
-<span class="c1">#&gt; </span>
-<span class="c1">#&gt; </span>
-<span class="c1">#&gt; $data$`10.1371/journal.pone.0029797`</span>
-<span class="c1">#&gt; $data$`10.1371/journal.pone.0029797`$info</span>
-<span class="c1">#&gt;                            doi</span>
-<span class="c1">#&gt; 1 10.1371/journal.pone.0029797</span>
-<span class="c1">#&gt;                                                                             title</span>
-<span class="c1">#&gt; 1 Ecological Guild Evolution and the Discovery of the World&#39;s Smallest Vertebrate</span>
-<span class="c1">#&gt;                                                                canonical_url</span>
-<span class="c1">#&gt; 1 http://www.plosone.org/article/info%3Adoi%2F10.1371%2Fjournal.pone.0029797</span>
-<span class="c1">#&gt;       pmid   pmcid                        mendeley_uuid</span>
-<span class="c1">#&gt; 1 22253785 3256195 897fbbd6-5a23-3552-8077-97251b82c1e1</span>
-<span class="c1">#&gt;            update_date     issued</span>
-<span class="c1">#&gt; 1 2014-12-09T02:52:46Z 2012-01-11</span>
-<span class="c1">#&gt; </span>
-<span class="c1">#&gt; $data$`10.1371/journal.pone.0029797`$signposts</span>
-<span class="c1">#&gt;                            doi viewed saved discussed cited</span>
-<span class="c1">#&gt; 1 10.1371/journal.pone.0029797  34282    81       244     8</span>
-</code></pre></div>
-<h3>Python</h3>
-<div class="highlight"><pre><code class="language-r" data-lang="r">import pyalm
-ids <span class="o">=</span> <span class="p">[</span><span class="s">&quot;10.1371/journal.pone.0029797&quot;</span><span class="p">,</span><span class="s">&quot;10.1371/journal.pone.0029798&quot;</span><span class="p">]</span>
-pyalm.get_alm<span class="p">(</span>ids<span class="p">,</span> info<span class="o">=</span><span class="s">&quot;summary&quot;</span><span class="p">)</span>
-
-<span class="c1">#&gt; {&#39;articles&#39;: [&lt;ArticleALM Mitochondrial Electron Transport Is the Cellular Target of the Oncology Drug Elesclomol,</span>
-<span class="c1">#&gt; DOI 10.1371/journal.pone.0029798&gt;,</span>
-<span class="c1">#&gt;   &lt;ArticleALM Ecological Guild Evolution and the Discovery of the World&#39;s Smallest Vertebrate,</span>
-<span class="c1">#&gt;         DOI 10.1371/journal.pone.0029797&gt;],</span>
-<span class="c1">#&gt;  &#39;meta&#39;: {u&#39;error&#39;: None, u&#39;page&#39;: 1, u&#39;total&#39;: 2, u&#39;total_pages&#39;: 1}}</span>
-</code></pre></div>
-<h3>Ruby</h3>
-<div class="highlight"><pre><code class="language-r" data-lang="r"><span class="kn">require</span> <span class="s">&#39;alm&#39;</span>
-Alm.alm<span class="p">(</span>ids<span class="o">:</span> <span class="p">[</span><span class="s">&quot;10.1371/journal.pone.0029797&quot;</span><span class="p">,</span><span class="s">&quot;10.1371/journal.pone.0029798&quot;</span><span class="p">],</span> key<span class="o">:</span> ENV<span class="p">[</span><span class="s">&#39;PLOS_API_KEY&#39;</span><span class="p">])</span>
-
-<span class="c1">#&gt; =&gt; {&quot;total&quot;=&gt;2,</span>
-<span class="c1">#&gt;  &quot;total_pages&quot;=&gt;1,</span>
-<span class="c1">#&gt;  &quot;page&quot;=&gt;1,</span>
-<span class="c1">#&gt;  &quot;error&quot;=&gt;nil,</span>
-<span class="c1">#&gt;  &quot;data&quot;=&gt;</span>
-<span class="c1">#&gt;   [{&quot;doi&quot;=&gt;&quot;10.1371/journal.pone.0029798&quot;,</span>
-<span class="c1">#&gt;     &quot;title&quot;=&gt;&quot;Mitochondrial Electron Transport Is the Cellular Target of the Oncology Drug Elesclomol&quot;,</span>
-<span class="c1">#&gt;     &quot;issued&quot;=&gt;{&quot;date-parts&quot;=&gt;[[2012, 1, 11]]},</span>
-<span class="c1">#&gt;     &quot;canonical_url&quot;=&gt;&quot;http://www.plosone.org/article/info%3Adoi%2F10.1371%2Fjournal.pone.0029798&quot;,</span>
-<span class="c1">#&gt;     &quot;pmid&quot;=&gt;&quot;22253786&quot;,</span>
-<span class="c1">#&gt;     &quot;pmcid&quot;=&gt;&quot;3256171&quot;,</span>
-<span class="c1">#&gt;     &quot;mendeley_uuid&quot;=&gt;&quot;b08cc99e-b526-3f0c-adaa-d5ee6d0d978a&quot;,</span>
-<span class="c1">#&gt;     &quot;viewed&quot;=&gt;4346,</span>
-<span class="c1">#&gt;     &quot;saved&quot;=&gt;14,</span>
-<span class="c1">#&gt;     &quot;discussed&quot;=&gt;2,</span>
-<span class="c1">#&gt;     &quot;cited&quot;=&gt;26,</span>
-<span class="c1">#&gt;     &quot;update_date&quot;=&gt;&quot;2014-12-09T02:52:47Z&quot;},</span>
-<span class="c1">#&gt;    {&quot;doi&quot;=&gt;&quot;10.1371/journal.pone.0029797&quot;,</span>
-<span class="c1">#&gt;     &quot;title&quot;=&gt;&quot;Ecological Guild Evolution and the Discovery of the World&#39;s Smallest Vertebrate&quot;,</span>
-<span class="c1">#&gt;     &quot;issued&quot;=&gt;{&quot;date-parts&quot;=&gt;[[2012, 1, 11]]},</span>
-<span class="c1">#&gt;     &quot;canonical_url&quot;=&gt;&quot;http://www.plosone.org/article/info%3Adoi%2F10.1371%2Fjournal.pone.0029797&quot;,</span>
-<span class="c1">#&gt;     &quot;pmid&quot;=&gt;&quot;22253785&quot;,</span>
-<span class="c1">#&gt;     &quot;pmcid&quot;=&gt;&quot;3256195&quot;,</span>
-<span class="c1">#&gt;     &quot;mendeley_uuid&quot;=&gt;&quot;897fbbd6-5a23-3552-8077-97251b82c1e1&quot;,</span>
-<span class="c1">#&gt;     &quot;viewed&quot;=&gt;34282,</span>
-<span class="c1">#&gt;     &quot;saved&quot;=&gt;81,</span>
-<span class="c1">#&gt;     &quot;discussed&quot;=&gt;244,</span>
-<span class="c1">#&gt;     &quot;cited&quot;=&gt;8,</span>
-<span class="c1">#&gt;     &quot;update_date&quot;=&gt;&quot;2014-12-09T02:52:46Z&quot;}]}</span>
-</code></pre></div>
   </div>
   
 </div>
