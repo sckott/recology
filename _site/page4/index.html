@@ -8,7 +8,7 @@
 
   <title>
     
-    Recology, R ecology
+    Recology, R/etc.
   </title>
 
   <!-- CSS -->
@@ -56,6 +56,195 @@
       <div class="posts">
   <a style="float:right;" href="/archives" data-toggle="tooltip" data-placement="bottom" title="Archives"><i class="fa fa-archive fa-lg"></i></a>
   <a style="float:right;" href="/tags"><i class="fa fa-tags fa-lg"></i></a>&nbsp;
+  
+  <div class="post">
+    <h1>
+      <a href="/2014/12/taxize-workflows/">
+        taxize workflows
+      </a>
+    </h1>
+
+    <span class="post-date">02 Dec 2014</span>
+
+    <p>A missed chat on the rOpenSci website the other day asked:</p>
+
+<blockquote>
+<p>Hi there, i am trying to use the taxize package and have a .csv file of species names to run through taxize updating them. What would be the code i would need to run to achieve this?</p>
+</blockquote>
+
+<p>One way to answer this is to talk about the basic approach to importing data, doing stuff to the data, then recombining data. There are many ways to do this, but I&#39;ll go over a few of them.</p>
+
+<h2>Install taxize</h2>
+<div class="highlight"><pre><code class="language-r" data-lang="r">install.packages<span class="p">(</span><span class="s">&quot;taxize&quot;</span><span class="p">)</span>
+install.packages<span class="p">(</span><span class="s">&quot;downloader&quot;</span><span class="p">)</span>
+</code></pre></div><div class="highlight"><pre><code class="language-r" data-lang="r"><span class="kn">library</span><span class="p">(</span><span class="s">&quot;taxize&quot;</span><span class="p">)</span>
+</code></pre></div>
+<h2>Import data</h2>
+
+<p>We&#39;ll use Winston Chang&#39;s new <code>downloader</code> package to avoid problems with <code>https</code>, and get a dataset from our ropensci datasets repo <a href="https://github.com/ropensci/datasets">https://github.com/ropensci/datasets</a></p>
+<div class="highlight"><pre><code class="language-r" data-lang="r">downloader<span class="o">::</span>download<span class="p">(</span><span class="s">&quot;https://raw.githubusercontent.com/ropensci/datasets/master/planttraits/morphological.csv&quot;</span><span class="p">,</span> <span class="s">&quot;morphological.csv&quot;</span><span class="p">)</span>
+dat <span class="o">&lt;-</span> read.csv<span class="p">(</span><span class="s">&quot;morphological.csv&quot;</span><span class="p">,</span> stringsAsFactors <span class="o">=</span> <span class="kc">FALSE</span><span class="p">)</span>
+<span class="kp">head</span><span class="p">(</span>dat<span class="p">)</span>
+<span class="c1">#&gt;                  species log_SLA leaf_water_content log_wood_density</span>
+<span class="c1">#&gt; 1         Abies concolor    3.46               0.51            -0.52</span>
+<span class="c1">#&gt; 2          Abies grandis    3.58               0.49            -0.51</span>
+<span class="c1">#&gt; 3        Abies magnifica    3.87               0.62            -0.53</span>
+<span class="c1">#&gt; 4      Acacia farnesiana      NA                 NA               NA</span>
+<span class="c1">#&gt; 5           Acer glabrum    5.07               0.69            -0.54</span>
+<span class="c1">#&gt; 6 Adenostoma fasciculata    3.56               0.46            -0.31</span>
+<span class="c1">#&gt;   log_ht log_N</span>
+<span class="c1">#&gt; 1   7.72  0.02</span>
+<span class="c1">#&gt; 2   7.51 -0.31</span>
+<span class="c1">#&gt; 3   7.58 -0.14</span>
+<span class="c1">#&gt; 4   5.70    NA</span>
+<span class="c1">#&gt; 5   3.25  1.02</span>
+<span class="c1">#&gt; 6   5.33  0.29</span>
+</code></pre></div>
+<p>After importing data, there are a variety of approaches you could take:</p>
+
+<ol>
+<li>Vector: Take species names as vector from your <code>data.frame</code>, cleaning them, then re-attching to the <code>data.frame</code> later, or</li>
+<li>In-Place: Use for loops or <code>lapply</code> family functions to iterate over each name while simultaneously re-inserting into the <code>data.frame</code></li>
+</ol>
+
+<h2>1. Vector</h2>
+
+<p>Make a vector of names</p>
+<div class="highlight"><pre><code class="language-r" data-lang="r">splist <span class="o">&lt;-</span> dat<span class="o">$</span>species
+</code></pre></div>
+<p>Then proceed to do name cleaning, e.g, we can use the <code>tnrs</code> function to see if any names are potentially not spelled correctly. </p>
+<div class="highlight"><pre><code class="language-r" data-lang="r">tnrs_out <span class="o">&lt;-</span> tnrs<span class="p">(</span>splist<span class="p">,</span> <span class="kn">source</span> <span class="o">=</span> <span class="s">&quot;iPlant_TNRS&quot;</span><span class="p">)</span>
+<span class="kp">head</span><span class="p">(</span>tnrs_out<span class="p">)</span>
+<span class="c1">#&gt;              submittedname             acceptedname    sourceid score</span>
+<span class="c1">#&gt; 1     Ceanothus prostratus     Ceanothus prostratus iPlant_TNRS     1</span>
+<span class="c1">#&gt; 2          Abies magnifica          Abies magnifica iPlant_TNRS     1</span>
+<span class="c1">#&gt; 3 Arctostaphylos canescens Arctostaphylos canescens iPlant_TNRS     1</span>
+<span class="c1">#&gt; 4         Berberis nervosa         Berberis nervosa iPlant_TNRS     1</span>
+<span class="c1">#&gt; 5        Arbutus menziesii        Arbutus menziesii iPlant_TNRS     1</span>
+<span class="c1">#&gt; 6     Calocedrus decurrens     Calocedrus decurrens iPlant_TNRS     1</span>
+<span class="c1">#&gt;                matchedname      authority</span>
+<span class="c1">#&gt; 1     Ceanothus prostratus         Benth.</span>
+<span class="c1">#&gt; 2          Abies magnifica  A. Murray bis</span>
+<span class="c1">#&gt; 3 Arctostaphylos canescens         Eastw.</span>
+<span class="c1">#&gt; 4         Berberis nervosa          Pursh</span>
+<span class="c1">#&gt; 5        Arbutus menziesii          Pursh</span>
+<span class="c1">#&gt; 6     Calocedrus decurrens (Torr.) Florin</span>
+<span class="c1">#&gt;                                     uri</span>
+<span class="c1">#&gt; 1 http://www.tropicos.org/Name/27500276</span>
+<span class="c1">#&gt; 2 http://www.tropicos.org/Name/24900142</span>
+<span class="c1">#&gt; 3 http://www.tropicos.org/Name/12302547</span>
+<span class="c1">#&gt; 4  http://www.tropicos.org/Name/3500175</span>
+<span class="c1">#&gt; 5 http://www.tropicos.org/Name/12302436</span>
+<span class="c1">#&gt; 6  http://www.tropicos.org/Name/9400069</span>
+</code></pre></div>
+<p>Those with score of less than 1 may have misspellings</p>
+<div class="highlight"><pre><code class="language-r" data-lang="r">tnrs_out<span class="p">[</span> tnrs_out<span class="o">$</span>score <span class="o">&lt;</span> <span class="m">1</span><span class="p">,</span> <span class="p">]</span>
+<span class="c1">#&gt;                 submittedname              acceptedname    sourceid score</span>
+<span class="c1">#&gt; 23     Adenostoma fasciculata   Adenostoma fasciculatum iPlant_TNRS  0.97</span>
+<span class="c1">#&gt; 24 Arctostaphylos glandulosus Arctostaphylos glandulosa iPlant_TNRS  0.97</span>
+<span class="c1">#&gt; 36        Chamaebatia foliosa     Chamaebatia foliolosa iPlant_TNRS  0.95</span>
+<span class="c1">#&gt; 38     Juniperus californicus     Juniperus californica iPlant_TNRS  0.97</span>
+<span class="c1">#&gt; 77         Prunus illicifolia         Prunus ilicifolia iPlant_TNRS  0.99</span>
+<span class="c1">#&gt; 78         Prunus subcordatus         Prunus subcordata iPlant_TNRS  0.97</span>
+<span class="c1">#&gt;                  matchedname                         authority</span>
+<span class="c1">#&gt; 23   Adenostoma fasciculatum                      Hook. &amp; Arn.</span>
+<span class="c1">#&gt; 24 Arctostaphylos glandulosa                            Eastw.</span>
+<span class="c1">#&gt; 36     Chamaebatia foliolosa                            Benth.</span>
+<span class="c1">#&gt; 38     Juniperus californica                          Carrière</span>
+<span class="c1">#&gt; 77         Prunus ilicifolia (Nutt. ex Hook. &amp; Arn.) D. Dietr.</span>
+<span class="c1">#&gt; 78         Prunus subcordata                            Benth.</span>
+<span class="c1">#&gt;                                      uri</span>
+<span class="c1">#&gt; 23 http://www.tropicos.org/Name/27801458</span>
+<span class="c1">#&gt; 24 http://www.tropicos.org/Name/12300542</span>
+<span class="c1">#&gt; 36 http://www.tropicos.org/Name/27801486</span>
+<span class="c1">#&gt; 38  http://www.tropicos.org/Name/9400374</span>
+<span class="c1">#&gt; 77 http://www.tropicos.org/Name/27801102</span>
+<span class="c1">#&gt; 78 http://www.tropicos.org/Name/27801124</span>
+</code></pre></div>
+<p>So let&#39;s take the <code>acceptedname</code> column as a the new names and assign to a new vector</p>
+<div class="highlight"><pre><code class="language-r" data-lang="r">cleaned_names <span class="o">&lt;-</span> tnrs_out<span class="o">$</span>acceptedname
+</code></pre></div>
+<p>Then join names back, replacing them, or adding as a new column</p>
+
+<p>Replace</p>
+<div class="highlight"><pre><code class="language-r" data-lang="r">dat<span class="o">$</span>species <span class="o">&lt;-</span> cleaned_names
+<span class="kp">head</span><span class="p">(</span>dat<span class="p">)</span>
+<span class="c1">#&gt;                    species log_SLA leaf_water_content log_wood_density</span>
+<span class="c1">#&gt; 1     Ceanothus prostratus    3.46               0.51            -0.52</span>
+<span class="c1">#&gt; 2          Abies magnifica    3.58               0.49            -0.51</span>
+<span class="c1">#&gt; 3 Arctostaphylos canescens    3.87               0.62            -0.53</span>
+<span class="c1">#&gt; 4         Berberis nervosa      NA                 NA               NA</span>
+<span class="c1">#&gt; 5        Arbutus menziesii    5.07               0.69            -0.54</span>
+<span class="c1">#&gt; 6     Calocedrus decurrens    3.56               0.46            -0.31</span>
+<span class="c1">#&gt;   log_ht log_N</span>
+<span class="c1">#&gt; 1   7.72  0.02</span>
+<span class="c1">#&gt; 2   7.51 -0.31</span>
+<span class="c1">#&gt; 3   7.58 -0.14</span>
+<span class="c1">#&gt; 4   5.70    NA</span>
+<span class="c1">#&gt; 5   3.25  1.02</span>
+<span class="c1">#&gt; 6   5.33  0.29</span>
+</code></pre></div>
+<p>New column</p>
+<div class="highlight"><pre><code class="language-r" data-lang="r">dat<span class="o">$</span>species_cleaned <span class="o">&lt;-</span> cleaned_names
+<span class="kp">head</span><span class="p">(</span>dat<span class="p">)</span>
+<span class="c1">#&gt;                    species log_SLA leaf_water_content log_wood_density</span>
+<span class="c1">#&gt; 1     Ceanothus prostratus    3.46               0.51            -0.52</span>
+<span class="c1">#&gt; 2          Abies magnifica    3.58               0.49            -0.51</span>
+<span class="c1">#&gt; 3 Arctostaphylos canescens    3.87               0.62            -0.53</span>
+<span class="c1">#&gt; 4         Berberis nervosa      NA                 NA               NA</span>
+<span class="c1">#&gt; 5        Arbutus menziesii    5.07               0.69            -0.54</span>
+<span class="c1">#&gt; 6     Calocedrus decurrens    3.56               0.46            -0.31</span>
+<span class="c1">#&gt;   log_ht log_N          species_cleaned</span>
+<span class="c1">#&gt; 1   7.72  0.02     Ceanothus prostratus</span>
+<span class="c1">#&gt; 2   7.51 -0.31          Abies magnifica</span>
+<span class="c1">#&gt; 3   7.58 -0.14 Arctostaphylos canescens</span>
+<span class="c1">#&gt; 4   5.70    NA         Berberis nervosa</span>
+<span class="c1">#&gt; 5   3.25  1.02        Arbutus menziesii</span>
+<span class="c1">#&gt; 6   5.33  0.29     Calocedrus decurrens</span>
+</code></pre></div>
+<h2>2. In-place</h2>
+
+<p>You can use functions from the <code>dplyr</code> package to <code>split-apply-combine</code>, where <code>split</code> is split apart your vector for each taxon, <code>apply</code> to apply a function or functions to do name cleaning, then <code>combine</code> to put them back together. </p>
+
+<p>Here, we&#39;ll attach taxonomic ids from the Catalogue of Life to each species (each row) (with just a subset of the data to save time):</p>
+<div class="highlight"><pre><code class="language-r" data-lang="r"><span class="kn">library</span><span class="p">(</span><span class="s">&quot;dplyr&quot;</span><span class="p">)</span>
+tbl_df<span class="p">(</span>dat<span class="p">)[</span><span class="m">1</span><span class="o">:</span><span class="m">5</span><span class="p">,]</span> <span class="o">%&gt;%</span>
+  rowwise<span class="p">()</span> <span class="o">%&gt;%</span>
+  mutate<span class="p">(</span>colid <span class="o">=</span> get_colid<span class="p">(</span>species<span class="p">))</span> <span class="o">%&gt;%</span>
+  select<span class="p">(</span>species<span class="p">,</span> colid<span class="p">)</span>
+<span class="c1">#&gt; Source: local data frame [5 x 2]</span>
+<span class="c1">#&gt; Groups: &lt;by row&gt;</span>
+<span class="c1">#&gt; </span>
+<span class="c1">#&gt;                    species    colid</span>
+<span class="c1">#&gt; 1     Ceanothus prostratus 19544732</span>
+<span class="c1">#&gt; 2          Abies magnifica 18158318</span>
+<span class="c1">#&gt; 3 Arctostaphylos canescens 19358934</span>
+<span class="c1">#&gt; 4         Berberis nervosa 19374077</span>
+<span class="c1">#&gt; 5        Arbutus menziesii 19358819</span>
+</code></pre></div>
+<p>Let&#39;s do something a bit more complicated. Get common names for each taxon in a new column, if more than 1, concatenate into a single character string for easy inclusion in a <code>data.frame</code></p>
+<div class="highlight"><pre><code class="language-r" data-lang="r">sci2comm_concat <span class="o">&lt;-</span> <span class="kr">function</span><span class="p">(</span>x<span class="p">){</span>
+  temp <span class="o">&lt;-</span> sci2comm<span class="p">(</span>x<span class="p">,</span> db <span class="o">=</span> <span class="s">&quot;eol&quot;</span><span class="p">)</span>
+  <span class="kr">if</span><span class="p">(</span><span class="kp">length</span><span class="p">(</span>temp<span class="p">)</span> <span class="o">==</span> <span class="m">0</span><span class="p">)</span> <span class="kc">NA</span> <span class="kr">else</span> <span class="kp">paste0</span><span class="p">(</span>temp<span class="p">[[</span><span class="m">1</span><span class="p">]],</span> collapse <span class="o">=</span> <span class="s">&quot;, &quot;</span><span class="p">)</span>
+<span class="p">}</span>
+
+dat_new <span class="o">&lt;-</span> tbl_df<span class="p">(</span>dat<span class="p">)[</span><span class="m">1</span><span class="o">:</span><span class="m">5</span><span class="p">,]</span> <span class="o">%&gt;%</span>
+  rowwise<span class="p">()</span> <span class="o">%&gt;%</span>
+  mutate<span class="p">(</span>comm <span class="o">=</span> sci2comm_concat<span class="p">(</span>species<span class="p">))</span>
+</code></pre></div>
+<p>To see the new column, do </p>
+<div class="highlight"><pre><code class="language-r" data-lang="r">dat_new <span class="o">%&gt;%</span> select<span class="p">(</span>comm<span class="p">)</span>
+<span class="c1">#&gt; Source: local data frame [5 x 1]</span>
+<span class="c1">#&gt; Groups: &lt;by row&gt;</span>
+<span class="c1">#&gt; </span>
+<span class="c1">#&gt;                                                                          comm</span>
+<span class="c1">#&gt; 1                      Mahala-mat Ceanothus, prostrate ceanothus, squawcarpet</span>
+<span class="c1">#&gt; 2 Prächtige Tanne, Goldtanne (Gold-Tanne), Kalifornische Rot-Tanne, Pracht-Ta</span>
+<span class="c1">#&gt; 3                          hoary manzanita, hoary manzanita, Sonoma manzanita</span>
+<span class="c1">#&gt; 4 Longleaf Oregon-grape, Cascade barberry, Dull Oregon grape, Oregon grape-ho</span>
+<span class="c1">#&gt; 5                   pacific madrone, Madrona, madrone, Kalifornianmansikkapuu</span>
+</code></pre></div>
+  </div>
   
   <div class="post">
     <h1>
@@ -604,154 +793,6 @@ out<span class="p">[,</span> <span class="o">!</span><span class="kp">names</spa
 <li>Other things? Get in touch on twitter <code>@recology_</code> or below</li>
 </ul>
 
-  </div>
-  
-  <div class="post">
-    <h1>
-      <a href="/2014/11/github-fun/">
-        Fun with the GitHub API
-      </a>
-    </h1>
-
-    <span class="post-date">26 Nov 2014</span>
-
-    <p>Recently I&#39;ve had fun playing with the GitHub API, and here are some notes to self about this fun having.</p>
-
-<h2>Setup</h2>
-
-<p>Get/load packages</p>
-<div class="highlight"><pre><code class="language-r" data-lang="r">install.packages<span class="p">(</span><span class="kt">c</span><span class="p">(</span><span class="s">&#39;devtools&#39;</span><span class="p">,</span><span class="s">&#39;jsonlite&#39;</span><span class="p">,</span><span class="s">&#39;httr&#39;</span><span class="p">,</span><span class="s">&#39;yaml&#39;</span><span class="p">))</span>
-</code></pre></div><div class="highlight"><pre><code class="language-r" data-lang="r"><span class="kn">library</span><span class="p">(</span><span class="s">&quot;devtools&quot;</span><span class="p">)</span>
-<span class="kn">library</span><span class="p">(</span><span class="s">&quot;httr&quot;</span><span class="p">)</span>
-<span class="kn">library</span><span class="p">(</span><span class="s">&quot;yaml&quot;</span><span class="p">)</span>
-</code></pre></div>
-<h2>Define a vector of package names</h2>
-<div class="highlight"><pre><code class="language-r" data-lang="r">pkgs <span class="o">&lt;-</span> <span class="kt">c</span><span class="p">(</span><span class="s">&quot;alm&quot;</span><span class="p">,</span> <span class="s">&quot;bmc&quot;</span><span class="p">,</span> <span class="s">&quot;bold&quot;</span><span class="p">,</span> <span class="s">&quot;clifro&quot;</span><span class="p">,</span> <span class="s">&quot;ecoengine&quot;</span><span class="p">,</span>
-  <span class="s">&quot;elastic&quot;</span><span class="p">,</span> <span class="s">&quot;fulltext&quot;</span><span class="p">,</span> <span class="s">&quot;geonames&quot;</span><span class="p">,</span> <span class="s">&quot;gistr&quot;</span><span class="p">,</span>
-  <span class="s">&quot;RNeXML&quot;</span><span class="p">,</span> <span class="s">&quot;rnoaa&quot;</span><span class="p">,</span> <span class="s">&quot;rnpn&quot;</span><span class="p">,</span> <span class="s">&quot;traits&quot;</span><span class="p">,</span> <span class="s">&quot;rplos&quot;</span><span class="p">,</span> <span class="s">&quot;rsnps&quot;</span><span class="p">,</span>
-  <span class="s">&quot;rWBclimate&quot;</span><span class="p">,</span> <span class="s">&quot;solr&quot;</span><span class="p">,</span> <span class="s">&quot;spocc&quot;</span><span class="p">,</span> <span class="s">&quot;taxize&quot;</span><span class="p">,</span> <span class="s">&quot;togeojson&quot;</span><span class="p">,</span> <span class="s">&quot;treeBASE&quot;</span><span class="p">)</span>
-pkgs <span class="o">&lt;-</span> <span class="kp">sort</span><span class="p">(</span>pkgs<span class="p">)</span>
-</code></pre></div>
-<h2>Define functions</h2>
-<div class="highlight"><pre><code class="language-r" data-lang="r">github_auth <span class="o">&lt;-</span> <span class="kr">function</span><span class="p">(</span>appname <span class="o">=</span> <span class="kp">getOption</span><span class="p">(</span><span class="s">&quot;gh_appname&quot;</span><span class="p">),</span> key <span class="o">=</span> <span class="kp">getOption</span><span class="p">(</span><span class="s">&quot;gh_id&quot;</span><span class="p">),</span>
-                        secret <span class="o">=</span> <span class="kp">getOption</span><span class="p">(</span><span class="s">&quot;gh_secret&quot;</span><span class="p">))</span> <span class="p">{</span>
-  <span class="kr">if</span> <span class="p">(</span><span class="kp">is.null</span><span class="p">(</span><span class="kp">getOption</span><span class="p">(</span><span class="s">&quot;gh_token&quot;</span><span class="p">)))</span> <span class="p">{</span>
-    myapp <span class="o">&lt;-</span> oauth_app<span class="p">(</span>appname<span class="p">,</span> key<span class="p">,</span> secret<span class="p">)</span>
-    token <span class="o">&lt;-</span> oauth2.0_token<span class="p">(</span>oauth_endpoints<span class="p">(</span><span class="s">&quot;github&quot;</span><span class="p">),</span> myapp<span class="p">)</span>
-    <span class="kp">options</span><span class="p">(</span>gh_token <span class="o">=</span> token<span class="p">)</span>
-  <span class="p">}</span> <span class="kr">else</span> <span class="p">{</span>
-    token <span class="o">&lt;-</span> <span class="kp">getOption</span><span class="p">(</span><span class="s">&quot;gh_token&quot;</span><span class="p">)</span>
-  <span class="p">}</span>
-  <span class="kr">return</span><span class="p">(</span>token<span class="p">)</span>
-<span class="p">}</span>
-
-make_url <span class="o">&lt;-</span> <span class="kr">function</span><span class="p">(</span>x<span class="p">,</span> y<span class="p">,</span> z<span class="p">)</span> <span class="p">{</span>
-  <span class="kp">sprintf</span><span class="p">(</span><span class="s">&quot;https://api.github.com/repos/%s/%s/%s&quot;</span><span class="p">,</span> x<span class="p">,</span> y<span class="p">,</span> z<span class="p">)</span>
-<span class="p">}</span>
-
-process_result <span class="o">&lt;-</span> <span class="kr">function</span><span class="p">(</span>x<span class="p">)</span> <span class="p">{</span>
-  stop_for_status<span class="p">(</span>x<span class="p">)</span>
-  <span class="kr">if</span> <span class="p">(</span><span class="o">!</span>x<span class="o">$</span>headers<span class="o">$</span><span class="sb">`content-type`</span> <span class="o">==</span> <span class="s">&quot;application/json; charset=utf-8&quot;</span><span class="p">)</span>
-    <span class="kp">stop</span><span class="p">(</span><span class="s">&quot;content type mismatch&quot;</span><span class="p">)</span>
-  tmp <span class="o">&lt;-</span> content<span class="p">(</span>x<span class="p">,</span> as <span class="o">=</span> <span class="s">&quot;text&quot;</span><span class="p">)</span>
-  jsonlite<span class="o">::</span>fromJSON<span class="p">(</span>tmp<span class="p">,</span> flatten <span class="o">=</span> <span class="kc">TRUE</span><span class="p">)</span>
-<span class="p">}</span>
-
-parse_file <span class="o">&lt;-</span> <span class="kr">function</span><span class="p">(</span>x<span class="p">)</span> <span class="p">{</span>
-  tmp <span class="o">&lt;-</span> <span class="kp">gsub</span><span class="p">(</span><span class="s">&quot;\n\\s+&quot;</span><span class="p">,</span> <span class="s">&quot;\n&quot;</span><span class="p">,</span> 
-              <span class="kp">paste</span><span class="p">(</span><span class="kp">vapply</span><span class="p">(</span><span class="kp">strsplit</span><span class="p">(</span>x<span class="p">,</span> <span class="s">&quot;\n&quot;</span><span class="p">)[[</span><span class="m">1</span><span class="p">]],</span> RCurl<span class="o">::</span>base64Decode<span class="p">,</span>
-                           <span class="kt">character</span><span class="p">(</span><span class="m">1</span><span class="p">),</span> USE.NAMES <span class="o">=</span> <span class="kc">FALSE</span><span class="p">),</span> collapse <span class="o">=</span> <span class="s">&quot; &quot;</span><span class="p">))</span>
-  lines <span class="o">&lt;-</span> <span class="kp">readLines</span><span class="p">(</span><span class="kp">textConnection</span><span class="p">(</span>tmp<span class="p">))</span>
-  <span class="kp">vapply</span><span class="p">(</span>lines<span class="p">,</span> <span class="kp">gsub</span><span class="p">,</span> <span class="kt">character</span><span class="p">(</span><span class="m">1</span><span class="p">),</span> pattern <span class="o">=</span> <span class="s">&quot;\\s&quot;</span><span class="p">,</span> replacement <span class="o">=</span> <span class="s">&quot;&quot;</span><span class="p">,</span>
-         USE.NAMES <span class="o">=</span> <span class="kc">FALSE</span><span class="p">)</span>
-<span class="p">}</span>
-
-request <span class="o">&lt;-</span> <span class="kr">function</span><span class="p">(</span>owner <span class="o">=</span> <span class="s">&quot;ropensci&quot;</span><span class="p">,</span> repo<span class="p">,</span> file<span class="o">=</span><span class="s">&quot;DESCRIPTION&quot;</span><span class="p">,</span> <span class="kc">...</span><span class="p">)</span> <span class="p">{</span>
-  req <span class="o">&lt;-</span> GET<span class="p">(</span>make_url<span class="p">(</span>owner<span class="p">,</span> repo<span class="p">,</span> <span class="kp">paste0</span><span class="p">(</span><span class="s">&quot;contents/&quot;</span><span class="p">,</span> <span class="kp">file</span><span class="p">)),</span> 
-             config <span class="o">=</span> <span class="kt">c</span><span class="p">(</span>token <span class="o">=</span> github_auth<span class="p">(),</span> <span class="kc">...</span><span class="p">))</span>
-  <span class="kr">if</span><span class="p">(</span>req<span class="o">$</span>status_code <span class="o">!=</span> <span class="m">200</span><span class="p">)</span> <span class="p">{</span> <span class="kc">NA</span> <span class="p">}</span> <span class="kr">else</span> <span class="p">{</span>
-    cts <span class="o">&lt;-</span> process_result<span class="p">(</span>req<span class="p">)</span><span class="o">$</span>content
-    parse_file<span class="p">(</span>cts<span class="p">)</span>
-  <span class="p">}</span>
-<span class="p">}</span>
-
-has_term <span class="o">&lt;-</span> <span class="kr">function</span><span class="p">(</span>what<span class="p">,</span> <span class="kc">...</span><span class="p">)</span> <span class="kp">any</span><span class="p">(</span><span class="kp">grepl</span><span class="p">(</span>what<span class="p">,</span> request<span class="p">(</span><span class="kc">...</span><span class="p">)))</span>
-has_file <span class="o">&lt;-</span> <span class="kr">function</span><span class="p">(</span>what<span class="p">,</span> <span class="kc">...</span><span class="p">)</span> <span class="kr">if</span><span class="p">(</span><span class="kp">all</span><span class="p">(</span><span class="kp">is.na</span><span class="p">(</span>request<span class="p">(</span>file <span class="o">=</span> what<span class="p">,</span> <span class="kc">...</span><span class="p">))))</span> <span class="kc">FALSE</span> <span class="kr">else</span> <span class="kc">TRUE</span>
-</code></pre></div>
-<h2>Do stuff</h2>
-
-<p>Does a package depend on a particular package? e.g., look for <code>httr</code> in the <code>DESCRIPTION</code> file (which is the default file name in <code>request()</code> above)</p>
-<div class="highlight"><pre><code class="language-r" data-lang="r">has_term<span class="p">(</span><span class="s">&quot;httr&quot;</span><span class="p">,</span> repo<span class="o">=</span><span class="s">&quot;taxize&quot;</span><span class="p">)</span>
-<span class="c1">#&gt; [1] TRUE</span>
-has_term<span class="p">(</span><span class="s">&quot;maptools&quot;</span><span class="p">,</span> repo<span class="o">=</span><span class="s">&quot;taxize&quot;</span><span class="p">)</span>
-<span class="c1">#&gt; [1] FALSE</span>
-</code></pre></div>
-<p>Do a series of R packages have a file for how to contribute <code>CONTRIBUTING.md</code>?</p>
-
-<p>Yes</p>
-<div class="highlight"><pre><code class="language-r" data-lang="r">has_file<span class="p">(</span><span class="s">&quot;CONTRIBUTING.md&quot;</span><span class="p">,</span> repo<span class="o">=</span><span class="s">&quot;taxize&quot;</span><span class="p">)</span>
-<span class="c1">#&gt; [1] TRUE</span>
-</code></pre></div>
-<p>Many packages</p>
-<div class="highlight"><pre><code class="language-r" data-lang="r"><span class="kp">vapply</span><span class="p">(</span>pkgs<span class="p">,</span> <span class="kr">function</span><span class="p">(</span>x<span class="p">)</span> has_file<span class="p">(</span><span class="s">&quot;CONTRIBUTING.md&quot;</span><span class="p">,</span> repo<span class="o">=</span>x<span class="p">),</span> <span class="kt">logical</span><span class="p">(</span><span class="m">1</span><span class="p">))</span>
-<span class="c1">#&gt;        alm        bmc       bold     clifro  ecoengine    elastic </span>
-<span class="c1">#&gt;      FALSE      FALSE      FALSE      FALSE      FALSE      FALSE </span>
-<span class="c1">#&gt;   fulltext   geonames      gistr     RNeXML      rnoaa       rnpn </span>
-<span class="c1">#&gt;       TRUE      FALSE      FALSE       TRUE       TRUE      FALSE </span>
-<span class="c1">#&gt;      rplos      rsnps rWBclimate       solr      spocc     taxize </span>
-<span class="c1">#&gt;      FALSE      FALSE      FALSE      FALSE       TRUE       TRUE </span>
-<span class="c1">#&gt;  togeojson     traits   treeBASE </span>
-<span class="c1">#&gt;      FALSE      FALSE      FALSE</span>
-</code></pre></div>
-<h2>Check rate limit</h2>
-
-<p>Define function</p>
-<div class="highlight"><pre><code class="language-r" data-lang="r">rate_limit <span class="o">&lt;-</span> <span class="kr">function</span><span class="p">(</span><span class="kc">...</span><span class="p">)</span> <span class="p">{</span>
-  token <span class="o">&lt;-</span> github_auth<span class="p">()</span>
-  req <span class="o">&lt;-</span> GET<span class="p">(</span><span class="s">&quot;https://api.github.com/rate_limit&quot;</span><span class="p">,</span> config <span class="o">=</span> <span class="kt">c</span><span class="p">(</span>token <span class="o">=</span> token<span class="p">,</span> <span class="kc">...</span><span class="p">))</span>
-  process_result<span class="p">(</span>req<span class="p">)</span>
-<span class="p">}</span>
-</code></pre></div>
-<p>Check it</p>
-<div class="highlight"><pre><code class="language-r" data-lang="r">rate_limit<span class="p">()</span>
-<span class="c1">#&gt; $resources</span>
-<span class="c1">#&gt; $resources$core</span>
-<span class="c1">#&gt; $resources$core$limit</span>
-<span class="c1">#&gt; [1] 5000</span>
-<span class="c1">#&gt; </span>
-<span class="c1">#&gt; $resources$core$remaining</span>
-<span class="c1">#&gt; [1] 4925</span>
-<span class="c1">#&gt; </span>
-<span class="c1">#&gt; $resources$core$reset</span>
-<span class="c1">#&gt; [1] 1417031016</span>
-<span class="c1">#&gt; </span>
-<span class="c1">#&gt; </span>
-<span class="c1">#&gt; $resources$search</span>
-<span class="c1">#&gt; $resources$search$limit</span>
-<span class="c1">#&gt; [1] 30</span>
-<span class="c1">#&gt; </span>
-<span class="c1">#&gt; $resources$search$remaining</span>
-<span class="c1">#&gt; [1] 30</span>
-<span class="c1">#&gt; </span>
-<span class="c1">#&gt; $resources$search$reset</span>
-<span class="c1">#&gt; [1] 1417028069</span>
-<span class="c1">#&gt; </span>
-<span class="c1">#&gt; </span>
-<span class="c1">#&gt; </span>
-<span class="c1">#&gt; $rate</span>
-<span class="c1">#&gt; $rate$limit</span>
-<span class="c1">#&gt; [1] 5000</span>
-<span class="c1">#&gt; </span>
-<span class="c1">#&gt; $rate$remaining</span>
-<span class="c1">#&gt; [1] 4925</span>
-<span class="c1">#&gt; </span>
-<span class="c1">#&gt; $rate$reset</span>
-<span class="c1">#&gt; [1] 1417031016</span>
-</code></pre></div>
-<p>Convert time to reset to human readable form</p>
-<div class="highlight"><pre><code class="language-r" data-lang="r"><span class="kp">as.POSIXct</span><span class="p">(</span>rate_limit<span class="p">()</span><span class="o">$</span>rate<span class="o">$</span>reset<span class="p">,</span> origin<span class="o">=</span><span class="s">&quot;1970-01-01&quot;</span><span class="p">)</span>
-<span class="c1">#&gt; [1] &quot;2014-11-26 11:43:36 PST&quot;</span>
-</code></pre></div>
   </div>
   
 </div>
