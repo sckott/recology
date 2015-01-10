@@ -4,6 +4,7 @@ layout: post
 title: R talk on regular expressions (regex)
 author: Scott Chamberlain
 date: 2011-10-06 10:50:00.001000 -05:00
+sourceslug: _posts/2011-10-06-r-talk-on-regular-expressions-regex.md
 tags: 
 - regex
 - sciencetalks

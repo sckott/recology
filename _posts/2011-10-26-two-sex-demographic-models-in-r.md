@@ -4,6 +4,7 @@ layout: post
 title: Two-sex demographic models in R
 author: Scott Chamberlain
 date: 2011-10-26 09:31:00 -05:00
+sourceslug: _posts/2011-10-26-two-sex-demographic-models-in-r.md
 tags: 
 - Papers
 - Ecology

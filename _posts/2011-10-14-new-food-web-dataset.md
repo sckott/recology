@@ -4,6 +4,7 @@ layout: post
 title: New food web dataset
 author: Scott Chamberlain
 date: 2011-10-14 13:00:00 -05:00
+sourceslug: _posts/2011-10-14-new-food-web-dataset.md
 tags: 
 - ggplot2
 - Networks

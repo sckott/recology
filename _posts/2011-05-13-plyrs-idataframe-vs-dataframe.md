@@ -4,6 +4,7 @@ layout: post
 title: plyr's idata.frame VS. data.frame
 author: Scott Chamberlain
 date: 2011-05-13 15:16:00.001000 -05:00
+sourceslug: _posts/2011-05-13-plyrs-idataframe-vs-dataframe.md
 tags: 
 - plyr
 - R

@@ -4,6 +4,7 @@ layout: post
 title: "OpenStates from R via API: watch your elected representatives"
 author: Scott Chamberlain
 date: 2011-06-10 23:19:00 -05:00
+sourceslug: _posts/2011-06-10-openstates-from-r-via-api-watch-your-elected-representatives.md
 tags: 
 - R
 - Datasets

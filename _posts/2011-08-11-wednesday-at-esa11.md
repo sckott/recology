@@ -4,6 +4,7 @@ layout: post
 title: "Wednesday at #ESA11"
 author: Scott Chamberlain
 date: 2011-08-11 08:50:00 -05:00
+sourceslug: _posts/2011-08-11-wednesday-at-esa11.md
 tags: 
 - openaccess
 - Meetings

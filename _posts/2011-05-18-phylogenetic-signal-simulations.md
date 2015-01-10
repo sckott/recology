@@ -4,6 +4,7 @@ layout: post
 title: phylogenetic signal simulations
 author: Scott Chamberlain
 date: 2011-05-18 08:13:00 -05:00
+sourceslug: _posts/2011-05-18-phylogenetic-signal-simulations.md
 tags: 
 - ggplot2
 - ape

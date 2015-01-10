@@ -4,6 +4,7 @@ layout: post
 title: R tutorial on visualizations/graphics
 author: Scott Chamberlain
 date: 2011-09-30 10:48:00.001000 -05:00
+sourceslug: _posts/2011-09-30-r-tutorial-on-visualizationsgraphics.md
 tags: 
 - tutorials
 - sciencetalks

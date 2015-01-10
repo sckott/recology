@@ -4,6 +4,7 @@ layout: post
 title: Archiving ecology/evolution data sets online
 author: Scott Chamberlain
 date: 2011-07-15 21:02:00 -05:00
+sourceslug: _posts/2011-07-15-archiving-ecologyevolution-data-sets.md
 tags: 
 - openaccess
 - Datasets

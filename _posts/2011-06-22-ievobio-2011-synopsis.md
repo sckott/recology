@@ -4,6 +4,7 @@ layout: post
 title: iEvoBio 2011 Synopsis
 author: Scott Chamberlain
 date: 2011-06-22 21:38:00.001000 -05:00
+sourceslug: _posts/2011-06-22-ievobio-2011-synopsis.md
 tags: 
 - openaccess
 - Meetings

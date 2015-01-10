@@ -4,6 +4,7 @@ layout: post
 title: FigShare Talk
 author: Scott Chamberlain
 date: 2011-09-08 23:36:00.003000 -05:00
+sourceslug: _posts/2011-09-08-figshare-talk.md
 tags: 
 - openaccess
 - vime

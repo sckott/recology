@@ -4,6 +4,7 @@ layout: post
 title: "Short on funding? Can't get a grant? Crowdfunding! #SciFund"
 author: Scott Chamberlain
 date: 2011-09-27 11:16:00 -05:00
+sourceslug: _posts/2011-09-27-short-on-funding-can-t-get-a-grant-crowdfunding-scifund.md
 tags: 
 - crowdfunding
 ---

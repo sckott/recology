@@ -4,6 +4,7 @@ layout: post
 title: How to fit power laws
 author: Scott Chamberlain
 date: 2011-06-07 15:24:00 -05:00
+sourceslug: _posts/2011-06-07-how-to-fit-power-laws.md
 tags: 
 - Methods
 - Papers

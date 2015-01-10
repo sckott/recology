@@ -4,6 +4,7 @@ layout: post
 title: LondonR meetings presentations
 author: Scott Chamberlain
 date: 2011-12-11 11:59:00.001000 -06:00
+sourceslug: _posts/2011-12-11-londonr-meetings-presentations.md
 tags: 
 - segue
 - LondonR

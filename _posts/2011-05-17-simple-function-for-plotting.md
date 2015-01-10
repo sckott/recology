@@ -4,6 +4,7 @@ layout: post
 title: A simple function for plotting phylogenies in ggplot2
 author: Scott Chamberlain
 date: 2011-05-17 14:37:00.001000 -05:00
+sourceslug: _posts/2011-05-17-simple-function-for-plotting.md
 tags: 
 - ggplot2
 - Phylogenetics

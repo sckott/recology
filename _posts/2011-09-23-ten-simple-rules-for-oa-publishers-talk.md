@@ -4,6 +4,7 @@ layout: post
 title: Ten Simple Rules for OA Publishers talk by Philip Bourne
 author: Scott Chamberlain
 date: 2011-09-23 14:44:00 -05:00
+sourceslug: _posts/2011-09-23-ten-simple-rules-for-oa-publishers-talk.md
 tags: 
 - openaccess
 - sciencetalks

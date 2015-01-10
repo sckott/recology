@@ -4,6 +4,7 @@ layout: post
 title: Tenure track position in systematics at the University of Vermont
 author: Scott Chamberlain
 date: 2011-08-22 15:24:00 -05:00
+sourceslug: _posts/2011-08-22-tenure-track-position-in-systematics-at.md
 tags: 
 - Evolution
 - jobs

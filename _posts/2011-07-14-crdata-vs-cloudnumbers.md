@@ -4,6 +4,7 @@ layout: post
 title: CRdata vs. Cloudnumbers
 author: Scott Chamberlain
 date: 2011-07-14 08:31:00.001000 -05:00
+sourceslug: _posts/2011-07-14-crdata-vs-cloudnumbers.md
 tags: 
 - cloudcomputing
 - R

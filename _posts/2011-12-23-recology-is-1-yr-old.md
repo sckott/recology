@@ -4,6 +4,7 @@ layout: post
 title: Recology is 1 yr old
 author: Scott Chamberlain
 date: 2011-12-23 18:52:00 -06:00
+sourceslug: _posts/2011-12-23-recology-is-1-yr-old.md
 tags: 
 - ggplot2
 - Evolution

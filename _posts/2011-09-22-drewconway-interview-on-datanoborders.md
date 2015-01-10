@@ -4,6 +4,7 @@ layout: post
 title: "@drewconway interview on @DataNoBorders at the Strata conference"
 author: Scott Chamberlain
 date: 2011-09-22 23:10:00 -05:00
+sourceslug: _posts/2011-09-22-drewconway-interview-on-datanoborders.md
 tags: 
 - openaccess
 - API

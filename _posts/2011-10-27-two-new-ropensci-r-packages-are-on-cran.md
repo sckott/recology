@@ -4,6 +4,7 @@ layout: post
 title: Two new rOpenSci R packages are on CRAN
 author: Scott Chamberlain
 date: 2011-10-27 07:27:00.001000 -05:00
+sourceslug: _posts/2011-10-27-two-new-ropensci-r-packages-are-on-cran.md
 tags: 
 - packages
 - Ecology

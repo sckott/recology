@@ -4,6 +4,7 @@ layout: post
 title: Weecology can has new mammal dataset
 author: Scott Chamberlain
 date: 2011-12-29 08:11:00 -06:00
+sourceslug: _posts/2011-12-29-weecology-can-has-new-mammal-dataset.md
 tags: 
 - Datasets
 - ggplot2

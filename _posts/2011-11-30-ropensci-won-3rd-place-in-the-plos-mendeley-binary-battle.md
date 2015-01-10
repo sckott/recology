@@ -4,6 +4,7 @@ layout: post
 title: rOpenSci won 3rd place in the PLoS-Mendeley Binary Battle!
 author: Scott Chamberlain
 date: 2011-11-30 12:28:00.001000 -06:00
+sourceslug: _posts/2011-11-30-ropensci-won-3rd-place-in-the-plos-mendeley-binary-battle.md
 tags: 
 - packages
 - rmendeley

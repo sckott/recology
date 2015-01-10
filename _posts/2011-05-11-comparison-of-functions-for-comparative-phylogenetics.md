@@ -4,6 +4,7 @@ layout: post
 title: Comparison of functions for comparative phylogenetics
 author: Scott Chamberlain
 date: 2011-05-11 10:08:00 -05:00
+sourceslug: _posts/2011-05-11-comparison-of-functions-for-comparative-phylogenetics.md
 tags: 
 - Evolution
 - ape
