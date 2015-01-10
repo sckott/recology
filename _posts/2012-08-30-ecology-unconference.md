@@ -4,6 +4,7 @@ layout: post
 title: Ecology unconference at ESA 2013
 date: 2012-08-30 08:25:00.00 -08:00
 author: Scott Chamberlain
+sourceslug: _drafts/2012-08-30-ecology-unconference.Rmd
 tags: 
 - science
 - ecology
@@ -32,7 +33,7 @@ How do I get involved? Go to the wiki and start contributing: [http://ecologyunc
 
 *********
 
-### Get the .Rmd file used to create this post [at my github account](https://github.com/sckott/sckott.github.io/tree/master/_drafts/2012-08-30-making-matrices.Rmd).
+### Get the .Rmd file used to create this post [at my github account](https://github.com/sckott/sckott.github.com/tree/master/_drafts/2012-08-30-making-matrices.Rmd).
 
 *********
 

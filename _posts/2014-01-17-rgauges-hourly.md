@@ -4,6 +4,7 @@ layout: post
 title: rgauges - fun with hourly web site analytics
 date: 2014-01-17
 author: Scott Chamberlain
+sourceslug: _drafts/2014-01-17-rgauges-hourly.Rmd
 tags:
 - R
 - API

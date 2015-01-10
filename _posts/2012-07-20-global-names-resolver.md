@@ -4,6 +4,7 @@ layout: post
 title: Hitting the Global Names Resolver API
 date: 2012-07-20
 author: Scott Chamberlain
+sourceslug: _drafts/2012-07-20-global-names-resolver.Rmd
 tags: 
 - API
 - ropensci

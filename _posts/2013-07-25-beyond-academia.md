@@ -4,6 +4,7 @@ layout: post
 title: Beyond academia
 date: 2013-07-25
 author: Scott Chamberlain
+sourceslug: _drafts/2013-07-25-beyond-academia.Rmd
 tags:
 - ecology
 - conference

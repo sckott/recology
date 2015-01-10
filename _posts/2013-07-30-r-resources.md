@@ -4,6 +4,7 @@ layout: post
 title: R resources
 date: 2013-07-30
 author: Scott Chamberlain
+sourceslug: _posts/2013-07-30-r-resources.md
 tags:
 - R
 ---

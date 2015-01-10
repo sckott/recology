@@ -4,6 +4,7 @@ layout: post
 title: R ecology workshop
 date: 2013-07-31
 author: Scott Chamberlain
+sourceslug: _posts/2013-07-31-r-ecology-workshop.md
 tags:
 - R
 - ecology

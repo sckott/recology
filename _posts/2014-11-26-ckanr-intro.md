@@ -4,6 +4,7 @@ layout: post
 title: Intro to alpha ckanr - R client for CKAN RESTful API 
 date: 2014-11-26T11:42:36Z
 author: Scott Chamberlain
+sourceslug: _drafts/2014-11-26-ckanr-intro.Rmd
 tags:
 - R
 - API

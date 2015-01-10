@@ -4,6 +4,7 @@ layout: post
 title: http codes
 date: 2014-12-02T16:01:50Z
 author: Scott Chamberlain
+sourceslug: _drafts/2014-12-02-http-codes.Rmd
 tags:
 - R
 - API

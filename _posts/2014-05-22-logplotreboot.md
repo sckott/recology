@@ -4,6 +4,7 @@ layout: post
 title: Logistic plot reboot
 date: 2014-05-22
 author: Scott Chamberlain
+sourceslug: _drafts/2014-05-22-logplotreboot.Rmd
 tags:
 - R
 - ggplot2

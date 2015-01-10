@@ -4,6 +4,7 @@ layout: post
 title: analogsea - an R client for the Digital Ocean API
 date: 2014-05-28
 author: Scott Chamberlain
+sourceslug: _drafts/2014-05-28-analogsea.Rmd
 tags:
 - R
 - API

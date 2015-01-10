@@ -4,6 +4,7 @@ layout: post
 title: Museum metadata - the Asian Art Museum of San Francisco
 date: 2014-12-10
 author: Scott Chamberlain
+sourceslug: _drafts/2014-12-10-museum-aamsf.Rmd
 tags:
 - R
 - history

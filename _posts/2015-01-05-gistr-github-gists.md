@@ -4,6 +4,7 @@ layout: post
 title: gistr - R client for GitHub gists
 date: 2015-01-05
 author: Scott Chamberlain
+sourceslug: _drafts/2015-01-05-gistr-github-gists.Rmd
 tags:
 - R
 - github

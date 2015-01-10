@@ -4,6 +4,7 @@ layout: post
 title: taxize workflows
 date: 2014-12-02
 author: Scott Chamberlain
+sourceslug: _drafts/2014-12-02-taxize-workflows.Rmd
 tags:
 - R
 - API

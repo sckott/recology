@@ -4,6 +4,7 @@ layout: post
 title: ggplot2 maps with insets
 date: 2012-08-22
 author: Scott Chamberlain
+sourceslug: _drafts/2012-08-22-ggplot-inset-map.Rmd
 tags: 
 - ggplot2
 - map
@@ -137,7 +138,7 @@ print(a, vp = vpa_)
 
 *********
 
-### Get the .Rmd file used to create this post [at my github account](https://github.com/sckott/sckott.github.io/tree/master/_drafts/2012-08-22-ggplot-inset-map.Rmd).
+### Get the .Rmd file used to create this post [at my github account](https://github.com/sckott/sckott.github.com/tree/master/_drafts/2012-08-22-ggplot-inset-map.Rmd).
 
 *********
 

@@ -4,6 +4,7 @@ layout: post
 title: Function for phylogeny resolution
 author: Scott Chamberlain
 date: 2012-01-13
+sourceslug: _posts/2012-01-13-phylogeny-resolution.md
 tags: 
 - R
 - ape

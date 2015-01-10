@@ -4,6 +4,7 @@ layout: post
 title: Journal Articles Need Interactive Graphics
 date: 2012-02-25
 author: Pascal Mickelson
+sourceslug: _posts/2012-02-25-science-publications-need-interactive-graphics.md
 tags: 
 - datavisualization
 - publishing

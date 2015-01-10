@@ -4,6 +4,7 @@ layout: post
 title: R I/O for geojson and topojson
 date: 2015-01-06
 author: Scott Chamberlain
+sourceslug: _drafts/2015-01-06-geojson-topojson-io.Rmd
 tags:
 - R
 - geospatial

@@ -4,6 +4,7 @@ layout: post
 title: Recent R packages for ecology and evolution
 date: 2012-06-14
 author: Scott Chamberlain
+sourceslug: _drafts/2012-07-20-global-names-resolver.Rmd
 tags:
 - R
 - python

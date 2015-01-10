@@ -4,6 +4,7 @@ layout: post
 title: rsunlight - R client for Sunlight Labs APIs
 date: 2014-08-11
 author: Scott Chamberlain
+sourceslug: _drafts/2014-08-11-rsunlight.Rmd
 tags:
 - R
 - API

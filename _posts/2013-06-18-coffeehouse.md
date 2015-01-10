@@ -4,6 +4,7 @@ layout: post
 title: Coffeehouse - an aggregator for blog posts about data, data management, etc.
 date: 2013-06-18
 author: Scott Chamberlain
+sourceslug: _drafts/2013-06-18-coffeehouse.Rmd
 tags:
 - data
 - data management

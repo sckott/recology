@@ -4,6 +4,7 @@ layout: post
 title: Dealing with multi handle errors
 date: 2014-12-08
 author: Scott Chamberlain
+sourceslug: _drafts/2014-12-08-multi-handle.Rmd
 tags:
 - R
 - API

@@ -4,6 +4,7 @@ layout: post
 title: pytaxize - low level ITIS functions
 date: 2014-12-26
 author: Scott Chamberlain
+sourceslug: _drafts/2014-12-24-pytaxize-itis.md
 tags:
 - python
 - taxonomy

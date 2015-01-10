@@ -4,6 +4,7 @@ layout: post
 title: Engaging the public on climate change through phenology data
 date: 2013-08-18
 author: Scott Chamberlain
+sourceslug: _drafts/2013-08-18-phenology.Rmd
 tags:
 - climate change
 - phenology

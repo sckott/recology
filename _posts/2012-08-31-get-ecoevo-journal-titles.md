@@ -4,6 +4,7 @@ layout: post
 title: Getting ecology and evolution journal titles from R
 date: 2012-08-31
 author: Scott Chamberlain
+sourceslug: _drafts/2012-08-31-get-ecoevo-journal-titles.Rmd
 tags: 
 - R
 - altmetrics
@@ -136,7 +137,7 @@ ecoevotitles[1:10]
 
 *********
 
-### Get the .Rmd file used to create this post [at my github account](https://github.com/sckott/sckott.github.io/tree/master/_drafts/2012-08-30-get-ecoevo-journal-titles.Rmd).
+### Get the .Rmd file used to create this post [at my github account](https://github.com/sckott/sckott.github.com/tree/master/_drafts/2012-08-30-get-ecoevo-journal-titles.Rmd).
 
 *********
 

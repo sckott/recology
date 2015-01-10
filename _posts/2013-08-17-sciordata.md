@@ -4,6 +4,7 @@ layout: post
 title: Working with climate data from the web in R
 date: 2013-08-17
 author: Scott Chamberlain
+sourceslug: _drafts/2013-08-17-sciordata.Rmd
 tags:
 - climate change
 - phenology

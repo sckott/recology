@@ -4,6 +4,7 @@ layout: post
 title: Resolving species names when you have a lot of them
 date: 2013-01-25
 author: Scott Chamberlain
+sourceslug: _drafts/2013-01-25-tnrs-use-case.Rmd
 tags: 
 - R
 - ropensci
@@ -265,6 +266,6 @@ As we got this speies list from [theplantlist.org](http://www.theplantlist.org/)
 
 ***************
 
-#### Get the .Rmd file used to create this post [at my github account](https://github.com/sckott/sckott.github.io/tree/master/2013-01-25-tnrs-use-case.Rmd) - or [.md file](https://github.com/sckott/sckott.github.io/tree/master/_posts/2013-01-25-tnrs-use-case.md).
+#### Get the .Rmd file used to create this post [at my github account](https://github.com/sckott/sckott.github.com/tree/master/2013-01-25-tnrs-use-case.Rmd) - or [.md file](https://github.com/sckott/sckott.github.com/tree/master/_posts/2013-01-25-tnrs-use-case.md).
 
 #### Written in [Markdown](http://daringfireball.net/projects/markdown/), with help from [knitr](http://yihui.name/knitr/).

@@ -4,6 +4,7 @@ layout: post
 title: Take the INNGE survey on math and ecology
 author: Scott Chamberlain
 date: 2012-02-17
+sourceslug: _posts/2012-02-17-math-ecology-survey.md
 tags: 
 - R
 - math

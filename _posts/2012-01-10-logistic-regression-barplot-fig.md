@@ -4,6 +4,7 @@ layout: post
 title: Presenting results of logistic regression
 author: Scott Chamberlain
 date: 2012-01-10 07:50:00 -06:00
+sourceslug: _posts/2012-01-10-logistic-regression-barplot-fig.md
 tags: 
 - ggplot2
 - gridExtra

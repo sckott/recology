@@ -4,6 +4,7 @@ layout: post
 title: Taking a Closer Look at Peer Review
 author: Pascal Mickelson
 date: 2012-01-16
+sourceslug: _posts/2012-01-16-reviewing-peer-review-process.md
 tags: 
 - thoughts
 - publishing

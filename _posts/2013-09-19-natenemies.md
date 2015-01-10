@@ -4,6 +4,7 @@ layout: post
 title: Pollinator niche breadth and natural enemies
 date: 2013-09-19
 author: Scott Chamberlain
+sourceslug: _posts/2013-09-19-natenemies.md
 tags:
 - unfinished
 ---

@@ -4,6 +4,7 @@ layout: post
 title: Getting taxonomic names downstream
 date: 2012-10-16
 author: Scott Chamberlain
+sourceslug: _drafts/2012-10-16-get-taxa-downstream.Rmd
 tags: 
 - R
 - open access
@@ -135,6 +136,6 @@ downstream(180541, "Species")
 
 
 *********
-#### Get the .Rmd file used to create this post [at my github account](https://github.com/sckott/sckott.github.io/tree/master/_drafts/2012-10-16-get-taxa-downstream.Rmd) - or [.md file](https://github.com/sckott/sckott.github.io/tree/master/_posts/2012-10-16-get-taxa-downstream.md).
+#### Get the .Rmd file used to create this post [at my github account](https://github.com/sckott/sckott.github.com/tree/master/_drafts/2012-10-16-get-taxa-downstream.Rmd) - or [.md file](https://github.com/sckott/sckott.github.com/tree/master/_posts/2012-10-16-get-taxa-downstream.md).
 
 #### Written in [Markdown](http://daringfireball.net/projects/markdown/), with help from [knitr](http://yihui.name/knitr/).

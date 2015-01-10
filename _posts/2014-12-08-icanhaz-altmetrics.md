@@ -4,6 +4,7 @@ layout: post
 title: icanhaz altmetrics
 date: 2014-12-08T19:45:29Z
 author: Scott Chamberlain
+sourceslug: _drafts/2014-12-08-icanhaz-altmetrics.Rmd
 tags:
 - R
 - Python

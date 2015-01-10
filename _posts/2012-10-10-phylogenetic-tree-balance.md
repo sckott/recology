@@ -4,6 +4,7 @@ layout: post
 title: Exploring phylogenetic tree balance metrics
 date: 2012-10-10
 author: Scott Chamberlain
+sourceslug: _drafts/2012-10-10-phylogenetic-tree-balance.Rmd
 tags: 
 - R
 - phylogenetic
@@ -164,6 +165,6 @@ print(c, vp = vpc_)
 
 
 *********
-#### Get the .Rmd file used to create this post [at my github account](https://github.com/sckott/sckott.github.io/tree/master/_drafts/2012-10-10-phylogenetic-tree-balance.Rmd) - or [.md file](https://github.com/sckott/sckott.github.io/tree/master/_posts/2012-10-10-phylogenetic-tree-balance.md).
+#### Get the .Rmd file used to create this post [at my github account](https://github.com/sckott/sckott.github.com/tree/master/_drafts/2012-10-10-phylogenetic-tree-balance.Rmd) - or [.md file](https://github.com/sckott/sckott.github.com/tree/master/_posts/2012-10-10-phylogenetic-tree-balance.md).
 
 #### Written in [Markdown](http://daringfireball.net/projects/markdown/), with help from [knitr](http://yihui.name/knitr/).

@@ -4,6 +4,7 @@ layout: post
 title: Altmetrics from anywhere
 date: 2014-12-08
 author: Scott Chamberlain
+sourceslug: _drafts/2014-12-08-icanhaz-altmetrics.Rmd
 tags:
 - R
 - API

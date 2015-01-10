@@ -4,6 +4,7 @@ layout: post
 title: Fun with the GitHub API
 date: 2014-11-26
 author: Scott Chamberlain
+sourceslug: _drafts/2014-11-26-github-fun.Rmd
 tags:
 - R
 - API

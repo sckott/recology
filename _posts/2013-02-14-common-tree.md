@@ -4,6 +4,7 @@ layout: post
 title: Getting a simple tree via NCBI
 date: 2013-02-14
 author: Scott Chamberlain
+sourceslug: _drafts/2013-02-14-common-tree.Rmd
 tags: 
 - R
 - phylogenetic
@@ -68,6 +69,6 @@ plot(tree2, no.margin = TRUE, cex = 0.7)
 
 ***************
 
-#### Get the .Rmd file used to create this post [at my github account](https://github.com/sckott/sckott.github.io/tree/master/_drafts/2013-02-14-common-tree.Rmd) - or [.md file](https://github.com/sckott/sckott.github.io/tree/master/_posts/2013-02-14-common-tree.md).
+#### Get the .Rmd file used to create this post [at my github account](https://github.com/sckott/sckott.github.com/tree/master/_drafts/2013-02-14-common-tree.Rmd) - or [.md file](https://github.com/sckott/sckott.github.com/tree/master/_posts/2013-02-14-common-tree.md).
 
 #### Written in [Markdown](http://daringfireball.net/projects/markdown/), with help from [knitr](http://yihui.name/knitr/).

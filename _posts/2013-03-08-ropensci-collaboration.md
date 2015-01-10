@@ -4,6 +4,7 @@ layout: post
 title: Visualizing rOpenSci collaboration
 date: 2013-03-08
 author: Scott Chamberlain
+sourceslug: _drafts/2013-03-08-ropensci-collaboration.Rmd
 tags: 
 - R
 - ropensci

@@ -4,6 +4,7 @@ layout: post
 title: Jekyll - an intro
 date: 2013-11-20
 author: Scott Chamberlain
+sourceslug: _drafts/2013-11-20-jekyll-intro.md
 tags:
 - R
 - github

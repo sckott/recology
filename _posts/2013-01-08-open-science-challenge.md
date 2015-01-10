@@ -4,6 +4,7 @@ layout: post
 title: Open Science Challenge
 date: 2013-01-08
 author: Scott Chamberlain
+sourceslug: _drafts/2013-01-08-open-science-challenge.Rmd
 tags: 
 - R
 - ropensci
@@ -55,7 +56,7 @@ January 31, 2013
 
 ***************
 
-#### Get the .Rmd file used to create this post [at my github account](https://github.com/sckott/sckott.github.io/tree/master/_drafts/2013-01-08-open-science-challenge.Rmd) - or [.md file](https://github.com/sckott/sckott.github.io/tree/master/_posts/2013-01-08-open-science-challenge.md).
+#### Get the .Rmd file used to create this post [at my github account](https://github.com/sckott/sckott.github.com/tree/master/_drafts/2013-01-08-open-science-challenge.Rmd) - or [.md file](https://github.com/sckott/sckott.github.com/tree/master/_posts/2013-01-08-open-science-challenge.md).
 
 #### Written in [Markdown](http://daringfireball.net/projects/markdown/), with help from [knitr](http://yihui.name/knitr/), and [knitcitations](https://github.com/cboettig/knitcitations) from [Carl Boettiger](http://www.carlboettiger.info/).
 

@@ -4,6 +4,7 @@ layout: post
 title: Taxonomy data from the web in three languages
 date: 2013-09-27
 author: Scott Chamberlain
+sourceslug: _posts/2013-09-26-taxonomy-in-three-acts.md
 tags:
 - R
 - ruby

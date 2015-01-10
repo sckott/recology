@@ -4,6 +4,7 @@ layout: post
 title: Publications by author country
 date: 2014-12-03
 author: Scott Chamberlain
+sourceslug: _drafts/2014-12-03-rplos-pubs-country.Rmd
 tags:
 - R
 - API

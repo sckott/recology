@@ -4,6 +4,7 @@ layout: post
 title: Scraping Flora of North America
 author: Scott Chamberlain
 date: 2012-01-27
+sourceslug: _posts/2012-01-27-flora-north-america-scraping.md
 tags: 
 - R
 - scraping

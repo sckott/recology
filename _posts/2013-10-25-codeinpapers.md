@@ -4,6 +4,7 @@ layout: post
 title: Code display in scholarly journals
 date: 2013-10-25
 author: Scott Chamberlain
+sourceslug: _posts/2013-10-25-codeinpapers.md
 tags:
 - code
 - journals

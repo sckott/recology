@@ -4,6 +4,7 @@ layout: post
 title: Scholarly metadata in R
 date: 2013-03-16
 author: Scott Chamberlain
+sourceslug: _drafts/2013-03-16-r-metadata.Rmd
 tags: 
 - R
 - ropensci
@@ -370,6 +371,6 @@ ggplot(toplot_, aes(articletype, authors)) + theme_tufte(base_size = 16) + geom_
 
 ***************
 
-#### Get the .Rmd file used to create this post [at my github account](https://github.com/sckott/sckott.github.io/tree/master/_drafts/2013-03-16-r-metadata.Rmd) - or [.md file](https://github.com/sckott/sckott.github.io/tree/master/_posts/2013-03-16-r-metadata.md).
+#### Get the .Rmd file used to create this post [at my github account](https://github.com/sckott/sckott.github.com/tree/master/_drafts/2013-03-16-r-metadata.Rmd) - or [.md file](https://github.com/sckott/sckott.github.com/tree/master/_posts/2013-03-16-r-metadata.md).
 
 #### Written in [Markdown](http://daringfireball.net/projects/markdown/), with help from [knitr](http://yihui.name/knitr/), and [knitcitations](https://github.com/cboettig/knitcitations).

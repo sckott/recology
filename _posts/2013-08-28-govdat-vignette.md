@@ -4,6 +4,7 @@ layout: post
 title: govdat - SunlightLabs and New York Times Congress data via R
 date: 2013-08-28
 author: Scott Chamberlain
+sourceslug: _drafts/2013-08-28-govdat-vignette.Rmd
 tags:
 - R
 - API

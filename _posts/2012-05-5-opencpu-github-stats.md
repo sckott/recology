@@ -4,6 +4,7 @@ layout: post
 title: Visualize your Github stats (forks and watchers) in a browser with R!
 date: 2012-05-5
 author: Scott Chamberlain
+sourceslug: _posts/2012-05-5-opencpu-github-stats.md
 tags: 
 - datavisualization
 - ggplot2

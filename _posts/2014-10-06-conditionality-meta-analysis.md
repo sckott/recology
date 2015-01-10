@@ -4,6 +4,7 @@ layout: post
 title: Conditionality meta-analysis data
 date: 2014-10-06
 author: Scott Chamberlain
+sourceslug: _drafts/2014-10-06-conditionality-meta-analysis.Rmd
 tags:
 - R
 - data
