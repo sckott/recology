@@ -4,6 +4,7 @@ layout: post
 title: "Phylometa from R: Randomization via Tip Shuffle"
 author: Scott Chamberlain
 date: 2011-04-16 13:44:00.004000 -05:00
+sourceslug: _posts/2011-04-16-phylometa-from-r-randomization-via-tip-shuffle.md
 tags: 
 - meta-analysis
 - Methods

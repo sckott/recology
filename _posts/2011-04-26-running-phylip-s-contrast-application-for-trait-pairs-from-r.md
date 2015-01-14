@@ -4,6 +4,7 @@ layout: post
 title: Running Phylip's contrast application for trait pairs from R
 author: Scott Chamberlain
 date: 2011-04-26 07:40:00.004000 -05:00
+sourceslug: _posts/2011-04-26-running-phylip-s-contrast-application-for-trait-pairs-from-r.md
 tags: 
 - Phylogenetics
 - R

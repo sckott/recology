@@ -4,6 +4,7 @@ layout: post
 title: A new blog about using R for ecology and evolution
 author: Scott Chamberlain
 date: 2010-12-27 11:42:00.001000 -06:00
+sourceslug: _posts/2010-12-27-a-new-blog-about-using-r-for-ecology-and-evolution.md
 tags: 
 - Evolution
 - Ecology

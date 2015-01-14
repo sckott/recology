@@ -4,6 +4,7 @@ layout: post
 title: basic ggplot2 network graphs ver2
 author: Scott Chamberlain
 date: 2011-03-23 14:09:00 -05:00
+sourceslug: _posts/2011-03-23-basic-ggplot2-network-graphs-ver2.md
 tags: 
 - ggplot2
 - bipartite

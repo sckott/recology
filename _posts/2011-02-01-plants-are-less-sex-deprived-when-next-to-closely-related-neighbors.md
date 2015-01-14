@@ -4,6 +4,7 @@ layout: post
 title: Plants are less sex deprived when next to closely related neighbors
 author: Scott Chamberlain
 date: 2011-02-01 22:59:00 -06:00
+sourceslug: _posts/2011-02-01-plants-are-less-sex-deprived-when-next-to-closely-related-neighbors.md
 tags: 
 ---
 

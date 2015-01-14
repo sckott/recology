@@ -4,6 +4,7 @@ layout: post
 title: Treebase trees from R
 author: Scott Chamberlain
 date: 2011-05-03 10:00:00.001000 -05:00
+sourceslug: _posts/2011-05-03-treebase-trees-from-r.md
 tags: 
 - Phylogenetics
 - R

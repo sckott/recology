@@ -4,8 +4,8 @@ layout: post
 title: Ngram ecological terms
 author: Scott Chamberlain
 date: 2010-12-29 20:43:00.001000 -06:00
+sourceslug: _posts/2010-12-29-ngram-ecological-terms.md
 tags: 
-
 ---
 
 The recent availability of google ngram data is a great source of data on language use. Here are some terms from ecology from 1890 to 2000 (from here: http://ngrams.googlelabs.com/). Note that the word "ecology" doesn't appear at all until about 1890. 

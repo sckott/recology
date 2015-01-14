@@ -4,6 +4,7 @@ layout: post
 title: R-bloggers
 author: Scott Chamberlain
 date: 2011-01-05 08:11:00 -06:00
+sourceslug: _posts/2011-01-05-r-bloggers.md
 tags: 
 - R
 ---

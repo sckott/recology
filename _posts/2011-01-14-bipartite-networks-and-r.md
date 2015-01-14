@@ -4,6 +4,7 @@ layout: post
 title: Bipartite networks and R
 author: Scott Chamberlain
 date: 2011-01-14 09:05:00 -06:00
+sourceslug: _posts/2011-01-14-bipartite-networks-and-r.md
 tags: 
 - Networks
 - R

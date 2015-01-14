@@ -4,6 +4,7 @@ layout: post
 title: Processing nested lists
 author: Scott Chamberlain
 date: 2011-04-28 17:41:00 -05:00
+sourceslug: _posts/2011-04-28-processing-nested-lists.md
 tags: 
 - R
 ---

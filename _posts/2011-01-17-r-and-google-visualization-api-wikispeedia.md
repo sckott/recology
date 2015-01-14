@@ -4,6 +4,7 @@ layout: post
 title: "R and Google Visualization API: Wikispeedia"
 author: Scott Chamberlain
 date: 2011-01-17 19:48:00 -06:00
+sourceslug: _posts/2011-01-17-r-and-google-visualization-api-wikispeedia.md
 tags: 
 - GoogleVis
 - R

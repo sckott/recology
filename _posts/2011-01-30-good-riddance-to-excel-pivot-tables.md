@@ -4,6 +4,7 @@ layout: post
 title: Good riddance to Excel pivot tables
 author: Scott Chamberlain
 date: 2011-01-30 22:36:00.0000 -06:00
+sourceslug: _posts/2011-01-30-good-riddance-to-excel-pivot-tables.md
 tags: 
 - plyr
 - reshape2
