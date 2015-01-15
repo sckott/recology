@@ -4,7 +4,7 @@ layout: post
 title: discgolf - Dicourse from R
 date: 2015-01-15
 author: Scott Chamberlain
-sourceslug: _drafts/2015-01-15-gistr-github-gists.Rmd
+sourceslug: _drafts/2015-01-15-discourse-in-r.Rmd
 tags:
 - R
 - community
