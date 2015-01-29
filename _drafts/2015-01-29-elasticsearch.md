@@ -18,6 +18,8 @@ Elasticsearch is a document database built on the JVM. `elastic` interacts with 
 
 Here's a few examples of what you can do.
 
+Note: `elastic` was just pushed to CRAN. It just got accepted, so binaries may not be available, try again soon, or install from Github, or install from source from CRAN like `install.packages("http://cran.r-project.org/src/contrib/elastic_0.3.0.tar.gz", repos=NULL, type="source")`.
+
 ## Installation
 
 
@@ -589,16 +591,22 @@ body <- '{
  }
 }'
 out <- Search('plos', 'article', body=body)
+#> Error in search_POST("_search", index, type, args = ec(list(df = df, analyzer = analyzer, : IndexMissingException[[plos] missing]
 out$hits$total
-#> [1] 58
+#> [1] 5000
 ```
 
 
 ```r
 sapply(out$hits$hits, function(x) x$highlight$title[[1]])[8:10]
-#> [1] "DUSP1 Is a Novel Target for Enhancing Pancreatic Cancer <em>Cell</em> Sensitivity to Gemcitabine"                       
-#> [2] "Carbon Ion Radiation Inhibits Glioma and Endothelial <em>Cell</em> Migration Induced by Secreted VEGF"                  
-#> [3] "Dynamic Visualization of Dendritic <em>Cell</em>-Antigen Interactions in the Skin Following Transcutaneous Immunization"
+#> [[1]]
+#> NULL
+#> 
+#> [[2]]
+#> NULL
+#> 
+#> [[3]]
+#> NULL
 ```
 
 ### Scrolling search - instead of paging
@@ -674,13 +682,13 @@ Get indices
 ```r
 cat_indices()
 #> yellow open gbifgeo      5 1  600 0 861.9kb 861.9kb 
-#> yellow open plos         5 1 1000 0 414.6kb 414.6kb 
 #> yellow open geoshape     5 1  222 0  42.9kb  42.9kb 
 #> yellow open _river       1 1    2 1    12kb    12kb 
 #> yellow open test1        5 1    0 0    575b    575b 
 #> yellow open gbif         5 1  899 0     1mb     1mb 
 #> yellow open geopt        5 1    0 0    575b    575b 
 #> yellow open gbifgeopoint 5 1  600 0 871.6kb 871.6kb 
+#> yellow open twitter      5 1    0 0    575b    575b 
 #> yellow open shakespeare  5 1 5000 0     1mb     1mb
 ```
 
@@ -689,7 +697,7 @@ Get nodes
 
 ```r
 cat_nodes()
-#> Scotts-MBP-1 192.168.1.104 7 72 2.39 d * Spitfire
+#> Scotts-MBP-1 192.168.1.104 7 68 2.75 d * Uatu
 ```
 
 ## Work with indices
@@ -714,8 +722,7 @@ Delete an index
 
 ```r
 index_delete(index='plos')
-#> $acknowledged
-#> [1] TRUE
+#> Error in index_delete(index = "plos"): client error: (404) Not Found
 ```
 
 Create an index
@@ -723,8 +730,7 @@ Create an index
 
 ```r
 index_create(index='twitter')
-#> $acknowledged
-#> [1] TRUE
+#> Error in index_create(index = "twitter"): client error: (400) Bad Request
 ```
 
 ## Work with documents
