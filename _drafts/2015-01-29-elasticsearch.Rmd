@@ -1,0 +1,376 @@
+---
+name: elasticsearch
+layout: post
+title: elastic - Elasticsearch from R
+date: 2015-01-29
+author: Scott Chamberlain
+sourceslug: _drafts/2015-01-29-elasticsearch.Rmd
+tags:
+- R
+- taxonomy
+---
+
+```{r, echo=FALSE}
+knitr::opts_chunk$set(
+  collapse = TRUE,
+  comment = "#>",
+  warning = FALSE,
+  message = FALSE
+)
+```
+
+We've (ropensci) been working on an R client for interacting with [Elasticsearch](http://www.elasticsearch.org/) for a while now, first commit was November 2013.
+
+Elasticsearch is a document database built on the JVM. `elastic` interacts with the Elasticsearch HTTP API, and includes functions for setting connection details to Elasticsearch instances, loading bulk data, searching for documents with both HTTP query variables and JSON based body requests. In addition, `elastic` provides functions for interacting with APIs for indices, documents, nodes, clusters, an interface to the cat API, and more.
+
+Here's a few examples of what you can do.
+
+## Installation
+
+```{r eval=FALSE}
+install.packages("elastic")
+```
+
+Or install development version:
+
+```{r eval=FALSE}
+install.packages("devtools")
+devtools::install_github("ropensci/elastic")
+```
+
+The load package
+
+```{r}
+library("elastic")
+```
+
+
+## Install Elasticsearch
+
+* [Elasticsearch installation help](http://www.elasticsearch.org/guide/en/elasticsearch/reference/current/_installation.html)
+
+__Unix (linux/osx)__
+
+Replace `1.4.1` with the version you are working with.
+
++ Download zip or tar file from Elasticsearch [see here for download](http://www.elasticsearch.org/overview/elkdownloads/), e.g., `curl -L -O https://download.elasticsearch.org/elasticsearch/elasticsearch/elasticsearch-1.4.1.tar.gz`
++ Uncompress it: `tar -xvf elasticsearch-1.4.1.tar.gz`
++ Move it: `sudo mv /path/to/elasticsearch-1.4.1 /usr/local`
++ Navigate to /usr/local: `cd /usr/local`
++ Add shortcut: `sudo ln -s elasticsearch-1.4.1 elasticsearch`
+
+On OSX, you can install via Homebrew: `brew install elasticsearch`
+
+__Windows__
+
+Windows users can follow the above, but unzip the zip file instead of uncompressing the tar file.
+
+## Start Elasticsearch
+
+* Navigate to elasticsearch: `cd /usr/local/elasticsearch`
+* Start elasticsearch: `bin/elasticsearch`
+
+I create a little bash shortcut called `es` that does both of the above commands in one step (`cd /usr/local/elasticsearch && bin/elasticsearch`).
+
+__Note:__ Windows users should run the `elasticsearch.bat` file
+
+## Initialize connection
+
+The function `connect()` is used before doing anything else to set the connection details to your remote or local elasticsearch store. The details created by `connect()` are written to your options for the current session, and are used by `elastic` functions.
+
+```{r eval=FALSE}
+connect()
+```
+
+On package load, your base url and port are set to `http://127.0.0.1` and `9200`, respectively. You can of course override these settings per session or for all sessions.
+
+## Get data
+
+Elasticsearch has a bulk load API to load data in fast. The format is pretty weird though. It's sort of JSON, but would pass no JSON linter. I include a few data sets in `elastic` so it's easy to get up and running, and so when you run examples in this package they'll actually run the same way (hopefully).
+
+### Shakespeare data
+
+Elasticsearch provides some data on Shakespeare plays. I've provided a subset of this data in this package. Get the path for the file specific to your machine:
+
+```{r eval=FALSE}
+shakespeare <- system.file("examples", "shakespeare_data.json", package = "elastic")
+```
+
+Then load the data into Elasticsearch:
+
+```{r eval=FALSE}
+docs_bulk(shakespeare)
+```
+
+### Public Library of Science (PLOS) data
+
+A dataset inluded in the `elastic` package is metadata for PLOS scholarly articles.
+
+```{r eval=FALSE}
+plosdat <- system.file("examples", "plos_data.json", package = "elastic")
+docs_bulk(plosdat)
+```
+
+### Global Biodiversity Information Facility (GBIF) data
+
+A dataset inluded in the `elastic` package is data for GBIF species occurrence records. Get the file path, then load:
+
+```{r eval=FALSE}
+gbifdat <- system.file("examples", "gbif_data.json", package = "elastic")
+docs_bulk(gbifdat)
+```
+
+GBIF geo data with a coordinates element to allow `geo_shape` queries
+
+```{r eval=FALSE}
+gbifgeo <- system.file("examples", "gbif_geo.json", package = "elastic")
+docs_bulk(gbifgeo)
+```
+
+## The Search function
+
+The main interface to searching documents in your Elasticsearch store is the function `Search()`. I nearly always develop R software using all lowercase, but R has a function called `search()`, and I wanted to avoid collision with that function.
+
+`Search()` is an interface to both the HTTP search API (in which queries are passed in the URI of the request, meaning queries have to be relatively simple), as well as the POST API, or the Query DSL, in which queries are passed in the body of the request (so can be much more complex).
+
+There are a huge amount of ways you can search Elasticsearch documents - this tutorial covers some of them, and highlights the ways in which you interact with the R outputs.
+
+### Search an index
+
+```{r}
+out <- Search(index="shakespeare")
+out$hits$total
+```
+
+```{r}
+out$hits$hits[[1]]
+```
+
+### Search an index by type
+
+```{r}
+Search(index="shakespeare", type="act")$hits$hits[[1]]
+```
+
+### Return certain fields
+
+```{r}
+Search(index="shakespeare", fields=c('play_name','speaker'))$hits$hits[[1]]
+```
+
+### Sorting
+
+```{r}
+Search(index="shakespeare", type="act", sort="text_entry")$hits$hits[1:2]
+```
+
+### Paging
+
+```{r}
+Search(index="shakespeare", size=1, from=1, fields='text_entry')$hits
+```
+
+### Queries
+
+Using the `q` parameter you can pass in a query, which gets passed in the URI of the query. This type of query is less powerful than the below query passed in the body of the request, using the `body` parameter.
+
+```{r}
+Search(index="shakespeare", type="act", q="speaker:KING HENRY IV")$hits$total
+```
+
+### Query DSL searches - queries sent in the body of the request
+
+Pass in as an R list
+
+```{r}
+aggs <- list(aggs = list(stats = list(terms = list(field = "text_entry"))))
+Search(index="shakespeare", body=aggs)$hits$hits[[1]]
+```
+
+Or pass in as json query with newlines, easy to read
+
+```{r}
+aggs <- '{
+    "aggs": {
+        "stats" : {
+            "terms" : {
+                "field" : "text_entry"
+            }
+        }
+    }
+}'
+Search(index="shakespeare", body=aggs)$hits$hits[[1]]
+```
+
+Or pass in collapsed json string
+
+```{r}
+aggs <- '{"aggs":{"stats":{"terms":{"field":"text_entry"}}}}'
+Search(index="shakespeare", body=aggs)$hits$hits[[1]]
+```
+
+### Fuzzy query
+
+Fuzzy query on numerics
+
+```{r}
+fuzzy <- list(query = list(fuzzy = list(speech_number = 7)))
+Search(index="shakespeare", body=fuzzy)$hits$total
+```
+
+```{r}
+fuzzy <- list(query = list(fuzzy = list(speech_number = list(value = 7, fuzziness = 4))))
+Search(index="shakespeare", body=fuzzy)$hits$total
+```
+
+### Range query
+
+With numeric
+
+```{r}
+body <- list(query=list(range=list(decimalLongitude=list(gte=1, lte=3))))
+Search('gbif', body=body)$hits$total
+```
+
+```{r}
+body <- list(query=list(range=list(decimalLongitude=list(gte=2.9, lte=10))))
+Search('gbif', body=body)$hits$total
+```
+
+With dates
+
+```{r}
+body <- list(query=list(range=list(eventDate=list(gte="2012-01-01", lte="now"))))
+Search('gbif', body=body)$hits$total
+```
+
+```{r}
+body <- list(query=list(range=list(eventDate=list(gte="2014-01-01", lte="now"))))
+Search('gbif', body=body)$hits$total
+```
+
+### Highlighting
+
+```{r}
+body <- '{
+ "query": {
+   "query_string": {
+     "query" : "cell"
+   }
+ },
+ "highlight": {
+   "fields": {
+     "title": {"number_of_fragments": 2}
+   }
+ }
+}'
+out <- Search('plos', 'article', body=body)
+out$hits$total
+```
+
+```{r}
+sapply(out$hits$hits, function(x) x$highlight$title[[1]])[8:10]
+```
+
+### Scrolling search - instead of paging
+
+```{r}
+Search('shakespeare', q="a*")$hits$total
+res <- Search(index = 'shakespeare', q="a*", scroll="1m")
+res <- Search(index = 'shakespeare', q="a*", scroll="1m", search_type = "scan")
+length(scroll(scroll_id = res$`_scroll_id`)$hits$hits)
+```
+
+```{r}
+res <- Search(index = 'shakespeare', q="a*", scroll="5m", search_type = "scan")
+out <- list()
+hits <- 1
+while(hits != 0){
+  res <- scroll(scroll_id = res$`_scroll_id`)
+  hits <- length(res$hits$hits)
+  if(hits > 0)
+    out <- c(out, res$hits$hits)
+}
+length(out)
+```
+
+Woohoo! Collected all `r length(out)` documents in very little time.
+
+## The cat API
+
+List cat methods
+
+```{r}
+cat_()
+```
+
+Get aliases
+
+```{r}
+cat_aliases()
+```
+
+Get indices
+
+```{r}
+cat_indices()
+```
+
+Get nodes
+
+```{r}
+cat_nodes()
+```
+
+## Work with indices
+
+```{r}
+out <- index_get(index='shakespeare')
+names(out$shakespeare$mappings)
+```
+
+Check for index existence
+
+```{r}
+index_exists(index='shakespeare')
+```
+
+Delete an index
+
+```{r}
+index_delete(index='plos')
+```
+
+Create an index
+
+```{r}
+index_create(index='twitter')
+```
+
+## Work with documents
+
+Get a document
+
+```{r}
+docs_get(index='shakespeare', type='line', id=10)
+```
+
+Get certain fields
+
+```{r}
+docs_get(index='shakespeare', type='line', id=10, fields=c('play_name','speaker'))
+```
+
+Test for existence of the document
+
+```{r}
+docs_get(index='plos', type='article', id=1, exists=TRUE)
+```
+
+```{r}
+docs_get(index='plos', type='article', id=123456, exists=TRUE)
+```
+
+## Thats it
+
+Let us know if you have any feedback!
