@@ -7,7 +7,8 @@ author: Scott Chamberlain
 sourceslug: _drafts/2015-01-29-elasticsearch.Rmd
 tags:
 - R
-- taxonomy
+- http
+- API
 ---
 
 
@@ -35,7 +36,7 @@ install.packages("devtools")
 devtools::install_github("ropensci/elastic")
 ```
 
-The load package
+Then load package
 
 
 ```r
@@ -591,22 +592,16 @@ body <- '{
  }
 }'
 out <- Search('plos', 'article', body=body)
-#> Error in search_POST("_search", index, type, args = ec(list(df = df, analyzer = analyzer, : IndexMissingException[[plos] missing]
 out$hits$total
-#> [1] 5000
+#> [1] 57
 ```
 
 
 ```r
 sapply(out$hits$hits, function(x) x$highlight$title[[1]])[8:10]
-#> [[1]]
-#> NULL
-#> 
-#> [[2]]
-#> NULL
-#> 
-#> [[3]]
-#> NULL
+#> [1] "c-FLIP Protects Eosinophils from TNF-α-Mediated <em>Cell</em> Death In Vivo"                          
+#> [2] "DUSP1 Is a Novel Target for Enhancing Pancreatic Cancer <em>Cell</em> Sensitivity to Gemcitabine"     
+#> [3] "Carbon Ion Radiation Inhibits Glioma and Endothelial <em>Cell</em> Migration Induced by Secreted VEGF"
 ```
 
 ### Scrolling search - instead of paging
@@ -674,6 +669,8 @@ Get aliases
 
 ```r
 cat_aliases()
+#> things plos - - - 
+#> stuff  plos - - -
 ```
 
 Get indices
@@ -681,15 +678,19 @@ Get indices
 
 ```r
 cat_indices()
-#> yellow open gbifgeo      5 1  600 0 861.9kb 861.9kb 
-#> yellow open geoshape     5 1  222 0  42.9kb  42.9kb 
-#> yellow open _river       1 1    2 1    12kb    12kb 
-#> yellow open test1        5 1    0 0    575b    575b 
-#> yellow open gbif         5 1  899 0     1mb     1mb 
-#> yellow open geopt        5 1    0 0    575b    575b 
-#> yellow open gbifgeopoint 5 1  600 0 871.6kb 871.6kb 
-#> yellow open twitter      5 1    0 0    575b    575b 
-#> yellow open shakespeare  5 1 5000 0     1mb     1mb
+#> yellow open plosmore     5 1  1000  0   3.5mb   3.5mb 
+#> yellow open leotheadfadf 5 1     0  0    575b    575b 
+#> red    open alsothat     3 2                          
+#> yellow open gbif         5 1   899  0     1mb     1mb 
+#> yellow open gbifgeopoint 5 1     0  0    575b    575b 
+#> yellow open gbifnewgeo   5 1     2  0   5.8kb   5.8kb 
+#> yellow open plos         5 1  1202 39  14.2mb  14.2mb 
+#> yellow open leothedog    5 1     0  0    575b    575b 
+#> yellow open shakespeare  5 1  5000  0     1mb     1mb 
+#> yellow open gbifgeo      5 1   600  0 861.9kb 861.9kb 
+#> yellow open plosbigdata  5 1 20000  0  53.6mb  53.6mb 
+#> yellow open mapuris      5 1    31  0  34.4kb  34.4kb 
+#> yellow open leothelion   5 1     0  0    575b    575b
 ```
 
 Get nodes
@@ -697,7 +698,7 @@ Get nodes
 
 ```r
 cat_nodes()
-#> Scotts-MBP-1 192.168.1.104 7 68 2.75 d * Uatu
+#> Scotts-MacBook-Pro.local 192.168.1.104 6 79 3.44 d * Hellfire
 ```
 
 ## Work with indices
@@ -706,7 +707,7 @@ cat_nodes()
 ```r
 out <- index_get(index='shakespeare')
 names(out$shakespeare$mappings)
-#> [1] "line"  "act"   "scene"
+#> [1] "line"  "scene" "act"
 ```
 
 Check for index existence
@@ -722,7 +723,8 @@ Delete an index
 
 ```r
 index_delete(index='plos')
-#> Error in index_delete(index = "plos"): client error: (404) Not Found
+#> $acknowledged
+#> [1] TRUE
 ```
 
 Create an index
@@ -730,7 +732,8 @@ Create an index
 
 ```r
 index_create(index='twitter')
-#> Error in index_create(index = "twitter"): client error: (400) Bad Request
+#> $acknowledged
+#> [1] TRUE
 ```
 
 ## Work with documents
