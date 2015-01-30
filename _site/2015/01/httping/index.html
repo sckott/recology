@@ -1,0 +1,344 @@
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en" lang="en-us">
+
+  <head>
+  <meta http-equiv="content-type" content="text/html; charset=utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1">
+  <link href="http://gmpg.org/xfn/11" rel="profile">
+
+  <title>
+    httping - ping and time http requests &middot; 
+    Recology, R/etc.
+  </title>
+
+  <!-- CSS -->
+  <link rel="stylesheet" href="/public/css/hyde.css">
+  <link rel="stylesheet" href="/public/css/syntax.css">
+  <link rel="stylesheet" href="http://fonts.googleapis.com/css?family=Open+Sans:300,400italic,400,600,700|Abril+Fatface">
+
+  <!-- Icons -->
+  <link rel="apple-touch-icon-precomposed" sizes="144x144" href="/public/favicon.ico">
+  <link rel="shortcut icon" href="/public/favicon.ico">
+  <link href="//netdna.bootstrapcdn.com/font-awesome/4.2.0/css/font-awesome.css" rel="stylesheet">
+
+  <!-- RSS -->
+  <link rel="alternate" type="application/rss+xml" title="RSS" href="/atom.xml">
+</head>
+
+
+  <body class="theme-base-0f layout-reverse">
+
+    <header class="masthead">
+      <div class="masthead-inner">
+        <h1>Recology</h1>
+        <!-- <h1> <a href="http://recology.info/">Recology</a></h1> -->
+        <p class="lead">R/etc.</p>
+
+        <div class="colophon">
+          <ul class="colophon-links">
+            <li>
+              <a href="/"><i class="fa fa-home fa-lg"></i></a>&nbsp;
+              <a href="/about"><i class="fa fa-info-circle fa-lg"></i></a>&nbsp;
+              <a href="/archives"><i class="fa fa-archive fa-lg"></i></a>&nbsp;
+              <a href="/rresources"><i class="fa fa-book fa-lg"></i></a>&nbsp;
+              <a href="http://rforcats.net/" rel><i class="fa fa-graduation-cap fa-lg"></i></a>&nbsp;
+              <a href="feed.xml"><i class="fa fa-rss fa-lg"></i></a>&nbsp;
+              <a href="https://twitter.com/recology_"><i class="fa fa-twitter fa-lg"></i></a>&nbsp;
+              <a href="/fork"><i class="fa fa-spinner fa-lg"></i></a>
+            </li>
+          </ul>
+          <!-- <small><a href="https://github.com/mdo/hyde">Hyde</a> from <a href="https://twitter.com/mdo" target="_blank">@mdo</a>.</small> -->
+        </div>
+      </div>
+    </header>
+
+    <div class="content container">
+      <div class="post">
+  <h1>httping - ping and time http requests</h1><a style="float:right;" href="/archives"><i class="fa fa-archive fa-lg"></i></a>&nbsp;<a style="float:right;" href="/tags"><i class="fa fa-tags fa-lg"></i></a>
+  <span class="post-date">30 Jan 2015</span>
+  <i class="fa fa-tags fa-large"></i>&nbsp;
+     <a href="/tags/R" class="badge" rel="tooltip" data-placement="bottom" title="View posts tagged with &quot;R&quot;"><span class="blog_tag">R</span></a>    <a href="/tags/http" class="badge" rel="tooltip" data-placement="bottom" title="View posts tagged with &quot;http&quot;"><span class="blog_tag">http</span></a>   <br>
+  <!-- <i class="fa fa-code fa-large"></i>&nbsp;Source: <a href="https://github.com/sckott/sckott.github.com/tree/master/_drafts/2015-01-30-httping.Rmd">.Rmd</a> -->
+  <i class="fa fa-code fa-large"></i>&nbsp;Source: <a href="https://github.com/sckott/sckott.github.com/tree/master/_drafts/2015-01-30-elasticsearch.Rmd">.Rmd/.md</a>
+  <br><br>
+  <p>I&#39;ve been working on a little thing called <code>httping</code> - a small R package that started as a pkg to Ping urls and time requests. It&#39;s a port of the Ruby gem <a href="https://github.com/jpignata/httping">httping</a>. The <code>httr</code> package is in <code>Depends</code> in this package, so its functions can be called directly, without having to load <code>httr</code> explicitly yourself.</p>
+
+<p>In addition to timing requests, I&#39;ve been tinkering with how to make http requests, with curl options accepting and returning the same object so they can be chained together, and then that object passed to a http verb like <code>GET</code>. Maybe this is a bad idea, but maybe not.</p>
+
+<h2>Installation</h2>
+
+<p>Install:</p>
+
+<p>One non-CRAN dep (<code>httpcode</code>) needs to be installed first.</p>
+<div class="highlight"><pre><code class="language-r" data-lang="r">install.packages<span class="p">(</span><span class="s">&quot;devtools&quot;</span><span class="p">)</span>
+devtools<span class="o">::</span>install_github<span class="p">(</span><span class="s">&quot;sckott/httpcode&quot;</span><span class="p">)</span>
+devtools<span class="o">::</span>install_github<span class="p">(</span><span class="s">&quot;sckott/httping&quot;</span><span class="p">)</span>
+</code></pre></div>
+<p>Then load package</p>
+<div class="highlight"><pre><code class="language-r" data-lang="r"><span class="kn">library</span><span class="p">(</span><span class="s">&quot;httping&quot;</span><span class="p">)</span>
+</code></pre></div>
+<h2>Time requests</h2>
+
+<p>The idea with <code>time()</code> is to provide easy to use and understand information on how long http requests take to run. You should be able to pass in any <code>httr</code> verbs (<code>GET()</code>, <code>POST()</code>, etc.) to <code>time()</code>. <code>time()</code> repeats whatever http request you pass to it by default 10 times, but you can set the number of times to repeat in the <code>count</code> parameter. In addition, the <code>flood</code> parameter controls whether there is a delay between requests or not, and <code>delay</code> controls length of the delay. </p>
+
+<p>A <code>GET</code> request</p>
+<div class="highlight"><pre><code class="language-r" data-lang="r">GET<span class="p">(</span><span class="s">&quot;http://google.com&quot;</span><span class="p">)</span> <span class="o">%&gt;%</span> time<span class="p">(</span>count<span class="o">=</span><span class="m">3</span><span class="p">)</span>
+<span class="c1">#&gt; 29.392 kb - http://www.google.com/ code:200 time(ms):92.444</span>
+<span class="c1">#&gt; 29.392 kb - http://www.google.com/ code:200 time(ms):82.127</span>
+<span class="c1">#&gt; 29.392 kb - http://www.google.com/ code:200 time(ms):85.587</span>
+<span class="c1">#&gt; &lt;http time&gt;</span>
+<span class="c1">#&gt;   Avg. min (ms):  82.127</span>
+<span class="c1">#&gt;   Avg. max (ms):  92.444</span>
+<span class="c1">#&gt;   Avg. mean (ms): 86.71933</span>
+</code></pre></div>
+<p>A <code>POST</code> request</p>
+<div class="highlight"><pre><code class="language-r" data-lang="r">POST<span class="p">(</span><span class="s">&quot;http://httpbin.org/post&quot;</span><span class="p">,</span> body <span class="o">=</span> <span class="s">&quot;A simple text string&quot;</span><span class="p">)</span> <span class="o">%&gt;%</span> time<span class="p">(</span>count<span class="o">=</span><span class="m">3</span><span class="p">)</span>
+<span class="c1">#&gt; 10.144 kb - http://httpbin.org/post code:200 time(ms):267.574</span>
+<span class="c1">#&gt; 10.144 kb - http://httpbin.org/post code:200 time(ms):113.309</span>
+<span class="c1">#&gt; 10.144 kb - http://httpbin.org/post code:200 time(ms):99.938</span>
+<span class="c1">#&gt; &lt;http time&gt;</span>
+<span class="c1">#&gt;   Avg. min (ms):  99.938</span>
+<span class="c1">#&gt;   Avg. max (ms):  267.574</span>
+<span class="c1">#&gt;   Avg. mean (ms): 160.2737</span>
+</code></pre></div>
+<p>The return object is a list with slots for all the <code>httr</code> response objects, the times for each request, and the average times. The number of requests, and the delay between requests are included as attributes.</p>
+<div class="highlight"><pre><code class="language-r" data-lang="r">res <span class="o">&lt;-</span> GET<span class="p">(</span><span class="s">&quot;http://google.com&quot;</span><span class="p">)</span> <span class="o">%&gt;%</span> time<span class="p">(</span>count<span class="o">=</span><span class="m">3</span><span class="p">)</span>
+<span class="c1">#&gt; 29.392 kb - http://www.google.com/ code:200 time(ms):82.086</span>
+<span class="c1">#&gt; 29.392 kb - http://www.google.com/ code:200 time(ms):78.15</span>
+<span class="c1">#&gt; 29.392 kb - http://www.google.com/ code:200 time(ms):79.763</span>
+</code></pre></div><div class="highlight"><pre><code class="language-r" data-lang="r"><span class="kp">attributes</span><span class="p">(</span>res<span class="p">)</span>
+<span class="c1">#&gt; $names</span>
+<span class="c1">#&gt; [1] &quot;times&quot;    &quot;averages&quot; &quot;request&quot; </span>
+<span class="c1">#&gt; </span>
+<span class="c1">#&gt; $count</span>
+<span class="c1">#&gt; [1] 3</span>
+<span class="c1">#&gt; </span>
+<span class="c1">#&gt; $delay</span>
+<span class="c1">#&gt; [1] 0.5</span>
+<span class="c1">#&gt; </span>
+<span class="c1">#&gt; $class</span>
+<span class="c1">#&gt; [1] &quot;http_time&quot;</span>
+</code></pre></div>
+<p>Or print a summary of a response, gives more detail</p>
+<div class="highlight"><pre><code class="language-r" data-lang="r">res <span class="o">%&gt;%</span> <span class="kp">summary</span><span class="p">()</span>
+<span class="c1">#&gt; &lt;http time, averages (min max mean)&gt;</span>
+<span class="c1">#&gt;   Total (s):           78.15 82.086 79.99967</span>
+<span class="c1">#&gt;   Tedirect (s):        26.695 34.319 29.80633</span>
+<span class="c1">#&gt;   Namelookup time (s): 0.025 0.03 0.028</span>
+<span class="c1">#&gt;   Connect (s):         0.028 0.034 0.032</span>
+<span class="c1">#&gt;   Pretransfer (s):     0.069 0.081 0.07633333</span>
+<span class="c1">#&gt;   Starttransfer (s):   45.44 49.326 47.95867</span>
+</code></pre></div>
+<p>Messages are printed using <code>cat</code>, so you can suppress those using <code>verbose=FALSE</code>, like</p>
+<div class="highlight"><pre><code class="language-r" data-lang="r">GET<span class="p">(</span><span class="s">&quot;http://google.com&quot;</span><span class="p">)</span> <span class="o">%&gt;%</span> time<span class="p">(</span>count<span class="o">=</span><span class="m">3</span><span class="p">,</span> verbose <span class="o">=</span> <span class="kc">FALSE</span><span class="p">)</span>
+<span class="c1">#&gt; &lt;http time&gt;</span>
+<span class="c1">#&gt;   Avg. min (ms):  86.12</span>
+<span class="c1">#&gt;   Avg. max (ms):  94.035</span>
+<span class="c1">#&gt;   Avg. mean (ms): 89.12467</span>
+</code></pre></div>
+<h2>Ping an endpoint</h2>
+
+<p>The idea with <code>ping()</code> is to simply return the http status code along with a message describing what that code means. That&#39;s it.</p>
+
+<p>This function is a bit different, accepts a url as first parameter, but can accept any args passed on to <code>httr</code> verb functions, like <code>GET</code>, <code>POST</code>,  etc.</p>
+<div class="highlight"><pre><code class="language-r" data-lang="r"><span class="s">&quot;http://google.com&quot;</span> <span class="o">%&gt;%</span> ping<span class="p">()</span>
+<span class="c1">#&gt; &lt;http ping&gt; 200</span>
+<span class="c1">#&gt;   Message: OK</span>
+<span class="c1">#&gt;   Description: Request fulfilled, document follows</span>
+</code></pre></div>
+<p>Or pass in additional arguments to modify request</p>
+<div class="highlight"><pre><code class="language-r" data-lang="r"><span class="s">&quot;http://google.com&quot;</span> <span class="o">%&gt;%</span> ping<span class="p">(</span>config<span class="o">=</span>verbose<span class="p">())</span>
+<span class="c1">#&gt; -&gt; GET / HTTP/1.1</span>
+<span class="c1">#&gt; -&gt; User-Agent: curl/7.37.1 Rcurl/1.95.4.5 httr/0.6.1</span>
+<span class="c1">#&gt; -&gt; Host: google.com</span>
+<span class="c1">#&gt; -&gt; Accept-Encoding: gzip</span>
+<span class="m">...</span>cutoff
+</code></pre></div>
+<h2>Even simpler verbs</h2>
+
+<p><code>httr</code> is already easy, but <code>Get()</code>:</p>
+
+<ul>
+<li>Allows use of an intuitive chaining workflow</li>
+<li>Parses data for you using <code>httr</code> built in format guesser, which should work in most cases</li>
+</ul>
+
+<p>A simple GET request</p>
+<div class="highlight"><pre><code class="language-r" data-lang="r"><span class="s">&quot;http://httpbin.org/get&quot;</span> <span class="o">%&gt;%</span>
+  Get<span class="p">()</span>
+<span class="c1">#&gt; $args</span>
+<span class="c1">#&gt; named list()</span>
+<span class="c1">#&gt; </span>
+<span class="c1">#&gt; $headers</span>
+<span class="c1">#&gt; $headers$Accept</span>
+<span class="c1">#&gt; [1] &quot;application/json, text/xml, application/xml, */*&quot;</span>
+<span class="c1">#&gt; </span>
+<span class="c1">#&gt; $headers$`Accept-Encoding`</span>
+<span class="c1">#&gt; [1] &quot;gzip&quot;</span>
+<span class="c1">#&gt; </span>
+<span class="c1">#&gt; $headers$Host</span>
+<span class="c1">#&gt; [1] &quot;httpbin.org&quot;</span>
+<span class="c1">#&gt; </span>
+<span class="c1">#&gt; $headers$`User-Agent`</span>
+<span class="c1">#&gt; [1] &quot;curl/7.37.1 Rcurl/1.95.4.5 httr/0.6.1&quot;</span>
+<span class="c1">#&gt; </span>
+<span class="c1">#&gt; </span>
+<span class="c1">#&gt; $origin</span>
+<span class="c1">#&gt; [1] &quot;24.21.209.71&quot;</span>
+<span class="c1">#&gt; </span>
+<span class="c1">#&gt; $url</span>
+<span class="c1">#&gt; [1] &quot;http://httpbin.org/get&quot;</span>
+</code></pre></div>
+<p>You can buid up options by calling functions</p>
+<div class="highlight"><pre><code class="language-r" data-lang="r"><span class="s">&quot;http://httpbin.org/get&quot;</span> <span class="o">%&gt;%</span>
+  Progress<span class="p">()</span> <span class="o">%&gt;%</span>
+  Verbose<span class="p">()</span>
+<span class="c1">#&gt; &lt;http request&gt; </span>
+<span class="c1">#&gt;   url: http://httpbin.org/get</span>
+<span class="c1">#&gt;   config: </span>
+<span class="c1">#&gt; Config: </span>
+<span class="c1">#&gt; List of 4</span>
+<span class="c1">#&gt;  $ noprogress      :FALSE</span>
+<span class="c1">#&gt;  $ progressfunction:function (...)  </span>
+<span class="c1">#&gt;  $ debugfunction   :function (...)  </span>
+<span class="c1">#&gt;  $ verbose         :TRUE</span>
+</code></pre></div>
+<p>Then eventually execute the GET request</p>
+<div class="highlight"><pre><code class="language-r" data-lang="r"><span class="s">&quot;http://httpbin.org/get&quot;</span> <span class="o">%&gt;%</span>
+  Verbose<span class="p">()</span> <span class="o">%&gt;%</span>
+  Progress<span class="p">()</span> <span class="o">%&gt;%</span>
+  Get<span class="p">()</span>
+<span class="c1">#&gt; -&gt; GET /get HTTP/1.1</span>
+<span class="c1">#&gt; -&gt; User-Agent: curl/7.37.1 Rcurl/1.95.4.5 httr/0.6.1</span>
+<span class="c1">#&gt; -&gt; Host: httpbin.org</span>
+<span class="c1">#&gt; -&gt; Accept-Encoding: gzip</span>
+<span class="c1">#&gt; -&gt; Accept: application/json, text/xml, application/xml, */*</span>
+<span class="c1">#&gt; -&gt; </span>
+<span class="c1">#&gt; &lt;- HTTP/1.1 200 OK</span>
+<span class="c1">#&gt; &lt;- Server: nginx</span>
+<span class="c1">#&gt; &lt;- Date: Fri, 30 Jan 2015 17:38:58 GMT</span>
+<span class="c1">#&gt; &lt;- Content-Type: application/json</span>
+<span class="c1">#&gt; &lt;- Content-Length: 288</span>
+<span class="c1">#&gt; &lt;- Connection: keep-alive</span>
+<span class="c1">#&gt; &lt;- Access-Control-Allow-Origin: *</span>
+<span class="c1">#&gt; &lt;- Access-Control-Allow-Credentials: true</span>
+<span class="c1">#&gt; &lt;- </span>
+<span class="c1">#&gt;   |=======================================| 100%</span>
+<span class="c1">#&gt; </span>
+<span class="c1">#&gt; $args</span>
+<span class="c1">#&gt; named list()</span>
+<span class="c1">#&gt; </span>
+<span class="c1">#&gt; $headers</span>
+<span class="c1">#&gt; $headers$Accept</span>
+<span class="c1">#&gt; [1] &quot;application/json, text/xml, application/xml, */*&quot;</span>
+<span class="c1">#&gt; </span>
+<span class="c1">#&gt; $headers$`Accept-Encoding`</span>
+<span class="c1">#&gt; [1] &quot;gzip&quot;</span>
+<span class="c1">#&gt; </span>
+<span class="c1">#&gt; $headers$Host</span>
+<span class="c1">#&gt; [1] &quot;httpbin.org&quot;</span>
+<span class="c1">#&gt; </span>
+<span class="c1">#&gt; $headers$`User-Agent`</span>
+<span class="c1">#&gt; [1] &quot;curl/7.37.1 Rcurl/1.95.4.5 httr/0.6.1&quot;</span>
+<span class="c1">#&gt; </span>
+<span class="c1">#&gt; </span>
+<span class="c1">#&gt; $origin</span>
+<span class="c1">#&gt; [1] &quot;24.21.209.71&quot;</span>
+<span class="c1">#&gt; </span>
+<span class="c1">#&gt; $url</span>
+<span class="c1">#&gt; [1] &quot;http://httpbin.org/get&quot;</span>
+<span class="c1">#&gt; </span>
+</code></pre></div>
+</div>
+
+<div id="disqus_thread"></div>
+<script type="text/javascript">
+    /* * * CONFIGURATION VARIABLES: EDIT BEFORE PASTING INTO YOUR WEBPAGE * * */
+    var disqus_shortname = 'coffeehaus'; // required: replace example with your forum shortname
+
+    /* * * DON'T EDIT BELOW THIS LINE * * */
+    (function() {
+        var dsq = document.createElement('script'); dsq.type = 'text/javascript'; dsq.async = true;
+        dsq.src = '//' + disqus_shortname + '.disqus.com/embed.js';
+        (document.getElementsByTagName('head')[0] || document.getElementsByTagName('body')[0]).appendChild(dsq);
+    })();
+</script>
+<noscript>Please enable JavaScript to view the <a href="http://disqus.com/?ref_noscript">comments powered by Disqus.</a></noscript>
+<a href="http://disqus.com" class="dsq-brlink">comments powered by <span class="logo-disqus">Disqus</span></a>
+
+<!-- <div class="related">
+  <h2>Related Posts</h2>
+  <ul class="related-posts">
+    
+      <li>
+        <h3>
+          <a href="/2015/01/elasticsearch/">
+            elastic - Elasticsearch from R
+            <small>29 Jan 2015</small>
+          </a>
+        </h3>
+      </li>
+    
+      <li>
+        <h3>
+          <a href="/2015/01/binomen/">
+            binomen - taxonomic classes and parsing
+            <small>19 Jan 2015</small>
+          </a>
+        </h3>
+      </li>
+    
+      <li>
+        <h3>
+          <a href="/2015/01/discourse-in-r/">
+            discgolf - Dicourse from R
+            <small>15 Jan 2015</small>
+          </a>
+        </h3>
+      </li>
+    
+  </ul>
+</div>
+ -->
+
+    </div>
+
+    <!-- for bootstrap tooltips -->
+    <script type="text/javascript">
+      $("[data-toggle=\"tooltip\"]").tooltip();
+    </script>
+
+  </body>
+
+  <footer>
+  <!-- Disqus code -->
+  <script type="text/javascript">
+      /* * * CONFIGURATION VARIABLES: EDIT BEFORE PASTING INTO YOUR WEBPAGE * * */
+      var disqus_shortname = 'recology'; // required: replace example with your forum shortname
+
+      /* * * DON'T EDIT BELOW THIS LINE * * */
+      (function () {
+          var s = document.createElement('script'); s.async = true;
+          s.type = 'text/javascript';
+          s.src = 'http://' + disqus_shortname + '.disqus.com/count.js';
+          (document.getElementsByTagName('HEAD')[0] || document.getElementsByTagName('BODY')[0]).appendChild(s);
+      }());
+  </script>
+
+  <!-- Gaug.es Analytics -->
+  <script type="text/javascript">
+    var _gauges = _gauges || [];
+    (function() {
+      var t   = document.createElement('script');
+      t.type  = 'text/javascript';
+      t.async = true;
+      t.id    = 'gauges-tracker';
+      t.setAttribute('data-site-id', '4efd83a6f5a1f5158a000004');
+      t.src = '//secure.gaug.es/track.js';
+      var s = document.getElementsByTagName('script')[0];
+      s.parentNode.insertBefore(t, s);
+    })();
+  </script>
+</footer>
+
+</html>
