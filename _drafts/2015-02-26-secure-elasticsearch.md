@@ -11,11 +11,11 @@ tags:
 - security
 ---
 
-Recently I spun up a box on DigitalOcean planning to make a tens of thousdands of queries to an Elasticsearch instance on the same box. I could have done this on my own machine, but didn't want to take up compute resources.
+Recently I spun up a box on a cloud hosting provider planning to make a tens of thousdands of queries to an Elasticsearch instance on the same box. I could have done this on my own machine, but didn't want to take up compute resources.
 
-I installed R and Elasticsearch on a 2 GB droplet, then went about doing my thang.
+I installed R and Elasticsearch on the box, then went about doing my thang.
 
-A day later when things were still running, DigitalOcean sent me a message that apparently my box had been serving up a DDoS attack.
+A day later when things were still running, the hosting provider sent me a message that apparently my box had been serving up a DDoS attack.
 
 This was incredibly surprising, as I don't even know how to do such a thing.
 
