@@ -2,7 +2,7 @@
 name: secure-elasticsearch
 layout: post
 title: note to self, secure elasticsearch
-date: 2015-02-26
+date: 2015-02-26T10:00:00-08:00
 author: Scott Chamberlain
 sourceslug: _drafts/2015-02-26-secure-elasticsearch.Rmd
 tags:
