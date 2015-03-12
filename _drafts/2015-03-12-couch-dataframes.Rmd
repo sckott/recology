@@ -1,0 +1,126 @@
+---
+name: couch-dataframes
+layout: post
+title: PUT dataframes on your couch
+date: 2015-03-12
+author: Scott Chamberlain
+sourceslug: _drafts/2015-03-12-couch-dataframes.Rmd
+tags:
+- R
+- couchdb
+- sofa
+---
+
+```{r echo=FALSE}
+knitr::opts_chunk$set(
+  comment = "#>",
+  collapse = TRUE,
+  warning = FALSE, 
+  message = FALSE
+)
+```
+
+It would be nice to easily push each row or column of a data.frame into CouchDB instead of having to prepare them yourself into JSON, then push in to couch. I recently added ability to push data.frame's into couch using the normal `PUT /{db}` method, and added support for the couch bulk API.
+
+## Install
+
+```{r eval=FALSE}
+install.packages("devtools")
+devtools::install_github("sckott/sofa")
+```
+
+```{r}
+library("sofa")
+```
+
+## PUT /db
+
+You can write directly from a data.frame, either by rows or columns. First, rows:
+
+```{r echo=FALSE}
+if(is.null(db_info(dbname = "mtcarsdb")$error)) db_delete(dbname='mtcarsdb')
+```
+
+Create a database
+
+```{r}
+db_create(dbname="mtcarsdb")
+```
+
+```{r}
+out <- doc_create(mtcars, dbname="mtcarsdb", how="rows")
+out[1:2]
+```
+
+Then by columns
+
+```{r}
+out <- doc_create(mtcars, dbname="mtcarsdb", how="columns")
+out[1:2]
+```
+
+## Bulk API
+
+The bulk API will/should be faster for larger data.frames
+
+```{r echo=FALSE}
+if(is.null(db_info(dbname = "bulktest")$error)) db_delete(dbname='bulktest')
+```
+
+We'll use part of the diamonds dataset
+
+```{r}
+library("ggplot2")
+dat <- diamonds[1:20000,]
+```
+
+Create a database
+
+```{r}
+db_create(dbname="bulktest")
+```
+
+Load by row (could instead do each column, see `how` parameter), printing the time it takes
+
+```{r}
+system.time(out <- bulk_create(dat, dbname="bulktest"))
+```
+
+The returned data is the same as with `doc_create()`
+
+```{r}
+out[1:2]
+```
+
+So that's 20,000 rows in not that much time, not bad.
+
+### not dataframes
+
+You can also pass in lists or vectors of json as character strings, e.g., 
+
+_lists_
+
+```{r echo=FALSE}
+if(is.null(db_info(dbname = "bulkfromlist")$error)) db_delete(dbname='bulkfromlist')
+```
+
+```{r}
+row.names(mtcars) <- NULL # get rid of row.names
+lst <- parse_df(mtcars, tojson=FALSE)
+db_create(dbname="bulkfromlist")
+out <- bulk_create(lst, dbname="bulkfromlist")
+out[1:2]
+```
+
+_json_
+
+```{r echo=FALSE}
+if(is.null(db_info(dbname = "bulkfromchr")$error)) db_delete(dbname='bulkfromchr')
+```
+
+```{r}
+strs <- as.character(parse_df(mtcars, "columns"))
+db_create(dbname="bulkfromchr")
+out <- bulk_create(strs, dbname="bulkfromchr")
+out[1:2]
+```
