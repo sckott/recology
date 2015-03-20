@@ -6,6 +6,119 @@
 		<link>http://recology.info/</link>
 		
 			<item>
+				<title>Faster solr with csv</title>
+				<description>&lt;p&gt;With the &lt;a href=&quot;https://github.com/ropensci/solr/issues/47&quot;&gt;help of user input&lt;/a&gt;, I&amp;#39;ve tweaked &lt;code&gt;solr&lt;/code&gt; just a bit to make things faster using default setings. I imagine the main interface for people using the &lt;code&gt;solr&lt;/code&gt; R client is via &lt;code&gt;solr_search()&lt;/code&gt;, which used to have &lt;code&gt;wt=json&lt;/code&gt; by default. Changing this to &lt;code&gt;wt=csv&lt;/code&gt; gives better performance. And it sorta makes sense to use csv, as the point of using an R client is probably do get data eventually into a data.frame, so it makes sense to go csv format (Already in tabular format) if it&amp;#39;s faster too.&lt;/p&gt;
+
+&lt;h2&gt;Install&lt;/h2&gt;
+
+&lt;p&gt;Install and load &lt;code&gt;solr&lt;/code&gt;&lt;/p&gt;
+&lt;div class=&quot;highlight&quot;&gt;&lt;pre&gt;&lt;code class=&quot;language-r&quot; data-lang=&quot;r&quot;&gt;devtools&lt;span class=&quot;o&quot;&gt;::&lt;/span&gt;install_github&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;s&quot;&gt;&amp;quot;ropensci/solr&amp;quot;&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt;
+&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;&lt;div class=&quot;highlight&quot;&gt;&lt;pre&gt;&lt;code class=&quot;language-r&quot; data-lang=&quot;r&quot;&gt;&lt;span class=&quot;kn&quot;&gt;library&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;s&quot;&gt;&amp;quot;solr&amp;quot;&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt;
+&lt;span class=&quot;kn&quot;&gt;library&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;s&quot;&gt;&amp;quot;microbenchmark&amp;quot;&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt;
+&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;
+&lt;h2&gt;Setup&lt;/h2&gt;
+
+&lt;p&gt;Define base url and fields to return&lt;/p&gt;
+&lt;div class=&quot;highlight&quot;&gt;&lt;pre&gt;&lt;code class=&quot;language-r&quot; data-lang=&quot;r&quot;&gt;url &lt;span class=&quot;o&quot;&gt;&amp;lt;-&lt;/span&gt; &lt;span class=&quot;s&quot;&gt;&amp;#39;http://api.plos.org/search&amp;#39;&lt;/span&gt;
+fields &lt;span class=&quot;o&quot;&gt;&amp;lt;-&lt;/span&gt; &lt;span class=&quot;kt&quot;&gt;c&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;s&quot;&gt;&amp;#39;id&amp;#39;&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt;&lt;span class=&quot;s&quot;&gt;&amp;#39;cross_published_journal_name&amp;#39;&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt;&lt;span class=&quot;s&quot;&gt;&amp;#39;cross_published_journal_key&amp;#39;&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt;
+            &lt;span class=&quot;s&quot;&gt;&amp;#39;cross_published_journal_eissn&amp;#39;&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt;&lt;span class=&quot;s&quot;&gt;&amp;#39;pmid&amp;#39;&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt;&lt;span class=&quot;s&quot;&gt;&amp;#39;pmcid&amp;#39;&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt;&lt;span class=&quot;s&quot;&gt;&amp;#39;publisher&amp;#39;&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt;&lt;span class=&quot;s&quot;&gt;&amp;#39;journal&amp;#39;&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt;
+            &lt;span class=&quot;s&quot;&gt;&amp;#39;publication_date&amp;#39;&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt;&lt;span class=&quot;s&quot;&gt;&amp;#39;article_type&amp;#39;&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt;&lt;span class=&quot;s&quot;&gt;&amp;#39;article_type_facet&amp;#39;&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt;&lt;span class=&quot;s&quot;&gt;&amp;#39;author&amp;#39;&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt;
+            &lt;span class=&quot;s&quot;&gt;&amp;#39;author_facet&amp;#39;&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt;&lt;span class=&quot;s&quot;&gt;&amp;#39;volume&amp;#39;&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt;&lt;span class=&quot;s&quot;&gt;&amp;#39;issue&amp;#39;&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt;&lt;span class=&quot;s&quot;&gt;&amp;#39;elocation_id&amp;#39;&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt;&lt;span class=&quot;s&quot;&gt;&amp;#39;author_display&amp;#39;&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt;
+            &lt;span class=&quot;s&quot;&gt;&amp;#39;competing_interest&amp;#39;&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt;&lt;span class=&quot;s&quot;&gt;&amp;#39;copyright&amp;#39;&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt;
+&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;
+&lt;h2&gt;json&lt;/h2&gt;
+
+&lt;p&gt;The previous default for &lt;code&gt;solr_search()&lt;/code&gt; used &lt;code&gt;json&lt;/code&gt;&lt;/p&gt;
+&lt;div class=&quot;highlight&quot;&gt;&lt;pre&gt;&lt;code class=&quot;language-r&quot; data-lang=&quot;r&quot;&gt;solr_search&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;q&lt;span class=&quot;o&quot;&gt;=&lt;/span&gt;&lt;span class=&quot;s&quot;&gt;&amp;#39;*:*&amp;#39;&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt; rows&lt;span class=&quot;o&quot;&gt;=&lt;/span&gt;&lt;span class=&quot;m&quot;&gt;10&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt; fl&lt;span class=&quot;o&quot;&gt;=&lt;/span&gt;fields&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt; base&lt;span class=&quot;o&quot;&gt;=&lt;/span&gt;&lt;span class=&quot;kp&quot;&gt;url&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt; wt &lt;span class=&quot;o&quot;&gt;=&lt;/span&gt; &lt;span class=&quot;s&quot;&gt;&amp;quot;json&amp;quot;&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt;
+&lt;span class=&quot;c1&quot;&gt;#&amp;gt; Source: local data frame [10 x 19]&lt;/span&gt;
+&lt;span class=&quot;c1&quot;&gt;#&amp;gt; &lt;/span&gt;
+&lt;span class=&quot;c1&quot;&gt;#&amp;gt;                                                                    id&lt;/span&gt;
+&lt;span class=&quot;c1&quot;&gt;#&amp;gt; 1             10.1371/annotation/856f0890-9d85-4719-8e54-c27530ac94f4&lt;/span&gt;
+&lt;span class=&quot;c1&quot;&gt;#&amp;gt; 2       10.1371/annotation/856f0890-9d85-4719-8e54-c27530ac94f4/title&lt;/span&gt;
+&lt;span class=&quot;c1&quot;&gt;#&amp;gt; 3    10.1371/annotation/856f0890-9d85-4719-8e54-c27530ac94f4/abstract&lt;/span&gt;
+&lt;span class=&quot;c1&quot;&gt;#&amp;gt; 4  10.1371/annotation/856f0890-9d85-4719-8e54-c27530ac94f4/references&lt;/span&gt;
+&lt;span class=&quot;c1&quot;&gt;#&amp;gt; 5        10.1371/annotation/856f0890-9d85-4719-8e54-c27530ac94f4/body&lt;/span&gt;
+&lt;span class=&quot;c1&quot;&gt;#&amp;gt; 6             10.1371/annotation/8551e3d5-fdd5-413b-a253-170ba13b7525&lt;/span&gt;
+&lt;span class=&quot;c1&quot;&gt;#&amp;gt; 7       10.1371/annotation/8551e3d5-fdd5-413b-a253-170ba13b7525/title&lt;/span&gt;
+&lt;span class=&quot;c1&quot;&gt;#&amp;gt; 8    10.1371/annotation/8551e3d5-fdd5-413b-a253-170ba13b7525/abstract&lt;/span&gt;
+&lt;span class=&quot;c1&quot;&gt;#&amp;gt; 9  10.1371/annotation/8551e3d5-fdd5-413b-a253-170ba13b7525/references&lt;/span&gt;
+&lt;span class=&quot;c1&quot;&gt;#&amp;gt; 10       10.1371/annotation/8551e3d5-fdd5-413b-a253-170ba13b7525/body&lt;/span&gt;
+&lt;span class=&quot;c1&quot;&gt;#&amp;gt; Variables not shown: cross_published_journal_name (chr),&lt;/span&gt;
+&lt;span class=&quot;c1&quot;&gt;#&amp;gt;   cross_published_journal_key (chr), cross_published_journal_eissn (chr),&lt;/span&gt;
+&lt;span class=&quot;c1&quot;&gt;#&amp;gt;   pmid (chr), pmcid (chr), publisher (chr), journal (chr),&lt;/span&gt;
+&lt;span class=&quot;c1&quot;&gt;#&amp;gt;   publication_date (chr), article_type (chr), article_type_facet (chr),&lt;/span&gt;
+&lt;span class=&quot;c1&quot;&gt;#&amp;gt;   author (chr), author_facet (chr), volume (int), issue (int),&lt;/span&gt;
+&lt;span class=&quot;c1&quot;&gt;#&amp;gt;   elocation_id (chr), author_display (chr), competing_interest (chr),&lt;/span&gt;
+&lt;span class=&quot;c1&quot;&gt;#&amp;gt;   copyright (chr)&lt;/span&gt;
+&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;
+&lt;h2&gt;csv&lt;/h2&gt;
+
+&lt;p&gt;The default &lt;code&gt;wt&lt;/code&gt; setting is now &lt;code&gt;csv&lt;/code&gt;&lt;/p&gt;
+&lt;div class=&quot;highlight&quot;&gt;&lt;pre&gt;&lt;code class=&quot;language-r&quot; data-lang=&quot;r&quot;&gt;solr_search&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;q&lt;span class=&quot;o&quot;&gt;=&lt;/span&gt;&lt;span class=&quot;s&quot;&gt;&amp;#39;*:*&amp;#39;&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt; rows&lt;span class=&quot;o&quot;&gt;=&lt;/span&gt;&lt;span class=&quot;m&quot;&gt;10&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt; fl&lt;span class=&quot;o&quot;&gt;=&lt;/span&gt;fields&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt; base&lt;span class=&quot;o&quot;&gt;=&lt;/span&gt;&lt;span class=&quot;kp&quot;&gt;url&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt; wt &lt;span class=&quot;o&quot;&gt;=&lt;/span&gt; &lt;span class=&quot;s&quot;&gt;&amp;quot;json&amp;quot;&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt;
+&lt;span class=&quot;c1&quot;&gt;#&amp;gt; Source: local data frame [10 x 19]&lt;/span&gt;
+&lt;span class=&quot;c1&quot;&gt;#&amp;gt; &lt;/span&gt;
+&lt;span class=&quot;c1&quot;&gt;#&amp;gt;                                                                    id&lt;/span&gt;
+&lt;span class=&quot;c1&quot;&gt;#&amp;gt; 1             10.1371/annotation/856f0890-9d85-4719-8e54-c27530ac94f4&lt;/span&gt;
+&lt;span class=&quot;c1&quot;&gt;#&amp;gt; 2       10.1371/annotation/856f0890-9d85-4719-8e54-c27530ac94f4/title&lt;/span&gt;
+&lt;span class=&quot;c1&quot;&gt;#&amp;gt; 3    10.1371/annotation/856f0890-9d85-4719-8e54-c27530ac94f4/abstract&lt;/span&gt;
+&lt;span class=&quot;c1&quot;&gt;#&amp;gt; 4  10.1371/annotation/856f0890-9d85-4719-8e54-c27530ac94f4/references&lt;/span&gt;
+&lt;span class=&quot;c1&quot;&gt;#&amp;gt; 5        10.1371/annotation/856f0890-9d85-4719-8e54-c27530ac94f4/body&lt;/span&gt;
+&lt;span class=&quot;c1&quot;&gt;#&amp;gt; 6             10.1371/annotation/8551e3d5-fdd5-413b-a253-170ba13b7525&lt;/span&gt;
+&lt;span class=&quot;c1&quot;&gt;#&amp;gt; 7       10.1371/annotation/8551e3d5-fdd5-413b-a253-170ba13b7525/title&lt;/span&gt;
+&lt;span class=&quot;c1&quot;&gt;#&amp;gt; 8    10.1371/annotation/8551e3d5-fdd5-413b-a253-170ba13b7525/abstract&lt;/span&gt;
+&lt;span class=&quot;c1&quot;&gt;#&amp;gt; 9  10.1371/annotation/8551e3d5-fdd5-413b-a253-170ba13b7525/references&lt;/span&gt;
+&lt;span class=&quot;c1&quot;&gt;#&amp;gt; 10       10.1371/annotation/8551e3d5-fdd5-413b-a253-170ba13b7525/body&lt;/span&gt;
+&lt;span class=&quot;c1&quot;&gt;#&amp;gt; Variables not shown: cross_published_journal_name (chr),&lt;/span&gt;
+&lt;span class=&quot;c1&quot;&gt;#&amp;gt;   cross_published_journal_key (chr), cross_published_journal_eissn (chr),&lt;/span&gt;
+&lt;span class=&quot;c1&quot;&gt;#&amp;gt;   pmid (chr), pmcid (chr), publisher (chr), journal (chr),&lt;/span&gt;
+&lt;span class=&quot;c1&quot;&gt;#&amp;gt;   publication_date (chr), article_type (chr), article_type_facet (chr),&lt;/span&gt;
+&lt;span class=&quot;c1&quot;&gt;#&amp;gt;   author (chr), author_facet (chr), volume (int), issue (int),&lt;/span&gt;
+&lt;span class=&quot;c1&quot;&gt;#&amp;gt;   elocation_id (chr), author_display (chr), competing_interest (chr),&lt;/span&gt;
+&lt;span class=&quot;c1&quot;&gt;#&amp;gt;   copyright (chr)&lt;/span&gt;
+&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;
+&lt;h2&gt;Compare times&lt;/h2&gt;
+
+&lt;p&gt;When parsing to a data.frame (which &lt;code&gt;solr_search()&lt;/code&gt; does by default), csv is quite a bit faster.&lt;/p&gt;
+&lt;div class=&quot;highlight&quot;&gt;&lt;pre&gt;&lt;code class=&quot;language-r&quot; data-lang=&quot;r&quot;&gt;microbenchmark&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;
+  json &lt;span class=&quot;o&quot;&gt;=&lt;/span&gt; solr_search&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;q&lt;span class=&quot;o&quot;&gt;=&lt;/span&gt;&lt;span class=&quot;s&quot;&gt;&amp;#39;*:*&amp;#39;&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt; rows&lt;span class=&quot;o&quot;&gt;=&lt;/span&gt;&lt;span class=&quot;m&quot;&gt;500&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt; fl&lt;span class=&quot;o&quot;&gt;=&lt;/span&gt;fields&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt; base&lt;span class=&quot;o&quot;&gt;=&lt;/span&gt;&lt;span class=&quot;kp&quot;&gt;url&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt; wt &lt;span class=&quot;o&quot;&gt;=&lt;/span&gt; &lt;span class=&quot;s&quot;&gt;&amp;quot;json&amp;quot;&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt; verbose &lt;span class=&quot;o&quot;&gt;=&lt;/span&gt; &lt;span class=&quot;kc&quot;&gt;FALSE&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;),&lt;/span&gt;
+  csv &lt;span class=&quot;o&quot;&gt;=&lt;/span&gt; solr_search&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;q&lt;span class=&quot;o&quot;&gt;=&lt;/span&gt;&lt;span class=&quot;s&quot;&gt;&amp;#39;*:*&amp;#39;&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt; rows&lt;span class=&quot;o&quot;&gt;=&lt;/span&gt;&lt;span class=&quot;m&quot;&gt;500&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt; fl&lt;span class=&quot;o&quot;&gt;=&lt;/span&gt;fields&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt; base&lt;span class=&quot;o&quot;&gt;=&lt;/span&gt;&lt;span class=&quot;kp&quot;&gt;url&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt; wt &lt;span class=&quot;o&quot;&gt;=&lt;/span&gt; &lt;span class=&quot;s&quot;&gt;&amp;quot;csv&amp;quot;&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt; verbose &lt;span class=&quot;o&quot;&gt;=&lt;/span&gt; &lt;span class=&quot;kc&quot;&gt;FALSE&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;),&lt;/span&gt; 
+  times &lt;span class=&quot;o&quot;&gt;=&lt;/span&gt; &lt;span class=&quot;m&quot;&gt;20&lt;/span&gt;
+&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt;
+&lt;span class=&quot;c1&quot;&gt;#&amp;gt; Unit: milliseconds&lt;/span&gt;
+&lt;span class=&quot;c1&quot;&gt;#&amp;gt;  expr      min       lq      mean    median        uq       max neval cld&lt;/span&gt;
+&lt;span class=&quot;c1&quot;&gt;#&amp;gt;  json 965.7043 1013.014 1124.1229 1086.3225 1227.9054 1441.8332    20   b&lt;/span&gt;
+&lt;span class=&quot;c1&quot;&gt;#&amp;gt;   csv 509.6573  520.089  541.5784  532.4546  548.0303  723.7575    20  a&lt;/span&gt;
+&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;
+&lt;h2&gt;json vs xml vs csv&lt;/h2&gt;
+
+&lt;p&gt;When getting raw data, csv is best, json next, then xml pulling up the rear.&lt;/p&gt;
+&lt;div class=&quot;highlight&quot;&gt;&lt;pre&gt;&lt;code class=&quot;language-r&quot; data-lang=&quot;r&quot;&gt;microbenchmark&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;
+  json &lt;span class=&quot;o&quot;&gt;=&lt;/span&gt; solr_search&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;q&lt;span class=&quot;o&quot;&gt;=&lt;/span&gt;&lt;span class=&quot;s&quot;&gt;&amp;#39;*:*&amp;#39;&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt; rows&lt;span class=&quot;o&quot;&gt;=&lt;/span&gt;&lt;span class=&quot;m&quot;&gt;1000&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt; fl&lt;span class=&quot;o&quot;&gt;=&lt;/span&gt;fields&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt; base&lt;span class=&quot;o&quot;&gt;=&lt;/span&gt;&lt;span class=&quot;kp&quot;&gt;url&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt; wt &lt;span class=&quot;o&quot;&gt;=&lt;/span&gt; &lt;span class=&quot;s&quot;&gt;&amp;quot;json&amp;quot;&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt; verbose &lt;span class=&quot;o&quot;&gt;=&lt;/span&gt; &lt;span class=&quot;kc&quot;&gt;FALSE&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt; raw &lt;span class=&quot;o&quot;&gt;=&lt;/span&gt; &lt;span class=&quot;kc&quot;&gt;TRUE&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;),&lt;/span&gt;
+  csv &lt;span class=&quot;o&quot;&gt;=&lt;/span&gt; solr_search&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;q&lt;span class=&quot;o&quot;&gt;=&lt;/span&gt;&lt;span class=&quot;s&quot;&gt;&amp;#39;*:*&amp;#39;&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt; rows&lt;span class=&quot;o&quot;&gt;=&lt;/span&gt;&lt;span class=&quot;m&quot;&gt;1000&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt; fl&lt;span class=&quot;o&quot;&gt;=&lt;/span&gt;fields&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt; base&lt;span class=&quot;o&quot;&gt;=&lt;/span&gt;&lt;span class=&quot;kp&quot;&gt;url&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt; wt &lt;span class=&quot;o&quot;&gt;=&lt;/span&gt; &lt;span class=&quot;s&quot;&gt;&amp;quot;csv&amp;quot;&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt; verbose &lt;span class=&quot;o&quot;&gt;=&lt;/span&gt; &lt;span class=&quot;kc&quot;&gt;FALSE&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt; raw &lt;span class=&quot;o&quot;&gt;=&lt;/span&gt; &lt;span class=&quot;kc&quot;&gt;TRUE&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;),&lt;/span&gt;
+  xml &lt;span class=&quot;o&quot;&gt;=&lt;/span&gt; solr_search&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;q&lt;span class=&quot;o&quot;&gt;=&lt;/span&gt;&lt;span class=&quot;s&quot;&gt;&amp;#39;*:*&amp;#39;&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt; rows&lt;span class=&quot;o&quot;&gt;=&lt;/span&gt;&lt;span class=&quot;m&quot;&gt;1000&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt; fl&lt;span class=&quot;o&quot;&gt;=&lt;/span&gt;fields&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt; base&lt;span class=&quot;o&quot;&gt;=&lt;/span&gt;&lt;span class=&quot;kp&quot;&gt;url&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt; wt &lt;span class=&quot;o&quot;&gt;=&lt;/span&gt; &lt;span class=&quot;s&quot;&gt;&amp;quot;xml&amp;quot;&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt; verbose &lt;span class=&quot;o&quot;&gt;=&lt;/span&gt; &lt;span class=&quot;kc&quot;&gt;FALSE&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt; raw &lt;span class=&quot;o&quot;&gt;=&lt;/span&gt; &lt;span class=&quot;kc&quot;&gt;TRUE&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;),&lt;/span&gt;
+  times &lt;span class=&quot;o&quot;&gt;=&lt;/span&gt; &lt;span class=&quot;m&quot;&gt;10&lt;/span&gt;
+&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt;
+&lt;span class=&quot;c1&quot;&gt;#&amp;gt; Unit: milliseconds&lt;/span&gt;
+&lt;span class=&quot;c1&quot;&gt;#&amp;gt;  expr       min       lq      mean    median        uq       max neval cld&lt;/span&gt;
+&lt;span class=&quot;c1&quot;&gt;#&amp;gt;  json 1110.9515 1142.478 1198.9981 1169.0808 1195.5709 1518.7412    10  b &lt;/span&gt;
+&lt;span class=&quot;c1&quot;&gt;#&amp;gt;   csv  801.6871  802.516  826.0655  819.1532  835.0512  873.4266    10 a  &lt;/span&gt;
+&lt;span class=&quot;c1&quot;&gt;#&amp;gt;   xml 1507.1111 1554.002 1618.5963 1617.5208 1671.0026 1740.4448    10   c&lt;/span&gt;
+&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;
+&lt;h2&gt;Notes&lt;/h2&gt;
+
+&lt;p&gt;Note that &lt;code&gt;wt=csv&lt;/code&gt; is only available in &lt;code&gt;solr_search()&lt;/code&gt; and &lt;code&gt;solr_all()&lt;/code&gt; because csv writer 
+only returns the docs element in csv, dropping other elements, including facets, mlt, groups, 
+stats, etc. &lt;/p&gt;
+
+&lt;p&gt;Also, note the http client used in &lt;code&gt;solr&lt;/code&gt; is &lt;code&gt;httr&lt;/code&gt;, which passes in a gzip compression header by default, so as long as the server serving up the Solr data has compression turned on, that&amp;#39;s all set.&lt;/p&gt;
+
+&lt;p&gt;Another way I&amp;#39;ve sped things up is if you use &lt;code&gt;wt=json&lt;/code&gt; then parse to a data.frame, it uses &lt;code&gt;dplyr&lt;/code&gt; which sped things up considerably.&lt;/p&gt;
+</description>
+				<published>2015-03-20 00:00:00 -0700</published>
+				<link>http://recology.info//2015/03/faster-solr/</link>
+			</item>
+		
+			<item>
 				<title>PUT dataframes on your couch</title>
 				<description>&lt;p&gt;It would be nice to easily push each row or column of a data.frame into CouchDB instead of having to prepare them yourself into JSON, then push in to couch. I recently added ability to push data.frame&amp;#39;s into couch using the normal &lt;code&gt;PUT /{db}&lt;/code&gt; method, and added support for the couch bulk API.&lt;/p&gt;
 
@@ -1890,321 +2003,6 @@ validate&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;x&lt;span class=&quot;p&qu
 &lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;</description>
 				<published>2015-01-06 00:00:00 -0800</published>
 				<link>http://recology.info//2015/01/geojson-topojson-io/</link>
-			</item>
-		
-			<item>
-				<title>gistr - R client for GitHub gists</title>
-				<description>&lt;p&gt;GitHub has this site &lt;a href=&quot;https://gist.github.com/&quot;&gt;https://gist.github.com/&lt;/a&gt; in which we can share code, text, images, maps, plots, etc super easily, without having to open up a repo, etc. GitHub gists are a great way to throw up an example use case to show someone, or show code that&amp;#39;s throwing errors to a support person, etc. In addition, there&amp;#39;s API access, which means we can interact with Gists not just from their web interface, but from the command line, or any programming language. There are clients for &lt;a href=&quot;https://github.com/mbostock/gistup&quot;&gt;Node.js&lt;/a&gt;, &lt;a href=&quot;https://rubygems.org/gems/gist&quot;&gt;Ruby&lt;/a&gt;, &lt;a href=&quot;https://pypi.python.org/pypi/gists/0.4.6&quot;&gt;Python&lt;/a&gt;, and on and on. But AFAIK there wasn&amp;#39;t one for R. Along with &lt;a href=&quot;https://github.com/ramnathv&quot;&gt;Ramnath&lt;/a&gt; and others, we&amp;#39;ve been working on an R client for gists. &lt;code&gt;v0.1&lt;/code&gt; is &lt;a href=&quot;http://cran.r-project.org/web/packages/gistr/index.html&quot;&gt;now on CRAN&lt;/a&gt;. Below is an overview. &lt;/p&gt;
-
-&lt;p&gt;One useful thing about this package in terms of other R packages is that you can now depend on &lt;code&gt;gistr&lt;/code&gt; to easily share results as Gists. For example, you can share maps as gists (via geojson, rendered as interactive map), or code, or plots, etc. That is, you don&amp;#39;t have to re-write an interface to Github Gists yourself. We plan on using &lt;code&gt;gistr&lt;/code&gt; in a few rOpenSci packages. &lt;/p&gt;
-
-&lt;h2&gt;Installation&lt;/h2&gt;
-
-&lt;h2&gt;Installation&lt;/h2&gt;
-
-&lt;p&gt;Install from CRAN&lt;/p&gt;
-&lt;div class=&quot;highlight&quot;&gt;&lt;pre&gt;&lt;code class=&quot;language-r&quot; data-lang=&quot;r&quot;&gt;install.packages&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;s&quot;&gt;&amp;quot;gistr&amp;quot;&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt;
-&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;
-&lt;p&gt;Or the development version from GitHub&lt;/p&gt;
-&lt;div class=&quot;highlight&quot;&gt;&lt;pre&gt;&lt;code class=&quot;language-r&quot; data-lang=&quot;r&quot;&gt;install.packages&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;s&quot;&gt;&amp;quot;devtools&amp;quot;&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt;
-devtools&lt;span class=&quot;o&quot;&gt;::&lt;/span&gt;install_github&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;s&quot;&gt;&amp;quot;ropensci/gistr&amp;quot;&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt;
-&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;&lt;div class=&quot;highlight&quot;&gt;&lt;pre&gt;&lt;code class=&quot;language-r&quot; data-lang=&quot;r&quot;&gt;&lt;span class=&quot;kn&quot;&gt;library&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;s&quot;&gt;&amp;quot;gistr&amp;quot;&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt;
-&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;
-&lt;h2&gt;Authentication&lt;/h2&gt;
-
-&lt;p&gt;There are two ways to authorise &lt;code&gt;gistr&lt;/code&gt; to work with your GitHub account:&lt;/p&gt;
-
-&lt;ul&gt;
-&lt;li&gt;Generate a personal access token (PAT) at &lt;a href=&quot;https://help.github.com/articles/creating-an-access-token-for-command-line-use&quot;&gt;https://help.github.com/articles/creating-an-access-token-for-command-line-use&lt;/a&gt; and record it in the &lt;code&gt;GITHUB_PAT&lt;/code&gt; envar.&lt;/li&gt;
-&lt;li&gt;Interactively login into your GitHub account and authorise with OAuth.&lt;/li&gt;
-&lt;/ul&gt;
-
-&lt;p&gt;Using the PAT is recommended.&lt;/p&gt;
-
-&lt;p&gt;Using the &lt;code&gt;gist_auth()&lt;/code&gt; function you can authenticate seperately first, or if you&amp;#39;re not authenticated, this function will run internally with each functionn call. If you have a PAT, that will be used, if not, OAuth will be used.&lt;/p&gt;
-&lt;div class=&quot;highlight&quot;&gt;&lt;pre&gt;&lt;code class=&quot;language-r&quot; data-lang=&quot;r&quot;&gt;gist_auth&lt;span class=&quot;p&quot;&gt;()&lt;/span&gt;
-&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;
-&lt;h2&gt;Workflow&lt;/h2&gt;
-
-&lt;p&gt;In &lt;code&gt;gistr&lt;/code&gt; you can use pipes to pass outputs from one function to another. If you have used &lt;code&gt;dplyr&lt;/code&gt; with pipes you can see the difference, and perhaps the utility, of this workflow over the traditional workflow in R. You can use a non-piping or a piping workflow with &lt;code&gt;gistr&lt;/code&gt;. Examples below use a mix of both workflows. Here is an example of a piping wofklow (with some explanation):&lt;/p&gt;
-&lt;div class=&quot;highlight&quot;&gt;&lt;pre&gt;&lt;code class=&quot;language-r&quot; data-lang=&quot;r&quot;&gt;gists&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;what &lt;span class=&quot;o&quot;&gt;=&lt;/span&gt; &lt;span class=&quot;s&quot;&gt;&amp;quot;minepublic&amp;quot;&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;)[[&lt;/span&gt;&lt;span class=&quot;m&quot;&gt;6&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;]]&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;%&amp;gt;%&lt;/span&gt; &lt;span class=&quot;c1&quot;&gt;# List my public gists, and index 1st&lt;/span&gt;
-  add_files&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;s&quot;&gt;&amp;quot;~/alm_othersources.md&amp;quot;&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;%&amp;gt;%&lt;/span&gt; &lt;span class=&quot;c1&quot;&gt;# Add new file to that gist&lt;/span&gt;
-  update&lt;span class=&quot;p&quot;&gt;()&lt;/span&gt; &lt;span class=&quot;c1&quot;&gt;# update sends a PATCH command to Gists API to add file to your gist&lt;/span&gt;
-&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;
-&lt;p&gt;And a non-piping workflow that does the same exact thing:&lt;/p&gt;
-&lt;div class=&quot;highlight&quot;&gt;&lt;pre&gt;&lt;code class=&quot;language-r&quot; data-lang=&quot;r&quot;&gt;g &lt;span class=&quot;o&quot;&gt;&amp;lt;-&lt;/span&gt; gists&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;what &lt;span class=&quot;o&quot;&gt;=&lt;/span&gt; &lt;span class=&quot;s&quot;&gt;&amp;quot;minepublic&amp;quot;&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;)[[&lt;/span&gt;&lt;span class=&quot;m&quot;&gt;1&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;]]&lt;/span&gt;
-g &lt;span class=&quot;o&quot;&gt;&amp;lt;-&lt;/span&gt; add_files&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;g&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt; &lt;span class=&quot;s&quot;&gt;&amp;quot;~/alm_othersources.md&amp;quot;&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt;
-update&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;g&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt;
-&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;
-&lt;p&gt;Or you could string them all together in one line (but it&amp;#39;s rather difficult to follow what&amp;#39;s going on because you have to read from the inside out)&lt;/p&gt;
-&lt;div class=&quot;highlight&quot;&gt;&lt;pre&gt;&lt;code class=&quot;language-r&quot; data-lang=&quot;r&quot;&gt;update&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;add_files&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;gists&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;what &lt;span class=&quot;o&quot;&gt;=&lt;/span&gt; &lt;span class=&quot;s&quot;&gt;&amp;quot;minepublic&amp;quot;&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;)[[&lt;/span&gt;&lt;span class=&quot;m&quot;&gt;1&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;]],&lt;/span&gt; &lt;span class=&quot;s&quot;&gt;&amp;quot;~/alm_othersources.md&amp;quot;&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;))&lt;/span&gt;
-&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;
-&lt;h2&gt;Rate limit information&lt;/h2&gt;
-&lt;div class=&quot;highlight&quot;&gt;&lt;pre&gt;&lt;code class=&quot;language-r&quot; data-lang=&quot;r&quot;&gt;rate_limit&lt;span class=&quot;p&quot;&gt;()&lt;/span&gt;
-&lt;span class=&quot;c1&quot;&gt;#&amp;gt; Rate limit: 5000&lt;/span&gt;
-&lt;span class=&quot;c1&quot;&gt;#&amp;gt; Remaining:  4948&lt;/span&gt;
-&lt;span class=&quot;c1&quot;&gt;#&amp;gt; Resets in:  46 minutes&lt;/span&gt;
-&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;
-&lt;h2&gt;List gists&lt;/h2&gt;
-
-&lt;p&gt;Limiting to a few results here to keep it brief&lt;/p&gt;
-&lt;div class=&quot;highlight&quot;&gt;&lt;pre&gt;&lt;code class=&quot;language-r&quot; data-lang=&quot;r&quot;&gt;gists&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;per_page &lt;span class=&quot;o&quot;&gt;=&lt;/span&gt; &lt;span class=&quot;m&quot;&gt;2&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt;
-&lt;span class=&quot;c1&quot;&gt;#&amp;gt; [[1]]&lt;/span&gt;
-&lt;span class=&quot;c1&quot;&gt;#&amp;gt; &amp;lt;gist&amp;gt;575fd0342ae15f89645f&lt;/span&gt;
-&lt;span class=&quot;c1&quot;&gt;#&amp;gt;   URL: https://gist.github.com/575fd0342ae15f89645f&lt;/span&gt;
-&lt;span class=&quot;c1&quot;&gt;#&amp;gt;   Description: Script to disable the mouse acceleration on Ubuntu (and probably also other distributions). Read the &amp;#39;usage&amp;#39; section.&lt;/span&gt;
-&lt;span class=&quot;c1&quot;&gt;#&amp;gt;   Public: TRUE&lt;/span&gt;
-&lt;span class=&quot;c1&quot;&gt;#&amp;gt;   Created/Edited: 2015-01-04T17:41:49Z / 2015-01-04T17:41:50Z&lt;/span&gt;
-&lt;span class=&quot;c1&quot;&gt;#&amp;gt;   Files: disable-mouse-accel.sh&lt;/span&gt;
-&lt;span class=&quot;c1&quot;&gt;#&amp;gt; &lt;/span&gt;
-&lt;span class=&quot;c1&quot;&gt;#&amp;gt; [[2]]&lt;/span&gt;
-&lt;span class=&quot;c1&quot;&gt;#&amp;gt; &amp;lt;gist&amp;gt;1ebff1af906f214f98cd&lt;/span&gt;
-&lt;span class=&quot;c1&quot;&gt;#&amp;gt;   URL: https://gist.github.com/1ebff1af906f214f98cd&lt;/span&gt;
-&lt;span class=&quot;c1&quot;&gt;#&amp;gt;   Description: Ladda&lt;/span&gt;
-&lt;span class=&quot;c1&quot;&gt;#&amp;gt;   Public: TRUE&lt;/span&gt;
-&lt;span class=&quot;c1&quot;&gt;#&amp;gt;   Created/Edited: 2015-01-04T17:41:45Z / 2015-01-04T17:41:45Z&lt;/span&gt;
-&lt;span class=&quot;c1&quot;&gt;#&amp;gt;   Files: Ladda.markdown, index.html, script.js, style.css&lt;/span&gt;
-&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;
-&lt;p&gt;Since a certain date/time&lt;/p&gt;
-&lt;div class=&quot;highlight&quot;&gt;&lt;pre&gt;&lt;code class=&quot;language-r&quot; data-lang=&quot;r&quot;&gt;gists&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;since&lt;span class=&quot;o&quot;&gt;=&lt;/span&gt;&lt;span class=&quot;s&quot;&gt;&amp;#39;2014-05-26T00:00:00Z&amp;#39;&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt; per_page &lt;span class=&quot;o&quot;&gt;=&lt;/span&gt; &lt;span class=&quot;m&quot;&gt;2&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt;
-&lt;span class=&quot;c1&quot;&gt;#&amp;gt; [[1]]&lt;/span&gt;
-&lt;span class=&quot;c1&quot;&gt;#&amp;gt; &amp;lt;gist&amp;gt;575fd0342ae15f89645f&lt;/span&gt;
-&lt;span class=&quot;c1&quot;&gt;#&amp;gt;   URL: https://gist.github.com/575fd0342ae15f89645f&lt;/span&gt;
-&lt;span class=&quot;c1&quot;&gt;#&amp;gt;   Description: Script to disable the mouse acceleration on Ubuntu (and probably also other distributions). Read the &amp;#39;usage&amp;#39; section.&lt;/span&gt;
-&lt;span class=&quot;c1&quot;&gt;#&amp;gt;   Public: TRUE&lt;/span&gt;
-&lt;span class=&quot;c1&quot;&gt;#&amp;gt;   Created/Edited: 2015-01-04T17:41:49Z / 2015-01-04T17:41:50Z&lt;/span&gt;
-&lt;span class=&quot;c1&quot;&gt;#&amp;gt;   Files: disable-mouse-accel.sh&lt;/span&gt;
-&lt;span class=&quot;c1&quot;&gt;#&amp;gt; &lt;/span&gt;
-&lt;span class=&quot;c1&quot;&gt;#&amp;gt; [[2]]&lt;/span&gt;
-&lt;span class=&quot;c1&quot;&gt;#&amp;gt; &amp;lt;gist&amp;gt;1ebff1af906f214f98cd&lt;/span&gt;
-&lt;span class=&quot;c1&quot;&gt;#&amp;gt;   URL: https://gist.github.com/1ebff1af906f214f98cd&lt;/span&gt;
-&lt;span class=&quot;c1&quot;&gt;#&amp;gt;   Description: Ladda&lt;/span&gt;
-&lt;span class=&quot;c1&quot;&gt;#&amp;gt;   Public: TRUE&lt;/span&gt;
-&lt;span class=&quot;c1&quot;&gt;#&amp;gt;   Created/Edited: 2015-01-04T17:41:45Z / 2015-01-04T17:41:45Z&lt;/span&gt;
-&lt;span class=&quot;c1&quot;&gt;#&amp;gt;   Files: Ladda.markdown, index.html, script.js, style.css&lt;/span&gt;
-&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;
-&lt;p&gt;Request different types of gists, one of public, minepublic, mineall, or starred.&lt;/p&gt;
-&lt;div class=&quot;highlight&quot;&gt;&lt;pre&gt;&lt;code class=&quot;language-r&quot; data-lang=&quot;r&quot;&gt;gists&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;s&quot;&gt;&amp;#39;minepublic&amp;#39;&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt; per_page &lt;span class=&quot;o&quot;&gt;=&lt;/span&gt; &lt;span class=&quot;m&quot;&gt;2&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt;
-&lt;span class=&quot;c1&quot;&gt;#&amp;gt; [[1]]&lt;/span&gt;
-&lt;span class=&quot;c1&quot;&gt;#&amp;gt; &amp;lt;gist&amp;gt;588921d4111e00551bcf&lt;/span&gt;
-&lt;span class=&quot;c1&quot;&gt;#&amp;gt;   URL: https://gist.github.com/588921d4111e00551bcf&lt;/span&gt;
-&lt;span class=&quot;c1&quot;&gt;#&amp;gt;   Description: &lt;/span&gt;
-&lt;span class=&quot;c1&quot;&gt;#&amp;gt;   Public: TRUE&lt;/span&gt;
-&lt;span class=&quot;c1&quot;&gt;#&amp;gt;   Created/Edited: 2015-01-04T17:33:47Z / 2015-01-04T17:33:56Z&lt;/span&gt;
-&lt;span class=&quot;c1&quot;&gt;#&amp;gt;   Files: code.R&lt;/span&gt;
-&lt;span class=&quot;c1&quot;&gt;#&amp;gt; &lt;/span&gt;
-&lt;span class=&quot;c1&quot;&gt;#&amp;gt; [[2]]&lt;/span&gt;
-&lt;span class=&quot;c1&quot;&gt;#&amp;gt; &amp;lt;gist&amp;gt;54c0195ee8753c7aaf9f&lt;/span&gt;
-&lt;span class=&quot;c1&quot;&gt;#&amp;gt;   URL: https://gist.github.com/54c0195ee8753c7aaf9f&lt;/span&gt;
-&lt;span class=&quot;c1&quot;&gt;#&amp;gt;   Description: a new cool gist&lt;/span&gt;
-&lt;span class=&quot;c1&quot;&gt;#&amp;gt;   Public: TRUE&lt;/span&gt;
-&lt;span class=&quot;c1&quot;&gt;#&amp;gt;   Created/Edited: 2015-01-04T17:33:47Z / 2015-01-04T17:33:47Z&lt;/span&gt;
-&lt;span class=&quot;c1&quot;&gt;#&amp;gt;   Files: stuff.md&lt;/span&gt;
-&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;
-&lt;h2&gt;List a single gist&lt;/h2&gt;
-&lt;div class=&quot;highlight&quot;&gt;&lt;pre&gt;&lt;code class=&quot;language-r&quot; data-lang=&quot;r&quot;&gt;gist&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;id &lt;span class=&quot;o&quot;&gt;=&lt;/span&gt; &lt;span class=&quot;s&quot;&gt;&amp;#39;f1403260eb92f5dfa7e1&amp;#39;&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt;
-&lt;span class=&quot;c1&quot;&gt;#&amp;gt; &amp;lt;gist&amp;gt;f1403260eb92f5dfa7e1&lt;/span&gt;
-&lt;span class=&quot;c1&quot;&gt;#&amp;gt;   URL: https://gist.github.com/f1403260eb92f5dfa7e1&lt;/span&gt;
-&lt;span class=&quot;c1&quot;&gt;#&amp;gt;   Description: Querying bitly from R &lt;/span&gt;
-&lt;span class=&quot;c1&quot;&gt;#&amp;gt;   Public: TRUE&lt;/span&gt;
-&lt;span class=&quot;c1&quot;&gt;#&amp;gt;   Created/Edited: 2014-10-15T20:40:12Z / 2014-10-15T21:54:29Z&lt;/span&gt;
-&lt;span class=&quot;c1&quot;&gt;#&amp;gt;   Files: bitly_r.md&lt;/span&gt;
-&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;
-&lt;h2&gt;Create gist&lt;/h2&gt;
-
-&lt;p&gt;You can pass in files&lt;/p&gt;
-
-&lt;p&gt;First, get a file to work with&lt;/p&gt;
-&lt;div class=&quot;highlight&quot;&gt;&lt;pre&gt;&lt;code class=&quot;language-r&quot; data-lang=&quot;r&quot;&gt;stuffpath &lt;span class=&quot;o&quot;&gt;&amp;lt;-&lt;/span&gt; &lt;span class=&quot;kp&quot;&gt;system.file&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;s&quot;&gt;&amp;quot;examples&amp;quot;&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt; &lt;span class=&quot;s&quot;&gt;&amp;quot;stuff.md&amp;quot;&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt; package &lt;span class=&quot;o&quot;&gt;=&lt;/span&gt; &lt;span class=&quot;s&quot;&gt;&amp;quot;gistr&amp;quot;&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt;
-&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;&lt;div class=&quot;highlight&quot;&gt;&lt;pre&gt;&lt;code class=&quot;language-r&quot; data-lang=&quot;r&quot;&gt;gist_create&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;files&lt;span class=&quot;o&quot;&gt;=&lt;/span&gt;stuffpath&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt; description&lt;span class=&quot;o&quot;&gt;=&lt;/span&gt;&lt;span class=&quot;s&quot;&gt;&amp;#39;a new cool gist&amp;#39;&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt;
-&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;&lt;div class=&quot;highlight&quot;&gt;&lt;pre&gt;&lt;code class=&quot;language-r&quot; data-lang=&quot;r&quot;&gt;gist_create&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;files&lt;span class=&quot;o&quot;&gt;=&lt;/span&gt;stuffpath&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt; description&lt;span class=&quot;o&quot;&gt;=&lt;/span&gt;&lt;span class=&quot;s&quot;&gt;&amp;#39;a new cool gist&amp;#39;&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt; browse &lt;span class=&quot;o&quot;&gt;=&lt;/span&gt; &lt;span class=&quot;kc&quot;&gt;FALSE&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt;
-&lt;span class=&quot;c1&quot;&gt;#&amp;gt; &amp;lt;gist&amp;gt;aa391404638f2f368b99&lt;/span&gt;
-&lt;span class=&quot;c1&quot;&gt;#&amp;gt;   URL: https://gist.github.com/aa391404638f2f368b99&lt;/span&gt;
-&lt;span class=&quot;c1&quot;&gt;#&amp;gt;   Description: a new cool gist&lt;/span&gt;
-&lt;span class=&quot;c1&quot;&gt;#&amp;gt;   Public: TRUE&lt;/span&gt;
-&lt;span class=&quot;c1&quot;&gt;#&amp;gt;   Created/Edited: 2015-01-04T17:42:37Z / 2015-01-04T17:42:37Z&lt;/span&gt;
-&lt;span class=&quot;c1&quot;&gt;#&amp;gt;   Files: stuff.md&lt;/span&gt;
-&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;
-&lt;p&gt;Or, wrap &lt;code&gt;gist_create()&lt;/code&gt; around some code in your R session/IDE, like so, with just the function name, and a &lt;code&gt;{&amp;#39;&lt;/code&gt; at the start and a &lt;code&gt;}&amp;#39;&lt;/code&gt; at the end.&lt;/p&gt;
-&lt;div class=&quot;highlight&quot;&gt;&lt;pre&gt;&lt;code class=&quot;language-r&quot; data-lang=&quot;r&quot;&gt;gist_create&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;code&lt;span class=&quot;o&quot;&gt;=&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;{&lt;/span&gt;&lt;span class=&quot;s&quot;&gt;&amp;#39;&lt;/span&gt;
-&lt;span class=&quot;s&quot;&gt;x &amp;lt;- letters&lt;/span&gt;
-&lt;span class=&quot;s&quot;&gt;numbers &amp;lt;- runif(8)&lt;/span&gt;
-&lt;span class=&quot;s&quot;&gt;numbers&lt;/span&gt;
-
-&lt;span class=&quot;s&quot;&gt;[1] 0.3229318 0.5933054 0.7778408 0.3898947 0.1309717 0.7501378 0.3206379 0.3379005&lt;/span&gt;
-&lt;span class=&quot;s&quot;&gt;&amp;#39;&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;},&lt;/span&gt; browse&lt;span class=&quot;o&quot;&gt;=&lt;/span&gt;&lt;span class=&quot;kc&quot;&gt;FALSE&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt;
-&lt;span class=&quot;c1&quot;&gt;#&amp;gt; &amp;lt;gist&amp;gt;85158117880f197df422&lt;/span&gt;
-&lt;span class=&quot;c1&quot;&gt;#&amp;gt;   URL: https://gist.github.com/85158117880f197df422&lt;/span&gt;
-&lt;span class=&quot;c1&quot;&gt;#&amp;gt;   Description: &lt;/span&gt;
-&lt;span class=&quot;c1&quot;&gt;#&amp;gt;   Public: TRUE&lt;/span&gt;
-&lt;span class=&quot;c1&quot;&gt;#&amp;gt;   Created/Edited: 2015-01-04T17:42:37Z / 2015-01-04T17:42:37Z&lt;/span&gt;
-&lt;span class=&quot;c1&quot;&gt;#&amp;gt;   Files: code.R&lt;/span&gt;
-&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;
-&lt;p&gt;You can also knit an input file before posting as a gist:&lt;/p&gt;
-&lt;div class=&quot;highlight&quot;&gt;&lt;pre&gt;&lt;code class=&quot;language-r&quot; data-lang=&quot;r&quot;&gt;file &lt;span class=&quot;o&quot;&gt;&amp;lt;-&lt;/span&gt; &lt;span class=&quot;kp&quot;&gt;system.file&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;s&quot;&gt;&amp;quot;examples&amp;quot;&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt; &lt;span class=&quot;s&quot;&gt;&amp;quot;stuff.Rmd&amp;quot;&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt; package &lt;span class=&quot;o&quot;&gt;=&lt;/span&gt; &lt;span class=&quot;s&quot;&gt;&amp;quot;gistr&amp;quot;&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt;
-gist_create&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;kp&quot;&gt;file&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt; description&lt;span class=&quot;o&quot;&gt;=&lt;/span&gt;&lt;span class=&quot;s&quot;&gt;&amp;#39;a new cool gist&amp;#39;&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt; knit&lt;span class=&quot;o&quot;&gt;=&lt;/span&gt;&lt;span class=&quot;kc&quot;&gt;TRUE&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt;
-&lt;span class=&quot;c1&quot;&gt;#&amp;gt; &amp;lt;gist&amp;gt;4162b9c53479fbc298db&lt;/span&gt;
-&lt;span class=&quot;c1&quot;&gt;#&amp;gt;   URL: https://gist.github.com/4162b9c53479fbc298db&lt;/span&gt;
-&lt;span class=&quot;c1&quot;&gt;#&amp;gt;   Description: a new cool gist&lt;/span&gt;
-&lt;span class=&quot;c1&quot;&gt;#&amp;gt;   Public: TRUE&lt;/span&gt;
-&lt;span class=&quot;c1&quot;&gt;#&amp;gt;   Created/Edited: 2014-10-27T16:07:31Z / 2014-10-27T16:07:31Z&lt;/span&gt;
-&lt;span class=&quot;c1&quot;&gt;#&amp;gt;   Files: stuff.md&lt;/span&gt;
-&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;
-&lt;p&gt;Or code blocks before (note that code blocks without knitr block demarcations will result in unexecuted code):&lt;/p&gt;
-&lt;div class=&quot;highlight&quot;&gt;&lt;pre&gt;&lt;code class=&quot;language-r&quot; data-lang=&quot;r&quot;&gt;gist_create&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;code&lt;span class=&quot;o&quot;&gt;=&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;{&lt;/span&gt;&lt;span class=&quot;s&quot;&gt;&amp;#39;&lt;/span&gt;
-&lt;span class=&quot;s&quot;&gt;x &amp;lt;- letters&lt;/span&gt;
-&lt;span class=&quot;s&quot;&gt;(numbers &amp;lt;- runif(8))&lt;/span&gt;
-&lt;span class=&quot;s&quot;&gt;&amp;#39;&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;},&lt;/span&gt; knit&lt;span class=&quot;o&quot;&gt;=&lt;/span&gt;&lt;span class=&quot;kc&quot;&gt;TRUE&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt;
-&lt;span class=&quot;c1&quot;&gt;#&amp;gt; &amp;lt;gist&amp;gt;ec45c396dee4aa492139&lt;/span&gt;
-&lt;span class=&quot;c1&quot;&gt;#&amp;gt;   URL: https://gist.github.com/ec45c396dee4aa492139&lt;/span&gt;
-&lt;span class=&quot;c1&quot;&gt;#&amp;gt;   Description:&lt;/span&gt;
-&lt;span class=&quot;c1&quot;&gt;#&amp;gt;   Public: TRUE&lt;/span&gt;
-&lt;span class=&quot;c1&quot;&gt;#&amp;gt;   Created/Edited: 2014-10-27T16:09:09Z / 2014-10-27T16:09:09Z&lt;/span&gt;
-&lt;span class=&quot;c1&quot;&gt;#&amp;gt;   Files: file81720d1ceff.md&lt;/span&gt;
-&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;
-&lt;h2&gt;knit code from file path, code block, or gist file&lt;/h2&gt;
-
-&lt;p&gt;knit a local file&lt;/p&gt;
-&lt;div class=&quot;highlight&quot;&gt;&lt;pre&gt;&lt;code class=&quot;language-r&quot; data-lang=&quot;r&quot;&gt;file &lt;span class=&quot;o&quot;&gt;&amp;lt;-&lt;/span&gt; &lt;span class=&quot;kp&quot;&gt;system.file&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;s&quot;&gt;&amp;quot;examples&amp;quot;&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt; &lt;span class=&quot;s&quot;&gt;&amp;quot;stuff.Rmd&amp;quot;&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt; package &lt;span class=&quot;o&quot;&gt;=&lt;/span&gt; &lt;span class=&quot;s&quot;&gt;&amp;quot;gistr&amp;quot;&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt;
-run&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;kp&quot;&gt;file&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt; knitopts &lt;span class=&quot;o&quot;&gt;=&lt;/span&gt; &lt;span class=&quot;kt&quot;&gt;list&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;quiet&lt;span class=&quot;o&quot;&gt;=&lt;/span&gt;&lt;span class=&quot;kc&quot;&gt;TRUE&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;))&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;%&amp;gt;%&lt;/span&gt; gist_create&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;browse &lt;span class=&quot;o&quot;&gt;=&lt;/span&gt; &lt;span class=&quot;kc&quot;&gt;FALSE&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt;
-&lt;span class=&quot;c1&quot;&gt;#&amp;gt; &amp;lt;gist&amp;gt;d5d86e11964c36cb4f1e&lt;/span&gt;
-&lt;span class=&quot;c1&quot;&gt;#&amp;gt;   URL: https://gist.github.com/d5d86e11964c36cb4f1e&lt;/span&gt;
-&lt;span class=&quot;c1&quot;&gt;#&amp;gt;   Description: &lt;/span&gt;
-&lt;span class=&quot;c1&quot;&gt;#&amp;gt;   Public: TRUE&lt;/span&gt;
-&lt;span class=&quot;c1&quot;&gt;#&amp;gt;   Created/Edited: 2015-01-04T17:42:38Z / 2015-01-04T17:42:38Z&lt;/span&gt;
-&lt;span class=&quot;c1&quot;&gt;#&amp;gt;   Files: stuff.md&lt;/span&gt;
-&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;
-&lt;p&gt;knit a code block (&lt;code&gt;knitr&lt;/code&gt; code block notation missing, do add that in) (result not shown)&lt;/p&gt;
-&lt;div class=&quot;highlight&quot;&gt;&lt;pre&gt;&lt;code class=&quot;language-r&quot; data-lang=&quot;r&quot;&gt;run&lt;span class=&quot;p&quot;&gt;({&lt;/span&gt;&lt;span class=&quot;s&quot;&gt;&amp;#39;&lt;/span&gt;
-&lt;span class=&quot;s&quot;&gt;x &amp;lt;- letters&lt;/span&gt;
-&lt;span class=&quot;s&quot;&gt;(numbers &amp;lt;- runif(8))&lt;/span&gt;
-&lt;span class=&quot;s&quot;&gt;&amp;#39;&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;})&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;%&amp;gt;%&lt;/span&gt; gist_create
-&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;
-&lt;p&gt;knit a file from a gist, has to get file first (result not shown)&lt;/p&gt;
-&lt;div class=&quot;highlight&quot;&gt;&lt;pre&gt;&lt;code class=&quot;language-r&quot; data-lang=&quot;r&quot;&gt;gists&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;s&quot;&gt;&amp;#39;minepublic&amp;#39;&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;)[[&lt;/span&gt;&lt;span class=&quot;m&quot;&gt;1&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;]]&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;%&amp;gt;%&lt;/span&gt; run&lt;span class=&quot;p&quot;&gt;()&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;%&amp;gt;%&lt;/span&gt; update&lt;span class=&quot;p&quot;&gt;()&lt;/span&gt;
-&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;
-&lt;h2&gt;List commits on a gist&lt;/h2&gt;
-&lt;div class=&quot;highlight&quot;&gt;&lt;pre&gt;&lt;code class=&quot;language-r&quot; data-lang=&quot;r&quot;&gt;gists&lt;span class=&quot;p&quot;&gt;()[[&lt;/span&gt;&lt;span class=&quot;m&quot;&gt;1&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;]]&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;%&amp;gt;%&lt;/span&gt; commits&lt;span class=&quot;p&quot;&gt;()&lt;/span&gt;
-&lt;span class=&quot;c1&quot;&gt;#&amp;gt; [[1]]&lt;/span&gt;
-&lt;span class=&quot;c1&quot;&gt;#&amp;gt; &amp;lt;commit&amp;gt;&lt;/span&gt;
-&lt;span class=&quot;c1&quot;&gt;#&amp;gt;   Version: faa7a40f4b55aa7914be7685c75d5c80731971bb&lt;/span&gt;
-&lt;span class=&quot;c1&quot;&gt;#&amp;gt;   User: sckott&lt;/span&gt;
-&lt;span class=&quot;c1&quot;&gt;#&amp;gt;   Commited: 2015-01-04T17:42:37Z&lt;/span&gt;
-&lt;span class=&quot;c1&quot;&gt;#&amp;gt;   Commits [total, additions, deletions]: [5,5,0]&lt;/span&gt;
-&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;
-&lt;h2&gt;Star a gist&lt;/h2&gt;
-
-&lt;p&gt;Star&lt;/p&gt;
-&lt;div class=&quot;highlight&quot;&gt;&lt;pre&gt;&lt;code class=&quot;language-r&quot; data-lang=&quot;r&quot;&gt;gist&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;s&quot;&gt;&amp;#39;7ddb9810fc99c84c65ec&amp;#39;&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;%&amp;gt;%&lt;/span&gt; star&lt;span class=&quot;p&quot;&gt;()&lt;/span&gt;
-&lt;span class=&quot;c1&quot;&gt;#&amp;gt; &amp;lt;gist&amp;gt;7ddb9810fc99c84c65ec&lt;/span&gt;
-&lt;span class=&quot;c1&quot;&gt;#&amp;gt;   URL: https://gist.github.com/7ddb9810fc99c84c65ec&lt;/span&gt;
-&lt;span class=&quot;c1&quot;&gt;#&amp;gt;   Description: &lt;/span&gt;
-&lt;span class=&quot;c1&quot;&gt;#&amp;gt;   Public: TRUE&lt;/span&gt;
-&lt;span class=&quot;c1&quot;&gt;#&amp;gt;   Created/Edited: 2014-06-27T17:50:37Z / 2014-06-27T17:50:37Z&lt;/span&gt;
-&lt;span class=&quot;c1&quot;&gt;#&amp;gt;   Files: code.R, manifest.yml, rrt_manifest.yml&lt;/span&gt;
-&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;
-&lt;p&gt;Unstar&lt;/p&gt;
-&lt;div class=&quot;highlight&quot;&gt;&lt;pre&gt;&lt;code class=&quot;language-r&quot; data-lang=&quot;r&quot;&gt;gist&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;s&quot;&gt;&amp;#39;7ddb9810fc99c84c65ec&amp;#39;&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;%&amp;gt;%&lt;/span&gt; unstar&lt;span class=&quot;p&quot;&gt;()&lt;/span&gt;
-&lt;span class=&quot;c1&quot;&gt;#&amp;gt; &amp;lt;gist&amp;gt;7ddb9810fc99c84c65ec&lt;/span&gt;
-&lt;span class=&quot;c1&quot;&gt;#&amp;gt;   URL: https://gist.github.com/7ddb9810fc99c84c65ec&lt;/span&gt;
-&lt;span class=&quot;c1&quot;&gt;#&amp;gt;   Description: &lt;/span&gt;
-&lt;span class=&quot;c1&quot;&gt;#&amp;gt;   Public: TRUE&lt;/span&gt;
-&lt;span class=&quot;c1&quot;&gt;#&amp;gt;   Created/Edited: 2014-06-27T17:50:37Z / 2014-06-27T17:50:37Z&lt;/span&gt;
-&lt;span class=&quot;c1&quot;&gt;#&amp;gt;   Files: code.R, manifest.yml, rrt_manifest.yml&lt;/span&gt;
-&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;
-&lt;h2&gt;Update a gist&lt;/h2&gt;
-
-&lt;p&gt;Add files&lt;/p&gt;
-
-&lt;p&gt;First, path to file&lt;/p&gt;
-&lt;div class=&quot;highlight&quot;&gt;&lt;pre&gt;&lt;code class=&quot;language-r&quot; data-lang=&quot;r&quot;&gt;file &lt;span class=&quot;o&quot;&gt;&amp;lt;-&lt;/span&gt; &lt;span class=&quot;kp&quot;&gt;system.file&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;s&quot;&gt;&amp;quot;examples&amp;quot;&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt; &lt;span class=&quot;s&quot;&gt;&amp;quot;alm_othersources.md&amp;quot;&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt; package &lt;span class=&quot;o&quot;&gt;=&lt;/span&gt; &lt;span class=&quot;s&quot;&gt;&amp;quot;gistr&amp;quot;&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt;
-&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;&lt;div class=&quot;highlight&quot;&gt;&lt;pre&gt;&lt;code class=&quot;language-r&quot; data-lang=&quot;r&quot;&gt;gists&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;what &lt;span class=&quot;o&quot;&gt;=&lt;/span&gt; &lt;span class=&quot;s&quot;&gt;&amp;quot;minepublic&amp;quot;&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;)[[&lt;/span&gt;&lt;span class=&quot;m&quot;&gt;1&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;]]&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;%&amp;gt;%&lt;/span&gt;
-  add_files&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;kp&quot;&gt;file&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;%&amp;gt;%&lt;/span&gt;
-  update&lt;span class=&quot;p&quot;&gt;()&lt;/span&gt;
-&lt;span class=&quot;c1&quot;&gt;#&amp;gt; &amp;lt;gist&amp;gt;85158117880f197df422&lt;/span&gt;
-&lt;span class=&quot;c1&quot;&gt;#&amp;gt;   URL: https://gist.github.com/85158117880f197df422&lt;/span&gt;
-&lt;span class=&quot;c1&quot;&gt;#&amp;gt;   Description: &lt;/span&gt;
-&lt;span class=&quot;c1&quot;&gt;#&amp;gt;   Public: TRUE&lt;/span&gt;
-&lt;span class=&quot;c1&quot;&gt;#&amp;gt;   Created/Edited: 2015-01-04T17:42:37Z / 2015-01-04T17:42:42Z&lt;/span&gt;
-&lt;span class=&quot;c1&quot;&gt;#&amp;gt;   Files: alm_othersources.md, code.R&lt;/span&gt;
-&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;
-&lt;p&gt;Delete files&lt;/p&gt;
-&lt;div class=&quot;highlight&quot;&gt;&lt;pre&gt;&lt;code class=&quot;language-r&quot; data-lang=&quot;r&quot;&gt;gists&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;what &lt;span class=&quot;o&quot;&gt;=&lt;/span&gt; &lt;span class=&quot;s&quot;&gt;&amp;quot;minepublic&amp;quot;&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;)[[&lt;/span&gt;&lt;span class=&quot;m&quot;&gt;1&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;]]&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;%&amp;gt;%&lt;/span&gt;
-  delete_files&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;kp&quot;&gt;file&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;%&amp;gt;%&lt;/span&gt;
-  update&lt;span class=&quot;p&quot;&gt;()&lt;/span&gt;
-&lt;span class=&quot;c1&quot;&gt;#&amp;gt; &amp;lt;gist&amp;gt;85158117880f197df422&lt;/span&gt;
-&lt;span class=&quot;c1&quot;&gt;#&amp;gt;   URL: https://gist.github.com/85158117880f197df422&lt;/span&gt;
-&lt;span class=&quot;c1&quot;&gt;#&amp;gt;   Description: &lt;/span&gt;
-&lt;span class=&quot;c1&quot;&gt;#&amp;gt;   Public: TRUE&lt;/span&gt;
-&lt;span class=&quot;c1&quot;&gt;#&amp;gt;   Created/Edited: 2015-01-04T17:42:37Z / 2015-01-04T17:42:42Z&lt;/span&gt;
-&lt;span class=&quot;c1&quot;&gt;#&amp;gt;   Files: code.R&lt;/span&gt;
-&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;
-&lt;h2&gt;Open a gist in your default browser&lt;/h2&gt;
-&lt;div class=&quot;highlight&quot;&gt;&lt;pre&gt;&lt;code class=&quot;language-r&quot; data-lang=&quot;r&quot;&gt;gists&lt;span class=&quot;p&quot;&gt;()[[&lt;/span&gt;&lt;span class=&quot;m&quot;&gt;1&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;]]&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;%&amp;gt;%&lt;/span&gt; browse&lt;span class=&quot;p&quot;&gt;()&lt;/span&gt;
-&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;
-&lt;blockquote&gt;
-&lt;p&gt;Opens the gist in your default browser&lt;/p&gt;
-&lt;/blockquote&gt;
-
-&lt;h2&gt;Get embed script&lt;/h2&gt;
-&lt;div class=&quot;highlight&quot;&gt;&lt;pre&gt;&lt;code class=&quot;language-r&quot; data-lang=&quot;r&quot;&gt;gists&lt;span class=&quot;p&quot;&gt;()[[&lt;/span&gt;&lt;span class=&quot;m&quot;&gt;1&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;]]&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;%&amp;gt;%&lt;/span&gt; embed&lt;span class=&quot;p&quot;&gt;()&lt;/span&gt;
-&lt;span class=&quot;c1&quot;&gt;#&amp;gt; [1] &amp;quot;&amp;lt;script src=\&amp;quot;https://gist.github.com/sckott/85158117880f197df422.js\&amp;quot;&amp;gt;&amp;lt;/script&amp;gt;&amp;quot;&lt;/span&gt;
-&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;
-&lt;h3&gt;List forks&lt;/h3&gt;
-
-&lt;p&gt;Returns a list of &lt;code&gt;gist&lt;/code&gt; objects, just like &lt;code&gt;gists()&lt;/code&gt;&lt;/p&gt;
-&lt;div class=&quot;highlight&quot;&gt;&lt;pre&gt;&lt;code class=&quot;language-r&quot; data-lang=&quot;r&quot;&gt;gist&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;id&lt;span class=&quot;o&quot;&gt;=&lt;/span&gt;&lt;span class=&quot;s&quot;&gt;&amp;#39;1642874&amp;#39;&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;%&amp;gt;%&lt;/span&gt; forks&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;per_page&lt;span class=&quot;o&quot;&gt;=&lt;/span&gt;&lt;span class=&quot;m&quot;&gt;2&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt;
-&lt;span class=&quot;c1&quot;&gt;#&amp;gt; [[1]]&lt;/span&gt;
-&lt;span class=&quot;c1&quot;&gt;#&amp;gt; &amp;lt;gist&amp;gt;1642989&lt;/span&gt;
-&lt;span class=&quot;c1&quot;&gt;#&amp;gt;   URL: https://gist.github.com/1642989&lt;/span&gt;
-&lt;span class=&quot;c1&quot;&gt;#&amp;gt;   Description: Spline Transition&lt;/span&gt;
-&lt;span class=&quot;c1&quot;&gt;#&amp;gt;   Public: TRUE&lt;/span&gt;
-&lt;span class=&quot;c1&quot;&gt;#&amp;gt;   Created/Edited: 2012-01-19T21:45:20Z / 2014-12-10T03:25:19Z&lt;/span&gt;
-&lt;span class=&quot;c1&quot;&gt;#&amp;gt;   Files: &lt;/span&gt;
-&lt;span class=&quot;c1&quot;&gt;#&amp;gt; &lt;/span&gt;
-&lt;span class=&quot;c1&quot;&gt;#&amp;gt; [[2]]&lt;/span&gt;
-&lt;span class=&quot;c1&quot;&gt;#&amp;gt; &amp;lt;gist&amp;gt;1643051&lt;/span&gt;
-&lt;span class=&quot;c1&quot;&gt;#&amp;gt;   URL: https://gist.github.com/1643051&lt;/span&gt;
-&lt;span class=&quot;c1&quot;&gt;#&amp;gt;   Description: Line Transition (Broken)&lt;/span&gt;
-&lt;span class=&quot;c1&quot;&gt;#&amp;gt;   Public: TRUE&lt;/span&gt;
-&lt;span class=&quot;c1&quot;&gt;#&amp;gt;   Created/Edited: 2012-01-19T21:51:30Z / 2014-04-09T03:11:36Z&lt;/span&gt;
-&lt;span class=&quot;c1&quot;&gt;#&amp;gt;   Files:&lt;/span&gt;
-&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;
-&lt;h2&gt;Fork a gist&lt;/h2&gt;
-
-&lt;p&gt;Returns a &lt;code&gt;gist&lt;/code&gt; object&lt;/p&gt;
-&lt;div class=&quot;highlight&quot;&gt;&lt;pre&gt;&lt;code class=&quot;language-r&quot; data-lang=&quot;r&quot;&gt;g &lt;span class=&quot;o&quot;&gt;&amp;lt;-&lt;/span&gt; gists&lt;span class=&quot;p&quot;&gt;()&lt;/span&gt;
-&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;forked &lt;span class=&quot;o&quot;&gt;&amp;lt;-&lt;/span&gt; g&lt;span class=&quot;p&quot;&gt;[[&lt;/span&gt; &lt;span class=&quot;kp&quot;&gt;sample&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;kp&quot;&gt;seq_along&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;g&lt;span class=&quot;p&quot;&gt;),&lt;/span&gt; &lt;span class=&quot;m&quot;&gt;1&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;]]&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;%&amp;gt;%&lt;/span&gt; fork&lt;span class=&quot;p&quot;&gt;())&lt;/span&gt;
-&lt;span class=&quot;c1&quot;&gt;#&amp;gt; &amp;lt;gist&amp;gt;62b05dd4ebc2d29add15&lt;/span&gt;
-&lt;span class=&quot;c1&quot;&gt;#&amp;gt;   URL: https://gist.github.com/62b05dd4ebc2d29add15&lt;/span&gt;
-&lt;span class=&quot;c1&quot;&gt;#&amp;gt;   Description: Solution to level 1 in Untrusted: http://alex.nisnevich.com/untrusted/&lt;/span&gt;
-&lt;span class=&quot;c1&quot;&gt;#&amp;gt;   Public: TRUE&lt;/span&gt;
-&lt;span class=&quot;c1&quot;&gt;#&amp;gt;   Created/Edited: 2015-01-04T17:42:43Z / 2015-01-04T17:42:43Z&lt;/span&gt;
-&lt;span class=&quot;c1&quot;&gt;#&amp;gt;   Files: untrusted-lvl1-solution.js&lt;/span&gt;
-&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;
-&lt;h2&gt;Example use case&lt;/h2&gt;
-
-&lt;p&gt;&lt;em&gt;Working with the Mapzen Pelias geocoding API&lt;/em&gt;&lt;/p&gt;
-
-&lt;p&gt;The API is described at &lt;a href=&quot;https://github.com/pelias/pelias&quot;&gt;https://github.com/pelias/pelias&lt;/a&gt;, and is still in alpha they say. The steps: get data, make a gist. The data is returned from Mapzen as geojson, so all we have to do is literally push it up to GitHub gists and we&amp;#39;re done b/c GitHub renders the map.&lt;/p&gt;
-&lt;div class=&quot;highlight&quot;&gt;&lt;pre&gt;&lt;code class=&quot;language-r&quot; data-lang=&quot;r&quot;&gt;&lt;span class=&quot;kn&quot;&gt;library&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;s&quot;&gt;&amp;#39;httr&amp;#39;&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt;
-base &lt;span class=&quot;o&quot;&gt;&amp;lt;-&lt;/span&gt; &lt;span class=&quot;s&quot;&gt;&amp;quot;http://pelias.mapzen.com/search&amp;quot;&lt;/span&gt;
-res &lt;span class=&quot;o&quot;&gt;&amp;lt;-&lt;/span&gt; GET&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;base&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt; query &lt;span class=&quot;o&quot;&gt;=&lt;/span&gt; &lt;span class=&quot;kt&quot;&gt;list&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;input &lt;span class=&quot;o&quot;&gt;=&lt;/span&gt; &lt;span class=&quot;s&quot;&gt;&amp;#39;coffee shop&amp;#39;&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt; lat &lt;span class=&quot;o&quot;&gt;=&lt;/span&gt; &lt;span class=&quot;m&quot;&gt;45.5&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt; lon &lt;span class=&quot;o&quot;&gt;=&lt;/span&gt; &lt;span class=&quot;m&quot;&gt;-122.6&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;))&lt;/span&gt;
-json &lt;span class=&quot;o&quot;&gt;&amp;lt;-&lt;/span&gt; content&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;res&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt; as &lt;span class=&quot;o&quot;&gt;=&lt;/span&gt; &lt;span class=&quot;s&quot;&gt;&amp;quot;text&amp;quot;&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt;
-gist_create&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;code &lt;span class=&quot;o&quot;&gt;=&lt;/span&gt; json&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt; filename &lt;span class=&quot;o&quot;&gt;=&lt;/span&gt; &lt;span class=&quot;s&quot;&gt;&amp;quot;pelias_test.geojson&amp;quot;&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt;
-&lt;span class=&quot;c1&quot;&gt;#&amp;gt; &amp;lt;gist&amp;gt;017214637bcfeb198070&lt;/span&gt;
-&lt;span class=&quot;c1&quot;&gt;#&amp;gt;   URL: https://gist.github.com/017214637bcfeb198070&lt;/span&gt;
-&lt;span class=&quot;c1&quot;&gt;#&amp;gt;   Description:&lt;/span&gt;
-&lt;span class=&quot;c1&quot;&gt;#&amp;gt;   Public: TRUE&lt;/span&gt;
-&lt;span class=&quot;c1&quot;&gt;#&amp;gt;   Created/Edited: 2014-10-28T14:42:36Z / 2014-10-28T14:42:36Z&lt;/span&gt;
-&lt;span class=&quot;c1&quot;&gt;#&amp;gt;   Files: pelias_test.geojson&lt;/span&gt;
-&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;
-&lt;p&gt;And here&amp;#39;s that gist: &lt;a href=&quot;https://gist.github.com/sckott/017214637bcfeb198070&quot;&gt;https://gist.github.com/sckott/017214637bcfeb198070&lt;/a&gt;&lt;/p&gt;
-
-&lt;p&gt;&lt;img src=&quot;/public/img/2015-01-05-gistr-github-gists/gistr_ss.png&quot; alt=&quot;image&quot;&gt;&lt;/p&gt;
-</description>
-				<published>2015-01-05 00:00:00 -0800</published>
-				<link>http://recology.info//2015/01/gistr-github-gists/</link>
 			</item>
 		
 	</channel>

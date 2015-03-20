@@ -5,6 +5,119 @@
 		<link>http://recology.info/</link>
 		
 			<item>
+				<title>Faster solr with csv</title>
+				<description>&lt;p&gt;With the &lt;a href=&quot;https://github.com/ropensci/solr/issues/47&quot;&gt;help of user input&lt;/a&gt;, I&amp;#39;ve tweaked &lt;code&gt;solr&lt;/code&gt; just a bit to make things faster using default setings. I imagine the main interface for people using the &lt;code&gt;solr&lt;/code&gt; R client is via &lt;code&gt;solr_search()&lt;/code&gt;, which used to have &lt;code&gt;wt=json&lt;/code&gt; by default. Changing this to &lt;code&gt;wt=csv&lt;/code&gt; gives better performance. And it sorta makes sense to use csv, as the point of using an R client is probably do get data eventually into a data.frame, so it makes sense to go csv format (Already in tabular format) if it&amp;#39;s faster too.&lt;/p&gt;
+
+&lt;h2&gt;Install&lt;/h2&gt;
+
+&lt;p&gt;Install and load &lt;code&gt;solr&lt;/code&gt;&lt;/p&gt;
+&lt;div class=&quot;highlight&quot;&gt;&lt;pre&gt;&lt;code class=&quot;language-r&quot; data-lang=&quot;r&quot;&gt;devtools&lt;span class=&quot;o&quot;&gt;::&lt;/span&gt;install_github&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;s&quot;&gt;&amp;quot;ropensci/solr&amp;quot;&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt;
+&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;&lt;div class=&quot;highlight&quot;&gt;&lt;pre&gt;&lt;code class=&quot;language-r&quot; data-lang=&quot;r&quot;&gt;&lt;span class=&quot;kn&quot;&gt;library&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;s&quot;&gt;&amp;quot;solr&amp;quot;&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt;
+&lt;span class=&quot;kn&quot;&gt;library&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;s&quot;&gt;&amp;quot;microbenchmark&amp;quot;&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt;
+&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;
+&lt;h2&gt;Setup&lt;/h2&gt;
+
+&lt;p&gt;Define base url and fields to return&lt;/p&gt;
+&lt;div class=&quot;highlight&quot;&gt;&lt;pre&gt;&lt;code class=&quot;language-r&quot; data-lang=&quot;r&quot;&gt;url &lt;span class=&quot;o&quot;&gt;&amp;lt;-&lt;/span&gt; &lt;span class=&quot;s&quot;&gt;&amp;#39;http://api.plos.org/search&amp;#39;&lt;/span&gt;
+fields &lt;span class=&quot;o&quot;&gt;&amp;lt;-&lt;/span&gt; &lt;span class=&quot;kt&quot;&gt;c&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;s&quot;&gt;&amp;#39;id&amp;#39;&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt;&lt;span class=&quot;s&quot;&gt;&amp;#39;cross_published_journal_name&amp;#39;&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt;&lt;span class=&quot;s&quot;&gt;&amp;#39;cross_published_journal_key&amp;#39;&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt;
+            &lt;span class=&quot;s&quot;&gt;&amp;#39;cross_published_journal_eissn&amp;#39;&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt;&lt;span class=&quot;s&quot;&gt;&amp;#39;pmid&amp;#39;&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt;&lt;span class=&quot;s&quot;&gt;&amp;#39;pmcid&amp;#39;&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt;&lt;span class=&quot;s&quot;&gt;&amp;#39;publisher&amp;#39;&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt;&lt;span class=&quot;s&quot;&gt;&amp;#39;journal&amp;#39;&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt;
+            &lt;span class=&quot;s&quot;&gt;&amp;#39;publication_date&amp;#39;&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt;&lt;span class=&quot;s&quot;&gt;&amp;#39;article_type&amp;#39;&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt;&lt;span class=&quot;s&quot;&gt;&amp;#39;article_type_facet&amp;#39;&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt;&lt;span class=&quot;s&quot;&gt;&amp;#39;author&amp;#39;&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt;
+            &lt;span class=&quot;s&quot;&gt;&amp;#39;author_facet&amp;#39;&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt;&lt;span class=&quot;s&quot;&gt;&amp;#39;volume&amp;#39;&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt;&lt;span class=&quot;s&quot;&gt;&amp;#39;issue&amp;#39;&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt;&lt;span class=&quot;s&quot;&gt;&amp;#39;elocation_id&amp;#39;&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt;&lt;span class=&quot;s&quot;&gt;&amp;#39;author_display&amp;#39;&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt;
+            &lt;span class=&quot;s&quot;&gt;&amp;#39;competing_interest&amp;#39;&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt;&lt;span class=&quot;s&quot;&gt;&amp;#39;copyright&amp;#39;&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt;
+&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;
+&lt;h2&gt;json&lt;/h2&gt;
+
+&lt;p&gt;The previous default for &lt;code&gt;solr_search()&lt;/code&gt; used &lt;code&gt;json&lt;/code&gt;&lt;/p&gt;
+&lt;div class=&quot;highlight&quot;&gt;&lt;pre&gt;&lt;code class=&quot;language-r&quot; data-lang=&quot;r&quot;&gt;solr_search&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;q&lt;span class=&quot;o&quot;&gt;=&lt;/span&gt;&lt;span class=&quot;s&quot;&gt;&amp;#39;*:*&amp;#39;&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt; rows&lt;span class=&quot;o&quot;&gt;=&lt;/span&gt;&lt;span class=&quot;m&quot;&gt;10&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt; fl&lt;span class=&quot;o&quot;&gt;=&lt;/span&gt;fields&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt; base&lt;span class=&quot;o&quot;&gt;=&lt;/span&gt;&lt;span class=&quot;kp&quot;&gt;url&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt; wt &lt;span class=&quot;o&quot;&gt;=&lt;/span&gt; &lt;span class=&quot;s&quot;&gt;&amp;quot;json&amp;quot;&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt;
+&lt;span class=&quot;c1&quot;&gt;#&amp;gt; Source: local data frame [10 x 19]&lt;/span&gt;
+&lt;span class=&quot;c1&quot;&gt;#&amp;gt; &lt;/span&gt;
+&lt;span class=&quot;c1&quot;&gt;#&amp;gt;                                                                    id&lt;/span&gt;
+&lt;span class=&quot;c1&quot;&gt;#&amp;gt; 1             10.1371/annotation/856f0890-9d85-4719-8e54-c27530ac94f4&lt;/span&gt;
+&lt;span class=&quot;c1&quot;&gt;#&amp;gt; 2       10.1371/annotation/856f0890-9d85-4719-8e54-c27530ac94f4/title&lt;/span&gt;
+&lt;span class=&quot;c1&quot;&gt;#&amp;gt; 3    10.1371/annotation/856f0890-9d85-4719-8e54-c27530ac94f4/abstract&lt;/span&gt;
+&lt;span class=&quot;c1&quot;&gt;#&amp;gt; 4  10.1371/annotation/856f0890-9d85-4719-8e54-c27530ac94f4/references&lt;/span&gt;
+&lt;span class=&quot;c1&quot;&gt;#&amp;gt; 5        10.1371/annotation/856f0890-9d85-4719-8e54-c27530ac94f4/body&lt;/span&gt;
+&lt;span class=&quot;c1&quot;&gt;#&amp;gt; 6             10.1371/annotation/8551e3d5-fdd5-413b-a253-170ba13b7525&lt;/span&gt;
+&lt;span class=&quot;c1&quot;&gt;#&amp;gt; 7       10.1371/annotation/8551e3d5-fdd5-413b-a253-170ba13b7525/title&lt;/span&gt;
+&lt;span class=&quot;c1&quot;&gt;#&amp;gt; 8    10.1371/annotation/8551e3d5-fdd5-413b-a253-170ba13b7525/abstract&lt;/span&gt;
+&lt;span class=&quot;c1&quot;&gt;#&amp;gt; 9  10.1371/annotation/8551e3d5-fdd5-413b-a253-170ba13b7525/references&lt;/span&gt;
+&lt;span class=&quot;c1&quot;&gt;#&amp;gt; 10       10.1371/annotation/8551e3d5-fdd5-413b-a253-170ba13b7525/body&lt;/span&gt;
+&lt;span class=&quot;c1&quot;&gt;#&amp;gt; Variables not shown: cross_published_journal_name (chr),&lt;/span&gt;
+&lt;span class=&quot;c1&quot;&gt;#&amp;gt;   cross_published_journal_key (chr), cross_published_journal_eissn (chr),&lt;/span&gt;
+&lt;span class=&quot;c1&quot;&gt;#&amp;gt;   pmid (chr), pmcid (chr), publisher (chr), journal (chr),&lt;/span&gt;
+&lt;span class=&quot;c1&quot;&gt;#&amp;gt;   publication_date (chr), article_type (chr), article_type_facet (chr),&lt;/span&gt;
+&lt;span class=&quot;c1&quot;&gt;#&amp;gt;   author (chr), author_facet (chr), volume (int), issue (int),&lt;/span&gt;
+&lt;span class=&quot;c1&quot;&gt;#&amp;gt;   elocation_id (chr), author_display (chr), competing_interest (chr),&lt;/span&gt;
+&lt;span class=&quot;c1&quot;&gt;#&amp;gt;   copyright (chr)&lt;/span&gt;
+&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;
+&lt;h2&gt;csv&lt;/h2&gt;
+
+&lt;p&gt;The default &lt;code&gt;wt&lt;/code&gt; setting is now &lt;code&gt;csv&lt;/code&gt;&lt;/p&gt;
+&lt;div class=&quot;highlight&quot;&gt;&lt;pre&gt;&lt;code class=&quot;language-r&quot; data-lang=&quot;r&quot;&gt;solr_search&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;q&lt;span class=&quot;o&quot;&gt;=&lt;/span&gt;&lt;span class=&quot;s&quot;&gt;&amp;#39;*:*&amp;#39;&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt; rows&lt;span class=&quot;o&quot;&gt;=&lt;/span&gt;&lt;span class=&quot;m&quot;&gt;10&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt; fl&lt;span class=&quot;o&quot;&gt;=&lt;/span&gt;fields&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt; base&lt;span class=&quot;o&quot;&gt;=&lt;/span&gt;&lt;span class=&quot;kp&quot;&gt;url&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt; wt &lt;span class=&quot;o&quot;&gt;=&lt;/span&gt; &lt;span class=&quot;s&quot;&gt;&amp;quot;json&amp;quot;&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt;
+&lt;span class=&quot;c1&quot;&gt;#&amp;gt; Source: local data frame [10 x 19]&lt;/span&gt;
+&lt;span class=&quot;c1&quot;&gt;#&amp;gt; &lt;/span&gt;
+&lt;span class=&quot;c1&quot;&gt;#&amp;gt;                                                                    id&lt;/span&gt;
+&lt;span class=&quot;c1&quot;&gt;#&amp;gt; 1             10.1371/annotation/856f0890-9d85-4719-8e54-c27530ac94f4&lt;/span&gt;
+&lt;span class=&quot;c1&quot;&gt;#&amp;gt; 2       10.1371/annotation/856f0890-9d85-4719-8e54-c27530ac94f4/title&lt;/span&gt;
+&lt;span class=&quot;c1&quot;&gt;#&amp;gt; 3    10.1371/annotation/856f0890-9d85-4719-8e54-c27530ac94f4/abstract&lt;/span&gt;
+&lt;span class=&quot;c1&quot;&gt;#&amp;gt; 4  10.1371/annotation/856f0890-9d85-4719-8e54-c27530ac94f4/references&lt;/span&gt;
+&lt;span class=&quot;c1&quot;&gt;#&amp;gt; 5        10.1371/annotation/856f0890-9d85-4719-8e54-c27530ac94f4/body&lt;/span&gt;
+&lt;span class=&quot;c1&quot;&gt;#&amp;gt; 6             10.1371/annotation/8551e3d5-fdd5-413b-a253-170ba13b7525&lt;/span&gt;
+&lt;span class=&quot;c1&quot;&gt;#&amp;gt; 7       10.1371/annotation/8551e3d5-fdd5-413b-a253-170ba13b7525/title&lt;/span&gt;
+&lt;span class=&quot;c1&quot;&gt;#&amp;gt; 8    10.1371/annotation/8551e3d5-fdd5-413b-a253-170ba13b7525/abstract&lt;/span&gt;
+&lt;span class=&quot;c1&quot;&gt;#&amp;gt; 9  10.1371/annotation/8551e3d5-fdd5-413b-a253-170ba13b7525/references&lt;/span&gt;
+&lt;span class=&quot;c1&quot;&gt;#&amp;gt; 10       10.1371/annotation/8551e3d5-fdd5-413b-a253-170ba13b7525/body&lt;/span&gt;
+&lt;span class=&quot;c1&quot;&gt;#&amp;gt; Variables not shown: cross_published_journal_name (chr),&lt;/span&gt;
+&lt;span class=&quot;c1&quot;&gt;#&amp;gt;   cross_published_journal_key (chr), cross_published_journal_eissn (chr),&lt;/span&gt;
+&lt;span class=&quot;c1&quot;&gt;#&amp;gt;   pmid (chr), pmcid (chr), publisher (chr), journal (chr),&lt;/span&gt;
+&lt;span class=&quot;c1&quot;&gt;#&amp;gt;   publication_date (chr), article_type (chr), article_type_facet (chr),&lt;/span&gt;
+&lt;span class=&quot;c1&quot;&gt;#&amp;gt;   author (chr), author_facet (chr), volume (int), issue (int),&lt;/span&gt;
+&lt;span class=&quot;c1&quot;&gt;#&amp;gt;   elocation_id (chr), author_display (chr), competing_interest (chr),&lt;/span&gt;
+&lt;span class=&quot;c1&quot;&gt;#&amp;gt;   copyright (chr)&lt;/span&gt;
+&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;
+&lt;h2&gt;Compare times&lt;/h2&gt;
+
+&lt;p&gt;When parsing to a data.frame (which &lt;code&gt;solr_search()&lt;/code&gt; does by default), csv is quite a bit faster.&lt;/p&gt;
+&lt;div class=&quot;highlight&quot;&gt;&lt;pre&gt;&lt;code class=&quot;language-r&quot; data-lang=&quot;r&quot;&gt;microbenchmark&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;
+  json &lt;span class=&quot;o&quot;&gt;=&lt;/span&gt; solr_search&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;q&lt;span class=&quot;o&quot;&gt;=&lt;/span&gt;&lt;span class=&quot;s&quot;&gt;&amp;#39;*:*&amp;#39;&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt; rows&lt;span class=&quot;o&quot;&gt;=&lt;/span&gt;&lt;span class=&quot;m&quot;&gt;500&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt; fl&lt;span class=&quot;o&quot;&gt;=&lt;/span&gt;fields&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt; base&lt;span class=&quot;o&quot;&gt;=&lt;/span&gt;&lt;span class=&quot;kp&quot;&gt;url&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt; wt &lt;span class=&quot;o&quot;&gt;=&lt;/span&gt; &lt;span class=&quot;s&quot;&gt;&amp;quot;json&amp;quot;&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt; verbose &lt;span class=&quot;o&quot;&gt;=&lt;/span&gt; &lt;span class=&quot;kc&quot;&gt;FALSE&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;),&lt;/span&gt;
+  csv &lt;span class=&quot;o&quot;&gt;=&lt;/span&gt; solr_search&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;q&lt;span class=&quot;o&quot;&gt;=&lt;/span&gt;&lt;span class=&quot;s&quot;&gt;&amp;#39;*:*&amp;#39;&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt; rows&lt;span class=&quot;o&quot;&gt;=&lt;/span&gt;&lt;span class=&quot;m&quot;&gt;500&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt; fl&lt;span class=&quot;o&quot;&gt;=&lt;/span&gt;fields&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt; base&lt;span class=&quot;o&quot;&gt;=&lt;/span&gt;&lt;span class=&quot;kp&quot;&gt;url&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt; wt &lt;span class=&quot;o&quot;&gt;=&lt;/span&gt; &lt;span class=&quot;s&quot;&gt;&amp;quot;csv&amp;quot;&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt; verbose &lt;span class=&quot;o&quot;&gt;=&lt;/span&gt; &lt;span class=&quot;kc&quot;&gt;FALSE&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;),&lt;/span&gt; 
+  times &lt;span class=&quot;o&quot;&gt;=&lt;/span&gt; &lt;span class=&quot;m&quot;&gt;20&lt;/span&gt;
+&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt;
+&lt;span class=&quot;c1&quot;&gt;#&amp;gt; Unit: milliseconds&lt;/span&gt;
+&lt;span class=&quot;c1&quot;&gt;#&amp;gt;  expr      min       lq      mean    median        uq       max neval cld&lt;/span&gt;
+&lt;span class=&quot;c1&quot;&gt;#&amp;gt;  json 965.7043 1013.014 1124.1229 1086.3225 1227.9054 1441.8332    20   b&lt;/span&gt;
+&lt;span class=&quot;c1&quot;&gt;#&amp;gt;   csv 509.6573  520.089  541.5784  532.4546  548.0303  723.7575    20  a&lt;/span&gt;
+&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;
+&lt;h2&gt;json vs xml vs csv&lt;/h2&gt;
+
+&lt;p&gt;When getting raw data, csv is best, json next, then xml pulling up the rear.&lt;/p&gt;
+&lt;div class=&quot;highlight&quot;&gt;&lt;pre&gt;&lt;code class=&quot;language-r&quot; data-lang=&quot;r&quot;&gt;microbenchmark&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;
+  json &lt;span class=&quot;o&quot;&gt;=&lt;/span&gt; solr_search&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;q&lt;span class=&quot;o&quot;&gt;=&lt;/span&gt;&lt;span class=&quot;s&quot;&gt;&amp;#39;*:*&amp;#39;&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt; rows&lt;span class=&quot;o&quot;&gt;=&lt;/span&gt;&lt;span class=&quot;m&quot;&gt;1000&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt; fl&lt;span class=&quot;o&quot;&gt;=&lt;/span&gt;fields&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt; base&lt;span class=&quot;o&quot;&gt;=&lt;/span&gt;&lt;span class=&quot;kp&quot;&gt;url&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt; wt &lt;span class=&quot;o&quot;&gt;=&lt;/span&gt; &lt;span class=&quot;s&quot;&gt;&amp;quot;json&amp;quot;&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt; verbose &lt;span class=&quot;o&quot;&gt;=&lt;/span&gt; &lt;span class=&quot;kc&quot;&gt;FALSE&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt; raw &lt;span class=&quot;o&quot;&gt;=&lt;/span&gt; &lt;span class=&quot;kc&quot;&gt;TRUE&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;),&lt;/span&gt;
+  csv &lt;span class=&quot;o&quot;&gt;=&lt;/span&gt; solr_search&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;q&lt;span class=&quot;o&quot;&gt;=&lt;/span&gt;&lt;span class=&quot;s&quot;&gt;&amp;#39;*:*&amp;#39;&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt; rows&lt;span class=&quot;o&quot;&gt;=&lt;/span&gt;&lt;span class=&quot;m&quot;&gt;1000&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt; fl&lt;span class=&quot;o&quot;&gt;=&lt;/span&gt;fields&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt; base&lt;span class=&quot;o&quot;&gt;=&lt;/span&gt;&lt;span class=&quot;kp&quot;&gt;url&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt; wt &lt;span class=&quot;o&quot;&gt;=&lt;/span&gt; &lt;span class=&quot;s&quot;&gt;&amp;quot;csv&amp;quot;&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt; verbose &lt;span class=&quot;o&quot;&gt;=&lt;/span&gt; &lt;span class=&quot;kc&quot;&gt;FALSE&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt; raw &lt;span class=&quot;o&quot;&gt;=&lt;/span&gt; &lt;span class=&quot;kc&quot;&gt;TRUE&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;),&lt;/span&gt;
+  xml &lt;span class=&quot;o&quot;&gt;=&lt;/span&gt; solr_search&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;q&lt;span class=&quot;o&quot;&gt;=&lt;/span&gt;&lt;span class=&quot;s&quot;&gt;&amp;#39;*:*&amp;#39;&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt; rows&lt;span class=&quot;o&quot;&gt;=&lt;/span&gt;&lt;span class=&quot;m&quot;&gt;1000&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt; fl&lt;span class=&quot;o&quot;&gt;=&lt;/span&gt;fields&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt; base&lt;span class=&quot;o&quot;&gt;=&lt;/span&gt;&lt;span class=&quot;kp&quot;&gt;url&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt; wt &lt;span class=&quot;o&quot;&gt;=&lt;/span&gt; &lt;span class=&quot;s&quot;&gt;&amp;quot;xml&amp;quot;&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt; verbose &lt;span class=&quot;o&quot;&gt;=&lt;/span&gt; &lt;span class=&quot;kc&quot;&gt;FALSE&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt; raw &lt;span class=&quot;o&quot;&gt;=&lt;/span&gt; &lt;span class=&quot;kc&quot;&gt;TRUE&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;),&lt;/span&gt;
+  times &lt;span class=&quot;o&quot;&gt;=&lt;/span&gt; &lt;span class=&quot;m&quot;&gt;10&lt;/span&gt;
+&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt;
+&lt;span class=&quot;c1&quot;&gt;#&amp;gt; Unit: milliseconds&lt;/span&gt;
+&lt;span class=&quot;c1&quot;&gt;#&amp;gt;  expr       min       lq      mean    median        uq       max neval cld&lt;/span&gt;
+&lt;span class=&quot;c1&quot;&gt;#&amp;gt;  json 1110.9515 1142.478 1198.9981 1169.0808 1195.5709 1518.7412    10  b &lt;/span&gt;
+&lt;span class=&quot;c1&quot;&gt;#&amp;gt;   csv  801.6871  802.516  826.0655  819.1532  835.0512  873.4266    10 a  &lt;/span&gt;
+&lt;span class=&quot;c1&quot;&gt;#&amp;gt;   xml 1507.1111 1554.002 1618.5963 1617.5208 1671.0026 1740.4448    10   c&lt;/span&gt;
+&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;
+&lt;h2&gt;Notes&lt;/h2&gt;
+
+&lt;p&gt;Note that &lt;code&gt;wt=csv&lt;/code&gt; is only available in &lt;code&gt;solr_search()&lt;/code&gt; and &lt;code&gt;solr_all()&lt;/code&gt; because csv writer 
+only returns the docs element in csv, dropping other elements, including facets, mlt, groups, 
+stats, etc. &lt;/p&gt;
+
+&lt;p&gt;Also, note the http client used in &lt;code&gt;solr&lt;/code&gt; is &lt;code&gt;httr&lt;/code&gt;, which passes in a gzip compression header by default, so as long as the server serving up the Solr data has compression turned on, that&amp;#39;s all set.&lt;/p&gt;
+
+&lt;p&gt;Another way I&amp;#39;ve sped things up is if you use &lt;code&gt;wt=json&lt;/code&gt; then parse to a data.frame, it uses &lt;code&gt;dplyr&lt;/code&gt; which sped things up considerably.&lt;/p&gt;
+</description>
+				<published>2015-03-20 00:00:00 -0700</published>
+				<link>http://recology.info//2015/03/faster-solr/</link>
+			</item>
+		
+			<item>
 				<title>PUT dataframes on your couch</title>
 				<description>&lt;p&gt;It would be nice to easily push each row or column of a data.frame into CouchDB instead of having to prepare them yourself into JSON, then push in to couch. I recently added ability to push data.frame&amp;#39;s into couch using the normal &lt;code&gt;PUT /{db}&lt;/code&gt; method, and added support for the couch bulk API.&lt;/p&gt;
 
@@ -1617,311 +1730,6 @@ create_topic&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;title&lt;span class=&q
 </description>
 				<published>2015-01-15 00:00:00 -0800</published>
 				<link>http://recology.info//2015/01/discourse-in-r/</link>
-			</item>
-		
-			<item>
-				<title>R I/O for geojson and topojson</title>
-				<description>&lt;p&gt;At rOpenSci we&amp;#39;ve been working on an R package (&lt;code&gt;geojsonio&lt;/code&gt;) to make converting R data in various formats to &lt;a href=&quot;http://geojson.org/geojson-spec.html&quot;&gt;geoJSON&lt;/a&gt; and &lt;a href=&quot;https://github.com/topojson/topojson-specification/blob/master/README.md&quot;&gt;topoJSON&lt;/a&gt;, and vice versa. We hope to do this one job very well, and handle all reasonable use cases.&lt;/p&gt;
-
-&lt;p&gt;Functions in this package are organized first around what you&amp;#39;re working with or want to get, &lt;code&gt;geojson&lt;/code&gt; or &lt;code&gt;topojson&lt;/code&gt;, then convert to or read from various formats:&lt;/p&gt;
-
-&lt;ul&gt;
-&lt;li&gt;&lt;code&gt;geojson_list()&lt;/code&gt;/&lt;code&gt;topojson_list()&lt;/code&gt; - convert to geojson/topojson as R list format&lt;/li&gt;
-&lt;li&gt;&lt;code&gt;geojson_json()&lt;/code&gt;/&lt;code&gt;topojson_json()&lt;/code&gt; - convert to geojson/topojson as json&lt;/li&gt;
-&lt;li&gt;&lt;code&gt;geojson_read()&lt;/code&gt;&lt;code&gt;topojson_read()&lt;/code&gt; - read a geojson/topojson file from file path or URL&lt;/li&gt;
-&lt;li&gt;&lt;code&gt;geojson_write()&lt;/code&gt;/&lt;code&gt;topojson_write()&lt;/code&gt; - write a geojson/topojson file locally&lt;/li&gt;
-&lt;/ul&gt;
-
-&lt;p&gt;Each of the above functions have methods for various objects/classes, including &lt;code&gt;numeric&lt;/code&gt;, &lt;code&gt;data.frame&lt;/code&gt;, &lt;code&gt;list&lt;/code&gt;, &lt;code&gt;SpatialPolygons&lt;/code&gt;, &lt;code&gt;SpatialPolygonsDataFrame&lt;/code&gt;, &lt;code&gt;SpatialLines&lt;/code&gt;, &lt;code&gt;SpatialLinesDataFrame&lt;/code&gt;, &lt;code&gt;SpatialPoints&lt;/code&gt;, &lt;code&gt;SpatialPointsDataFrame&lt;/code&gt;.&lt;/p&gt;
-
-&lt;h2&gt;Install&lt;/h2&gt;
-
-&lt;p&gt;Install rgdal - in case you can&amp;#39;t get it installed from binary , here&amp;#39;s what works on a Mac.&lt;/p&gt;
-&lt;div class=&quot;highlight&quot;&gt;&lt;pre&gt;&lt;code class=&quot;language-r&quot; data-lang=&quot;r&quot;&gt;install.packages&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;s&quot;&gt;&amp;quot;http://cran.r-project.org/src/contrib/rgdal_0.9-1.tar.gz&amp;quot;&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt; repos &lt;span class=&quot;o&quot;&gt;=&lt;/span&gt; &lt;span class=&quot;kc&quot;&gt;NULL&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt; type&lt;span class=&quot;o&quot;&gt;=&lt;/span&gt;&lt;span class=&quot;s&quot;&gt;&amp;quot;source&amp;quot;&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt; configure.args &lt;span class=&quot;o&quot;&gt;=&lt;/span&gt; &lt;span class=&quot;s&quot;&gt;&amp;quot;--with-gdal-config=/Library/Frameworks/GDAL.framework/Versions/1.10/unix/bin/gdal-config --with-proj-include=/Library/Frameworks/PROJ.framework/unix/include --with-proj-lib=/Library/Frameworks/PROJ.framework/unix/lib&amp;quot;&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt;
-&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;
-&lt;p&gt;Install &lt;code&gt;geojsonio&lt;/code&gt;&lt;/p&gt;
-&lt;div class=&quot;highlight&quot;&gt;&lt;pre&gt;&lt;code class=&quot;language-r&quot; data-lang=&quot;r&quot;&gt;install.packages&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;s&quot;&gt;&amp;quot;devtools&amp;quot;&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt;
-devtools&lt;span class=&quot;o&quot;&gt;::&lt;/span&gt;install_github&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;s&quot;&gt;&amp;quot;ropensci/geojsonio&amp;quot;&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt;
-&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;&lt;div class=&quot;highlight&quot;&gt;&lt;pre&gt;&lt;code class=&quot;language-r&quot; data-lang=&quot;r&quot;&gt;&lt;span class=&quot;kn&quot;&gt;library&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;s&quot;&gt;&amp;quot;geojsonio&amp;quot;&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt;
-&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;
-&lt;h2&gt;GeoJSON&lt;/h2&gt;
-
-&lt;h3&gt;Convert various formats to geojson&lt;/h3&gt;
-
-&lt;p&gt;From a &lt;code&gt;numeric&lt;/code&gt; vector of length 2, as json or list&lt;/p&gt;
-&lt;div class=&quot;highlight&quot;&gt;&lt;pre&gt;&lt;code class=&quot;language-r&quot; data-lang=&quot;r&quot;&gt;geojson_json&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;kt&quot;&gt;c&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;m&quot;&gt;32.45&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt;&lt;span class=&quot;m&quot;&gt;-99.74&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;))&lt;/span&gt;
-&lt;span class=&quot;c1&quot;&gt;#&amp;gt; {&amp;quot;type&amp;quot;:&amp;quot;Point&amp;quot;,&amp;quot;geometry&amp;quot;:{&amp;quot;type&amp;quot;:&amp;quot;Point&amp;quot;,&amp;quot;coordinates&amp;quot;:[32.45,-99.74]},&amp;quot;properties&amp;quot;:{}}&lt;/span&gt;
-geojson_list&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;kt&quot;&gt;c&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;m&quot;&gt;32.45&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt;&lt;span class=&quot;m&quot;&gt;-99.74&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;))&lt;/span&gt;
-&lt;span class=&quot;c1&quot;&gt;#&amp;gt; $type&lt;/span&gt;
-&lt;span class=&quot;c1&quot;&gt;#&amp;gt; [1] &amp;quot;Point&amp;quot;&lt;/span&gt;
-&lt;span class=&quot;c1&quot;&gt;#&amp;gt; &lt;/span&gt;
-&lt;span class=&quot;c1&quot;&gt;#&amp;gt; $geometry&lt;/span&gt;
-&lt;span class=&quot;c1&quot;&gt;#&amp;gt; $geometry$type&lt;/span&gt;
-&lt;span class=&quot;c1&quot;&gt;#&amp;gt; [1] &amp;quot;Point&amp;quot;&lt;/span&gt;
-&lt;span class=&quot;c1&quot;&gt;#&amp;gt; &lt;/span&gt;
-&lt;span class=&quot;c1&quot;&gt;#&amp;gt; $geometry$coordinates&lt;/span&gt;
-&lt;span class=&quot;c1&quot;&gt;#&amp;gt; [1]  32.45 -99.74&lt;/span&gt;
-&lt;span class=&quot;c1&quot;&gt;#&amp;gt; &lt;/span&gt;
-&lt;span class=&quot;c1&quot;&gt;#&amp;gt; &lt;/span&gt;
-&lt;span class=&quot;c1&quot;&gt;#&amp;gt; $properties&lt;/span&gt;
-&lt;span class=&quot;c1&quot;&gt;#&amp;gt; NULL&lt;/span&gt;
-&lt;span class=&quot;c1&quot;&gt;#&amp;gt; &lt;/span&gt;
-&lt;span class=&quot;c1&quot;&gt;#&amp;gt; attr(,&amp;quot;class&amp;quot;)&lt;/span&gt;
-&lt;span class=&quot;c1&quot;&gt;#&amp;gt; [1] &amp;quot;geo_list&amp;quot;&lt;/span&gt;
-&lt;span class=&quot;c1&quot;&gt;#&amp;gt; attr(,&amp;quot;from&amp;quot;)&lt;/span&gt;
-&lt;span class=&quot;c1&quot;&gt;#&amp;gt; [1] &amp;quot;numeric&amp;quot;&lt;/span&gt;
-&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;
-&lt;p&gt;From a &lt;code&gt;data.frame&lt;/code&gt;&lt;/p&gt;
-&lt;div class=&quot;highlight&quot;&gt;&lt;pre&gt;&lt;code class=&quot;language-r&quot; data-lang=&quot;r&quot;&gt;&lt;span class=&quot;kn&quot;&gt;library&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;s&quot;&gt;&amp;#39;maps&amp;#39;&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt;
-data&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;us.cities&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt;
-geojson_json&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;us.cities&lt;span class=&quot;p&quot;&gt;[&lt;/span&gt;&lt;span class=&quot;m&quot;&gt;1&lt;/span&gt;&lt;span class=&quot;o&quot;&gt;:&lt;/span&gt;&lt;span class=&quot;m&quot;&gt;2&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,],&lt;/span&gt; lat&lt;span class=&quot;o&quot;&gt;=&lt;/span&gt;&lt;span class=&quot;s&quot;&gt;&amp;#39;lat&amp;#39;&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt; lon&lt;span class=&quot;o&quot;&gt;=&lt;/span&gt;&lt;span class=&quot;s&quot;&gt;&amp;#39;long&amp;#39;&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt;
-&lt;span class=&quot;c1&quot;&gt;#&amp;gt; {&amp;quot;type&amp;quot;:&amp;quot;FeatureCollection&amp;quot;,&amp;quot;features&amp;quot;:[{&amp;quot;type&amp;quot;:&amp;quot;Feature&amp;quot;,&amp;quot;geometry&amp;quot;:{&amp;quot;type&amp;quot;:&amp;quot;Point&amp;quot;,&amp;quot;coordinates&amp;quot;:[-99.74,32.45]},&amp;quot;properties&amp;quot;:{&amp;quot;name&amp;quot;:&amp;quot;Abilene TX&amp;quot;,&amp;quot;country.etc&amp;quot;:&amp;quot;TX&amp;quot;,&amp;quot;pop&amp;quot;:&amp;quot;113888&amp;quot;,&amp;quot;capital&amp;quot;:&amp;quot;0&amp;quot;}},{&amp;quot;type&amp;quot;:&amp;quot;Feature&amp;quot;,&amp;quot;geometry&amp;quot;:{&amp;quot;type&amp;quot;:&amp;quot;Point&amp;quot;,&amp;quot;coordinates&amp;quot;:[-81.52,41.08]},&amp;quot;properties&amp;quot;:{&amp;quot;name&amp;quot;:&amp;quot;Akron OH&amp;quot;,&amp;quot;country.etc&amp;quot;:&amp;quot;OH&amp;quot;,&amp;quot;pop&amp;quot;:&amp;quot;206634&amp;quot;,&amp;quot;capital&amp;quot;:&amp;quot;0&amp;quot;}}]}&lt;/span&gt;
-geojson_list&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;us.cities&lt;span class=&quot;p&quot;&gt;[&lt;/span&gt;&lt;span class=&quot;m&quot;&gt;1&lt;/span&gt;&lt;span class=&quot;o&quot;&gt;:&lt;/span&gt;&lt;span class=&quot;m&quot;&gt;2&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,],&lt;/span&gt; lat&lt;span class=&quot;o&quot;&gt;=&lt;/span&gt;&lt;span class=&quot;s&quot;&gt;&amp;#39;lat&amp;#39;&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt; lon&lt;span class=&quot;o&quot;&gt;=&lt;/span&gt;&lt;span class=&quot;s&quot;&gt;&amp;#39;long&amp;#39;&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt;
-&lt;span class=&quot;c1&quot;&gt;#&amp;gt; $type&lt;/span&gt;
-&lt;span class=&quot;c1&quot;&gt;#&amp;gt; [1] &amp;quot;FeatureCollection&amp;quot;&lt;/span&gt;
-&lt;span class=&quot;c1&quot;&gt;#&amp;gt; &lt;/span&gt;
-&lt;span class=&quot;c1&quot;&gt;#&amp;gt; $features&lt;/span&gt;
-&lt;span class=&quot;c1&quot;&gt;#&amp;gt; $features[[1]]&lt;/span&gt;
-&lt;span class=&quot;c1&quot;&gt;#&amp;gt; $features[[1]]$type&lt;/span&gt;
-&lt;span class=&quot;c1&quot;&gt;#&amp;gt; [1] &amp;quot;Feature&amp;quot;&lt;/span&gt;
-&lt;span class=&quot;c1&quot;&gt;#&amp;gt; &lt;/span&gt;
-&lt;span class=&quot;c1&quot;&gt;#&amp;gt; $features[[1]]$geometry&lt;/span&gt;
-&lt;span class=&quot;c1&quot;&gt;#&amp;gt; $features[[1]]$geometry$type&lt;/span&gt;
-&lt;span class=&quot;c1&quot;&gt;#&amp;gt; [1] &amp;quot;Point&amp;quot;&lt;/span&gt;
-&lt;span class=&quot;c1&quot;&gt;#&amp;gt; &lt;/span&gt;
-&lt;span class=&quot;c1&quot;&gt;#&amp;gt; $features[[1]]$geometry$coordinates&lt;/span&gt;
-&lt;span class=&quot;c1&quot;&gt;#&amp;gt; [1] -99.74  32.45&lt;/span&gt;
-&lt;span class=&quot;c1&quot;&gt;#&amp;gt; &lt;/span&gt;
-&lt;span class=&quot;c1&quot;&gt;#&amp;gt; &lt;/span&gt;
-&lt;span class=&quot;c1&quot;&gt;#&amp;gt; $features[[1]]$properties&lt;/span&gt;
-&lt;span class=&quot;c1&quot;&gt;#&amp;gt; $features[[1]]$properties$name&lt;/span&gt;
-&lt;span class=&quot;c1&quot;&gt;#&amp;gt; [1] &amp;quot;Abilene TX&amp;quot;&lt;/span&gt;
-&lt;span class=&quot;c1&quot;&gt;#&amp;gt; &lt;/span&gt;
-&lt;span class=&quot;c1&quot;&gt;#&amp;gt; $features[[1]]$properties$country.etc&lt;/span&gt;
-&lt;span class=&quot;c1&quot;&gt;#&amp;gt; [1] &amp;quot;TX&amp;quot;&lt;/span&gt;
-&lt;span class=&quot;c1&quot;&gt;#&amp;gt; &lt;/span&gt;
-&lt;span class=&quot;c1&quot;&gt;#&amp;gt; $features[[1]]$properties$pop&lt;/span&gt;
-&lt;span class=&quot;c1&quot;&gt;#&amp;gt; [1] &amp;quot;113888&amp;quot;&lt;/span&gt;
-&lt;span class=&quot;c1&quot;&gt;#&amp;gt; &lt;/span&gt;
-&lt;span class=&quot;c1&quot;&gt;#&amp;gt; $features[[1]]$properties$capital&lt;/span&gt;
-&lt;span class=&quot;c1&quot;&gt;#&amp;gt; [1] &amp;quot;0&amp;quot;&lt;/span&gt;
-&lt;span class=&quot;c1&quot;&gt;#&amp;gt; &lt;/span&gt;
-&lt;span class=&quot;c1&quot;&gt;#&amp;gt; &lt;/span&gt;
-&lt;span class=&quot;c1&quot;&gt;#&amp;gt; &lt;/span&gt;
-&lt;span class=&quot;c1&quot;&gt;#&amp;gt; $features[[2]]&lt;/span&gt;
-&lt;span class=&quot;c1&quot;&gt;#&amp;gt; $features[[2]]$type&lt;/span&gt;
-&lt;span class=&quot;c1&quot;&gt;#&amp;gt; [1] &amp;quot;Feature&amp;quot;&lt;/span&gt;
-&lt;span class=&quot;c1&quot;&gt;#&amp;gt; &lt;/span&gt;
-&lt;span class=&quot;c1&quot;&gt;#&amp;gt; $features[[2]]$geometry&lt;/span&gt;
-&lt;span class=&quot;c1&quot;&gt;#&amp;gt; $features[[2]]$geometry$type&lt;/span&gt;
-&lt;span class=&quot;c1&quot;&gt;#&amp;gt; [1] &amp;quot;Point&amp;quot;&lt;/span&gt;
-&lt;span class=&quot;c1&quot;&gt;#&amp;gt; &lt;/span&gt;
-&lt;span class=&quot;c1&quot;&gt;#&amp;gt; $features[[2]]$geometry$coordinates&lt;/span&gt;
-&lt;span class=&quot;c1&quot;&gt;#&amp;gt; [1] -81.52  41.08&lt;/span&gt;
-&lt;span class=&quot;c1&quot;&gt;#&amp;gt; &lt;/span&gt;
-&lt;span class=&quot;c1&quot;&gt;#&amp;gt; &lt;/span&gt;
-&lt;span class=&quot;c1&quot;&gt;#&amp;gt; $features[[2]]$properties&lt;/span&gt;
-&lt;span class=&quot;c1&quot;&gt;#&amp;gt; $features[[2]]$properties$name&lt;/span&gt;
-&lt;span class=&quot;c1&quot;&gt;#&amp;gt; [1] &amp;quot;Akron OH&amp;quot;&lt;/span&gt;
-&lt;span class=&quot;c1&quot;&gt;#&amp;gt; &lt;/span&gt;
-&lt;span class=&quot;c1&quot;&gt;#&amp;gt; $features[[2]]$properties$country.etc&lt;/span&gt;
-&lt;span class=&quot;c1&quot;&gt;#&amp;gt; [1] &amp;quot;OH&amp;quot;&lt;/span&gt;
-&lt;span class=&quot;c1&quot;&gt;#&amp;gt; &lt;/span&gt;
-&lt;span class=&quot;c1&quot;&gt;#&amp;gt; $features[[2]]$properties$pop&lt;/span&gt;
-&lt;span class=&quot;c1&quot;&gt;#&amp;gt; [1] &amp;quot;206634&amp;quot;&lt;/span&gt;
-&lt;span class=&quot;c1&quot;&gt;#&amp;gt; &lt;/span&gt;
-&lt;span class=&quot;c1&quot;&gt;#&amp;gt; $features[[2]]$properties$capital&lt;/span&gt;
-&lt;span class=&quot;c1&quot;&gt;#&amp;gt; [1] &amp;quot;0&amp;quot;&lt;/span&gt;
-&lt;span class=&quot;c1&quot;&gt;#&amp;gt; &lt;/span&gt;
-&lt;span class=&quot;c1&quot;&gt;#&amp;gt; &lt;/span&gt;
-&lt;span class=&quot;c1&quot;&gt;#&amp;gt; &lt;/span&gt;
-&lt;span class=&quot;c1&quot;&gt;#&amp;gt; &lt;/span&gt;
-&lt;span class=&quot;c1&quot;&gt;#&amp;gt; attr(,&amp;quot;class&amp;quot;)&lt;/span&gt;
-&lt;span class=&quot;c1&quot;&gt;#&amp;gt; [1] &amp;quot;geo_list&amp;quot;&lt;/span&gt;
-&lt;span class=&quot;c1&quot;&gt;#&amp;gt; attr(,&amp;quot;from&amp;quot;)&lt;/span&gt;
-&lt;span class=&quot;c1&quot;&gt;#&amp;gt; [1] &amp;quot;data.frame&amp;quot;&lt;/span&gt;
-&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;
-&lt;p&gt;From &lt;code&gt;SpatialPolygons&lt;/code&gt; class&lt;/p&gt;
-&lt;div class=&quot;highlight&quot;&gt;&lt;pre&gt;&lt;code class=&quot;language-r&quot; data-lang=&quot;r&quot;&gt;&lt;span class=&quot;kn&quot;&gt;library&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;s&quot;&gt;&amp;#39;sp&amp;#39;&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt;
-poly1 &lt;span class=&quot;o&quot;&gt;&amp;lt;-&lt;/span&gt; Polygons&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;kt&quot;&gt;list&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;Polygon&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;kp&quot;&gt;cbind&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;kt&quot;&gt;c&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;m&quot;&gt;-100&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt;&lt;span class=&quot;m&quot;&gt;-90&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt;&lt;span class=&quot;m&quot;&gt;-85&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt;&lt;span class=&quot;m&quot;&gt;-100&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;),&lt;/span&gt;
-                                     &lt;span class=&quot;kt&quot;&gt;c&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;m&quot;&gt;40&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt;&lt;span class=&quot;m&quot;&gt;50&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt;&lt;span class=&quot;m&quot;&gt;45&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt;&lt;span class=&quot;m&quot;&gt;40&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;)))),&lt;/span&gt; &lt;span class=&quot;s&quot;&gt;&amp;quot;1&amp;quot;&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt;
-poly2 &lt;span class=&quot;o&quot;&gt;&amp;lt;-&lt;/span&gt; Polygons&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;kt&quot;&gt;list&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;Polygon&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;kp&quot;&gt;cbind&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;kt&quot;&gt;c&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;m&quot;&gt;-90&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt;&lt;span class=&quot;m&quot;&gt;-80&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt;&lt;span class=&quot;m&quot;&gt;-75&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt;&lt;span class=&quot;m&quot;&gt;-90&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;),&lt;/span&gt;
-                                     &lt;span class=&quot;kt&quot;&gt;c&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;m&quot;&gt;30&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt;&lt;span class=&quot;m&quot;&gt;40&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt;&lt;span class=&quot;m&quot;&gt;35&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt;&lt;span class=&quot;m&quot;&gt;30&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;)))),&lt;/span&gt; &lt;span class=&quot;s&quot;&gt;&amp;quot;2&amp;quot;&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt;
-sp_poly &lt;span class=&quot;o&quot;&gt;&amp;lt;-&lt;/span&gt; SpatialPolygons&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;kt&quot;&gt;list&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;poly1&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt; poly2&lt;span class=&quot;p&quot;&gt;),&lt;/span&gt; &lt;span class=&quot;m&quot;&gt;1&lt;/span&gt;&lt;span class=&quot;o&quot;&gt;:&lt;/span&gt;&lt;span class=&quot;m&quot;&gt;2&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt;
-&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;
-&lt;p&gt;to json&lt;/p&gt;
-&lt;div class=&quot;highlight&quot;&gt;&lt;pre&gt;&lt;code class=&quot;language-r&quot; data-lang=&quot;r&quot;&gt;geojson_json&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;sp_poly&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt;
-&lt;span class=&quot;c1&quot;&gt;#&amp;gt; {&amp;quot;type&amp;quot;:&amp;quot;Polygon&amp;quot;,&amp;quot;bbox&amp;quot;:[-100,-75,30,50],&amp;quot;coordinates&amp;quot;:[[[-100,40],[-90,50],[-85,45],[-100,40]],[[-90,30],[-80,40],[-75,35],[-90,30]]],&amp;quot;properties&amp;quot;:{}}&lt;/span&gt;
-&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;
-&lt;p&gt;to list&lt;/p&gt;
-&lt;div class=&quot;highlight&quot;&gt;&lt;pre&gt;&lt;code class=&quot;language-r&quot; data-lang=&quot;r&quot;&gt;geojson_list&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;sp_poly&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt;&lt;span class=&quot;o&quot;&gt;$&lt;/span&gt;coordinates&lt;span class=&quot;p&quot;&gt;[[&lt;/span&gt;&lt;span class=&quot;m&quot;&gt;1&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;]]&lt;/span&gt;
-&lt;span class=&quot;c1&quot;&gt;#&amp;gt; [[1]]&lt;/span&gt;
-&lt;span class=&quot;c1&quot;&gt;#&amp;gt; [[1]][[1]]&lt;/span&gt;
-&lt;span class=&quot;c1&quot;&gt;#&amp;gt; [1] -100&lt;/span&gt;
-&lt;span class=&quot;c1&quot;&gt;#&amp;gt; &lt;/span&gt;
-&lt;span class=&quot;c1&quot;&gt;#&amp;gt; [[1]][[2]]&lt;/span&gt;
-&lt;span class=&quot;c1&quot;&gt;#&amp;gt; [1] 40&lt;/span&gt;
-&lt;span class=&quot;c1&quot;&gt;#&amp;gt; &lt;/span&gt;
-&lt;span class=&quot;c1&quot;&gt;#&amp;gt; &lt;/span&gt;
-&lt;span class=&quot;c1&quot;&gt;#&amp;gt; [[2]]&lt;/span&gt;
-&lt;span class=&quot;c1&quot;&gt;#&amp;gt; [[2]][[1]]&lt;/span&gt;
-&lt;span class=&quot;c1&quot;&gt;#&amp;gt; [1] -90&lt;/span&gt;
-&lt;span class=&quot;c1&quot;&gt;#&amp;gt; &lt;/span&gt;
-&lt;span class=&quot;c1&quot;&gt;#&amp;gt; [[2]][[2]]&lt;/span&gt;
-&lt;span class=&quot;c1&quot;&gt;#&amp;gt; [1] 50&lt;/span&gt;
-&lt;span class=&quot;c1&quot;&gt;#&amp;gt; &lt;/span&gt;
-&lt;span class=&quot;c1&quot;&gt;#&amp;gt; &lt;/span&gt;
-&lt;span class=&quot;c1&quot;&gt;#&amp;gt; [[3]]&lt;/span&gt;
-&lt;span class=&quot;c1&quot;&gt;#&amp;gt; [[3]][[1]]&lt;/span&gt;
-&lt;span class=&quot;c1&quot;&gt;#&amp;gt; [1] -85&lt;/span&gt;
-&lt;span class=&quot;c1&quot;&gt;#&amp;gt; &lt;/span&gt;
-&lt;span class=&quot;c1&quot;&gt;#&amp;gt; [[3]][[2]]&lt;/span&gt;
-&lt;span class=&quot;c1&quot;&gt;#&amp;gt; [1] 45&lt;/span&gt;
-&lt;span class=&quot;c1&quot;&gt;#&amp;gt; &lt;/span&gt;
-&lt;span class=&quot;c1&quot;&gt;#&amp;gt; &lt;/span&gt;
-&lt;span class=&quot;c1&quot;&gt;#&amp;gt; [[4]]&lt;/span&gt;
-&lt;span class=&quot;c1&quot;&gt;#&amp;gt; [[4]][[1]]&lt;/span&gt;
-&lt;span class=&quot;c1&quot;&gt;#&amp;gt; [1] -100&lt;/span&gt;
-&lt;span class=&quot;c1&quot;&gt;#&amp;gt; &lt;/span&gt;
-&lt;span class=&quot;c1&quot;&gt;#&amp;gt; [[4]][[2]]&lt;/span&gt;
-&lt;span class=&quot;c1&quot;&gt;#&amp;gt; [1] 40&lt;/span&gt;
-&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;
-&lt;h3&gt;Write geojson&lt;/h3&gt;
-&lt;div class=&quot;highlight&quot;&gt;&lt;pre&gt;&lt;code class=&quot;language-r&quot; data-lang=&quot;r&quot;&gt;&lt;span class=&quot;kn&quot;&gt;library&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;s&quot;&gt;&amp;#39;maps&amp;#39;&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt;
-data&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;us.cities&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt;
-geojson_write&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;us.cities&lt;span class=&quot;p&quot;&gt;[&lt;/span&gt;&lt;span class=&quot;m&quot;&gt;1&lt;/span&gt;&lt;span class=&quot;o&quot;&gt;:&lt;/span&gt;&lt;span class=&quot;m&quot;&gt;2&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,],&lt;/span&gt; lat&lt;span class=&quot;o&quot;&gt;=&lt;/span&gt;&lt;span class=&quot;s&quot;&gt;&amp;#39;lat&amp;#39;&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt; lon&lt;span class=&quot;o&quot;&gt;=&lt;/span&gt;&lt;span class=&quot;s&quot;&gt;&amp;#39;long&amp;#39;&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt;
-&lt;span class=&quot;c1&quot;&gt;#&amp;gt; &amp;lt;geojson&amp;gt;&lt;/span&gt;
-&lt;span class=&quot;c1&quot;&gt;#&amp;gt;   Path:       myfile.geojson&lt;/span&gt;
-&lt;span class=&quot;c1&quot;&gt;#&amp;gt;   From class: data.frame&lt;/span&gt;
-&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;
-&lt;h3&gt;Read geojson&lt;/h3&gt;
-&lt;div class=&quot;highlight&quot;&gt;&lt;pre&gt;&lt;code class=&quot;language-r&quot; data-lang=&quot;r&quot;&gt;file &lt;span class=&quot;o&quot;&gt;&amp;lt;-&lt;/span&gt; &lt;span class=&quot;kp&quot;&gt;system.file&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;s&quot;&gt;&amp;quot;examples&amp;quot;&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt; &lt;span class=&quot;s&quot;&gt;&amp;quot;california.geojson&amp;quot;&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt; package &lt;span class=&quot;o&quot;&gt;=&lt;/span&gt; &lt;span class=&quot;s&quot;&gt;&amp;quot;geojsonio&amp;quot;&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt;
-out &lt;span class=&quot;o&quot;&gt;&amp;lt;-&lt;/span&gt; geojson_read&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;kp&quot;&gt;file&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt;
-&lt;span class=&quot;c1&quot;&gt;#&amp;gt; OGR data source with driver: GeoJSON &lt;/span&gt;
-&lt;span class=&quot;c1&quot;&gt;#&amp;gt; Source: &amp;quot;/Users/sacmac/Library/R/3.1/library/geojsonio/examples/california.geojson&amp;quot;, layer: &amp;quot;OGRGeoJSON&amp;quot;&lt;/span&gt;
-&lt;span class=&quot;c1&quot;&gt;#&amp;gt; with 1 features and 11 fields&lt;/span&gt;
-&lt;span class=&quot;c1&quot;&gt;#&amp;gt; Feature type: wkbMultiPolygon with 2 dimensions&lt;/span&gt;
-plot&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;out&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt;
-&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;
-&lt;p&gt;&lt;img src=&quot;/public/img/2015-01-06-geojson-topojson-io/unnamed-chunk-11-1.png&quot; alt=&quot;plot of chunk unnamed-chunk-11&quot;&gt; &lt;/p&gt;
-
-&lt;h2&gt;TopoJSON&lt;/h2&gt;
-
-&lt;h3&gt;Convert to TopoJSON with Node topojson client&lt;/h3&gt;
-
-&lt;p&gt;For topojson you will need Mike Bostock&amp;#39;s command line client. Install it by doing&lt;/p&gt;
-&lt;div class=&quot;highlight&quot;&gt;&lt;pre&gt;&lt;code class=&quot;language-text&quot; data-lang=&quot;text&quot;&gt;sudo npm install -g topojson
-&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;
-&lt;p&gt;Download a zipped shape fileset, &lt;a href=&quot;http://esp.cr.usgs.gov/data/little/querwisl.zip&quot;&gt;this one&lt;/a&gt; for distribution of &lt;em&gt;Quercus wislizeni&lt;/em&gt;. Unzip the zip file to a folder. Then do (changing the path to your path)&lt;/p&gt;
-&lt;div class=&quot;highlight&quot;&gt;&lt;pre&gt;&lt;code class=&quot;language-r&quot; data-lang=&quot;r&quot;&gt;topojson_write&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;shppath&lt;span class=&quot;o&quot;&gt;=&lt;/span&gt;&lt;span class=&quot;s&quot;&gt;&amp;#39;~/Downloads/querwisl&amp;#39;&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt; path &lt;span class=&quot;o&quot;&gt;=&lt;/span&gt; &lt;span class=&quot;s&quot;&gt;&amp;quot;~/Downloads&amp;quot;&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt; projection&lt;span class=&quot;o&quot;&gt;=&lt;/span&gt;&lt;span class=&quot;s&quot;&gt;&amp;#39;albers&amp;#39;&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt; projargs&lt;span class=&quot;o&quot;&gt;=&lt;/span&gt;&lt;span class=&quot;kt&quot;&gt;list&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;rotate&lt;span class=&quot;o&quot;&gt;=&lt;/span&gt;&lt;span class=&quot;s&quot;&gt;&amp;#39;[60, -35, 0]&amp;#39;&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;))&lt;/span&gt;
-&lt;span class=&quot;c1&quot;&gt;#&amp;gt; OGR data source with driver: ESRI Shapefile &lt;/span&gt;
-&lt;span class=&quot;c1&quot;&gt;#&amp;gt; Source: &amp;quot;/Users/sacmac/Downloads/querwisl&amp;quot;, layer: &amp;quot;querwisl&amp;quot;&lt;/span&gt;
-&lt;span class=&quot;c1&quot;&gt;#&amp;gt; with 35 features and 5 fields&lt;/span&gt;
-&lt;span class=&quot;c1&quot;&gt;#&amp;gt; Feature type: wkbPolygon with 2 dimensions&lt;/span&gt;
-&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;
-&lt;p&gt;Which prints progress on the conversion of the shape file. And prints the topojson CLI call, including the location of the output file, here &lt;code&gt;/Users/sacmac/querwisl.json&lt;/code&gt;&lt;/p&gt;
-&lt;div class=&quot;highlight&quot;&gt;&lt;pre&gt;&lt;code class=&quot;language-r&quot; data-lang=&quot;r&quot;&gt;OGR data &lt;span class=&quot;kn&quot;&gt;source&lt;/span&gt; with driver&lt;span class=&quot;o&quot;&gt;:&lt;/span&gt; ESRI Shapefile
-Source&lt;span class=&quot;o&quot;&gt;:&lt;/span&gt; &lt;span class=&quot;s&quot;&gt;&amp;quot;/Users/sacmac/Downloads/querwisl&amp;quot;&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt; layer&lt;span class=&quot;o&quot;&gt;:&lt;/span&gt; &lt;span class=&quot;s&quot;&gt;&amp;quot;querwisl&amp;quot;&lt;/span&gt;
-with &lt;span class=&quot;m&quot;&gt;35&lt;/span&gt; features and &lt;span class=&quot;m&quot;&gt;5&lt;/span&gt; fields
-Feature type&lt;span class=&quot;o&quot;&gt;:&lt;/span&gt; wkbPolygon with &lt;span class=&quot;m&quot;&gt;2&lt;/span&gt; dimensions
-topojson &lt;span class=&quot;o&quot;&gt;-&lt;/span&gt;o &lt;span class=&quot;o&quot;&gt;/&lt;/span&gt;Users&lt;span class=&quot;o&quot;&gt;/&lt;/span&gt;sacmac&lt;span class=&quot;o&quot;&gt;/&lt;/span&gt;querwisl.json &lt;span class=&quot;o&quot;&gt;-&lt;/span&gt;q &lt;span class=&quot;m&quot;&gt;1e4&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;-&lt;/span&gt;s &lt;span class=&quot;m&quot;&gt;0&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;--&lt;/span&gt;shapefile&lt;span class=&quot;o&quot;&gt;-&lt;/span&gt;encoding utf8 &lt;span class=&quot;o&quot;&gt;--&lt;/span&gt;projection &lt;span class=&quot;s&quot;&gt;&amp;#39;d3.geo.albers().rotate([60, -35, 0])&amp;#39;&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;--&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;/&lt;/span&gt;var&lt;span class=&quot;o&quot;&gt;/&lt;/span&gt;folders&lt;span class=&quot;o&quot;&gt;/&lt;/span&gt;gs&lt;span class=&quot;o&quot;&gt;/&lt;/span&gt;&lt;span class=&quot;m&quot;&gt;4&lt;/span&gt;khph0xs0436gmd2gdnwsg080000gn&lt;span class=&quot;o&quot;&gt;/&lt;/span&gt;&lt;span class=&quot;bp&quot;&gt;T&lt;/span&gt;&lt;span class=&quot;o&quot;&gt;//&lt;/span&gt;Rtmp49APW7&lt;span class=&quot;o&quot;&gt;/&lt;/span&gt;querwisl.shp
-
-bounds&lt;span class=&quot;o&quot;&gt;:&lt;/span&gt; &lt;span class=&quot;m&quot;&gt;-403.2554825867553&lt;/span&gt; &lt;span class=&quot;m&quot;&gt;401.27189387582916&lt;/span&gt; &lt;span class=&quot;m&quot;&gt;-295.798050380061&lt;/span&gt; &lt;span class=&quot;m&quot;&gt;585.4214768677039&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;cartesian&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt;
-pre&lt;span class=&quot;o&quot;&gt;-&lt;/span&gt;quantization&lt;span class=&quot;o&quot;&gt;:&lt;/span&gt; &lt;span class=&quot;m&quot;&gt;0.010746817902459677&lt;/span&gt; &lt;span class=&quot;m&quot;&gt;0.018416799979185387&lt;/span&gt;
-topology&lt;span class=&quot;o&quot;&gt;:&lt;/span&gt; &lt;span class=&quot;m&quot;&gt;35&lt;/span&gt; arcs&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt; &lt;span class=&quot;m&quot;&gt;2492&lt;/span&gt; points
-prune&lt;span class=&quot;o&quot;&gt;:&lt;/span&gt; retained &lt;span class=&quot;m&quot;&gt;35&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;/&lt;/span&gt; &lt;span class=&quot;m&quot;&gt;35&lt;/span&gt; arcs &lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;m&quot;&gt;100&lt;/span&gt;%&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt;
-&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;
-&lt;p&gt;You can then use this topojson file wherever. We&amp;#39;ll add a function soon to automagically throw this file up as a Github gist to get an interactive map.&lt;/p&gt;
-
-&lt;h3&gt;Read topojson&lt;/h3&gt;
-
-&lt;p&gt;TopoJSON&lt;/p&gt;
-&lt;div class=&quot;highlight&quot;&gt;&lt;pre&gt;&lt;code class=&quot;language-r&quot; data-lang=&quot;r&quot;&gt;url &lt;span class=&quot;o&quot;&gt;&amp;lt;-&lt;/span&gt; &lt;span class=&quot;s&quot;&gt;&amp;quot;https://raw.githubusercontent.com/shawnbot/d3-cartogram/master/data/us-states.topojson&amp;quot;&lt;/span&gt;
-out &lt;span class=&quot;o&quot;&gt;&amp;lt;-&lt;/span&gt; topojson_read&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;kp&quot;&gt;url&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt;
-&lt;span class=&quot;c1&quot;&gt;#&amp;gt; OGR data source with driver: GeoJSON &lt;/span&gt;
-&lt;span class=&quot;c1&quot;&gt;#&amp;gt; Source: &amp;quot;https://raw.githubusercontent.com/shawnbot/d3-cartogram/master/data/us-states.topojson&amp;quot;, layer: &amp;quot;states&amp;quot;&lt;/span&gt;
-&lt;span class=&quot;c1&quot;&gt;#&amp;gt; with 51 features and 2 fields&lt;/span&gt;
-&lt;span class=&quot;c1&quot;&gt;#&amp;gt; Feature type: wkbPolygon with 2 dimensions&lt;/span&gt;
-plot&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;out&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt;
-&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;
-&lt;p&gt;&lt;img src=&quot;/public/img/2015-01-06-geojson-topojson-io/unnamed-chunk-14-1.png&quot; alt=&quot;plot of chunk unnamed-chunk-14&quot;&gt; &lt;/p&gt;
-
-&lt;h2&gt;Use case: Play with US states&lt;/h2&gt;
-
-&lt;p&gt;Using data from &lt;a href=&quot;https://github.com/glynnbird/usstatesgeojson&quot;&gt;https://github.com/glynnbird/usstatesgeojson&lt;/a&gt;&lt;/p&gt;
-
-&lt;p&gt;Get some geojson&lt;/p&gt;
-&lt;div class=&quot;highlight&quot;&gt;&lt;pre&gt;&lt;code class=&quot;language-r&quot; data-lang=&quot;r&quot;&gt;&lt;span class=&quot;kn&quot;&gt;library&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;s&quot;&gt;&amp;#39;httr&amp;#39;&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt;
-res &lt;span class=&quot;o&quot;&gt;&amp;lt;-&lt;/span&gt; GET&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;s&quot;&gt;&amp;#39;https://api.github.com/repos/glynnbird/usstatesgeojson/contents&amp;#39;&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt;
-st_names &lt;span class=&quot;o&quot;&gt;&amp;lt;-&lt;/span&gt; &lt;span class=&quot;kp&quot;&gt;Filter&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;kr&quot;&gt;function&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;x&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt; &lt;span class=&quot;kp&quot;&gt;grepl&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;s&quot;&gt;&amp;quot;\\.geojson&amp;quot;&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt; x&lt;span class=&quot;p&quot;&gt;),&lt;/span&gt; &lt;span class=&quot;kp&quot;&gt;sapply&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;content&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;res&lt;span class=&quot;p&quot;&gt;),&lt;/span&gt; &lt;span class=&quot;s&quot;&gt;&amp;quot;[[&amp;quot;&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt; &lt;span class=&quot;s&quot;&gt;&amp;quot;name&amp;quot;&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;))&lt;/span&gt;
-base &lt;span class=&quot;o&quot;&gt;&amp;lt;-&lt;/span&gt; &lt;span class=&quot;s&quot;&gt;&amp;#39;https://raw.githubusercontent.com/glynnbird/usstatesgeojson/master/&amp;#39;&lt;/span&gt;
-st_files &lt;span class=&quot;o&quot;&gt;&amp;lt;-&lt;/span&gt; &lt;span class=&quot;kp&quot;&gt;paste0&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;base&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt; st_names&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt;
-&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;
-&lt;p&gt;Make a faceted plot&lt;/p&gt;
-&lt;div class=&quot;highlight&quot;&gt;&lt;pre&gt;&lt;code class=&quot;language-r&quot; data-lang=&quot;r&quot;&gt;&lt;span class=&quot;kn&quot;&gt;library&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;s&quot;&gt;&amp;#39;ggplot2&amp;#39;&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt;
-&lt;span class=&quot;kn&quot;&gt;library&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;s&quot;&gt;&amp;#39;plyr&amp;#39;&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt;
-st_use &lt;span class=&quot;o&quot;&gt;&amp;lt;-&lt;/span&gt; st_files&lt;span class=&quot;p&quot;&gt;[&lt;/span&gt;&lt;span class=&quot;m&quot;&gt;7&lt;/span&gt;&lt;span class=&quot;o&quot;&gt;:&lt;/span&gt;&lt;span class=&quot;m&quot;&gt;13&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;]&lt;/span&gt;
-geo &lt;span class=&quot;o&quot;&gt;&amp;lt;-&lt;/span&gt; &lt;span class=&quot;kp&quot;&gt;lapply&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;st_use&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt; geojson_read&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt; verbose &lt;span class=&quot;o&quot;&gt;=&lt;/span&gt; &lt;span class=&quot;kc&quot;&gt;FALSE&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt;
-df &lt;span class=&quot;o&quot;&gt;&amp;lt;-&lt;/span&gt; ldply&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;setNames&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;kp&quot;&gt;lapply&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;geo&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt; fortify&lt;span class=&quot;p&quot;&gt;),&lt;/span&gt; &lt;span class=&quot;kp&quot;&gt;gsub&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;s&quot;&gt;&amp;quot;\\.geojson&amp;quot;&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt; &lt;span class=&quot;s&quot;&gt;&amp;quot;&amp;quot;&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt; st_names&lt;span class=&quot;p&quot;&gt;[&lt;/span&gt;&lt;span class=&quot;m&quot;&gt;7&lt;/span&gt;&lt;span class=&quot;o&quot;&gt;:&lt;/span&gt;&lt;span class=&quot;m&quot;&gt;13&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;])))&lt;/span&gt;
-ggplot&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;df&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt; aes&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;long&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt; lat&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt; group &lt;span class=&quot;o&quot;&gt;=&lt;/span&gt; group&lt;span class=&quot;p&quot;&gt;))&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;+&lt;/span&gt;
-  geom_polygon&lt;span class=&quot;p&quot;&gt;()&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;+&lt;/span&gt;
-  facet_wrap&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;o&quot;&gt;~&lt;/span&gt; &lt;span class=&quot;m&quot;&gt;.i&lt;/span&gt;d&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt; scales &lt;span class=&quot;o&quot;&gt;=&lt;/span&gt; &lt;span class=&quot;s&quot;&gt;&amp;quot;free&amp;quot;&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt;
-&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;
-&lt;p&gt;&lt;img src=&quot;/public/img/2015-01-06-geojson-topojson-io/unnamed-chunk-16-1.png&quot; alt=&quot;plot of chunk unnamed-chunk-16&quot;&gt; &lt;/p&gt;
-
-&lt;h2&gt;Maps&lt;/h2&gt;
-
-&lt;p&gt;We&amp;#39;re also working on &lt;code&gt;map_gist()&lt;/code&gt; - to push up a geojson or topojson file as a GitHub gist (renders as an interactive map). It still needs some work...&lt;/p&gt;
-
-&lt;h2&gt;Validate geojson&lt;/h2&gt;
-
-&lt;p&gt;&lt;a href=&quot;http://geojsonlint.com/&quot;&gt;geojsonlint.com&lt;/a&gt; has a nice web interface you can use to make sure you&amp;#39;re geoJSON is in the right format. In addition, it provides a RESTful endpoint at &lt;code&gt;geojsonlint.com/validate&lt;/code&gt; to validate geoJSON. 
-This was just added today in this package, and can be used from many data types. &lt;/p&gt;
-
-&lt;p&gt;Good geoJSON&lt;/p&gt;
-&lt;div class=&quot;highlight&quot;&gt;&lt;pre&gt;&lt;code class=&quot;language-r&quot; data-lang=&quot;r&quot;&gt;validate&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;s&quot;&gt;&amp;#39;{&amp;quot;type&amp;quot;: &amp;quot;Point&amp;quot;, &amp;quot;coordinates&amp;quot;: [-100, 80]}&amp;#39;&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt;
-&lt;span class=&quot;c1&quot;&gt;#&amp;gt; $status&lt;/span&gt;
-&lt;span class=&quot;c1&quot;&gt;#&amp;gt; [1] &amp;quot;ok&amp;quot;&lt;/span&gt;
-&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;
-&lt;p&gt;Bad geoJSON&lt;/p&gt;
-&lt;div class=&quot;highlight&quot;&gt;&lt;pre&gt;&lt;code class=&quot;language-r&quot; data-lang=&quot;r&quot;&gt;validate&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;s&quot;&gt;&amp;#39;{&amp;quot;type&amp;quot;: &amp;quot;Rhombus&amp;quot;, &amp;quot;coordinates&amp;quot;: [[1, 2], [3, 4], [5, 6]]}&amp;#39;&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt;
-&lt;span class=&quot;c1&quot;&gt;#&amp;gt; $message&lt;/span&gt;
-&lt;span class=&quot;c1&quot;&gt;#&amp;gt; [1] &amp;quot;\&amp;quot;Rhombus\&amp;quot; is not a valid GeoJSON type.&amp;quot;&lt;/span&gt;
-&lt;span class=&quot;c1&quot;&gt;#&amp;gt; &lt;/span&gt;
-&lt;span class=&quot;c1&quot;&gt;#&amp;gt; $status&lt;/span&gt;
-&lt;span class=&quot;c1&quot;&gt;#&amp;gt; [1] &amp;quot;error&amp;quot;&lt;/span&gt;
-&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;
-&lt;p&gt;A file&lt;/p&gt;
-&lt;div class=&quot;highlight&quot;&gt;&lt;pre&gt;&lt;code class=&quot;language-r&quot; data-lang=&quot;r&quot;&gt;file &lt;span class=&quot;o&quot;&gt;&amp;lt;-&lt;/span&gt; &lt;span class=&quot;kp&quot;&gt;system.file&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;s&quot;&gt;&amp;quot;examples&amp;quot;&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt; &lt;span class=&quot;s&quot;&gt;&amp;quot;zillow_or.geojson&amp;quot;&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt; package &lt;span class=&quot;o&quot;&gt;=&lt;/span&gt; &lt;span class=&quot;s&quot;&gt;&amp;quot;togeojson&amp;quot;&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt;
-validate&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;x &lt;span class=&quot;o&quot;&gt;=&lt;/span&gt; as.location&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;kp&quot;&gt;file&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;))&lt;/span&gt;
-&lt;span class=&quot;c1&quot;&gt;#&amp;gt; $status&lt;/span&gt;
-&lt;span class=&quot;c1&quot;&gt;#&amp;gt; [1] &amp;quot;ok&amp;quot;&lt;/span&gt;
-&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;
-&lt;p&gt;A URL&lt;/p&gt;
-&lt;div class=&quot;highlight&quot;&gt;&lt;pre&gt;&lt;code class=&quot;language-r&quot; data-lang=&quot;r&quot;&gt;url &lt;span class=&quot;o&quot;&gt;&amp;lt;-&lt;/span&gt; &lt;span class=&quot;s&quot;&gt;&amp;quot;https://raw.githubusercontent.com/glynnbird/usstatesgeojson/master/california.geojson&amp;quot;&lt;/span&gt;
-validate&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;as.location&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;kp&quot;&gt;url&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;))&lt;/span&gt;
-&lt;span class=&quot;c1&quot;&gt;#&amp;gt; $status&lt;/span&gt;
-&lt;span class=&quot;c1&quot;&gt;#&amp;gt; [1] &amp;quot;ok&amp;quot;&lt;/span&gt;
-&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;
-&lt;p&gt;From the output of &lt;code&gt;geojson_list()&lt;/code&gt;&lt;/p&gt;
-&lt;div class=&quot;highlight&quot;&gt;&lt;pre&gt;&lt;code class=&quot;language-r&quot; data-lang=&quot;r&quot;&gt;&lt;span class=&quot;kn&quot;&gt;library&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;s&quot;&gt;&amp;quot;maps&amp;quot;&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt;
-data&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;us.cities&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt;
-x &lt;span class=&quot;o&quot;&gt;&amp;lt;-&lt;/span&gt; geojson_list&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;us.cities&lt;span class=&quot;p&quot;&gt;[&lt;/span&gt;&lt;span class=&quot;m&quot;&gt;1&lt;/span&gt;&lt;span class=&quot;o&quot;&gt;:&lt;/span&gt;&lt;span class=&quot;m&quot;&gt;2&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,],&lt;/span&gt; lat&lt;span class=&quot;o&quot;&gt;=&lt;/span&gt;&lt;span class=&quot;s&quot;&gt;&amp;#39;lat&amp;#39;&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt; lon&lt;span class=&quot;o&quot;&gt;=&lt;/span&gt;&lt;span class=&quot;s&quot;&gt;&amp;#39;long&amp;#39;&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt;
-validate&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;x&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt;
-&lt;span class=&quot;c1&quot;&gt;#&amp;gt; $status&lt;/span&gt;
-&lt;span class=&quot;c1&quot;&gt;#&amp;gt; [1] &amp;quot;ok&amp;quot;&lt;/span&gt;
-&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;
-&lt;p&gt;From SpatialPoints class&lt;/p&gt;
-&lt;div class=&quot;highlight&quot;&gt;&lt;pre&gt;&lt;code class=&quot;language-r&quot; data-lang=&quot;r&quot;&gt;&lt;span class=&quot;kn&quot;&gt;library&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;s&quot;&gt;&amp;quot;sp&amp;quot;&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt;
-a &lt;span class=&quot;o&quot;&gt;&amp;lt;-&lt;/span&gt; &lt;span class=&quot;kt&quot;&gt;c&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;m&quot;&gt;1&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt;&lt;span class=&quot;m&quot;&gt;2&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt;&lt;span class=&quot;m&quot;&gt;3&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt;&lt;span class=&quot;m&quot;&gt;4&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt;&lt;span class=&quot;m&quot;&gt;5&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt;
-b &lt;span class=&quot;o&quot;&gt;&amp;lt;-&lt;/span&gt; &lt;span class=&quot;kt&quot;&gt;c&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;m&quot;&gt;3&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt;&lt;span class=&quot;m&quot;&gt;2&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt;&lt;span class=&quot;m&quot;&gt;5&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt;&lt;span class=&quot;m&quot;&gt;1&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt;&lt;span class=&quot;m&quot;&gt;4&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt;
-x &lt;span class=&quot;o&quot;&gt;&amp;lt;-&lt;/span&gt; SpatialPoints&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;kp&quot;&gt;cbind&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;a&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt;b&lt;span class=&quot;p&quot;&gt;))&lt;/span&gt;
-validate&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;x&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt;
-&lt;span class=&quot;c1&quot;&gt;#&amp;gt; $status&lt;/span&gt;
-&lt;span class=&quot;c1&quot;&gt;#&amp;gt; [1] &amp;quot;ok&amp;quot;&lt;/span&gt;
-&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;</description>
-				<published>2015-01-06 00:00:00 -0800</published>
-				<link>http://recology.info//2015/01/geojson-topojson-io/</link>
 			</item>
 		
 	</channel>
