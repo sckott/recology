@@ -5,6 +5,212 @@
 		<link>http://recology.info/</link>
 		
 			<item>
+				<title>the new way - httsnap</title>
+				<description>&lt;p&gt;Inspired by &lt;code&gt;httpie&lt;/code&gt;, a Python command line client as a sort of drop in replacement for &lt;code&gt;curl&lt;/code&gt;, I am playing around with something similar-ish in R, at least in spirit. I started a little R pkg called &lt;code&gt;httsnap&lt;/code&gt; with the following ideas:&lt;/p&gt;
+
+&lt;ul&gt;
+&lt;li&gt;The web is increasingly a JSON world, so set &lt;code&gt;content-type&lt;/code&gt; and &lt;code&gt;accept&lt;/code&gt; headers to &lt;code&gt;applications/json&lt;/code&gt; by default &lt;/li&gt;
+&lt;li&gt;The workflow follows logically, or at least should, from, &lt;em&gt;hey, I got this url&lt;/em&gt;, to &lt;em&gt;i need to add some options&lt;/em&gt;, to &lt;em&gt;execute request&lt;/em&gt;&lt;/li&gt;
+&lt;li&gt;Whenever possible, transform output to data.frame&amp;#39;s - facilitating downstream manipulation via &lt;code&gt;dplyr&lt;/code&gt;, etc.&lt;/li&gt;
+&lt;li&gt;Do &lt;code&gt;GET&lt;/code&gt; requests by default. Specify a different type if you don&amp;#39;t want &lt;code&gt;GET&lt;/code&gt;. Some functionality does GET by default, though in some cases you need to specify GET&lt;/li&gt;
+&lt;li&gt;You can use non-standard evaluation to easily pass in query parameters without worrying about &lt;code&gt;&amp;amp;&lt;/code&gt;&amp;#39;s, URL escaping, etc. (see &lt;code&gt;Query()&lt;/code&gt;)&lt;/li&gt;
+&lt;li&gt;Same for body params (see &lt;code&gt;Body()&lt;/code&gt;)&lt;/li&gt;
+&lt;/ul&gt;
+
+&lt;h2&gt;Install&lt;/h2&gt;
+
+&lt;p&gt;Install and load &lt;code&gt;httsnap&lt;/code&gt;&lt;/p&gt;
+&lt;div class=&quot;highlight&quot;&gt;&lt;pre&gt;&lt;code class=&quot;language-r&quot; data-lang=&quot;r&quot;&gt;devtools&lt;span class=&quot;o&quot;&gt;::&lt;/span&gt;install_github&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;s&quot;&gt;&amp;quot;sckott/httsnap&amp;quot;&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt;
+&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;&lt;div class=&quot;highlight&quot;&gt;&lt;pre&gt;&lt;code class=&quot;language-r&quot; data-lang=&quot;r&quot;&gt;&lt;span class=&quot;kn&quot;&gt;library&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;s&quot;&gt;&amp;quot;httsnap&amp;quot;&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt;
+&lt;span class=&quot;kn&quot;&gt;library&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;s&quot;&gt;&amp;quot;dplyr&amp;quot;&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt;
+&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;
+&lt;h2&gt;Functions so far&lt;/h2&gt;
+
+&lt;ul&gt;
+&lt;li&gt;&lt;code&gt;Get&lt;/code&gt; - GET request&lt;/li&gt;
+&lt;li&gt;&lt;code&gt;Query&lt;/code&gt; - add query parameters&lt;/li&gt;
+&lt;li&gt;&lt;code&gt;Authenticate&lt;/code&gt; - add authentication details&lt;/li&gt;
+&lt;li&gt;&lt;code&gt;Progress&lt;/code&gt; - add progress bar&lt;/li&gt;
+&lt;li&gt;&lt;code&gt;Timeout&lt;/code&gt; - add a timeout&lt;/li&gt;
+&lt;li&gt;&lt;code&gt;User_agent&lt;/code&gt; - add a user agent&lt;/li&gt;
+&lt;li&gt;&lt;code&gt;Verbose&lt;/code&gt; - give verbose output&lt;/li&gt;
+&lt;li&gt;&lt;code&gt;Body&lt;/code&gt; - add a body&lt;/li&gt;
+&lt;li&gt;&lt;code&gt;h&lt;/code&gt; - add headers by key-value pair&lt;/li&gt;
+&lt;/ul&gt;
+
+&lt;p&gt;These are named to avoid conflict with &lt;code&gt;httr&lt;/code&gt;&lt;/p&gt;
+
+&lt;h2&gt;Intro&lt;/h2&gt;
+
+&lt;p&gt;A simple &lt;code&gt;GET&lt;/code&gt; request&lt;/p&gt;
+&lt;div class=&quot;highlight&quot;&gt;&lt;pre&gt;&lt;code class=&quot;language-r&quot; data-lang=&quot;r&quot;&gt;&lt;span class=&quot;s&quot;&gt;&amp;quot;http://httpbin.org/get&amp;quot;&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;%&amp;gt;%&lt;/span&gt;
+  Get&lt;span class=&quot;p&quot;&gt;()&lt;/span&gt;
+&lt;span class=&quot;c1&quot;&gt;#&amp;gt; $args&lt;/span&gt;
+&lt;span class=&quot;c1&quot;&gt;#&amp;gt; named list()&lt;/span&gt;
+&lt;span class=&quot;c1&quot;&gt;#&amp;gt; &lt;/span&gt;
+&lt;span class=&quot;c1&quot;&gt;#&amp;gt; $headers&lt;/span&gt;
+&lt;span class=&quot;c1&quot;&gt;#&amp;gt; $headers$Accept&lt;/span&gt;
+&lt;span class=&quot;c1&quot;&gt;#&amp;gt; [1] &amp;quot;application/json, text/xml, application/xml, */*&amp;quot;&lt;/span&gt;
+&lt;span class=&quot;c1&quot;&gt;#&amp;gt; &lt;/span&gt;
+&lt;span class=&quot;c1&quot;&gt;#&amp;gt; $headers$`Accept-Encoding`&lt;/span&gt;
+&lt;span class=&quot;c1&quot;&gt;#&amp;gt; [1] &amp;quot;gzip&amp;quot;&lt;/span&gt;
+&lt;span class=&quot;c1&quot;&gt;#&amp;gt; &lt;/span&gt;
+&lt;span class=&quot;c1&quot;&gt;#&amp;gt; $headers$Host&lt;/span&gt;
+&lt;span class=&quot;c1&quot;&gt;#&amp;gt; [1] &amp;quot;httpbin.org&amp;quot;&lt;/span&gt;
+&lt;span class=&quot;c1&quot;&gt;#&amp;gt; &lt;/span&gt;
+&lt;span class=&quot;c1&quot;&gt;#&amp;gt; $headers$`User-Agent`&lt;/span&gt;
+&lt;span class=&quot;c1&quot;&gt;#&amp;gt; [1] &amp;quot;curl/7.37.1 Rcurl/1.95.4.1 httr/0.6.1 httsnap/0.0.2.99&amp;quot;&lt;/span&gt;
+&lt;span class=&quot;c1&quot;&gt;#&amp;gt; &lt;/span&gt;
+&lt;span class=&quot;c1&quot;&gt;#&amp;gt; &lt;/span&gt;
+&lt;span class=&quot;c1&quot;&gt;#&amp;gt; $origin&lt;/span&gt;
+&lt;span class=&quot;c1&quot;&gt;#&amp;gt; [1] &amp;quot;24.21.209.71&amp;quot;&lt;/span&gt;
+&lt;span class=&quot;c1&quot;&gt;#&amp;gt; &lt;/span&gt;
+&lt;span class=&quot;c1&quot;&gt;#&amp;gt; $url&lt;/span&gt;
+&lt;span class=&quot;c1&quot;&gt;#&amp;gt; [1] &amp;quot;http://httpbin.org/get&amp;quot;&lt;/span&gt;
+&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;
+&lt;p&gt;You&amp;#39;ll notice that &lt;code&gt;Get()&lt;/code&gt; doesn&amp;#39;t just get the response, but also checks for whether it was a good response (the HTTP status code), and extracts the data. &lt;/p&gt;
+
+&lt;p&gt;Or you can just pass the URL into the function itself&lt;/p&gt;
+&lt;div class=&quot;highlight&quot;&gt;&lt;pre&gt;&lt;code class=&quot;language-r&quot; data-lang=&quot;r&quot;&gt;Get&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;s&quot;&gt;&amp;quot;http://httpbin.org/get&amp;quot;&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt;
+&lt;span class=&quot;c1&quot;&gt;#&amp;gt; $args&lt;/span&gt;
+&lt;span class=&quot;c1&quot;&gt;#&amp;gt; named list()&lt;/span&gt;
+&lt;span class=&quot;c1&quot;&gt;#&amp;gt; &lt;/span&gt;
+&lt;span class=&quot;c1&quot;&gt;#&amp;gt; $headers&lt;/span&gt;
+&lt;span class=&quot;c1&quot;&gt;#&amp;gt; $headers$Accept&lt;/span&gt;
+&lt;span class=&quot;c1&quot;&gt;#&amp;gt; [1] &amp;quot;application/json, text/xml, application/xml, */*&amp;quot;&lt;/span&gt;
+&lt;span class=&quot;c1&quot;&gt;#&amp;gt; &lt;/span&gt;
+&lt;span class=&quot;c1&quot;&gt;#&amp;gt; $headers$`Accept-Encoding`&lt;/span&gt;
+&lt;span class=&quot;c1&quot;&gt;#&amp;gt; [1] &amp;quot;gzip&amp;quot;&lt;/span&gt;
+&lt;span class=&quot;c1&quot;&gt;#&amp;gt; &lt;/span&gt;
+&lt;span class=&quot;c1&quot;&gt;#&amp;gt; $headers$Host&lt;/span&gt;
+&lt;span class=&quot;c1&quot;&gt;#&amp;gt; [1] &amp;quot;httpbin.org&amp;quot;&lt;/span&gt;
+&lt;span class=&quot;c1&quot;&gt;#&amp;gt; &lt;/span&gt;
+&lt;span class=&quot;c1&quot;&gt;#&amp;gt; $headers$`User-Agent`&lt;/span&gt;
+&lt;span class=&quot;c1&quot;&gt;#&amp;gt; [1] &amp;quot;curl/7.37.1 Rcurl/1.95.4.1 httr/0.6.1 httsnap/0.0.2.99&amp;quot;&lt;/span&gt;
+&lt;span class=&quot;c1&quot;&gt;#&amp;gt; &lt;/span&gt;
+&lt;span class=&quot;c1&quot;&gt;#&amp;gt; &lt;/span&gt;
+&lt;span class=&quot;c1&quot;&gt;#&amp;gt; $origin&lt;/span&gt;
+&lt;span class=&quot;c1&quot;&gt;#&amp;gt; [1] &amp;quot;24.21.209.71&amp;quot;&lt;/span&gt;
+&lt;span class=&quot;c1&quot;&gt;#&amp;gt; &lt;/span&gt;
+&lt;span class=&quot;c1&quot;&gt;#&amp;gt; $url&lt;/span&gt;
+&lt;span class=&quot;c1&quot;&gt;#&amp;gt; [1] &amp;quot;http://httpbin.org/get&amp;quot;&lt;/span&gt;
+&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;
+&lt;p&gt;You can buid up options by calling functions via pipes, and see what the options look like&lt;/p&gt;
+&lt;div class=&quot;highlight&quot;&gt;&lt;pre&gt;&lt;code class=&quot;language-r&quot; data-lang=&quot;r&quot;&gt;&lt;span class=&quot;s&quot;&gt;&amp;quot;http://httpbin.org/get&amp;quot;&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;%&amp;gt;%&lt;/span&gt;
+  Progress&lt;span class=&quot;p&quot;&gt;()&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;%&amp;gt;%&lt;/span&gt;
+  Verbose&lt;span class=&quot;p&quot;&gt;()&lt;/span&gt;
+&lt;span class=&quot;c1&quot;&gt;#&amp;gt; &amp;lt;http request&amp;gt; &lt;/span&gt;
+&lt;span class=&quot;c1&quot;&gt;#&amp;gt;   url: http://httpbin.org/get&lt;/span&gt;
+&lt;span class=&quot;c1&quot;&gt;#&amp;gt;   config: &lt;/span&gt;
+&lt;span class=&quot;c1&quot;&gt;#&amp;gt; Config: &lt;/span&gt;
+&lt;span class=&quot;c1&quot;&gt;#&amp;gt; List of 4&lt;/span&gt;
+&lt;span class=&quot;c1&quot;&gt;#&amp;gt;  $ noprogress      :FALSE&lt;/span&gt;
+&lt;span class=&quot;c1&quot;&gt;#&amp;gt;  $ progressfunction:function (...)  &lt;/span&gt;
+&lt;span class=&quot;c1&quot;&gt;#&amp;gt;  $ debugfunction   :function (...)  &lt;/span&gt;
+&lt;span class=&quot;c1&quot;&gt;#&amp;gt;  $ verbose         :TRUE&lt;/span&gt;
+&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;
+&lt;p&gt;Then execute the GET request when you&amp;#39;re ready&lt;/p&gt;
+&lt;div class=&quot;highlight&quot;&gt;&lt;pre&gt;&lt;code class=&quot;language-r&quot; data-lang=&quot;r&quot;&gt;&lt;span class=&quot;s&quot;&gt;&amp;quot;http://httpbin.org/get&amp;quot;&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;%&amp;gt;%&lt;/span&gt;
+  Progress&lt;span class=&quot;p&quot;&gt;()&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;%&amp;gt;%&lt;/span&gt;
+  Verbose&lt;span class=&quot;p&quot;&gt;()&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;%&amp;gt;%&lt;/span&gt;
+  Get&lt;span class=&quot;p&quot;&gt;()&lt;/span&gt;
+&lt;span class=&quot;c1&quot;&gt;#&amp;gt; $args&lt;/span&gt;
+&lt;span class=&quot;c1&quot;&gt;#&amp;gt; named list()&lt;/span&gt;
+&lt;span class=&quot;c1&quot;&gt;#&amp;gt; &lt;/span&gt;
+&lt;span class=&quot;c1&quot;&gt;#&amp;gt; $headers&lt;/span&gt;
+&lt;span class=&quot;c1&quot;&gt;#&amp;gt; $headers$Accept&lt;/span&gt;
+&lt;span class=&quot;c1&quot;&gt;#&amp;gt; [1] &amp;quot;application/json, text/xml, application/xml, */*&amp;quot;&lt;/span&gt;
+&lt;span class=&quot;c1&quot;&gt;#&amp;gt; &lt;/span&gt;
+&lt;span class=&quot;c1&quot;&gt;#&amp;gt; $headers$`Accept-Encoding`&lt;/span&gt;
+&lt;span class=&quot;c1&quot;&gt;#&amp;gt; [1] &amp;quot;gzip&amp;quot;&lt;/span&gt;
+&lt;span class=&quot;c1&quot;&gt;#&amp;gt; &lt;/span&gt;
+&lt;span class=&quot;c1&quot;&gt;#&amp;gt; $headers$Host&lt;/span&gt;
+&lt;span class=&quot;c1&quot;&gt;#&amp;gt; [1] &amp;quot;httpbin.org&amp;quot;&lt;/span&gt;
+&lt;span class=&quot;c1&quot;&gt;#&amp;gt; &lt;/span&gt;
+&lt;span class=&quot;c1&quot;&gt;#&amp;gt; $headers$`User-Agent`&lt;/span&gt;
+&lt;span class=&quot;c1&quot;&gt;#&amp;gt; [1] &amp;quot;curl/7.37.1 Rcurl/1.95.4.1 httr/0.6.1 httsnap/0.0.2.99&amp;quot;&lt;/span&gt;
+&lt;span class=&quot;c1&quot;&gt;#&amp;gt; &lt;/span&gt;
+&lt;span class=&quot;c1&quot;&gt;#&amp;gt; &lt;/span&gt;
+&lt;span class=&quot;c1&quot;&gt;#&amp;gt; $origin&lt;/span&gt;
+&lt;span class=&quot;c1&quot;&gt;#&amp;gt; [1] &amp;quot;24.21.209.71&amp;quot;&lt;/span&gt;
+&lt;span class=&quot;c1&quot;&gt;#&amp;gt; &lt;/span&gt;
+&lt;span class=&quot;c1&quot;&gt;#&amp;gt; $url&lt;/span&gt;
+&lt;span class=&quot;c1&quot;&gt;#&amp;gt; [1] &amp;quot;http://httpbin.org/get&amp;quot;&lt;/span&gt;
+&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;
+&lt;h2&gt;Example 1&lt;/h2&gt;
+
+&lt;p&gt;Get scholarly article metadata from the Crossref API&lt;/p&gt;
+&lt;div class=&quot;highlight&quot;&gt;&lt;pre&gt;&lt;code class=&quot;language-r&quot; data-lang=&quot;r&quot;&gt;&lt;span class=&quot;s&quot;&gt;&amp;quot;http://api.crossref.org/works&amp;quot;&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;%&amp;gt;%&lt;/span&gt;
+  Query&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;query &lt;span class=&quot;o&quot;&gt;=&lt;/span&gt; &lt;span class=&quot;s&quot;&gt;&amp;quot;ecology&amp;quot;&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;%&amp;gt;%&lt;/span&gt; 
+  &lt;span class=&quot;m&quot;&gt;.&lt;/span&gt;&lt;span class=&quot;o&quot;&gt;$&lt;/span&gt;message &lt;span class=&quot;o&quot;&gt;%&amp;gt;%&lt;/span&gt; 
+  &lt;span class=&quot;m&quot;&gt;.&lt;/span&gt;&lt;span class=&quot;o&quot;&gt;$&lt;/span&gt;items &lt;span class=&quot;o&quot;&gt;%&amp;gt;%&lt;/span&gt; 
+  select&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;DOI&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt; title&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt; publisher&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt;
+&lt;span class=&quot;c1&quot;&gt;#&amp;gt;                            DOI                title&lt;/span&gt;
+&lt;span class=&quot;c1&quot;&gt;#&amp;gt; 1          10.4996/fireecology         Fire Ecology&lt;/span&gt;
+&lt;span class=&quot;c1&quot;&gt;#&amp;gt; 2              10.5402/ecology         ISRN Ecology&lt;/span&gt;
+&lt;span class=&quot;c1&quot;&gt;#&amp;gt; 3                 10.1155/8641         ISRN Ecology&lt;/span&gt;
+&lt;span class=&quot;c1&quot;&gt;#&amp;gt; 4      10.1111/(issn)1526-100x  Restoration Ecology&lt;/span&gt;
+&lt;span class=&quot;c1&quot;&gt;#&amp;gt; 5        10.1007/248.1432-184x    Microbial Ecology&lt;/span&gt;
+&lt;span class=&quot;c1&quot;&gt;#&amp;gt; 6      10.1007/10144.1438-390x   Population Ecology&lt;/span&gt;
+&lt;span class=&quot;c1&quot;&gt;#&amp;gt; 7      10.1007/10452.1573-5125      Aquatic Ecology&lt;/span&gt;
+&lt;span class=&quot;c1&quot;&gt;#&amp;gt; 8      10.1007/10682.1573-8477 Evolutionary Ecology&lt;/span&gt;
+&lt;span class=&quot;c1&quot;&gt;#&amp;gt; 9      10.1007/10745.1572-9915        Human Ecology&lt;/span&gt;
+&lt;span class=&quot;c1&quot;&gt;#&amp;gt; 10     10.1007/10980.1572-9761    Landscape Ecology&lt;/span&gt;
+&lt;span class=&quot;c1&quot;&gt;#&amp;gt; 11     10.1007/11258.1573-5052        Plant Ecology&lt;/span&gt;
+&lt;span class=&quot;c1&quot;&gt;#&amp;gt; 12     10.1007/12080.1874-1746  Theoretical Ecology&lt;/span&gt;
+&lt;span class=&quot;c1&quot;&gt;#&amp;gt; 13     10.1111/(issn)1442-9993      Austral Ecology&lt;/span&gt;
+&lt;span class=&quot;c1&quot;&gt;#&amp;gt; 14     10.1111/(issn)1439-0485       Marine Ecology&lt;/span&gt;
+&lt;span class=&quot;c1&quot;&gt;#&amp;gt; 15     10.1111/(issn)1365-2435   Functional Ecology&lt;/span&gt;
+&lt;span class=&quot;c1&quot;&gt;#&amp;gt; 16     10.1111/(issn)1365-294x    Molecular Ecology&lt;/span&gt;
+&lt;span class=&quot;c1&quot;&gt;#&amp;gt; 17     10.1111/(issn)1461-0248      Ecology Letters&lt;/span&gt;
+&lt;span class=&quot;c1&quot;&gt;#&amp;gt; 18   10.1002/9780470979365.ch7  Behavioural Ecology&lt;/span&gt;
+&lt;span class=&quot;c1&quot;&gt;#&amp;gt; 19 10.1111/fec.2007.21.issue-5                     &lt;/span&gt;
+&lt;span class=&quot;c1&quot;&gt;#&amp;gt; 20     10.1111/rec.0.0.issue-0                     &lt;/span&gt;
+&lt;span class=&quot;c1&quot;&gt;#&amp;gt;                            publisher&lt;/span&gt;
+&lt;span class=&quot;c1&quot;&gt;#&amp;gt; 1       Association for Fire Ecology&lt;/span&gt;
+&lt;span class=&quot;c1&quot;&gt;#&amp;gt; 2     Hindawi Publishing Corporation&lt;/span&gt;
+&lt;span class=&quot;c1&quot;&gt;#&amp;gt; 3     Hindawi Publishing Corporation&lt;/span&gt;
+&lt;span class=&quot;c1&quot;&gt;#&amp;gt; 4                    Wiley-Blackwell&lt;/span&gt;
+&lt;span class=&quot;c1&quot;&gt;#&amp;gt; 5  Springer Science + Business Media&lt;/span&gt;
+&lt;span class=&quot;c1&quot;&gt;#&amp;gt; 6  Springer Science + Business Media&lt;/span&gt;
+&lt;span class=&quot;c1&quot;&gt;#&amp;gt; 7  Springer Science + Business Media&lt;/span&gt;
+&lt;span class=&quot;c1&quot;&gt;#&amp;gt; 8  Springer Science + Business Media&lt;/span&gt;
+&lt;span class=&quot;c1&quot;&gt;#&amp;gt; 9  Springer Science + Business Media&lt;/span&gt;
+&lt;span class=&quot;c1&quot;&gt;#&amp;gt; 10 Springer Science + Business Media&lt;/span&gt;
+&lt;span class=&quot;c1&quot;&gt;#&amp;gt; 11 Springer Science + Business Media&lt;/span&gt;
+&lt;span class=&quot;c1&quot;&gt;#&amp;gt; 12 Springer Science + Business Media&lt;/span&gt;
+&lt;span class=&quot;c1&quot;&gt;#&amp;gt; 13                   Wiley-Blackwell&lt;/span&gt;
+&lt;span class=&quot;c1&quot;&gt;#&amp;gt; 14                   Wiley-Blackwell&lt;/span&gt;
+&lt;span class=&quot;c1&quot;&gt;#&amp;gt; 15                   Wiley-Blackwell&lt;/span&gt;
+&lt;span class=&quot;c1&quot;&gt;#&amp;gt; 16                   Wiley-Blackwell&lt;/span&gt;
+&lt;span class=&quot;c1&quot;&gt;#&amp;gt; 17                   Wiley-Blackwell&lt;/span&gt;
+&lt;span class=&quot;c1&quot;&gt;#&amp;gt; 18                   Wiley-Blackwell&lt;/span&gt;
+&lt;span class=&quot;c1&quot;&gt;#&amp;gt; 19                   Wiley-Blackwell&lt;/span&gt;
+&lt;span class=&quot;c1&quot;&gt;#&amp;gt; 20                   Wiley-Blackwell&lt;/span&gt;
+&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;
+&lt;h2&gt;Example 2&lt;/h2&gt;
+
+&lt;p&gt;Get Public Library of Science article metadata via their API, make a histogram of number of tweets for each article&lt;/p&gt;
+&lt;div class=&quot;highlight&quot;&gt;&lt;pre&gt;&lt;code class=&quot;language-r&quot; data-lang=&quot;r&quot;&gt;&lt;span class=&quot;s&quot;&gt;&amp;quot;http://api.plos.org/search&amp;quot;&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;%&amp;gt;%&lt;/span&gt;
+  Query&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;q &lt;span class=&quot;o&quot;&gt;=&lt;/span&gt; &lt;span class=&quot;s&quot;&gt;&amp;quot;*:*&amp;quot;&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt; wt &lt;span class=&quot;o&quot;&gt;=&lt;/span&gt; &lt;span class=&quot;s&quot;&gt;&amp;quot;json&amp;quot;&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt; rows &lt;span class=&quot;o&quot;&gt;=&lt;/span&gt; &lt;span class=&quot;m&quot;&gt;100&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt; 
+        fl &lt;span class=&quot;o&quot;&gt;=&lt;/span&gt; &lt;span class=&quot;s&quot;&gt;&amp;quot;id,journal,alm_twitterCount&amp;quot;&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt;  
+        fq &lt;span class=&quot;o&quot;&gt;=&lt;/span&gt; &lt;span class=&quot;s&quot;&gt;&amp;#39;alm_twitterCount:[100 TO 10000]&amp;#39;&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;%&amp;gt;%&lt;/span&gt; 
+  &lt;span class=&quot;m&quot;&gt;.&lt;/span&gt;&lt;span class=&quot;o&quot;&gt;$&lt;/span&gt;response &lt;span class=&quot;o&quot;&gt;%&amp;gt;%&lt;/span&gt; 
+  &lt;span class=&quot;m&quot;&gt;.&lt;/span&gt;&lt;span class=&quot;o&quot;&gt;$&lt;/span&gt;docs &lt;span class=&quot;o&quot;&gt;%&amp;gt;%&lt;/span&gt; 
+  &lt;span class=&quot;m&quot;&gt;.&lt;/span&gt;&lt;span class=&quot;o&quot;&gt;$&lt;/span&gt;alm_twitterCount &lt;span class=&quot;o&quot;&gt;%&amp;gt;%&lt;/span&gt; 
+  hist&lt;span class=&quot;p&quot;&gt;()&lt;/span&gt;
+&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;
+&lt;p&gt;&lt;img src=&quot;/public/img/2015-04-29-the-new-way/unnamed-chunk-9-1.png&quot; alt=&quot;image&quot;&gt;&lt;/p&gt;
+
+&lt;h2&gt;Notes&lt;/h2&gt;
+
+&lt;p&gt;Okay, so this isn&amp;#39;t drastically different from what &lt;code&gt;httr&lt;/code&gt; already does, but its early days. &lt;/p&gt;
+</description>
+				<published>2015-04-29 00:00:00 -0700</published>
+				<link>http://recology.info//2015/04/the-new-way/</link>
+			</item>
+		
+			<item>
 				<title>Faster solr with csv</title>
 				<description>&lt;p&gt;With the &lt;a href=&quot;https://github.com/ropensci/solr/issues/47&quot;&gt;help of user input&lt;/a&gt;, I&amp;#39;ve tweaked &lt;code&gt;solr&lt;/code&gt; just a bit to make things faster using default setings. I imagine the main interface for people using the &lt;code&gt;solr&lt;/code&gt; R client is via &lt;code&gt;solr_search()&lt;/code&gt;, which used to have &lt;code&gt;wt=json&lt;/code&gt; by default. Changing this to &lt;code&gt;wt=csv&lt;/code&gt; gives better performance. And it sorta makes sense to use csv, as the point of using an R client is probably do get data eventually into a data.frame, so it makes sense to go csv format (Already in tabular format) if it&amp;#39;s faster too.&lt;/p&gt;
 
@@ -1575,161 +1781,6 @@ devtools&lt;span class=&quot;o&quot;&gt;::&lt;/span&gt;install_github&lt;span cl
 &lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;</description>
 				<published>2015-01-19 00:00:00 -0800</published>
 				<link>http://recology.info//2015/01/binomen/</link>
-			</item>
-		
-			<item>
-				<title>discgolf - Dicourse from R</title>
-				<description>&lt;p&gt;&lt;a href=&quot;http://www.discourse.org/&quot;&gt;Discourse&lt;/a&gt; is a great discussion forum application. It&amp;#39;s another thing from &lt;a href=&quot;https://en.wikipedia.org/wiki/Jeff_Atwood&quot;&gt;Jeff Atwood&lt;/a&gt;, the co-founder of &lt;a href=&quot;http://stackoverflow.com/&quot;&gt;Stackoverflow/Stackexchange&lt;/a&gt;. The installation is epecially easy with their dockerized installation setup on DigitalOcean ([instructions here][https://www.digitalocean.com/community/tutorials/how-to-install-discourse-on-ubuntu-14-04]). &lt;/p&gt;
-
-&lt;p&gt;In &lt;a href=&quot;http://ropensci.org/&quot;&gt;rOpenSci&lt;/a&gt;, we&amp;#39;ve been using a Google Groups mailing list, which is sufficient I guess, but doesn&amp;#39;t support Markdown, and we all know &lt;a href=&quot;http://www.slate.com/articles/technology/technology/2013/03/google_reader_why_did_everyone_s_favorite_rss_program_die_what_free_web.html&quot;&gt;Google can kill products any day&lt;/a&gt;, so it makes sense to use something with which we have more control. We&amp;#39;ve set up our own Discourse installation to have rOpenSci discussions - find it at &lt;a href=&quot;https://meta.discourse.org/&quot;&gt;discuss.ropensci.org&lt;/a&gt;. Check it out if you want to discuss anything rOpenSci related, or general open science, open source software, etc. You can login with email, Mozilla Persona, Twitter, or GitHub. &lt;/p&gt;
-
-&lt;p&gt;Discourse does have a RESTful API, which I found through the &lt;a href=&quot;https://github.com/discourse/discourse_api/&quot;&gt;Ruby gem&lt;/a&gt;. Why not interact with the API via R?&lt;/p&gt;
-
-&lt;h2&gt;Install&lt;/h2&gt;
-
-&lt;p&gt;Install &lt;code&gt;discgolf&lt;/code&gt; &lt;/p&gt;
-&lt;div class=&quot;highlight&quot;&gt;&lt;pre&gt;&lt;code class=&quot;language-r&quot; data-lang=&quot;r&quot;&gt;install.packages&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;s&quot;&gt;&amp;quot;devtools&amp;quot;&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt;
-devtools&lt;span class=&quot;o&quot;&gt;::&lt;/span&gt;install_github&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;s&quot;&gt;&amp;quot;sckott/discgolf&amp;quot;&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt;
-&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;&lt;div class=&quot;highlight&quot;&gt;&lt;pre&gt;&lt;code class=&quot;language-r&quot; data-lang=&quot;r&quot;&gt;&lt;span class=&quot;kn&quot;&gt;library&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;s&quot;&gt;&amp;quot;discgolf&amp;quot;&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt;
-&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;
-&lt;h2&gt;Authentication&lt;/h2&gt;
-
-&lt;p&gt;The Discourse API is based on using a specific installation of Discourse (as far as I know), which requires your username and an API key for that installation. Get those (I found mine in the admin panel), and you can pass them in to each function call, or set as option variables in &lt;code&gt;.Rprofile&lt;/code&gt; (use &lt;code&gt;discourse_api_key&lt;/code&gt; and &lt;code&gt;discourse_username&lt;/code&gt;) or environment variables in &lt;code&gt;.Renviron&lt;/code&gt; (use &lt;code&gt;DISCOURSE_API_KEY&lt;/code&gt; and &lt;code&gt;DISCOURSE_USERNAME&lt;/code&gt;).&lt;/p&gt;
-
-&lt;h2&gt;Examples&lt;/h2&gt;
-
-&lt;p&gt;Get the latest topics (abbreviated content for blog post brevity)&lt;/p&gt;
-&lt;div class=&quot;highlight&quot;&gt;&lt;pre&gt;&lt;code class=&quot;language-r&quot; data-lang=&quot;r&quot;&gt;latest_topics&lt;span class=&quot;p&quot;&gt;()&lt;/span&gt;
-&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;&lt;div class=&quot;highlight&quot;&gt;&lt;pre&gt;&lt;code class=&quot;language-text&quot; data-lang=&quot;text&quot;&gt;#&amp;gt;    id                             title                       fancy_title
-#&amp;gt; 1   8       Welcome to rOpenSci Discuss       Welcome to rOpenSci Discuss
-#&amp;gt; 2  92    Feedback on geojsonio package?    Feedback on geojsonio package?
-#&amp;gt; 3 102                Astronomy research                Astronomy research
-#&amp;gt; 4  99           Rgbif argument question           Rgbif argument question
-#&amp;gt; 5  93 Feedback on rnoaa ghcnd functions Feedback on rnoaa ghcnd functions
-#&amp;gt;                                slug
-#&amp;gt; 1       welcome-to-ropensci-discuss
-#&amp;gt; 2     feedback-on-geojsonio-package
-#&amp;gt; 3                astronomy-research
-#&amp;gt; 4           rgbif-argument-question
-#&amp;gt; 5 feedback-on-rnoaa-ghcnd-functions
-&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;
-&lt;p&gt;Get new topics&lt;/p&gt;
-&lt;div class=&quot;highlight&quot;&gt;&lt;pre&gt;&lt;code class=&quot;language-r&quot; data-lang=&quot;r&quot;&gt;new_topics&lt;span class=&quot;p&quot;&gt;()&lt;/span&gt;
-&lt;span class=&quot;c1&quot;&gt;#&amp;gt; $topic_list&lt;/span&gt;
-&lt;span class=&quot;c1&quot;&gt;#&amp;gt; $topic_list$can_create_topic&lt;/span&gt;
-&lt;span class=&quot;c1&quot;&gt;#&amp;gt; [1] TRUE&lt;/span&gt;
-&lt;span class=&quot;c1&quot;&gt;#&amp;gt; &lt;/span&gt;
-&lt;span class=&quot;c1&quot;&gt;#&amp;gt; $topic_list$draft&lt;/span&gt;
-&lt;span class=&quot;c1&quot;&gt;#&amp;gt; NULL&lt;/span&gt;
-&lt;span class=&quot;c1&quot;&gt;#&amp;gt; &lt;/span&gt;
-&lt;span class=&quot;c1&quot;&gt;#&amp;gt; $topic_list$draft_key&lt;/span&gt;
-&lt;span class=&quot;c1&quot;&gt;#&amp;gt; [1] &amp;quot;new_topic&amp;quot;&lt;/span&gt;
-&lt;span class=&quot;c1&quot;&gt;#&amp;gt; &lt;/span&gt;
-&lt;span class=&quot;c1&quot;&gt;#&amp;gt; $topic_list$draft_sequence&lt;/span&gt;
-&lt;span class=&quot;c1&quot;&gt;#&amp;gt; [1] 15&lt;/span&gt;
-&lt;span class=&quot;c1&quot;&gt;#&amp;gt; &lt;/span&gt;
-&lt;span class=&quot;c1&quot;&gt;#&amp;gt; $topic_list$per_page&lt;/span&gt;
-&lt;span class=&quot;c1&quot;&gt;#&amp;gt; [1] 30&lt;/span&gt;
-&lt;span class=&quot;c1&quot;&gt;#&amp;gt; &lt;/span&gt;
-&lt;span class=&quot;c1&quot;&gt;#&amp;gt; $topic_list$topics&lt;/span&gt;
-&lt;span class=&quot;c1&quot;&gt;#&amp;gt; list()&lt;/span&gt;
-&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;
-&lt;p&gt;Get topics by a specific user&lt;/p&gt;
-&lt;div class=&quot;highlight&quot;&gt;&lt;pre&gt;&lt;code class=&quot;language-r&quot; data-lang=&quot;r&quot;&gt;topics_by&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;s&quot;&gt;&amp;quot;cboettig&amp;quot;&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt;
-&lt;span class=&quot;c1&quot;&gt;#&amp;gt; $users&lt;/span&gt;
-&lt;span class=&quot;c1&quot;&gt;#&amp;gt;   id username uploaded_avatar_id&lt;/span&gt;
-&lt;span class=&quot;c1&quot;&gt;#&amp;gt; 1  3 cboettig                  4&lt;/span&gt;
-&lt;span class=&quot;c1&quot;&gt;#&amp;gt; 2  1   sckott                  2&lt;/span&gt;
-&lt;span class=&quot;c1&quot;&gt;#&amp;gt; 3 35 noamross                 57&lt;/span&gt;
-&lt;span class=&quot;c1&quot;&gt;#&amp;gt; 4  2  karthik                  3&lt;/span&gt;
-&lt;span class=&quot;c1&quot;&gt;#&amp;gt;                                            avatar_template&lt;/span&gt;
-&lt;span class=&quot;c1&quot;&gt;#&amp;gt; 1  /user_avatar/discuss.ropensci.org/cboettig/{size}/4.png&lt;/span&gt;
-&lt;span class=&quot;c1&quot;&gt;#&amp;gt; 2    /user_avatar/discuss.ropensci.org/sckott/{size}/2.png&lt;/span&gt;
-&lt;span class=&quot;c1&quot;&gt;#&amp;gt; 3 /user_avatar/discuss.ropensci.org/noamross/{size}/57.png&lt;/span&gt;
-&lt;span class=&quot;c1&quot;&gt;#&amp;gt; 4   /user_avatar/discuss.ropensci.org/karthik/{size}/3.png&lt;/span&gt;
-&lt;span class=&quot;c1&quot;&gt;#&amp;gt; &lt;/span&gt;
-&lt;span class=&quot;c1&quot;&gt;#&amp;gt; $topic_list&lt;/span&gt;
-&lt;span class=&quot;c1&quot;&gt;#&amp;gt; $topic_list$can_create_topic&lt;/span&gt;
-&lt;span class=&quot;c1&quot;&gt;#&amp;gt; [1] TRUE&lt;/span&gt;
-&lt;span class=&quot;c1&quot;&gt;#&amp;gt; &lt;/span&gt;
-&lt;span class=&quot;c1&quot;&gt;#&amp;gt; $topic_list$draft&lt;/span&gt;
-&lt;span class=&quot;c1&quot;&gt;#&amp;gt; NULL&lt;/span&gt;
-&lt;span class=&quot;c1&quot;&gt;#&amp;gt; &lt;/span&gt;
-&lt;span class=&quot;c1&quot;&gt;#&amp;gt; $topic_list$draft_key&lt;/span&gt;
-&lt;span class=&quot;c1&quot;&gt;#&amp;gt; [1] &amp;quot;new_topic&amp;quot;&lt;/span&gt;
-&lt;span class=&quot;c1&quot;&gt;#&amp;gt; &lt;/span&gt;
-&lt;span class=&quot;c1&quot;&gt;#&amp;gt; $topic_list$draft_sequence&lt;/span&gt;
-&lt;span class=&quot;c1&quot;&gt;#&amp;gt; [1] 15&lt;/span&gt;
-&lt;span class=&quot;c1&quot;&gt;#&amp;gt; &lt;/span&gt;
-&lt;span class=&quot;c1&quot;&gt;#&amp;gt; $topic_list$per_page&lt;/span&gt;
-&lt;span class=&quot;c1&quot;&gt;#&amp;gt; [1] 30&lt;/span&gt;
-&lt;span class=&quot;c1&quot;&gt;#&amp;gt; &lt;/span&gt;
-&lt;span class=&quot;c1&quot;&gt;#&amp;gt; $topic_list$topics&lt;/span&gt;
-&lt;span class=&quot;c1&quot;&gt;#&amp;gt;   id                                      title&lt;/span&gt;
-&lt;span class=&quot;c1&quot;&gt;#&amp;gt; 1 15 Using Discourse for blog comments as well?&lt;/span&gt;
-&lt;span class=&quot;c1&quot;&gt;#&amp;gt; 2 16                            Reply by email?&lt;/span&gt;
-&lt;span class=&quot;c1&quot;&gt;#&amp;gt;                                  fancy_title&lt;/span&gt;
-&lt;span class=&quot;c1&quot;&gt;#&amp;gt; 1 Using Discourse for blog comments as well?&lt;/span&gt;
-&lt;span class=&quot;c1&quot;&gt;#&amp;gt; 2                            Reply by email?&lt;/span&gt;
-&lt;span class=&quot;c1&quot;&gt;#&amp;gt;                                        slug posts_count reply_count&lt;/span&gt;
-&lt;span class=&quot;c1&quot;&gt;#&amp;gt; 1 using-discourse-for-blog-comments-as-well           8           4&lt;/span&gt;
-&lt;span class=&quot;c1&quot;&gt;#&amp;gt; 2                            reply-by-email           6           2&lt;/span&gt;
-&lt;span class=&quot;c1&quot;&gt;#&amp;gt;   highest_post_number image_url               created_at&lt;/span&gt;
-&lt;span class=&quot;c1&quot;&gt;#&amp;gt; 1                   8        NA 2014-12-15T19:33:11.879Z&lt;/span&gt;
-&lt;span class=&quot;c1&quot;&gt;#&amp;gt; 2                   6        NA 2014-12-15T20:10:36.414Z&lt;/span&gt;
-&lt;span class=&quot;c1&quot;&gt;#&amp;gt;             last_posted_at bumped                bumped_at unseen&lt;/span&gt;
-&lt;span class=&quot;c1&quot;&gt;#&amp;gt; 1 2015-01-02T19:47:42.403Z   TRUE 2015-01-02T19:47:42.403Z  FALSE&lt;/span&gt;
-&lt;span class=&quot;c1&quot;&gt;#&amp;gt; 2 2014-12-17T00:18:31.427Z   TRUE 2014-12-17T00:18:31.427Z  FALSE&lt;/span&gt;
-&lt;span class=&quot;c1&quot;&gt;#&amp;gt;   last_read_post_number unread new_posts pinned unpinned visible closed&lt;/span&gt;
-&lt;span class=&quot;c1&quot;&gt;#&amp;gt; 1                     8      0         0  FALSE       NA    TRUE  FALSE&lt;/span&gt;
-&lt;span class=&quot;c1&quot;&gt;#&amp;gt; 2                     6      0         0  FALSE       NA    TRUE  FALSE&lt;/span&gt;
-&lt;span class=&quot;c1&quot;&gt;#&amp;gt;   archived notification_level bookmarked liked views like_count&lt;/span&gt;
-&lt;span class=&quot;c1&quot;&gt;#&amp;gt; 1    FALSE                  2       TRUE FALSE    71          0&lt;/span&gt;
-&lt;span class=&quot;c1&quot;&gt;#&amp;gt; 2    FALSE                  3       TRUE FALSE    54          0&lt;/span&gt;
-&lt;span class=&quot;c1&quot;&gt;#&amp;gt;   has_summary archetype last_poster_username category_id pinned_globally&lt;/span&gt;
-&lt;span class=&quot;c1&quot;&gt;#&amp;gt; 1       FALSE   regular             cboettig           3           FALSE&lt;/span&gt;
-&lt;span class=&quot;c1&quot;&gt;#&amp;gt; 2       FALSE   regular               sckott           1           FALSE&lt;/span&gt;
-&lt;span class=&quot;c1&quot;&gt;#&amp;gt;   bookmarked_post_numbers&lt;/span&gt;
-&lt;span class=&quot;c1&quot;&gt;#&amp;gt; 1                       1&lt;/span&gt;
-&lt;span class=&quot;c1&quot;&gt;#&amp;gt; 2                       1&lt;/span&gt;
-&lt;span class=&quot;c1&quot;&gt;#&amp;gt;                                                                                                                   posters&lt;/span&gt;
-&lt;span class=&quot;c1&quot;&gt;#&amp;gt; 1 latest, NA, NA, NA, Original Poster, Most Recent Poster, Frequent Poster, Frequent Poster, Frequent Poster, 3, 1, 35, 2&lt;/span&gt;
-&lt;span class=&quot;c1&quot;&gt;#&amp;gt; 2                                                                   NA, latest, Original Poster, Most Recent Poster, 3, 1&lt;/span&gt;
-&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;
-&lt;p&gt;Get a single topic by id number&lt;/p&gt;
-&lt;div class=&quot;highlight&quot;&gt;&lt;pre&gt;&lt;code class=&quot;language-r&quot; data-lang=&quot;r&quot;&gt;topic&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;m&quot;&gt;8&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt;
-&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;&lt;div class=&quot;highlight&quot;&gt;&lt;pre&gt;&lt;code class=&quot;language-text&quot; data-lang=&quot;text&quot;&gt;#&amp;gt;   id              name username
-#&amp;gt; 1 11            system   system
-#&amp;gt; 2 14 Scott Chamberlain   sckott
-#&amp;gt; 3 51 Scott Chamberlain   sckott
-#&amp;gt;                                         avatar_template uploaded_avatar_id
-#&amp;gt; 1 /user_avatar/discuss.ropensci.org/system/{size}/1.png                  1
-#&amp;gt; 2 /user_avatar/discuss.ropensci.org/sckott/{size}/2.png                  2
-#&amp;gt; 3 /user_avatar/discuss.ropensci.org/sckott/{size}/2.png                  2
-&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;
-&lt;p&gt;Create topic&lt;/p&gt;
-&lt;div class=&quot;highlight&quot;&gt;&lt;pre&gt;&lt;code class=&quot;language-r&quot; data-lang=&quot;r&quot;&gt;text &lt;span class=&quot;o&quot;&gt;&amp;lt;-&lt;/span&gt; &lt;span class=&quot;s&quot;&gt;&amp;#39;&lt;/span&gt;
-&lt;span class=&quot;s&quot;&gt;print(&amp;quot;hello world&amp;quot;)&lt;/span&gt;
-&lt;span class=&quot;s&quot;&gt;#&amp;gt; [1] &amp;quot;hello world&amp;quot;&lt;/span&gt;
-
-&lt;span class=&quot;s&quot;&gt;head(mtcars)&lt;/span&gt;
-&lt;span class=&quot;s&quot;&gt;#&amp;gt;                    mpg cyl disp  hp drat    wt  qsec vs am gear carb&lt;/span&gt;
-&lt;span class=&quot;s&quot;&gt;#&amp;gt; Mazda RX4         21.0   6  160 110 3.90 2.620 16.46  0  1    4    4&lt;/span&gt;
-&lt;span class=&quot;s&quot;&gt;#&amp;gt; Mazda RX4 Wag     21.0   6  160 110 3.90 2.875 17.02  0  1    4    4&lt;/span&gt;
-&lt;span class=&quot;s&quot;&gt;#&amp;gt; Datsun 710        22.8   4  108  93 3.85 2.320 18.61  1  1    4    1&lt;/span&gt;
-&lt;span class=&quot;s&quot;&gt;#&amp;gt; Hornet 4 Drive    21.4   6  258 110 3.08 3.215 19.44  1  0    3    1&lt;/span&gt;
-&lt;span class=&quot;s&quot;&gt;#&amp;gt; Hornet Sportabout 18.7   8  360 175 3.15 3.440 17.02  0  0    3    2&lt;/span&gt;
-&lt;span class=&quot;s&quot;&gt;#&amp;gt; Valiant           18.1   6  225 105 2.76 3.460 20.22  1  0    3    1&lt;/span&gt;
-&lt;span class=&quot;s&quot;&gt;&amp;#39;&lt;/span&gt;
-
-create_topic&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;title&lt;span class=&quot;o&quot;&gt;=&lt;/span&gt;&lt;span class=&quot;s&quot;&gt;&amp;quot;testing from discgolf - 2&amp;quot;&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt; text&lt;span class=&quot;o&quot;&gt;=&lt;/span&gt;text&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt;
-&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;
-&lt;h2&gt;Wrapup&lt;/h2&gt;
-
-&lt;p&gt;There are more functions I didn&amp;#39;t highlight, and there are many methods that haven&amp;#39;t been implemented yet... in good time it will be done. &lt;/p&gt;
-</description>
-				<published>2015-01-15 00:00:00 -0800</published>
-				<link>http://recology.info//2015/01/discourse-in-r/</link>
 			</item>
 		
 	</channel>

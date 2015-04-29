@@ -59,6 +59,291 @@
   
   <div class="post">
     <h1>
+      <a href="/2014/11/sofa/">
+        sofa - reboot
+      </a>
+    </h1>
+
+    <span class="post-date">18 Nov 2014</span>
+
+    <p>I&#39;ve reworked <code>sofa</code> recently after someone reported a bug in the package. Since the last post on this package on 2013-06-21, there&#39;s a bunch of changes:</p>
+
+<ul>
+<li>Removed the <code>sofa_</code> prefix from all functions as it wasn&#39;t really necessary. </li>
+<li>Replaced <code>rjson</code>/<code>RJSONIO</code> with <code>jsonlite</code> for JSON I/O.</li>
+<li>New functions:
+
+<ul>
+<li><code>revisions()</code> - to get the revision numbers for a document.</li>
+<li><code>uuids()</code> - get any number of UUIDs - e.g., if you want to set document IDs with UUIDs</li>
+</ul></li>
+<li>Most functions that deal with documents are prefixed with <code>doc_</code></li>
+<li>Functions that deal with databases are prefixed with <code>db_</code></li>
+<li>Simplified all code, reducing duplication</li>
+<li>All functions take <code>cushion</code> as the first parameter, for consistency sake.</li>
+<li>Changed <code>cushion()</code> function so that you can only register one cushion with each function call, 
+and the function takes parameters for each element now, <code>name</code> (name of the cushion, whatever you want), <code>user</code> (user name, if applicable), <code>pwd</code> (password, if applicable), <code>type</code> (one of localhost, cloudant, or iriscouch), and <code>port</code> (if applicable).</li>
+<li>Changed package license from <code>CC0</code> to <code>MIT</code></li>
+</ul>
+
+<p>There&#39;s still more to do, but I&#39;m pretty happy with the recent changes, and I hope at least some find the package useful. Also, would love people to try it out as all bugs are shallow and all that...</p>
+
+<p>The following are a few examples of package use.</p>
+
+<h2>Install CouchDB</h2>
+
+<p>Instructions <a href="http://wiki.apache.org/couchdb/Installation">here</a></p>
+
+<h2>Start CouchDB</h2>
+
+<p>In your terminal </p>
+<div class="highlight"><pre><code class="language-sh" data-lang="sh">couchdb
+</code></pre></div>
+<p>You can interact with your CouchDB databases as well in your browser. Navigate to <a href="http://localhost:5984/_utils">http://localhost:5984/_utils</a></p>
+
+<h2>Install sofa</h2>
+<div class="highlight"><pre><code class="language-r" data-lang="r">install.packages<span class="p">(</span><span class="s">&quot;devtools&quot;</span><span class="p">)</span>
+devtools<span class="o">::</span>install_github<span class="p">(</span><span class="s">&quot;sckott/sofa&quot;</span><span class="p">)</span>
+</code></pre></div><div class="highlight"><pre><code class="language-r" data-lang="r"><span class="kn">library</span><span class="p">(</span><span class="s">&#39;sofa&#39;</span><span class="p">)</span>
+</code></pre></div>
+<h2>Authenticate - Cushions</h2>
+
+<p>As an example, here&#39;s how I set up details for connecting to my Cloudant couch:</p>
+<div class="highlight"><pre><code class="language-r" data-lang="r">cushion<span class="p">(</span>name <span class="o">=</span> <span class="s">&#39;cloudant&#39;</span><span class="p">,</span> user <span class="o">=</span> <span class="s">&#39;&lt;user name&gt;&#39;</span><span class="p">,</span> pwd <span class="o">=</span> <span class="s">&#39;&lt;password&gt;&#39;</span><span class="p">,</span> type <span class="o">=</span> <span class="s">&quot;cloudant&quot;</span><span class="p">)</span>
+</code></pre></div>
+<p>By default there is a built-in <code>cushion</code> for localhost so you don&#39;t have to do that, unless you want to change those details, e.g., the port number. Right now cushions aren&#39;t preserved across R sessions, but working on that.</p>
+
+<p>For example, I&#39;ll lay down a cushion for Cloudant, then I can call <code>cushions()</code> to see my cushions:</p>
+<div class="highlight"><pre><code class="language-r" data-lang="r">cushion<span class="p">(</span>name <span class="o">=</span> <span class="s">&#39;cloudant&#39;</span><span class="p">,</span> user <span class="o">=</span> <span class="s">&#39;&lt;user name&gt;&#39;</span><span class="p">,</span> pwd <span class="o">=</span> <span class="s">&#39;&lt;pwd&gt;&#39;</span><span class="p">,</span> type <span class="o">=</span> <span class="s">&quot;cloudant&quot;</span><span class="p">)</span>
+cushions<span class="p">()</span>
+</code></pre></div>
+<p>By default, if you don&#39;t provide a cushion name, you are using localhost.</p>
+
+<h2>Ping the server</h2>
+<div class="highlight"><pre><code class="language-r" data-lang="r">ping<span class="p">()</span>
+<span class="c1">#&gt; $couchdb</span>
+<span class="c1">#&gt; [1] &quot;Welcome&quot;</span>
+<span class="c1">#&gt; </span>
+<span class="c1">#&gt; $uuid</span>
+<span class="c1">#&gt; [1] &quot;2c10f0c6d9bd17205b692ae93cd4cf1d&quot;</span>
+<span class="c1">#&gt; </span>
+<span class="c1">#&gt; $version</span>
+<span class="c1">#&gt; [1] &quot;1.6.0&quot;</span>
+<span class="c1">#&gt; </span>
+<span class="c1">#&gt; $vendor</span>
+<span class="c1">#&gt; $vendor$version</span>
+<span class="c1">#&gt; [1] &quot;1.6.0-1&quot;</span>
+<span class="c1">#&gt; </span>
+<span class="c1">#&gt; $vendor$name</span>
+<span class="c1">#&gt; [1] &quot;Homebrew&quot;</span>
+</code></pre></div>
+<p>Nice, it&#39;s working.</p>
+
+<h2>Create a new database, and list available databases</h2>
+<div class="highlight"><pre><code class="language-r" data-lang="r">db_create<span class="p">(</span>dbname<span class="o">=</span><span class="s">&#39;sofadb&#39;</span><span class="p">)</span>
+<span class="c1">#&gt; $ok</span>
+<span class="c1">#&gt; [1] TRUE</span>
+</code></pre></div>
+<p>see if its there now</p>
+<div class="highlight"><pre><code class="language-r" data-lang="r">db_list<span class="p">()</span>
+<span class="c1">#&gt;  [1] &quot;_replicator&quot; &quot;_users&quot;      &quot;alm_couchdb&quot; &quot;cachecall&quot;   &quot;hello_earth&quot;</span>
+<span class="c1">#&gt;  [6] &quot;leothelion&quot;  &quot;mran&quot;        &quot;mydb&quot;        &quot;newdbs&quot;      &quot;sofadb&quot;</span>
+</code></pre></div>
+<h2>Create documents</h2>
+
+<p>Create a document WITH a name (uses PUT)</p>
+<div class="highlight"><pre><code class="language-r" data-lang="r">doc1 <span class="o">&lt;-</span> <span class="s">&#39;{&quot;name&quot;:&quot;sofa&quot;,&quot;beer&quot;:&quot;IPA&quot;}&#39;</span>
+doc_create<span class="p">(</span>dbname<span class="o">=</span><span class="s">&quot;sofadb&quot;</span><span class="p">,</span> doc<span class="o">=</span>doc1<span class="p">,</span> docid<span class="o">=</span><span class="s">&quot;a_beer&quot;</span><span class="p">)</span>
+<span class="c1">#&gt; $ok</span>
+<span class="c1">#&gt; [1] TRUE</span>
+<span class="c1">#&gt; </span>
+<span class="c1">#&gt; $id</span>
+<span class="c1">#&gt; [1] &quot;a_beer&quot;</span>
+<span class="c1">#&gt; </span>
+<span class="c1">#&gt; $rev</span>
+<span class="c1">#&gt; [1] &quot;1-a48c98c945bcc05d482bc6f938c89882&quot;</span>
+</code></pre></div>
+<p>Create a document WITHOUT a name (uses POST)</p>
+<div class="highlight"><pre><code class="language-r" data-lang="r">doc2 <span class="o">&lt;-</span> <span class="s">&#39;{&quot;name&quot;:&quot;sofa&quot;,&quot;icecream&quot;:&quot;rocky road&quot;}&#39;</span>
+doc_create<span class="p">(</span>dbname<span class="o">=</span><span class="s">&quot;sofadb&quot;</span><span class="p">,</span> doc<span class="o">=</span>doc2<span class="p">)</span>
+<span class="c1">#&gt; $ok</span>
+<span class="c1">#&gt; [1] TRUE</span>
+<span class="c1">#&gt; </span>
+<span class="c1">#&gt; $id</span>
+<span class="c1">#&gt; [1] &quot;c5c5c332c25cf62cc584647a81006f6d&quot;</span>
+<span class="c1">#&gt; </span>
+<span class="c1">#&gt; $rev</span>
+<span class="c1">#&gt; [1] &quot;1-fd0da7fcb8d3afbfc5757d065c92362c&quot;</span>
+</code></pre></div>
+<h2>List documents</h2>
+
+<p>List them</p>
+<div class="highlight"><pre><code class="language-r" data-lang="r">alldocs<span class="p">(</span>dbname<span class="o">=</span><span class="s">&quot;sofadb&quot;</span><span class="p">)</span>
+<span class="c1">#&gt;                                 id                              key</span>
+<span class="c1">#&gt; 1                           a_beer                           a_beer</span>
+<span class="c1">#&gt; 2 c5c5c332c25cf62cc584647a81006f6d c5c5c332c25cf62cc584647a81006f6d</span>
+<span class="c1">#&gt;                                  rev</span>
+<span class="c1">#&gt; 1 1-a48c98c945bcc05d482bc6f938c89882</span>
+<span class="c1">#&gt; 2 1-fd0da7fcb8d3afbfc5757d065c92362c</span>
+</code></pre></div>
+<p>Optionally include the documents, returned as a list by default as it would be hard to parse an endless number of document formats. </p>
+<div class="highlight"><pre><code class="language-r" data-lang="r">alldocs<span class="p">(</span>dbname<span class="o">=</span><span class="s">&quot;sofadb&quot;</span><span class="p">,</span> include_docs <span class="o">=</span> <span class="kc">TRUE</span><span class="p">)</span>
+<span class="c1">#&gt; $total_rows</span>
+<span class="c1">#&gt; [1] 2</span>
+<span class="c1">#&gt; </span>
+<span class="c1">#&gt; $offset</span>
+<span class="c1">#&gt; [1] 0</span>
+<span class="c1">#&gt; </span>
+<span class="c1">#&gt; $rows</span>
+<span class="c1">#&gt; $rows[[1]]</span>
+<span class="c1">#&gt; $rows[[1]]$id</span>
+<span class="c1">#&gt; [1] &quot;a_beer&quot;</span>
+<span class="c1">#&gt; </span>
+<span class="c1">#&gt; $rows[[1]]$key</span>
+<span class="c1">#&gt; [1] &quot;a_beer&quot;</span>
+<span class="c1">#&gt; </span>
+<span class="c1">#&gt; $rows[[1]]$value</span>
+<span class="c1">#&gt; $rows[[1]]$value$rev</span>
+<span class="c1">#&gt; [1] &quot;1-a48c98c945bcc05d482bc6f938c89882&quot;</span>
+<span class="c1">#&gt; </span>
+<span class="c1">#&gt; </span>
+<span class="c1">#&gt; $rows[[1]]$doc</span>
+<span class="c1">#&gt; $rows[[1]]$doc$`_id`</span>
+<span class="c1">#&gt; [1] &quot;a_beer&quot;</span>
+<span class="c1">#&gt; </span>
+<span class="c1">#&gt; $rows[[1]]$doc$`_rev`</span>
+<span class="c1">#&gt; [1] &quot;1-a48c98c945bcc05d482bc6f938c89882&quot;</span>
+<span class="c1">#&gt; </span>
+<span class="c1">#&gt; $rows[[1]]$doc$name</span>
+<span class="c1">#&gt; [1] &quot;sofa&quot;</span>
+<span class="c1">#&gt; </span>
+<span class="c1">#&gt; $rows[[1]]$doc$beer</span>
+<span class="c1">#&gt; [1] &quot;IPA&quot;</span>
+<span class="c1">#&gt; </span>
+<span class="c1">#&gt; </span>
+<span class="c1">#&gt; </span>
+<span class="c1">#&gt; $rows[[2]]</span>
+<span class="c1">#&gt; $rows[[2]]$id</span>
+<span class="c1">#&gt; [1] &quot;c5c5c332c25cf62cc584647a81006f6d&quot;</span>
+<span class="c1">#&gt; </span>
+<span class="c1">#&gt; $rows[[2]]$key</span>
+<span class="c1">#&gt; [1] &quot;c5c5c332c25cf62cc584647a81006f6d&quot;</span>
+<span class="c1">#&gt; </span>
+<span class="c1">#&gt; $rows[[2]]$value</span>
+<span class="c1">#&gt; $rows[[2]]$value$rev</span>
+<span class="c1">#&gt; [1] &quot;1-fd0da7fcb8d3afbfc5757d065c92362c&quot;</span>
+<span class="c1">#&gt; </span>
+<span class="c1">#&gt; </span>
+<span class="c1">#&gt; $rows[[2]]$doc</span>
+<span class="c1">#&gt; $rows[[2]]$doc$`_id`</span>
+<span class="c1">#&gt; [1] &quot;c5c5c332c25cf62cc584647a81006f6d&quot;</span>
+<span class="c1">#&gt; </span>
+<span class="c1">#&gt; $rows[[2]]$doc$`_rev`</span>
+<span class="c1">#&gt; [1] &quot;1-fd0da7fcb8d3afbfc5757d065c92362c&quot;</span>
+<span class="c1">#&gt; </span>
+<span class="c1">#&gt; $rows[[2]]$doc$name</span>
+<span class="c1">#&gt; [1] &quot;sofa&quot;</span>
+<span class="c1">#&gt; </span>
+<span class="c1">#&gt; $rows[[2]]$doc$icecream</span>
+<span class="c1">#&gt; [1] &quot;rocky road&quot;</span>
+</code></pre></div>
+<h2>Update a document</h2>
+
+<p>Change <em>IPA</em> (india pale ale) to <em>IPL</em> (india pale lager). We need to get revisions first as we need to include revision number when we update a document.</p>
+<div class="highlight"><pre><code class="language-r" data-lang="r"><span class="p">(</span>revs <span class="o">&lt;-</span> revisions<span class="p">(</span>dbname <span class="o">=</span> <span class="s">&quot;sofadb&quot;</span><span class="p">,</span> docid <span class="o">=</span> <span class="s">&quot;a_beer&quot;</span><span class="p">))</span>
+<span class="c1">#&gt; [1] &quot;1-a48c98c945bcc05d482bc6f938c89882&quot;</span>
+</code></pre></div><div class="highlight"><pre><code class="language-r" data-lang="r">newdoc <span class="o">&lt;-</span> <span class="s">&#39;{&quot;name&quot;:&quot;sofa&quot;,&quot;beer&quot;:&quot;IPL&quot;}&#39;</span>
+doc_update<span class="p">(</span>dbname <span class="o">=</span> <span class="s">&quot;sofadb&quot;</span><span class="p">,</span> doc <span class="o">=</span> newdoc<span class="p">,</span> docid <span class="o">=</span> <span class="s">&quot;a_beer&quot;</span><span class="p">,</span> rev <span class="o">=</span> revs<span class="p">[</span><span class="m">1</span><span class="p">])</span>
+<span class="c1">#&gt; $ok</span>
+<span class="c1">#&gt; [1] TRUE</span>
+<span class="c1">#&gt; </span>
+<span class="c1">#&gt; $id</span>
+<span class="c1">#&gt; [1] &quot;a_beer&quot;</span>
+<span class="c1">#&gt; </span>
+<span class="c1">#&gt; $rev</span>
+<span class="c1">#&gt; [1] &quot;2-f2390eb18b8f9a870c915c6712a7f65e&quot;</span>
+</code></pre></div>
+<p>Should be two revisions now</p>
+<div class="highlight"><pre><code class="language-r" data-lang="r">revisions<span class="p">(</span>dbname <span class="o">=</span> <span class="s">&quot;sofadb&quot;</span><span class="p">,</span> docid <span class="o">=</span> <span class="s">&quot;a_beer&quot;</span><span class="p">)</span>
+<span class="c1">#&gt; [1] &quot;2-f2390eb18b8f9a870c915c6712a7f65e&quot;</span>
+<span class="c1">#&gt; [2] &quot;1-a48c98c945bcc05d482bc6f938c89882&quot;</span>
+</code></pre></div>
+<h2>Get headers for a document</h2>
+<div class="highlight"><pre><code class="language-r" data-lang="r">doc_head<span class="p">(</span>dbname <span class="o">=</span> <span class="s">&quot;sofadb&quot;</span><span class="p">,</span> docid <span class="o">=</span> <span class="s">&quot;a_beer&quot;</span><span class="p">)</span>
+<span class="c1">#&gt; [[1]]</span>
+<span class="c1">#&gt; [[1]]$status</span>
+<span class="c1">#&gt; [1] 200</span>
+<span class="c1">#&gt; </span>
+<span class="c1">#&gt; [[1]]$version</span>
+<span class="c1">#&gt; [1] &quot;HTTP/1.1&quot;</span>
+<span class="c1">#&gt; </span>
+<span class="c1">#&gt; [[1]]$headers</span>
+<span class="c1">#&gt; $server</span>
+<span class="c1">#&gt; [1] &quot;CouchDB/1.6.0 (Erlang OTP/17)&quot;</span>
+<span class="c1">#&gt; </span>
+<span class="c1">#&gt; $etag</span>
+<span class="c1">#&gt; [1] &quot;\&quot;2-f2390eb18b8f9a870c915c6712a7f65e\&quot;&quot;</span>
+<span class="c1">#&gt; </span>
+<span class="c1">#&gt; $date</span>
+<span class="c1">#&gt; [1] &quot;Tue, 18 Nov 2014 21:19:16 GMT&quot;</span>
+<span class="c1">#&gt; </span>
+<span class="c1">#&gt; $`content-type`</span>
+<span class="c1">#&gt; [1] &quot;application/json&quot;</span>
+<span class="c1">#&gt; </span>
+<span class="c1">#&gt; $`content-length`</span>
+<span class="c1">#&gt; [1] &quot;88&quot;</span>
+<span class="c1">#&gt; </span>
+<span class="c1">#&gt; $`cache-control`</span>
+<span class="c1">#&gt; [1] &quot;must-revalidate&quot;</span>
+<span class="c1">#&gt; </span>
+<span class="c1">#&gt; attr(,&quot;class&quot;)</span>
+<span class="c1">#&gt; [1] &quot;insensitive&quot; &quot;list&quot;</span>
+</code></pre></div>
+<h2>JSON vs. list</h2>
+
+<p>Across all/most functions you can request json or list as output with the <code>as</code> parameter. </p>
+<div class="highlight"><pre><code class="language-r" data-lang="r">db_list<span class="p">(</span>as <span class="o">=</span> <span class="s">&quot;list&quot;</span><span class="p">)</span>
+<span class="c1">#&gt;  [1] &quot;_replicator&quot; &quot;_users&quot;      &quot;alm_couchdb&quot; &quot;cachecall&quot;   &quot;hello_earth&quot;</span>
+<span class="c1">#&gt;  [6] &quot;leothelion&quot;  &quot;mran&quot;        &quot;mydb&quot;        &quot;newdbs&quot;      &quot;sofadb&quot;</span>
+</code></pre></div><div class="highlight"><pre><code class="language-r" data-lang="r">db_list<span class="p">(</span>as <span class="o">=</span> <span class="s">&quot;json&quot;</span><span class="p">)</span>
+<span class="c1">#&gt; [1] &quot;[\&quot;_replicator\&quot;,\&quot;_users\&quot;,\&quot;alm_couchdb\&quot;,\&quot;cachecall\&quot;,\&quot;hello_earth\&quot;,\&quot;leothelion\&quot;,\&quot;mran\&quot;,\&quot;mydb\&quot;,\&quot;newdbs\&quot;,\&quot;sofadb\&quot;]\n&quot;</span>
+</code></pre></div>
+<h2>Curl options</h2>
+
+<p>Across all functions you can pass in curl options. We&#39;re using <code>httr</code> internally, so you can use <code>httr</code> helper functions to make some curl options easier. Examples:</p>
+
+<p>Verbose output</p>
+<div class="highlight"><pre><code class="language-r" data-lang="r"><span class="kn">library</span><span class="p">(</span><span class="s">&quot;httr&quot;</span><span class="p">)</span>
+db_list<span class="p">(</span>config<span class="o">=</span>verbose<span class="p">())</span>
+<span class="c1">#&gt;  [1] &quot;_replicator&quot; &quot;_users&quot;      &quot;alm_couchdb&quot; &quot;cachecall&quot;   &quot;hello_earth&quot;</span>
+<span class="c1">#&gt;  [6] &quot;leothelion&quot;  &quot;mran&quot;        &quot;mydb&quot;        &quot;newdbs&quot;      &quot;sofadb&quot;</span>
+</code></pre></div>
+<p>Progress</p>
+<div class="highlight"><pre><code class="language-r" data-lang="r">db_list<span class="p">(</span>config<span class="o">=</span>progress<span class="p">())</span>
+<span class="c1">#&gt; </span>
+  <span class="o">|</span>                                                                       
+  <span class="o">|</span>                                                                 <span class="o">|</span>   <span class="m">0</span><span class="o">%</span>
+<span class="o">  |                                                                       </span>
+<span class="o">  |=================================================================| 100%</span>
+<span class="c1">#&gt;  [1] &quot;_replicator&quot; &quot;_users&quot;      &quot;alm_couchdb&quot; &quot;cachecall&quot;   &quot;hello_earth&quot;</span>
+<span class="c1">#&gt;  [6] &quot;leothelion&quot;  &quot;mran&quot;        &quot;mydb&quot;        &quot;newdbs&quot;      &quot;sofadb&quot;</span>
+</code></pre></div>
+<p>Set a timeout</p>
+<div class="highlight"><pre><code class="language-r" data-lang="r">db_list<span class="p">(</span>config<span class="o">=</span>timeout<span class="p">(</span>seconds <span class="o">=</span> <span class="m">0.001</span><span class="p">))</span>
+<span class="c1">#&gt; </span>
+<span class="c1">#&gt; Error in function (type, msg, asError = TRUE)  : </span>
+<span class="c1">#&gt;    Operation timed out after 3 milliseconds with 0 out of -1 bytes received</span>
+</code></pre></div>
+<h2>Full text search</h2>
+
+<p>I&#39;m working on an R client for Elaticsearch called <code>elastic</code> - find it at <a href="https://github.com/ropensci/elastic">https://github.com/ropensci/elastic</a></p>
+
+<p>Thinking about where to include functions to allow <code>elastic</code> and <code>sofa</code> to work together...if you have any thoughts hit up the issues. I&#39;ll probably include helper functions for CouchDB search in the <code>elastic</code> package, interfacing with the <a href="https://github.com/elasticsearch/elasticsearch-river-couchdb">CouchDB plugin for Elasticsearch</a>.</p>
+
+  </div>
+  
+  <div class="post">
+    <h1>
       <a href="/2014/10/conditionality-meta-analysis/">
         Conditionality meta-analysis data
       </a>
@@ -439,290 +724,6 @@ ggplot<span class="p">(</span>res<span class="p">,</span> aes<span class="p">(</
 <li>test suite: embarrasingly, there is no test suite yet, boo me.</li>
 <li>I plan to push <code>rsunlight</code> to CRAN soon as <code>v0.3</code></li>
 </ul>
-
-  </div>
-  
-  <div class="post">
-    <h1>
-      <a href="/2014/06/analogsea-v01/">
-        analogsea - v0.1 notes
-      </a>
-    </h1>
-
-    <span class="post-date">18 Jun 2014</span>
-
-    <p>My <a href="http://recology.info/2014/05/analogsea/">last blog </a> post introduced the R package I&#39;m working on <code>analogsea</code>, an R client for the Digital Ocean API.</p>
-
-<p>Things have changed a bit, including fillig out more functions for all API endpoints, and incorparting feedback from Hadley and Karthik. The package is as <code>v0.1</code> now, so I thought I&#39;d say a few things about how it works.</p>
-
-<p>Note that Digital Ocean&#39;s v2 API is in beta stage now, so the current version of <code>analogsea</code> at <code>v0.1</code> works with their v1 API. The <a href="https://github.com/sckott/analogsea/tree/v2">v2 branch of analogsea</a> is being developed for their v2 API.</p>
-
-<p>If you sign up for an account with Digital Ocean use this referral link: <a href="https://www.digitalocean.com/?refcode=0740f5169634">https://www.digitalocean.com/?refcode=0740f5169634</a> so I can earn some credits. thx :)</p>
-
-<p>First, installation</p>
-
-<p>Note: I did try to submit to CRAN, but Ripley complained about the package name so I&#39;d rather not waste my time esp since people using this likely will already know about <code>install_github()</code>.</p>
-<div class="highlight"><pre><code class="language-r" data-lang="r">devtools<span class="o">::</span>install_github<span class="p">(</span><span class="s">&quot;sckott/analogsea&quot;</span><span class="p">)</span>
-</code></pre></div>
-<p>Load the library</p>
-<div class="highlight"><pre><code class="language-r" data-lang="r"><span class="kn">library</span><span class="p">(</span><span class="s">&quot;analogsea&quot;</span><span class="p">)</span>
-</code></pre></div><div class="highlight"><pre><code class="language-text" data-lang="text">## Loading required package: magrittr
-</code></pre></div>
-<p>Authenticate has changed a bit. Whereas auth details were stored as environment variables before, I&#39;m just using R&#39;s options. <code>do_auth()</code> will ask for your Digital Ocean details. You can enter them each R session, or store them in your <code>.Rprofile</code> file. After successful authentication, each function simply looks for your auth details with <code>getOption()</code>.  You don&#39;t have to use this function first, though if you don&#39;t your first call to another function will ask for auth details.</p>
-<div class="highlight"><pre><code class="language-r" data-lang="r">do_auth<span class="p">()</span>
-</code></pre></div>
-<p><code>sizes</code>, <code>images</code>, and <code>keys</code> functions have changed a bit, by default outputting a <code>data.frame</code> now.</p>
-
-<p>List available regions</p>
-<div class="highlight"><pre><code class="language-r" data-lang="r">regions<span class="p">()</span>
-</code></pre></div><div class="highlight"><pre><code class="language-text" data-lang="text">##   id            name slug
-## 1  3 San Francisco 1 sfo1
-## 2  4      New York 2 nyc2
-## 3  5     Amsterdam 2 ams2
-## 4  6     Singapore 1 sgp1
-</code></pre></div>
-<p>List available sizes</p>
-<div class="highlight"><pre><code class="language-r" data-lang="r">sizes<span class="p">()</span>
-</code></pre></div><div class="highlight"><pre><code class="language-text" data-lang="text">##   id  name  slug memory cpu disk cost_per_hour cost_per_month
-## 1 66 512MB 512mb    512   1   20       0.00744            5.0
-## 2 63   1GB   1gb   1024   1   30       0.01488           10.0
-## 3 62   2GB   2gb   2048   2   40       0.02976           20.0
-## 4 64   4GB   4gb   4096   2   60       0.05952           40.0
-## 5 65   8GB   8gb   8192   4   80       0.11905           80.0
-## 6 61  16GB  16gb  16384   8  160       0.23810          160.0
-## 7 60  32GB  32gb  32768  12  320       0.47619          320.0
-## 8 70  48GB  48gb  49152  16  480       0.71429          480.0
-## 9 69  64GB  64gb  65536  20  640       0.95238          640.0
-</code></pre></div>
-<p>List available images</p>
-<div class="highlight"><pre><code class="language-r" data-lang="r"><span class="kp">head</span><span class="p">(</span>images<span class="p">())</span>
-</code></pre></div><div class="highlight"><pre><code class="language-text" data-lang="text">##        id                  name             slug distribution public sfo1
-## 1 3209452 rstudioserverssh_snap             &lt;NA&gt;       Ubuntu  FALSE    1
-## 2    1601        CentOS 5.8 x64   centos-5-8-x64       CentOS   TRUE    1
-## 3    1602        CentOS 5.8 x32   centos-5-8-x32       CentOS   TRUE    1
-## 4   12573        Debian 6.0 x64   debian-6-0-x64       Debian   TRUE    1
-## 5   12575        Debian 6.0 x32   debian-6-0-x32       Debian   TRUE    1
-## 6   14097      Ubuntu 10.04 x64 ubuntu-10-04-x64       Ubuntu   TRUE    1
-##   nyc1 ams1 nyc2 ams2 sgp1
-## 1   NA   NA   NA   NA   NA
-## 2    1    1    1    1    1
-## 3    1    1    1    1    1
-## 4    1    1    1    1    1
-## 5    1    1    1    1    1
-## 6    1    1    1    1    1
-</code></pre></div>
-<p>List ssh keys</p>
-<div class="highlight"><pre><code class="language-r" data-lang="r">keys<span class="p">()</span>
-</code></pre></div><div class="highlight"><pre><code class="language-text" data-lang="text">## $ssh_keys
-## $ssh_keys[[1]]
-## $ssh_keys[[1]]$id
-## [1] 89103
-##
-## $ssh_keys[[1]]$name
-## [1] &quot;Scott Chamberlain&quot;
-</code></pre></div>
-<p>One change that&#39;s of interest is that most of the various <code>droplets_*()</code> functions take in the outputs of other <code>droplets_*()</code> functions. This means that we can pipe outputs of one <code>droplets_*()</code> function to another, including non-<code>droplet_*</code> functions (see examples).</p>
-
-<p>Let&#39;s create a droplet:</p>
-<div class="highlight"><pre><code class="language-r" data-lang="r"><span class="p">(</span>res <span class="o">&lt;-</span> droplets_new<span class="p">(</span>name<span class="o">=</span><span class="s">&quot;foo&quot;</span><span class="p">,</span> size_slug <span class="o">=</span> <span class="s">&#39;512mb&#39;</span><span class="p">,</span> image_slug <span class="o">=</span> <span class="s">&#39;ubuntu-14-04-x64&#39;</span><span class="p">,</span> region_slug <span class="o">=</span> <span class="s">&#39;sfo1&#39;</span><span class="p">,</span> ssh_key_ids <span class="o">=</span> <span class="m">89103</span><span class="p">))</span>
-</code></pre></div><div class="highlight"><pre><code class="language-r" data-lang="r"><span class="o">$</span>droplet
-<span class="o">$</span>droplet<span class="o">$</span>id
-<span class="p">[</span><span class="m">1</span><span class="p">]</span> <span class="m">1880805</span>
-
-<span class="o">$</span>droplet<span class="o">$</span>name
-<span class="p">[</span><span class="m">1</span><span class="p">]</span> <span class="s">&quot;foo&quot;</span>
-
-<span class="o">$</span>droplet<span class="o">$</span>image_id
-<span class="p">[</span><span class="m">1</span><span class="p">]</span> <span class="m">3240036</span>
-
-<span class="o">$</span>droplet<span class="o">$</span>size_id
-<span class="p">[</span><span class="m">1</span><span class="p">]</span> <span class="m">66</span>
-
-<span class="o">$</span>droplet<span class="o">$</span>event_id
-<span class="p">[</span><span class="m">1</span><span class="p">]</span> <span class="m">26711810</span>
-</code></pre></div>
-<p>List my droplets</p>
-
-<p>This function used to be <code>do_droplets_get()</code></p>
-<div class="highlight"><pre><code class="language-r" data-lang="r">droplets<span class="p">()</span>
-</code></pre></div><div class="highlight"><pre><code class="language-text" data-lang="text">## $droplet_ids
-## [1] 1880805
-##
-## $droplets
-## $droplets[[1]]
-## $droplets[[1]]$id
-## [1] 1880805
-##
-## $droplets[[1]]$name
-## [1] &quot;foo&quot;
-##
-## $droplets[[1]]$image_id
-## [1] 3240036
-##
-## $droplets[[1]]$size_id
-## [1] 66
-##
-## $droplets[[1]]$region_id
-## [1] 3
-##
-## $droplets[[1]]$backups_active
-## [1] FALSE
-##
-## $droplets[[1]]$ip_address
-## [1] &quot;162.243.152.56&quot;
-##
-## $droplets[[1]]$private_ip_address
-## NULL
-##
-## $droplets[[1]]$locked
-## [1] FALSE
-##
-## $droplets[[1]]$status
-## [1] &quot;active&quot;
-##
-## $droplets[[1]]$created_at
-## [1] &quot;2014-06-18T14:15:35Z&quot;
-##
-##
-##
-## $event_id
-## NULL
-</code></pre></div>
-<p>As mentioned above we can now pipe output of <code>droplet*()</code> functions to other <code>droplet*()</code> functions.</p>
-
-<p>Here, pipe output of lising droplets <code>droplets()</code> to the <code>events()</code> function</p>
-<div class="highlight"><pre><code class="language-r" data-lang="r">droplets<span class="p">()</span> <span class="o">%&gt;%</span> events<span class="p">()</span>
-</code></pre></div><div class="highlight"><pre><code class="language-text" data-lang="text">## Error: No event id found
-</code></pre></div>
-<p>In this case there were no event ids to get event data on.</p>
-
-<p>Here, we&#39;ll get details for the droplet we just created, then pipe that to <code>droplets_power_off()</code></p>
-<div class="highlight"><pre><code class="language-r" data-lang="r">droplets<span class="p">(</span><span class="m">1880805</span><span class="p">)</span> <span class="o">%&gt;%</span> droplets_power_off
-</code></pre></div><div class="highlight"><pre><code class="language-text" data-lang="text">## $droplet_ids
-## [1] 1880805
-##
-## $droplets
-## $droplets$droplet_ids
-## [1] 1880805
-##
-## $droplets$droplets
-## $droplets$droplets$id
-## [1] 1880805
-##
-## $droplets$droplets$name
-## [1] &quot;foo&quot;
-##
-## $droplets$droplets$image_id
-## [1] 3240036
-##
-## $droplets$droplets$size_id
-## [1] 66
-##
-## $droplets$droplets$region_id
-## [1] 3
-##
-## $droplets$droplets$backups_active
-## [1] FALSE
-##
-## $droplets$droplets$ip_address
-## [1] &quot;162.243.152.56&quot;
-##
-## $droplets$droplets$private_ip_address
-## NULL
-##
-## $droplets$droplets$locked
-## [1] FALSE
-##
-## $droplets$droplets$status
-## [1] &quot;active&quot;
-##
-## $droplets$droplets$created_at
-## [1] &quot;2014-06-18T14:15:35Z&quot;
-##
-## $droplets$droplets$backups
-## list()
-##
-## $droplets$droplets$snapshots
-## list()
-##
-##
-## $droplets$event_id
-## NULL
-##
-##
-## $event_id
-## [1] 26714109
-</code></pre></div>
-<p>Then pipe it again to <code>droplets_power_on()</code></p>
-<div class="highlight"><pre><code class="language-r" data-lang="r">droplets<span class="p">(</span><span class="m">1880805</span><span class="p">)</span> <span class="o">%&gt;%</span>
-  droplets_power_on
-</code></pre></div><div class="highlight"><pre><code class="language-text" data-lang="text">## $droplet_ids
-## [1] 1880805
-##
-## $droplets
-## $droplets$droplet_ids
-## [1] 1880805
-##
-## $droplets$droplets
-## $droplets$droplets$id
-## [1] 1880805
-##
-## $droplets$droplets$name
-## [1] &quot;foo&quot;
-##
-## $droplets$droplets$image_id
-## [1] 3240036
-##
-## $droplets$droplets$size_id
-## [1] 66
-##
-## $droplets$droplets$region_id
-## [1] 3
-##
-## $droplets$droplets$backups_active
-## [1] FALSE
-##
-## $droplets$droplets$ip_address
-## [1] &quot;162.243.152.56&quot;
-##
-## $droplets$droplets$private_ip_address
-## NULL
-##
-## $droplets$droplets$locked
-## [1] FALSE
-##
-## $droplets$droplets$status
-## [1] &quot;off&quot;
-##
-## $droplets$droplets$created_at
-## [1] &quot;2014-06-18T14:15:35Z&quot;
-##
-## $droplets$droplets$backups
-## list()
-##
-## $droplets$droplets$snapshots
-## list()
-##
-##
-## $droplets$event_id
-## NULL
-##
-##
-## $event_id
-## [1] 26714152
-</code></pre></div><div class="highlight"><pre><code class="language-r" data-lang="r"><span class="kp">Sys.sleep</span><span class="p">(</span><span class="m">6</span><span class="p">)</span>
-droplets<span class="p">(</span><span class="m">1880805</span><span class="p">)</span><span class="o">$</span>droplets<span class="o">$</span>status
-</code></pre></div><div class="highlight"><pre><code class="language-text" data-lang="text">## [1] &quot;off&quot;
-</code></pre></div>
-<p>Why not use more pipes?</p>
-<div class="highlight"><pre><code class="language-r" data-lang="r">droplets<span class="p">(</span><span class="m">1880805</span><span class="p">)</span> <span class="o">%&gt;%</span>
-  droplets_power_off <span class="o">%&gt;%</span>
-  droplets_power_on <span class="o">%&gt;%</span>
-  events
-</code></pre></div>
-<hr>
-
-<p>Last time I talked about installing R, RStudio, etc. on a droplet. I&#39;m still working out bugs in that stuff, but do test out so it can get better faster. See <code>do_install()</code>.</p>
 
   </div>
   
