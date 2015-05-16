@@ -59,6 +59,377 @@
   
   <div class="post">
     <h1>
+      <a href="/2015/05/mow-the-lawn/">
+        lawn - a new package to do geospatial analysis
+      </a>
+    </h1>
+
+    <span class="post-date">18 May 2015</span>
+
+    <p><code>lawn</code> is an R wrapper for the Javascript library <a href="http://turfjs.org/">turf.js</a> for advanced geospatial analysis. In addition, we have a few functions to interface with the <a href="https://github.com/mapbox/geojson-random">geojson-random</a> Javascript library.</p>
+
+<p><code>lawn</code> includes traditional spatial operations, helper functions for creating GeoJSON data, and data classification and statistics tools.</p>
+
+<p>There is an additional helper function (see <code>view()</code>) in this package to help visualize data with interactive maps via the <code>leaflet</code> package (<a href="https://github.com/rstudio/leaflet">https://github.com/rstudio/leaflet</a>). Note that <code>leaflet</code> is not required to install <code>lawn</code> - it&#39;s in Suggests, not Imports or Depends.</p>
+
+<p>Use cases for this package include (but not limited to, obs.) the following (all below assumes GeoJSON format):</p>
+
+<ul>
+<li>Create random spatial data.</li>
+<li>Convert among spatial data types (e.g. <code>Polygon</code> to <code>FeatureCollection</code>)</li>
+<li>Transform objects, including merging many, simplifying, calculating hulls, etc.</li>
+<li>Measuring objects</li>
+<li>Performing interpolation of objects</li>
+<li>Aggregating data (aka properties) associated with objects</li>
+</ul>
+
+<h2>Install</h2>
+
+<p>Stable <code>lawn</code> version from CRAN - this should fetch <code>leaflet</code>, which is not on CRAN, but in a <code>drat</code> repo (let me know if it doesn&#39;t)</p>
+<div class="highlight"><pre><code class="language-r" data-lang="r">install.packages<span class="p">(</span><span class="s">&quot;lawn&quot;</span><span class="p">)</span>
+</code></pre></div>
+<p>Or, the development version from Github</p>
+<div class="highlight"><pre><code class="language-r" data-lang="r">devtools<span class="o">::</span>install_github<span class="p">(</span><span class="s">&quot;ropensci/lawn&quot;</span><span class="p">)</span>
+</code></pre></div><div class="highlight"><pre><code class="language-r" data-lang="r"><span class="kn">library</span><span class="p">(</span><span class="s">&quot;lawn&quot;</span><span class="p">)</span>
+</code></pre></div>
+<h2>view</h2>
+
+<p><code>lawn</code> includes a tiny helper function for visualizing geojson. For examples below, we&#39;ll make liberal use of the <code>lawn::view()</code> function to visualize what it is the heck we&#39;re doing. mkay, lets roll...</p>
+
+<p>We&#39;ve tried to make <code>view()</code> work with as many inputs as possible, from class <code>character</code> containing
+json to the class <code>json</code> from the <code>jsonlite</code> package, to the class <code>list</code> to all of the GeoJSON outputs
+from functions in <code>lawn</code>.</p>
+<div class="highlight"><pre><code class="language-r" data-lang="r">view<span class="p">(</span>lawn_data<span class="o">$</span>points_average<span class="p">)</span>
+</code></pre></div>
+<p><img src="/public/img/2015-05-18-mow-the-lawn/map1.png" alt="map1"></p>
+
+<p>Here, we sample at random two points from the same dataset just viewed.</p>
+<div class="highlight"><pre><code class="language-r" data-lang="r">lawn_sample<span class="p">(</span>lawn_data<span class="o">$</span>points_average<span class="p">,</span> <span class="m">2</span><span class="p">)</span> <span class="o">%&gt;%</span> view<span class="p">()</span>
+</code></pre></div>
+<p><img src="/public/img/2015-05-18-mow-the-lawn/map2.png" alt="map2"></p>
+
+<h2>Make some geojson data</h2>
+
+<p>Point</p>
+<div class="highlight"><pre><code class="language-r" data-lang="r">lawn_point<span class="p">(</span><span class="kt">c</span><span class="p">(</span><span class="m">-74.5</span><span class="p">,</span> <span class="m">40</span><span class="p">))</span>
+<span class="c1">#&gt; $type</span>
+<span class="c1">#&gt; [1] &quot;Feature&quot;</span>
+<span class="c1">#&gt; </span>
+<span class="c1">#&gt; $geometry</span>
+<span class="c1">#&gt; $geometry$type</span>
+<span class="c1">#&gt; [1] &quot;Point&quot;</span>
+<span class="c1">#&gt; </span>
+<span class="c1">#&gt; $geometry$coordinates</span>
+<span class="c1">#&gt; [1] -74.5  40.0</span>
+<span class="c1">#&gt; </span>
+<span class="c1">#&gt; </span>
+<span class="c1">#&gt; $properties</span>
+<span class="c1">#&gt; named list()</span>
+<span class="c1">#&gt; </span>
+<span class="c1">#&gt; attr(,&quot;class&quot;)</span>
+<span class="c1">#&gt; [1] &quot;point&quot;</span>
+</code></pre></div><div class="highlight"><pre><code class="language-r" data-lang="r">lawn_point<span class="p">(</span><span class="kt">c</span><span class="p">(</span><span class="m">-74.5</span><span class="p">,</span> <span class="m">40</span><span class="p">))</span> <span class="o">%&gt;%</span> view
+</code></pre></div>
+<p><img src="/public/img/2015-05-18-mow-the-lawn/point.png" alt="point"></p>
+
+<p>Polygon</p>
+<div class="highlight"><pre><code class="language-r" data-lang="r">rings <span class="o">&lt;-</span> <span class="kt">list</span><span class="p">(</span><span class="kt">list</span><span class="p">(</span>
+  <span class="kt">c</span><span class="p">(</span><span class="m">-2.275543</span><span class="p">,</span> <span class="m">53.464547</span><span class="p">),</span>
+  <span class="kt">c</span><span class="p">(</span><span class="m">-2.275543</span><span class="p">,</span> <span class="m">53.489271</span><span class="p">),</span>
+  <span class="kt">c</span><span class="p">(</span><span class="m">-2.215118</span><span class="p">,</span> <span class="m">53.489271</span><span class="p">),</span>
+  <span class="kt">c</span><span class="p">(</span><span class="m">-2.215118</span><span class="p">,</span> <span class="m">53.464547</span><span class="p">),</span>
+  <span class="kt">c</span><span class="p">(</span><span class="m">-2.275543</span><span class="p">,</span> <span class="m">53.464547</span><span class="p">)</span>
+<span class="p">))</span>
+lawn_polygon<span class="p">(</span>rings<span class="p">)</span>
+<span class="c1">#&gt; $type</span>
+<span class="c1">#&gt; [1] &quot;Feature&quot;</span>
+<span class="c1">#&gt; </span>
+<span class="c1">#&gt; $geometry</span>
+<span class="c1">#&gt; $geometry$type</span>
+<span class="c1">#&gt; [1] &quot;Polygon&quot;</span>
+<span class="c1">#&gt; </span>
+<span class="c1">#&gt; $geometry$coordinates</span>
+<span class="c1">#&gt; , , 1</span>
+<span class="c1">#&gt; </span>
+<span class="c1">#&gt;           [,1]      [,2]      [,3]      [,4]      [,5]</span>
+<span class="c1">#&gt; [1,] -2.275543 -2.275543 -2.215118 -2.215118 -2.275543</span>
+<span class="c1">#&gt; </span>
+<span class="c1">#&gt; , , 2</span>
+<span class="c1">#&gt; </span>
+<span class="c1">#&gt;          [,1]     [,2]     [,3]     [,4]     [,5]</span>
+<span class="c1">#&gt; [1,] 53.46455 53.48927 53.48927 53.46455 53.46455</span>
+<span class="c1">#&gt; </span>
+<span class="c1">#&gt; </span>
+<span class="c1">#&gt; </span>
+<span class="c1">#&gt; $properties</span>
+<span class="c1">#&gt; named list()</span>
+<span class="c1">#&gt; </span>
+<span class="c1">#&gt; attr(,&quot;class&quot;)</span>
+<span class="c1">#&gt; [1] &quot;polygon&quot;</span>
+</code></pre></div><div class="highlight"><pre><code class="language-r" data-lang="r">lawn_polygon<span class="p">(</span>rings<span class="p">)</span> <span class="o">%&gt;%</span> view
+</code></pre></div>
+<p><img src="/public/img/2015-05-18-mow-the-lawn/polygon.png" alt="polygon"></p>
+
+<p>Random set of points</p>
+<div class="highlight"><pre><code class="language-r" data-lang="r">lawn_random<span class="p">(</span>n <span class="o">=</span> <span class="m">2</span><span class="p">)</span>
+<span class="c1">#&gt; $type</span>
+<span class="c1">#&gt; [1] &quot;FeatureCollection&quot;</span>
+<span class="c1">#&gt; </span>
+<span class="c1">#&gt; $features</span>
+<span class="c1">#&gt;      type geometry.type  geometry.coordinates</span>
+<span class="c1">#&gt; 1 Feature         Point -137.46327, -63.46154</span>
+<span class="c1">#&gt; 2 Feature         Point  -110.68426, 83.10533</span>
+<span class="c1">#&gt; </span>
+<span class="c1">#&gt; attr(,&quot;class&quot;)</span>
+<span class="c1">#&gt; [1] &quot;featurecollection&quot;</span>
+</code></pre></div><div class="highlight"><pre><code class="language-r" data-lang="r">lawn_random<span class="p">(</span>n <span class="o">=</span> <span class="m">5</span><span class="p">)</span> <span class="o">%&gt;%</span> view
+</code></pre></div>
+<p><img src="/public/img/2015-05-18-mow-the-lawn/lawn_random.png" alt="rand1"></p>
+
+<p>Or, use a different Javascript library (<a href="https://github.com/mapbox/geojson-random">geojson-random</a>) to create random features.</p>
+
+<p>Positions</p>
+<div class="highlight"><pre><code class="language-r" data-lang="r">gr_position<span class="p">()</span>
+<span class="c1">#&gt; [1] -179.77996   45.99018</span>
+</code></pre></div>
+<p>Points</p>
+<div class="highlight"><pre><code class="language-r" data-lang="r">gr_point<span class="p">(</span><span class="m">2</span><span class="p">)</span>
+<span class="c1">#&gt; $type</span>
+<span class="c1">#&gt; [1] &quot;FeatureCollection&quot;</span>
+<span class="c1">#&gt; </span>
+<span class="c1">#&gt; $features</span>
+<span class="c1">#&gt;      type geometry.type geometry.coordinates</span>
+<span class="c1">#&gt; 1 Feature         Point   5.83895, -27.77218</span>
+<span class="c1">#&gt; 2 Feature         Point   78.50177, 14.95840</span>
+<span class="c1">#&gt; </span>
+<span class="c1">#&gt; attr(,&quot;class&quot;)</span>
+<span class="c1">#&gt; [1] &quot;featurecollection&quot;</span>
+</code></pre></div><div class="highlight"><pre><code class="language-r" data-lang="r">gr_point<span class="p">(</span><span class="m">2</span><span class="p">)</span> <span class="o">%&gt;%</span> view
+</code></pre></div>
+<p><img src="/public/img/2015-05-18-mow-the-lawn/geojsonrandom_points.png" alt="rand2"></p>
+
+<p>Polygons</p>
+<div class="highlight"><pre><code class="language-r" data-lang="r">gr_polygon<span class="p">(</span>n <span class="o">=</span> <span class="m">1</span><span class="p">,</span> vertices <span class="o">=</span> <span class="m">5</span><span class="p">,</span> max_radial_length <span class="o">=</span> <span class="m">5</span><span class="p">)</span>
+<span class="c1">#&gt; $type</span>
+<span class="c1">#&gt; [1] &quot;FeatureCollection&quot;</span>
+<span class="c1">#&gt; </span>
+<span class="c1">#&gt; $features</span>
+<span class="c1">#&gt;      type geometry.type</span>
+<span class="c1">#&gt; 1 Feature       Polygon</span>
+<span class="c1">#&gt;                                                                                                           geometry.coordinates</span>
+<span class="c1">#&gt; 1 67.58827, 67.68551, 67.00091, 66.70156, 65.72578, 67.58827, -42.11340, -42.69850, -43.54866, -42.42758, -41.76731, -42.11340</span>
+<span class="c1">#&gt; </span>
+<span class="c1">#&gt; attr(,&quot;class&quot;)</span>
+<span class="c1">#&gt; [1] &quot;featurecollection&quot;</span>
+</code></pre></div><div class="highlight"><pre><code class="language-r" data-lang="r">gr_polygon<span class="p">(</span>n <span class="o">=</span> <span class="m">1</span><span class="p">,</span> vertices <span class="o">=</span> <span class="m">5</span><span class="p">,</span> max_radial_length <span class="o">=</span> <span class="m">5</span><span class="p">)</span> <span class="o">%&gt;%</span> view
+</code></pre></div>
+<p><img src="/public/img/2015-05-18-mow-the-lawn/geojsonrandom_polygons.png" alt="rand3"></p>
+
+<h2>count</h2>
+
+<p>Count number of points within polygons, appends a new field to properties (see the <code>count</code> field)</p>
+<div class="highlight"><pre><code class="language-r" data-lang="r">lawn_count<span class="p">(</span>polygons <span class="o">=</span> lawn_data<span class="o">$</span>polygons_count<span class="p">,</span> points <span class="o">=</span> lawn_data<span class="o">$</span>points_count<span class="p">)</span>
+<span class="c1">#&gt; $type</span>
+<span class="c1">#&gt; [1] &quot;FeatureCollection&quot;</span>
+<span class="c1">#&gt; </span>
+<span class="c1">#&gt; $features</span>
+<span class="c1">#&gt;      type pt_count geometry.type</span>
+<span class="c1">#&gt; 1 Feature        2       Polygon</span>
+<span class="c1">#&gt; 2 Feature        0       Polygon</span>
+<span class="c1">#&gt;                                                                                           geometry.coordinates</span>
+<span class="c1">#&gt; 1 -112.07239, -112.07239, -112.02810, -112.02810, -112.07239, 46.58659, 46.61761, 46.61761, 46.58659, 46.58659</span>
+<span class="c1">#&gt; 2 -112.02398, -112.02398, -111.96613, -111.96613, -112.02398, 46.57043, 46.61502, 46.61502, 46.57043, 46.57043</span>
+<span class="c1">#&gt; </span>
+<span class="c1">#&gt; attr(,&quot;class&quot;)</span>
+<span class="c1">#&gt; [1] &quot;featurecollection&quot;</span>
+</code></pre></div>
+<h2>distance</h2>
+
+<p>Define two points</p>
+<div class="highlight"><pre><code class="language-r" data-lang="r">from <span class="o">&lt;-</span> <span class="s">&#39;{</span>
+<span class="s"> &quot;type&quot;: &quot;Feature&quot;,</span>
+<span class="s"> &quot;properties&quot;: {},</span>
+<span class="s"> &quot;geometry&quot;: {</span>
+<span class="s">   &quot;type&quot;: &quot;Point&quot;,</span>
+<span class="s">   &quot;coordinates&quot;: [-75.343, 39.984]</span>
+<span class="s"> }</span>
+<span class="s">}&#39;</span>
+to <span class="o">&lt;-</span> <span class="s">&#39;{</span>
+<span class="s">  &quot;type&quot;: &quot;Feature&quot;,</span>
+<span class="s">  &quot;properties&quot;: {},</span>
+<span class="s">  &quot;geometry&quot;: {</span>
+<span class="s">    &quot;type&quot;: &quot;Point&quot;,</span>
+<span class="s">    &quot;coordinates&quot;: [-75.534, 39.123]</span>
+<span class="s">  }</span>
+<span class="s">}&#39;</span>
+</code></pre></div>
+<p>Calculate distance, default units is kilometers (default output: <code>km</code>)</p>
+<div class="highlight"><pre><code class="language-r" data-lang="r">lawn_distance<span class="p">(</span>from<span class="p">,</span> to<span class="p">)</span>
+<span class="c1">#&gt; [1] 97.15958</span>
+</code></pre></div>
+<h2>sample from a FeatureCollection</h2>
+<div class="highlight"><pre><code class="language-r" data-lang="r">dat <span class="o">&lt;-</span> lawn_data<span class="o">$</span>points_average
+<span class="kp">cat</span><span class="p">(</span>dat<span class="p">)</span>
+<span class="c1">#&gt; {</span>
+<span class="c1">#&gt;   &quot;type&quot;: &quot;FeatureCollection&quot;,</span>
+<span class="c1">#&gt;   &quot;features&quot;: [</span>
+<span class="c1">#&gt;     {</span>
+<span class="c1">#&gt;       &quot;type&quot;: &quot;Feature&quot;,</span>
+<span class="c1">#&gt;       &quot;properties&quot;: {</span>
+<span class="c1">#&gt;         &quot;population&quot;: 200</span>
+<span class="c1">#&gt;       },</span>
+<span class="c1">#&gt;       &quot;geometry&quot;: {</span>
+<span class="c1">#&gt;         &quot;type&quot;: &quot;Point&quot;,</span>
+<span class="kc">...</span>
+</code></pre></div>
+<p>Sample 2 points at random</p>
+<div class="highlight"><pre><code class="language-r" data-lang="r">lawn_sample<span class="p">(</span>dat<span class="p">,</span> <span class="m">2</span><span class="p">)</span>
+<span class="c1">#&gt; $type</span>
+<span class="c1">#&gt; [1] &quot;FeatureCollection&quot;</span>
+<span class="c1">#&gt; </span>
+<span class="c1">#&gt; $features</span>
+<span class="c1">#&gt;      type population geometry.type geometry.coordinates</span>
+<span class="c1">#&gt; 1 Feature        200         Point   10.80643, 59.90891</span>
+<span class="c1">#&gt; 2 Feature        600         Point   10.71579, 59.90478</span>
+<span class="c1">#&gt; </span>
+<span class="c1">#&gt; attr(,&quot;class&quot;)</span>
+<span class="c1">#&gt; [1] &quot;featurecollection&quot;</span>
+</code></pre></div>
+<h2>extent</h2>
+
+<p>Calculates the extent of all input features in a FeatureCollection, and returns a bounding box.</p>
+<div class="highlight"><pre><code class="language-r" data-lang="r">lawn_extent<span class="p">(</span>lawn_data<span class="o">$</span>points_average<span class="p">)</span>
+<span class="c1">#&gt; [1] 10.71579 59.90478 10.80643 59.93162</span>
+</code></pre></div>
+<h2>buffer</h2>
+
+<p>Calculates a buffer for input features for a given radius.</p>
+<div class="highlight"><pre><code class="language-r" data-lang="r">dat <span class="o">&lt;-</span> <span class="s">&#39;{</span>
+<span class="s"> &quot;type&quot;: &quot;Feature&quot;,</span>
+<span class="s"> &quot;properties&quot;: {},</span>
+<span class="s"> &quot;geometry&quot;: {</span>
+<span class="s">     &quot;type&quot;: &quot;Polygon&quot;,</span>
+<span class="s">     &quot;coordinates&quot;: [[</span>
+<span class="s">       [-112.072391,46.586591],</span>
+<span class="s">       [-112.072391,46.61761],</span>
+<span class="s">       [-112.028102,46.61761],</span>
+<span class="s">       [-112.028102,46.586591],</span>
+<span class="s">       [-112.072391,46.586591]</span>
+<span class="s">     ]]</span>
+<span class="s">   }</span>
+<span class="s">}&#39;</span>
+view<span class="p">(</span>dat<span class="p">)</span>
+</code></pre></div>
+<p><img src="/public/img/2015-05-18-mow-the-lawn/buffer1.png" alt="buffer1"></p>
+<div class="highlight"><pre><code class="language-r" data-lang="r">lawn_buffer<span class="p">(</span>dat<span class="p">,</span> <span class="m">1</span><span class="p">,</span> <span class="s">&quot;miles&quot;</span><span class="p">)</span> <span class="o">%&gt;%</span> view
+</code></pre></div>
+<p><img src="/public/img/2015-05-18-mow-the-lawn/buffer2.png" alt="buffer2"></p>
+
+<h2>Union polygons together</h2>
+<div class="highlight"><pre><code class="language-r" data-lang="r">poly1 <span class="o">&lt;-</span> <span class="s">&#39;{</span>
+<span class="s"> &quot;type&quot;: &quot;Feature&quot;,</span>
+<span class="s"> &quot;properties&quot;: {</span>
+<span class="s">   &quot;fill&quot;: &quot;#0f0&quot;</span>
+<span class="s"> },</span>
+<span class="s"> &quot;geometry&quot;: {</span>
+<span class="s">   &quot;type&quot;: &quot;Polygon&quot;,</span>
+<span class="s">   &quot;coordinates&quot;: [[</span>
+<span class="s">     [-122.801742, 45.48565],</span>
+<span class="s">     [-122.801742, 45.60491],</span>
+<span class="s">     [-122.584762, 45.60491],</span>
+<span class="s">     [-122.584762, 45.48565],</span>
+<span class="s">     [-122.801742, 45.48565]</span>
+<span class="s">    ]]</span>
+<span class="s"> }</span>
+<span class="s">}&#39;</span>
+
+poly2 <span class="o">&lt;-</span> <span class="s">&#39;{</span>
+<span class="s"> &quot;type&quot;: &quot;Feature&quot;,</span>
+<span class="s"> &quot;properties&quot;: {</span>
+<span class="s">   &quot;fill&quot;: &quot;#00f&quot;</span>
+<span class="s"> },</span>
+<span class="s"> &quot;geometry&quot;: {</span>
+<span class="s">   &quot;type&quot;: &quot;Polygon&quot;,</span>
+<span class="s">   &quot;coordinates&quot;: [[</span>
+<span class="s">     [-122.520217, 45.535693],</span>
+<span class="s">     [-122.64038, 45.553967],</span>
+<span class="s">     [-122.720031, 45.526554],</span>
+<span class="s">     [-122.669906, 45.507309],</span>
+<span class="s">     [-122.723464, 45.446643],</span>
+<span class="s">     [-122.532577, 45.408574],</span>
+<span class="s">     [-122.487258, 45.477466],</span>
+<span class="s">     [-122.520217, 45.535693]</span>
+<span class="s">     ]]</span>
+<span class="s"> }</span>
+<span class="s">}&#39;</span>
+view<span class="p">(</span>poly1<span class="p">)</span>
+</code></pre></div>
+<p><img src="/public/img/2015-05-18-mow-the-lawn/union1.png" alt="union1"></p>
+<div class="highlight"><pre><code class="language-r" data-lang="r">view<span class="p">(</span>poly2<span class="p">)</span>
+</code></pre></div>
+<p><img src="/public/img/2015-05-18-mow-the-lawn/union2.png" alt="union2"></p>
+
+<p>Visualize union-ed polygons</p>
+<div class="highlight"><pre><code class="language-r" data-lang="r">lawn_union<span class="p">(</span>poly1<span class="p">,</span> poly2<span class="p">)</span> <span class="o">%&gt;%</span> view
+</code></pre></div>
+<p><img src="/public/img/2015-05-18-mow-the-lawn/union3.png" alt="union3"></p>
+
+<p>See also <code>lawn_merge()</code> and <code>lawn_intersect()</code>.</p>
+
+<h2>lint input geojson</h2>
+
+<p>For most functions, you can lint your input geojson data to make sure it is proper geojson. We use 
+the javascript library <a href="https://github.com/mapbox/geojsonhint">geojsonhint</a>. See the <code>lint</code> parameter.</p>
+
+<p>Good GeoJSON</p>
+<div class="highlight"><pre><code class="language-r" data-lang="r">dat <span class="o">&lt;-</span> <span class="s">&#39;{</span>
+<span class="s">  &quot;type&quot;: &quot;FeatureCollection&quot;,</span>
+<span class="s">  &quot;features&quot;: [</span>
+<span class="s">    {</span>
+<span class="s">      &quot;type&quot;: &quot;Feature&quot;,</span>
+<span class="s">      &quot;properties&quot;: {</span>
+<span class="s">        &quot;population&quot;: 200</span>
+<span class="s">      },</span>
+<span class="s">      &quot;geometry&quot;: {</span>
+<span class="s">        &quot;type&quot;: &quot;Point&quot;,</span>
+<span class="s">        &quot;coordinates&quot;: [10.724029, 59.926807]</span>
+<span class="s">      }</span>
+<span class="s">    }</span>
+<span class="s">  ]</span>
+<span class="s">}&#39;</span>
+lawn_extent<span class="p">(</span>dat<span class="p">)</span>
+<span class="c1">#&gt; [1] 10.72403 59.92681 10.72403 59.92681</span>
+</code></pre></div>
+<p>Bad GeoJSON</p>
+<div class="highlight"><pre><code class="language-r" data-lang="r">dat <span class="o">&lt;-</span> <span class="s">&#39;{</span>
+<span class="s">  &quot;type&quot;: &quot;FeatureCollection&quot;,</span>
+<span class="s">  &quot;features&quot;: [</span>
+<span class="s">    {</span>
+<span class="s">      &quot;type&quot;: &quot;Feature&quot;,</span>
+<span class="s">      &quot;properties&quot;: {</span>
+<span class="s">        &quot;population&quot;: 200</span>
+<span class="s">      },</span>
+<span class="s">      &quot;geometry&quot;: {</span>
+<span class="s">        &quot;type&quot;: &quot;Point&quot;</span>
+<span class="s">      }</span>
+<span class="s">    }</span>
+<span class="s">  ]</span>
+<span class="s">}&#39;</span>
+lawn_extent<span class="p">(</span>dat<span class="p">,</span> lint <span class="o">=</span> <span class="kc">TRUE</span><span class="p">)</span>
+
+<span class="c1">#&gt; Error: Line 1 - &quot;coordinates&quot; property required</span>
+</code></pre></div>
+<h2>To do</h2>
+
+<ul>
+<li>As Turf.js changes, we&#39;ll update <code>lawn</code></li>
+<li>Performance improvements. We realize that this package is slower than the C based <code>rgdal</code>/<code>rgeos</code> - we are looking into ways to increaes performance to get closer to the performance of those packages. </li>
+</ul>
+
+  </div>
+  
+  <div class="post">
+    <h1>
       <a href="/2015/04/geojson-io/">
         geojsonio - a new package to do geojson things
       </a>
@@ -531,124 +902,6 @@ out <span class="o">&lt;-</span> topojson_read<span class="p">(</span><span clas
 <h2>Notes</h2>
 
 <p>Okay, so this isn&#39;t drastically different from what <code>httr</code> already does, but its early days. </p>
-
-  </div>
-  
-  <div class="post">
-    <h1>
-      <a href="/2015/03/faster-solr/">
-        Faster solr with csv
-      </a>
-    </h1>
-
-    <span class="post-date">20 Mar 2015</span>
-
-    <p>With the <a href="https://github.com/ropensci/solr/issues/47">help of user input</a>, I&#39;ve tweaked <code>solr</code> just a bit to make things faster using default setings. I imagine the main interface for people using the <code>solr</code> R client is via <code>solr_search()</code>, which used to have <code>wt=json</code> by default. Changing this to <code>wt=csv</code> gives better performance. And it sorta makes sense to use csv, as the point of using an R client is probably do get data eventually into a data.frame, so it makes sense to go csv format (Already in tabular format) if it&#39;s faster too.</p>
-
-<h2>Install</h2>
-
-<p>Install and load <code>solr</code></p>
-<div class="highlight"><pre><code class="language-r" data-lang="r">devtools<span class="o">::</span>install_github<span class="p">(</span><span class="s">&quot;ropensci/solr&quot;</span><span class="p">)</span>
-</code></pre></div><div class="highlight"><pre><code class="language-r" data-lang="r"><span class="kn">library</span><span class="p">(</span><span class="s">&quot;solr&quot;</span><span class="p">)</span>
-<span class="kn">library</span><span class="p">(</span><span class="s">&quot;microbenchmark&quot;</span><span class="p">)</span>
-</code></pre></div>
-<h2>Setup</h2>
-
-<p>Define base url and fields to return</p>
-<div class="highlight"><pre><code class="language-r" data-lang="r">url <span class="o">&lt;-</span> <span class="s">&#39;http://api.plos.org/search&#39;</span>
-fields <span class="o">&lt;-</span> <span class="kt">c</span><span class="p">(</span><span class="s">&#39;id&#39;</span><span class="p">,</span><span class="s">&#39;cross_published_journal_name&#39;</span><span class="p">,</span><span class="s">&#39;cross_published_journal_key&#39;</span><span class="p">,</span>
-            <span class="s">&#39;cross_published_journal_eissn&#39;</span><span class="p">,</span><span class="s">&#39;pmid&#39;</span><span class="p">,</span><span class="s">&#39;pmcid&#39;</span><span class="p">,</span><span class="s">&#39;publisher&#39;</span><span class="p">,</span><span class="s">&#39;journal&#39;</span><span class="p">,</span>
-            <span class="s">&#39;publication_date&#39;</span><span class="p">,</span><span class="s">&#39;article_type&#39;</span><span class="p">,</span><span class="s">&#39;article_type_facet&#39;</span><span class="p">,</span><span class="s">&#39;author&#39;</span><span class="p">,</span>
-            <span class="s">&#39;author_facet&#39;</span><span class="p">,</span><span class="s">&#39;volume&#39;</span><span class="p">,</span><span class="s">&#39;issue&#39;</span><span class="p">,</span><span class="s">&#39;elocation_id&#39;</span><span class="p">,</span><span class="s">&#39;author_display&#39;</span><span class="p">,</span>
-            <span class="s">&#39;competing_interest&#39;</span><span class="p">,</span><span class="s">&#39;copyright&#39;</span><span class="p">)</span>
-</code></pre></div>
-<h2>json</h2>
-
-<p>The previous default for <code>solr_search()</code> used <code>json</code></p>
-<div class="highlight"><pre><code class="language-r" data-lang="r">solr_search<span class="p">(</span>q<span class="o">=</span><span class="s">&#39;*:*&#39;</span><span class="p">,</span> rows<span class="o">=</span><span class="m">10</span><span class="p">,</span> fl<span class="o">=</span>fields<span class="p">,</span> base<span class="o">=</span><span class="kp">url</span><span class="p">,</span> wt <span class="o">=</span> <span class="s">&quot;json&quot;</span><span class="p">)</span>
-<span class="c1">#&gt; Source: local data frame [10 x 19]</span>
-<span class="c1">#&gt; </span>
-<span class="c1">#&gt;                                                                    id</span>
-<span class="c1">#&gt; 1             10.1371/annotation/856f0890-9d85-4719-8e54-c27530ac94f4</span>
-<span class="c1">#&gt; 2       10.1371/annotation/856f0890-9d85-4719-8e54-c27530ac94f4/title</span>
-<span class="c1">#&gt; 3    10.1371/annotation/856f0890-9d85-4719-8e54-c27530ac94f4/abstract</span>
-<span class="c1">#&gt; 4  10.1371/annotation/856f0890-9d85-4719-8e54-c27530ac94f4/references</span>
-<span class="c1">#&gt; 5        10.1371/annotation/856f0890-9d85-4719-8e54-c27530ac94f4/body</span>
-<span class="c1">#&gt; 6             10.1371/annotation/8551e3d5-fdd5-413b-a253-170ba13b7525</span>
-<span class="c1">#&gt; 7       10.1371/annotation/8551e3d5-fdd5-413b-a253-170ba13b7525/title</span>
-<span class="c1">#&gt; 8    10.1371/annotation/8551e3d5-fdd5-413b-a253-170ba13b7525/abstract</span>
-<span class="c1">#&gt; 9  10.1371/annotation/8551e3d5-fdd5-413b-a253-170ba13b7525/references</span>
-<span class="c1">#&gt; 10       10.1371/annotation/8551e3d5-fdd5-413b-a253-170ba13b7525/body</span>
-<span class="c1">#&gt; Variables not shown: cross_published_journal_name (chr),</span>
-<span class="c1">#&gt;   cross_published_journal_key (chr), cross_published_journal_eissn (chr),</span>
-<span class="c1">#&gt;   pmid (chr), pmcid (chr), publisher (chr), journal (chr),</span>
-<span class="c1">#&gt;   publication_date (chr), article_type (chr), article_type_facet (chr),</span>
-<span class="c1">#&gt;   author (chr), author_facet (chr), volume (int), issue (int),</span>
-<span class="c1">#&gt;   elocation_id (chr), author_display (chr), competing_interest (chr),</span>
-<span class="c1">#&gt;   copyright (chr)</span>
-</code></pre></div>
-<h2>csv</h2>
-
-<p>The default <code>wt</code> setting is now <code>csv</code></p>
-<div class="highlight"><pre><code class="language-r" data-lang="r">solr_search<span class="p">(</span>q<span class="o">=</span><span class="s">&#39;*:*&#39;</span><span class="p">,</span> rows<span class="o">=</span><span class="m">10</span><span class="p">,</span> fl<span class="o">=</span>fields<span class="p">,</span> base<span class="o">=</span><span class="kp">url</span><span class="p">,</span> wt <span class="o">=</span> <span class="s">&quot;json&quot;</span><span class="p">)</span>
-<span class="c1">#&gt; Source: local data frame [10 x 19]</span>
-<span class="c1">#&gt; </span>
-<span class="c1">#&gt;                                                                    id</span>
-<span class="c1">#&gt; 1             10.1371/annotation/856f0890-9d85-4719-8e54-c27530ac94f4</span>
-<span class="c1">#&gt; 2       10.1371/annotation/856f0890-9d85-4719-8e54-c27530ac94f4/title</span>
-<span class="c1">#&gt; 3    10.1371/annotation/856f0890-9d85-4719-8e54-c27530ac94f4/abstract</span>
-<span class="c1">#&gt; 4  10.1371/annotation/856f0890-9d85-4719-8e54-c27530ac94f4/references</span>
-<span class="c1">#&gt; 5        10.1371/annotation/856f0890-9d85-4719-8e54-c27530ac94f4/body</span>
-<span class="c1">#&gt; 6             10.1371/annotation/8551e3d5-fdd5-413b-a253-170ba13b7525</span>
-<span class="c1">#&gt; 7       10.1371/annotation/8551e3d5-fdd5-413b-a253-170ba13b7525/title</span>
-<span class="c1">#&gt; 8    10.1371/annotation/8551e3d5-fdd5-413b-a253-170ba13b7525/abstract</span>
-<span class="c1">#&gt; 9  10.1371/annotation/8551e3d5-fdd5-413b-a253-170ba13b7525/references</span>
-<span class="c1">#&gt; 10       10.1371/annotation/8551e3d5-fdd5-413b-a253-170ba13b7525/body</span>
-<span class="c1">#&gt; Variables not shown: cross_published_journal_name (chr),</span>
-<span class="c1">#&gt;   cross_published_journal_key (chr), cross_published_journal_eissn (chr),</span>
-<span class="c1">#&gt;   pmid (chr), pmcid (chr), publisher (chr), journal (chr),</span>
-<span class="c1">#&gt;   publication_date (chr), article_type (chr), article_type_facet (chr),</span>
-<span class="c1">#&gt;   author (chr), author_facet (chr), volume (int), issue (int),</span>
-<span class="c1">#&gt;   elocation_id (chr), author_display (chr), competing_interest (chr),</span>
-<span class="c1">#&gt;   copyright (chr)</span>
-</code></pre></div>
-<h2>Compare times</h2>
-
-<p>When parsing to a data.frame (which <code>solr_search()</code> does by default), csv is quite a bit faster.</p>
-<div class="highlight"><pre><code class="language-r" data-lang="r">microbenchmark<span class="p">(</span>
-  json <span class="o">=</span> solr_search<span class="p">(</span>q<span class="o">=</span><span class="s">&#39;*:*&#39;</span><span class="p">,</span> rows<span class="o">=</span><span class="m">500</span><span class="p">,</span> fl<span class="o">=</span>fields<span class="p">,</span> base<span class="o">=</span><span class="kp">url</span><span class="p">,</span> wt <span class="o">=</span> <span class="s">&quot;json&quot;</span><span class="p">,</span> verbose <span class="o">=</span> <span class="kc">FALSE</span><span class="p">),</span>
-  csv <span class="o">=</span> solr_search<span class="p">(</span>q<span class="o">=</span><span class="s">&#39;*:*&#39;</span><span class="p">,</span> rows<span class="o">=</span><span class="m">500</span><span class="p">,</span> fl<span class="o">=</span>fields<span class="p">,</span> base<span class="o">=</span><span class="kp">url</span><span class="p">,</span> wt <span class="o">=</span> <span class="s">&quot;csv&quot;</span><span class="p">,</span> verbose <span class="o">=</span> <span class="kc">FALSE</span><span class="p">),</span> 
-  times <span class="o">=</span> <span class="m">20</span>
-<span class="p">)</span>
-<span class="c1">#&gt; Unit: milliseconds</span>
-<span class="c1">#&gt;  expr      min       lq      mean    median        uq       max neval cld</span>
-<span class="c1">#&gt;  json 965.7043 1013.014 1124.1229 1086.3225 1227.9054 1441.8332    20   b</span>
-<span class="c1">#&gt;   csv 509.6573  520.089  541.5784  532.4546  548.0303  723.7575    20  a</span>
-</code></pre></div>
-<h2>json vs xml vs csv</h2>
-
-<p>When getting raw data, csv is best, json next, then xml pulling up the rear.</p>
-<div class="highlight"><pre><code class="language-r" data-lang="r">microbenchmark<span class="p">(</span>
-  json <span class="o">=</span> solr_search<span class="p">(</span>q<span class="o">=</span><span class="s">&#39;*:*&#39;</span><span class="p">,</span> rows<span class="o">=</span><span class="m">1000</span><span class="p">,</span> fl<span class="o">=</span>fields<span class="p">,</span> base<span class="o">=</span><span class="kp">url</span><span class="p">,</span> wt <span class="o">=</span> <span class="s">&quot;json&quot;</span><span class="p">,</span> verbose <span class="o">=</span> <span class="kc">FALSE</span><span class="p">,</span> raw <span class="o">=</span> <span class="kc">TRUE</span><span class="p">),</span>
-  csv <span class="o">=</span> solr_search<span class="p">(</span>q<span class="o">=</span><span class="s">&#39;*:*&#39;</span><span class="p">,</span> rows<span class="o">=</span><span class="m">1000</span><span class="p">,</span> fl<span class="o">=</span>fields<span class="p">,</span> base<span class="o">=</span><span class="kp">url</span><span class="p">,</span> wt <span class="o">=</span> <span class="s">&quot;csv&quot;</span><span class="p">,</span> verbose <span class="o">=</span> <span class="kc">FALSE</span><span class="p">,</span> raw <span class="o">=</span> <span class="kc">TRUE</span><span class="p">),</span>
-  xml <span class="o">=</span> solr_search<span class="p">(</span>q<span class="o">=</span><span class="s">&#39;*:*&#39;</span><span class="p">,</span> rows<span class="o">=</span><span class="m">1000</span><span class="p">,</span> fl<span class="o">=</span>fields<span class="p">,</span> base<span class="o">=</span><span class="kp">url</span><span class="p">,</span> wt <span class="o">=</span> <span class="s">&quot;xml&quot;</span><span class="p">,</span> verbose <span class="o">=</span> <span class="kc">FALSE</span><span class="p">,</span> raw <span class="o">=</span> <span class="kc">TRUE</span><span class="p">),</span>
-  times <span class="o">=</span> <span class="m">10</span>
-<span class="p">)</span>
-<span class="c1">#&gt; Unit: milliseconds</span>
-<span class="c1">#&gt;  expr       min       lq      mean    median        uq       max neval cld</span>
-<span class="c1">#&gt;  json 1110.9515 1142.478 1198.9981 1169.0808 1195.5709 1518.7412    10  b </span>
-<span class="c1">#&gt;   csv  801.6871  802.516  826.0655  819.1532  835.0512  873.4266    10 a  </span>
-<span class="c1">#&gt;   xml 1507.1111 1554.002 1618.5963 1617.5208 1671.0026 1740.4448    10   c</span>
-</code></pre></div>
-<h2>Notes</h2>
-
-<p>Note that <code>wt=csv</code> is only available in <code>solr_search()</code> and <code>solr_all()</code> because csv writer 
-only returns the docs element in csv, dropping other elements, including facets, mlt, groups, 
-stats, etc. </p>
-
-<p>Also, note the http client used in <code>solr</code> is <code>httr</code>, which passes in a gzip compression header by default, so as long as the server serving up the Solr data has compression turned on, that&#39;s all set.</p>
-
-<p>Another way I&#39;ve sped things up is if you use <code>wt=json</code> then parse to a data.frame, it uses <code>dplyr</code> which sped things up considerably.</p>
 
   </div>
   
