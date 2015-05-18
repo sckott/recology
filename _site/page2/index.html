@@ -59,6 +59,217 @@
   
   <div class="post">
     <h1>
+      <a href="/2015/04/the-new-way/">
+        the new way - httsnap
+      </a>
+    </h1>
+
+    <span class="post-date">29 Apr 2015</span>
+
+    <p>Inspired by <code>httpie</code>, a Python command line client as a sort of drop in replacement for <code>curl</code>, I am playing around with something similar-ish in R, at least in spirit. I started a little R pkg called <code>httsnap</code> with the following ideas:</p>
+
+<ul>
+<li>The web is increasingly a JSON world, so set <code>content-type</code> and <code>accept</code> headers to <code>applications/json</code> by default </li>
+<li>The workflow follows logically, or at least should, from, <em>hey, I got this url</em>, to <em>i need to add some options</em>, to <em>execute request</em></li>
+<li>Whenever possible, transform output to data.frame&#39;s - facilitating downstream manipulation via <code>dplyr</code>, etc.</li>
+<li>Do <code>GET</code> requests by default. Specify a different type if you don&#39;t want <code>GET</code>. Some functionality does GET by default, though in some cases you need to specify GET</li>
+<li>You can use non-standard evaluation to easily pass in query parameters without worrying about <code>&amp;</code>&#39;s, URL escaping, etc. (see <code>Query()</code>)</li>
+<li>Same for body params (see <code>Body()</code>)</li>
+</ul>
+
+<h2>Install</h2>
+
+<p>Install and load <code>httsnap</code></p>
+<div class="highlight"><pre><code class="language-r" data-lang="r">devtools<span class="o">::</span>install_github<span class="p">(</span><span class="s">&quot;sckott/httsnap&quot;</span><span class="p">)</span>
+</code></pre></div><div class="highlight"><pre><code class="language-r" data-lang="r"><span class="kn">library</span><span class="p">(</span><span class="s">&quot;httsnap&quot;</span><span class="p">)</span>
+<span class="kn">library</span><span class="p">(</span><span class="s">&quot;dplyr&quot;</span><span class="p">)</span>
+</code></pre></div>
+<h2>Functions so far</h2>
+
+<ul>
+<li><code>Get</code> - GET request</li>
+<li><code>Query</code> - add query parameters</li>
+<li><code>Authenticate</code> - add authentication details</li>
+<li><code>Progress</code> - add progress bar</li>
+<li><code>Timeout</code> - add a timeout</li>
+<li><code>User_agent</code> - add a user agent</li>
+<li><code>Verbose</code> - give verbose output</li>
+<li><code>Body</code> - add a body</li>
+<li><code>h</code> - add headers by key-value pair</li>
+</ul>
+
+<p>These are named to avoid conflict with <code>httr</code></p>
+
+<h2>Intro</h2>
+
+<p>A simple <code>GET</code> request</p>
+<div class="highlight"><pre><code class="language-r" data-lang="r"><span class="s">&quot;http://httpbin.org/get&quot;</span> <span class="o">%&gt;%</span>
+  Get<span class="p">()</span>
+<span class="c1">#&gt; $args</span>
+<span class="c1">#&gt; named list()</span>
+<span class="c1">#&gt; </span>
+<span class="c1">#&gt; $headers</span>
+<span class="c1">#&gt; $headers$Accept</span>
+<span class="c1">#&gt; [1] &quot;application/json, text/xml, application/xml, */*&quot;</span>
+<span class="c1">#&gt; </span>
+<span class="c1">#&gt; $headers$`Accept-Encoding`</span>
+<span class="c1">#&gt; [1] &quot;gzip&quot;</span>
+<span class="c1">#&gt; </span>
+<span class="c1">#&gt; $headers$Host</span>
+<span class="c1">#&gt; [1] &quot;httpbin.org&quot;</span>
+<span class="c1">#&gt; </span>
+<span class="c1">#&gt; $headers$`User-Agent`</span>
+<span class="c1">#&gt; [1] &quot;curl/7.37.1 Rcurl/1.95.4.1 httr/0.6.1 httsnap/0.0.2.99&quot;</span>
+<span class="c1">#&gt; </span>
+<span class="c1">#&gt; </span>
+<span class="c1">#&gt; $origin</span>
+<span class="c1">#&gt; [1] &quot;24.21.209.71&quot;</span>
+<span class="c1">#&gt; </span>
+<span class="c1">#&gt; $url</span>
+<span class="c1">#&gt; [1] &quot;http://httpbin.org/get&quot;</span>
+</code></pre></div>
+<p>You&#39;ll notice that <code>Get()</code> doesn&#39;t just get the response, but also checks for whether it was a good response (the HTTP status code), and extracts the data. </p>
+
+<p>Or you can just pass the URL into the function itself</p>
+<div class="highlight"><pre><code class="language-r" data-lang="r">Get<span class="p">(</span><span class="s">&quot;http://httpbin.org/get&quot;</span><span class="p">)</span>
+<span class="c1">#&gt; $args</span>
+<span class="c1">#&gt; named list()</span>
+<span class="c1">#&gt; </span>
+<span class="c1">#&gt; $headers</span>
+<span class="c1">#&gt; $headers$Accept</span>
+<span class="c1">#&gt; [1] &quot;application/json, text/xml, application/xml, */*&quot;</span>
+<span class="c1">#&gt; </span>
+<span class="c1">#&gt; $headers$`Accept-Encoding`</span>
+<span class="c1">#&gt; [1] &quot;gzip&quot;</span>
+<span class="c1">#&gt; </span>
+<span class="c1">#&gt; $headers$Host</span>
+<span class="c1">#&gt; [1] &quot;httpbin.org&quot;</span>
+<span class="c1">#&gt; </span>
+<span class="c1">#&gt; $headers$`User-Agent`</span>
+<span class="c1">#&gt; [1] &quot;curl/7.37.1 Rcurl/1.95.4.1 httr/0.6.1 httsnap/0.0.2.99&quot;</span>
+<span class="c1">#&gt; </span>
+<span class="c1">#&gt; </span>
+<span class="c1">#&gt; $origin</span>
+<span class="c1">#&gt; [1] &quot;24.21.209.71&quot;</span>
+<span class="c1">#&gt; </span>
+<span class="c1">#&gt; $url</span>
+<span class="c1">#&gt; [1] &quot;http://httpbin.org/get&quot;</span>
+</code></pre></div>
+<p>You can buid up options by calling functions via pipes, and see what the options look like</p>
+<div class="highlight"><pre><code class="language-r" data-lang="r"><span class="s">&quot;http://httpbin.org/get&quot;</span> <span class="o">%&gt;%</span>
+  Progress<span class="p">()</span> <span class="o">%&gt;%</span>
+  Verbose<span class="p">()</span>
+<span class="c1">#&gt; &lt;http request&gt; </span>
+<span class="c1">#&gt;   url: http://httpbin.org/get</span>
+<span class="c1">#&gt;   config: </span>
+<span class="c1">#&gt; Config: </span>
+<span class="c1">#&gt; List of 4</span>
+<span class="c1">#&gt;  $ noprogress      :FALSE</span>
+<span class="c1">#&gt;  $ progressfunction:function (...)  </span>
+<span class="c1">#&gt;  $ debugfunction   :function (...)  </span>
+<span class="c1">#&gt;  $ verbose         :TRUE</span>
+</code></pre></div>
+<p>Then execute the GET request when you&#39;re ready</p>
+<div class="highlight"><pre><code class="language-r" data-lang="r"><span class="s">&quot;http://httpbin.org/get&quot;</span> <span class="o">%&gt;%</span>
+  Progress<span class="p">()</span> <span class="o">%&gt;%</span>
+  Verbose<span class="p">()</span> <span class="o">%&gt;%</span>
+  Get<span class="p">()</span>
+<span class="c1">#&gt; $args</span>
+<span class="c1">#&gt; named list()</span>
+<span class="c1">#&gt; </span>
+<span class="c1">#&gt; $headers</span>
+<span class="c1">#&gt; $headers$Accept</span>
+<span class="c1">#&gt; [1] &quot;application/json, text/xml, application/xml, */*&quot;</span>
+<span class="c1">#&gt; </span>
+<span class="c1">#&gt; $headers$`Accept-Encoding`</span>
+<span class="c1">#&gt; [1] &quot;gzip&quot;</span>
+<span class="c1">#&gt; </span>
+<span class="c1">#&gt; $headers$Host</span>
+<span class="c1">#&gt; [1] &quot;httpbin.org&quot;</span>
+<span class="c1">#&gt; </span>
+<span class="c1">#&gt; $headers$`User-Agent`</span>
+<span class="c1">#&gt; [1] &quot;curl/7.37.1 Rcurl/1.95.4.1 httr/0.6.1 httsnap/0.0.2.99&quot;</span>
+<span class="c1">#&gt; </span>
+<span class="c1">#&gt; </span>
+<span class="c1">#&gt; $origin</span>
+<span class="c1">#&gt; [1] &quot;24.21.209.71&quot;</span>
+<span class="c1">#&gt; </span>
+<span class="c1">#&gt; $url</span>
+<span class="c1">#&gt; [1] &quot;http://httpbin.org/get&quot;</span>
+</code></pre></div>
+<h2>Example 1</h2>
+
+<p>Get scholarly article metadata from the Crossref API</p>
+<div class="highlight"><pre><code class="language-r" data-lang="r"><span class="s">&quot;http://api.crossref.org/works&quot;</span> <span class="o">%&gt;%</span>
+  Query<span class="p">(</span>query <span class="o">=</span> <span class="s">&quot;ecology&quot;</span><span class="p">)</span> <span class="o">%&gt;%</span> 
+  <span class="m">.</span><span class="o">$</span>message <span class="o">%&gt;%</span> 
+  <span class="m">.</span><span class="o">$</span>items <span class="o">%&gt;%</span> 
+  select<span class="p">(</span>DOI<span class="p">,</span> title<span class="p">,</span> publisher<span class="p">)</span>
+<span class="c1">#&gt;                            DOI                title</span>
+<span class="c1">#&gt; 1          10.4996/fireecology         Fire Ecology</span>
+<span class="c1">#&gt; 2              10.5402/ecology         ISRN Ecology</span>
+<span class="c1">#&gt; 3                 10.1155/8641         ISRN Ecology</span>
+<span class="c1">#&gt; 4      10.1111/(issn)1526-100x  Restoration Ecology</span>
+<span class="c1">#&gt; 5        10.1007/248.1432-184x    Microbial Ecology</span>
+<span class="c1">#&gt; 6      10.1007/10144.1438-390x   Population Ecology</span>
+<span class="c1">#&gt; 7      10.1007/10452.1573-5125      Aquatic Ecology</span>
+<span class="c1">#&gt; 8      10.1007/10682.1573-8477 Evolutionary Ecology</span>
+<span class="c1">#&gt; 9      10.1007/10745.1572-9915        Human Ecology</span>
+<span class="c1">#&gt; 10     10.1007/10980.1572-9761    Landscape Ecology</span>
+<span class="c1">#&gt; 11     10.1007/11258.1573-5052        Plant Ecology</span>
+<span class="c1">#&gt; 12     10.1007/12080.1874-1746  Theoretical Ecology</span>
+<span class="c1">#&gt; 13     10.1111/(issn)1442-9993      Austral Ecology</span>
+<span class="c1">#&gt; 14     10.1111/(issn)1439-0485       Marine Ecology</span>
+<span class="c1">#&gt; 15     10.1111/(issn)1365-2435   Functional Ecology</span>
+<span class="c1">#&gt; 16     10.1111/(issn)1365-294x    Molecular Ecology</span>
+<span class="c1">#&gt; 17     10.1111/(issn)1461-0248      Ecology Letters</span>
+<span class="c1">#&gt; 18   10.1002/9780470979365.ch7  Behavioural Ecology</span>
+<span class="c1">#&gt; 19 10.1111/fec.2007.21.issue-5                     </span>
+<span class="c1">#&gt; 20     10.1111/rec.0.0.issue-0                     </span>
+<span class="c1">#&gt;                            publisher</span>
+<span class="c1">#&gt; 1       Association for Fire Ecology</span>
+<span class="c1">#&gt; 2     Hindawi Publishing Corporation</span>
+<span class="c1">#&gt; 3     Hindawi Publishing Corporation</span>
+<span class="c1">#&gt; 4                    Wiley-Blackwell</span>
+<span class="c1">#&gt; 5  Springer Science + Business Media</span>
+<span class="c1">#&gt; 6  Springer Science + Business Media</span>
+<span class="c1">#&gt; 7  Springer Science + Business Media</span>
+<span class="c1">#&gt; 8  Springer Science + Business Media</span>
+<span class="c1">#&gt; 9  Springer Science + Business Media</span>
+<span class="c1">#&gt; 10 Springer Science + Business Media</span>
+<span class="c1">#&gt; 11 Springer Science + Business Media</span>
+<span class="c1">#&gt; 12 Springer Science + Business Media</span>
+<span class="c1">#&gt; 13                   Wiley-Blackwell</span>
+<span class="c1">#&gt; 14                   Wiley-Blackwell</span>
+<span class="c1">#&gt; 15                   Wiley-Blackwell</span>
+<span class="c1">#&gt; 16                   Wiley-Blackwell</span>
+<span class="c1">#&gt; 17                   Wiley-Blackwell</span>
+<span class="c1">#&gt; 18                   Wiley-Blackwell</span>
+<span class="c1">#&gt; 19                   Wiley-Blackwell</span>
+<span class="c1">#&gt; 20                   Wiley-Blackwell</span>
+</code></pre></div>
+<h2>Example 2</h2>
+
+<p>Get Public Library of Science article metadata via their API, make a histogram of number of tweets for each article</p>
+<div class="highlight"><pre><code class="language-r" data-lang="r"><span class="s">&quot;http://api.plos.org/search&quot;</span> <span class="o">%&gt;%</span>
+  Query<span class="p">(</span>q <span class="o">=</span> <span class="s">&quot;*:*&quot;</span><span class="p">,</span> wt <span class="o">=</span> <span class="s">&quot;json&quot;</span><span class="p">,</span> rows <span class="o">=</span> <span class="m">100</span><span class="p">,</span> 
+        fl <span class="o">=</span> <span class="s">&quot;id,journal,alm_twitterCount&quot;</span><span class="p">,</span>  
+        fq <span class="o">=</span> <span class="s">&#39;alm_twitterCount:[100 TO 10000]&#39;</span><span class="p">)</span> <span class="o">%&gt;%</span> 
+  <span class="m">.</span><span class="o">$</span>response <span class="o">%&gt;%</span> 
+  <span class="m">.</span><span class="o">$</span>docs <span class="o">%&gt;%</span> 
+  <span class="m">.</span><span class="o">$</span>alm_twitterCount <span class="o">%&gt;%</span> 
+  hist<span class="p">()</span>
+</code></pre></div>
+<p><img src="/public/img/2015-04-29-the-new-way/unnamed-chunk-9-1.png" alt="image"></p>
+
+<h2>Notes</h2>
+
+<p>Okay, so this isn&#39;t drastically different from what <code>httr</code> already does, but its early days. </p>
+
+  </div>
+  
+  <div class="post">
+    <h1>
       <a href="/2015/03/faster-solr/">
         Faster solr with csv
       </a>
@@ -357,143 +568,6 @@ out<span class="p">[</span><span class="m">1</span><span class="o">:</span><span
 <span class="c1">#&gt; </span>
 <span class="c1">#&gt; [[2]]$rev</span>
 <span class="c1">#&gt; [1] &quot;1-c21bfa5425c67743f0826fd4b44b0dbf&quot;</span>
-</code></pre></div>
-  </div>
-  
-  <div class="post">
-    <h1>
-      <a href="/2015/03/csl-client/">
-        csl - an R client for Citation Style Language data
-      </a>
-    </h1>
-
-    <span class="post-date">11 Mar 2015</span>
-
-    <p>CSL (Citation Style Language) is used quite widely now to specify citations in a standard fashion. <code>csl</code> is an R client for exploring CSL styles, and is inspired by the Ruby gem <a href="https://github.com/inukshuk/csl-ruby">csl</a>. For example, csl is given back in the PLOS Lagotto article level metric API (follow <a href="http://alm.plos.org/api/v5/articles?ids=10.1371%252Fjournal.pone.0025110&amp;info=detail&amp;source_id=crossref">http://alm.plos.org/api/v5/articles?ids=10.1371%252Fjournal.pone.0025110&amp;info=detail&amp;source_id=crossref</a>).</p>
-
-<p>Let me know if you have any feedback at the repo <a href="https://github.com/ropensci/csl">https://github.com/ropensci/csl</a></p>
-
-<h2>Install</h2>
-<div class="highlight"><pre><code class="language-r" data-lang="r">install.packages<span class="p">(</span><span class="s">&quot;devtools&quot;</span><span class="p">)</span>
-devtools<span class="o">::</span>install_github<span class="p">(</span><span class="s">&quot;ropensci/csl&quot;</span><span class="p">)</span>
-</code></pre></div><div class="highlight"><pre><code class="language-r" data-lang="r"><span class="kn">library</span><span class="p">(</span><span class="s">&quot;csl&quot;</span><span class="p">)</span>
-</code></pre></div>
-<h2>Load CSL style from a URL</h2>
-
-<p>You can load CSL styles from either a URL or a local file on your machine. Firt, from a URL. In this case from the Zotero style repository, for the American Journal or Political Science.</p>
-<div class="highlight"><pre><code class="language-r" data-lang="r">jps <span class="o">&lt;-</span> style_load<span class="p">(</span><span class="s">&#39;http://www.zotero.org/styles/american-journal-of-political-science&#39;</span><span class="p">)</span>
-</code></pre></div>
-<p>A list is returned, which you can index to various parts of the style specification.</p>
-<div class="highlight"><pre><code class="language-r" data-lang="r">jps<span class="o">$</span>info
-<span class="c1">#&gt; $title</span>
-<span class="c1">#&gt; [1] &quot;American Journal of Political Science&quot;</span>
-<span class="c1">#&gt; </span>
-<span class="c1">#&gt; $title_short</span>
-<span class="c1">#&gt; [1] &quot;AJPS&quot;</span>
-<span class="c1">#&gt; </span>
-<span class="c1">#&gt; $id</span>
-<span class="c1">#&gt; [1] &quot;http://www.zotero.org/styles/american-journal-of-political-science&quot;</span>
-<span class="c1">#&gt; </span>
-<span class="c1">#&gt; $author</span>
-<span class="kc">...</span>
-</code></pre></div><div class="highlight"><pre><code class="language-r" data-lang="r">jps<span class="o">$</span>title
-<span class="c1">#&gt; [1] &quot;American Journal of Political Science&quot;</span>
-</code></pre></div><div class="highlight"><pre><code class="language-r" data-lang="r">jps<span class="o">$</span>citation_format
-<span class="c1">#&gt; [1] &quot;author-date&quot;</span>
-</code></pre></div><div class="highlight"><pre><code class="language-r" data-lang="r">jps<span class="o">$</span>links_template
-<span class="c1">#&gt; [1] &quot;http://www.zotero.org/styles/american-political-science-association&quot;</span>
-</code></pre></div><div class="highlight"><pre><code class="language-r" data-lang="r">jps<span class="o">$</span>editor
-<span class="c1">#&gt; $editor</span>
-<span class="c1">#&gt; $editor$variable</span>
-<span class="c1">#&gt; [1] &quot;editor&quot;</span>
-<span class="c1">#&gt; </span>
-<span class="c1">#&gt; $editor$delimiter</span>
-<span class="c1">#&gt; [1] &quot;, &quot;</span>
-<span class="c1">#&gt; </span>
-<span class="c1">#&gt; </span>
-<span class="c1">#&gt; $label</span>
-<span class="c1">#&gt; $label$form</span>
-<span class="kc">...</span>
-</code></pre></div><div class="highlight"><pre><code class="language-r" data-lang="r">jps<span class="o">$</span>author
-<span class="c1">#&gt; $author</span>
-<span class="c1">#&gt; $author$variable</span>
-<span class="c1">#&gt; [1] &quot;author&quot;</span>
-<span class="c1">#&gt; </span>
-<span class="c1">#&gt; </span>
-<span class="c1">#&gt; $label</span>
-<span class="c1">#&gt; $label$form</span>
-<span class="c1">#&gt; [1] &quot;short&quot;</span>
-<span class="c1">#&gt; </span>
-<span class="c1">#&gt; $label$prefix</span>
-<span class="kc">...</span>
-</code></pre></div>
-<h2>Get raw XML</h2>
-
-<p>You can also get raw XML if you&#39;d rather deal with that format.</p>
-<div class="highlight"><pre><code class="language-r" data-lang="r">style_xml<span class="p">(</span><span class="s">&#39;http://www.zotero.org/styles/american-journal-of-political-science&#39;</span><span class="p">)</span>
-<span class="c1">#&gt; &lt;?xml version=&quot;1.0&quot; encoding=&quot;utf-8&quot;?&gt;</span>
-<span class="c1">#&gt; &lt;style xmlns=&quot;http://purl.org/net/xbiblio/csl&quot; class=&quot;in-text&quot; version=&quot;1.0&quot; demote-non-dropping-particle=&quot;sort-only&quot; default-locale=&quot;en-US&quot;&gt;</span>
-<span class="c1">#&gt;   &lt;info&gt;</span>
-<span class="c1">#&gt;     &lt;title&gt;American Journal of Political Science&lt;/title&gt;</span>
-<span class="c1">#&gt;     &lt;title-short&gt;AJPS&lt;/title-short&gt;</span>
-<span class="c1">#&gt;     &lt;id&gt;http://www.zotero.org/styles/american-journal-of-political-science&lt;/id&gt;</span>
-<span class="c1">#&gt;     &lt;link href=&quot;http://www.zotero.org/styles/american-journal-of-political-science&quot; rel=&quot;self&quot;/&gt;</span>
-<span class="c1">#&gt;     &lt;link href=&quot;http://www.zotero.org/styles/american-political-science-association&quot; rel=&quot;template&quot;/&gt;</span>
-<span class="c1">#&gt;     &lt;link href=&quot;http://www.ajps.org/AJPS%20Style%20Guide.pdf&quot; rel=&quot;documentation&quot;/&gt;</span>
-<span class="c1">#&gt;     &lt;author&gt;</span>
-<span class="kc">...</span>
-</code></pre></div>
-<h2>Get styles</h2>
-
-<p>There is a GitHub repository of CSL styles at  <a href="https://github.com/citation-style-language/styles-distribution">https://github.com/citation-style-language/styles-distribution</a>. These don&#39;t come with the <code>csl</code> package, so you have to run <code>get_styles()</code> to get them on your machine. The default path is <code>Sys.getenv(&quot;HOME&quot;)/styles</code>, which for me is <code>/Users/sacmac/styles</code>. You can change where files are saved by using the <code>path</code> parameter.</p>
-<div class="highlight"><pre><code class="language-r" data-lang="r">get_styles<span class="p">()</span>
-<span class="c1">#&gt; </span>
-<span class="c1">#&gt; Done! Files put in /Users/sacmac/styles</span>
-</code></pre></div>
-<p>After getting styles locally you can load them just as we did with <code>style_load()</code>, but from your machine. However, since the file is local, we can make this easier by allowing just the name of the style, like</p>
-<div class="highlight"><pre><code class="language-r" data-lang="r">style_load<span class="p">(</span><span class="s">&quot;apa&quot;</span><span class="p">)</span>
-<span class="c1">#&gt; $info</span>
-<span class="c1">#&gt; $info$title</span>
-<span class="c1">#&gt; [1] &quot;American Psychological Association 6th edition&quot;</span>
-<span class="c1">#&gt; </span>
-<span class="c1">#&gt; $info$title_short</span>
-<span class="c1">#&gt; [1] &quot;APA&quot;</span>
-<span class="c1">#&gt; </span>
-<span class="c1">#&gt; $info$id</span>
-<span class="c1">#&gt; [1] &quot;http://www.zotero.org/styles/apa&quot;</span>
-<span class="c1">#&gt; </span>
-<span class="kc">...</span>
-</code></pre></div>
-<p>If you are unsure if a style exists, you can use <code>style_exists()</code></p>
-<div class="highlight"><pre><code class="language-r" data-lang="r">style_exists<span class="p">(</span><span class="s">&quot;helloworld&quot;</span><span class="p">)</span>
-<span class="c1">#&gt; [1] FALSE</span>
-style_exists<span class="p">(</span><span class="s">&quot;acs-nano&quot;</span><span class="p">)</span>
-<span class="c1">#&gt; [1] TRUE</span>
-</code></pre></div>
-<p>In addition, you can list the path for a single style, more than 1, or all styles with <code>styles()</code></p>
-<div class="highlight"><pre><code class="language-r" data-lang="r">styles<span class="p">(</span><span class="s">&quot;apa&quot;</span><span class="p">)</span>
-<span class="c1">#&gt; [1] &quot;/Users/sacmac/styles/apa.csl&quot;</span>
-</code></pre></div>
-<p>All of them, truncated for blog brevity</p>
-<div class="highlight"><pre><code class="language-r" data-lang="r">styles<span class="p">()</span>
-<span class="c1">#&gt; $independent</span>
-<span class="c1">#&gt;    [1] &quot;academy-of-management-review&quot;                                                         </span>
-<span class="c1">#&gt;    [2] &quot;acm-sig-proceedings-long-author-list&quot;                                                 </span>
-<span class="c1">#&gt;    [3] &quot;acm-sig-proceedings&quot;                                                                  </span>
-<span class="c1">#&gt;    [4] &quot;acm-sigchi-proceedings-extended-abstract-format&quot;                                      </span>
-<span class="c1">#&gt;    [5] &quot;acm-sigchi-proceedings&quot;                                                               </span>
-<span class="c1">#&gt;    [6] &quot;acm-siggraph&quot;                                                                         </span>
-<span class="c1">#&gt;    [7] &quot;acs-nano&quot;                                                                             </span>
-<span class="c1">#&gt;    [8] &quot;acta-anaesthesiologica-scandinavica&quot;                                                  </span>
-<span class="c1">#&gt;    [9] &quot;acta-anaesthesiologica-taiwanica&quot;                                                     </span>
-<span class="kc">...</span>
-</code></pre></div>
-<h2>Get locales</h2>
-
-<p>In addition to styles, there is a GitHub repo for locales at  <a href="https://github.com/citation-style-language/locales">https://github.com/citation-style-language/locales</a>. These also don&#39;t come with the <code>csl</code> package, so you have to run <code>get_locales()</code> to get them on your machine. Same goes here for paths as above for styles.</p>
-<div class="highlight"><pre><code class="language-r" data-lang="r">get_locales<span class="p">()</span>
-<span class="c1">#&gt; </span>
-<span class="c1">#&gt; Done! Files put in /Users/sacmac/locales</span>
 </code></pre></div>
   </div>
   

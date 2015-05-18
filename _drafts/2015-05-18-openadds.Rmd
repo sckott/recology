@@ -1,0 +1,107 @@
+---
+name: openadds
+layout: post
+title: openadds - open addresses client
+date: 2015-05-18
+author: Scott Chamberlain
+sourceslug: _drafts/2015-05-18-openadds.Rmd
+tags:
+- R
+- opendata
+---
+
+```{r echo=FALSE}
+knitr::opts_chunk$set(
+  comment = "#>",
+  collapse = TRUE,
+  warning = FALSE,
+  message = FALSE
+)
+```
+
+`openadds` talks to [Openaddresses.io](http://openaddresses.io/). a run down of its things:
+
+## Install
+
+```{r eval=FALSE}
+devtools::install_github("sckott/openadds")
+```
+
+```{r}
+library("openadds")
+```
+
+## List datasets
+
+Scrapes links to datasets from the openaddresses site
+
+```{r}
+dat <- oa_list()
+dat[2:6]
+```
+
+## Search for datasets
+
+Uses `oa_list()` internally, then searches through columns requested.
+
+```{r}
+oa_search(country = "us", state = "ca")
+```
+
+## Get data
+
+Passing in a URL
+
+```{r}
+(out1 <- oa_get(dat[5]))
+```
+
+First getting URL for dataset through `as_openadd()`, then passing to `oa_get()`
+
+```{r}
+(x <- as_openadd("us", "nm", "hidalgo"))
+```
+
+```{r}
+oa_get(x)
+```
+
+## Combine multiple datasets
+
+`combine` attemps to guess lat/long and address columns, but definitely more work to do to make 
+this work for most cases. Lat/long and address columns vary among every dataset - some datasets
+have no lat/long data, some have no address data.
+ 
+```{r}
+out2 <- oa_get(dat[32])
+(alldat <- oa_combine(out1, out2))
+```
+
+## Map data
+
+Get some data
+
+```{r}
+(out <- oa_get(dat[400]))
+```
+
+Make an interactive map (not all data)
+
+```{r eval=FALSE}
+library("leaflet")
+
+x <- oa_get(oa_search(country = "us", city = "boulder")[1,]$url)
+y <- oa_get(oa_search(country = "us", city = "gunnison")[1,]$url)
+oa_combine(x, y) %>% 
+  leaflet() %>%
+  addTiles() %>%
+  addCircles(lat = ~lat, lng = ~lon, popup = ~address)
+```
+
+![image](/public/img/2015-05-18-openadds/map.png)
+
+## To do
+
+* Surely there are many datasets that won't work in `oa_combine()` - gotta go through many more.
+* An easy viz function wrapping `leaflet`
+* Since you can get a lot of spatial data quickly, easy way to visualize big data, maybe marker clusters?

@@ -59,6 +59,186 @@
   
   <div class="post">
     <h1>
+      <a href="/2014/11/taxize-1000/">
+        1000 commits to taxize
+      </a>
+    </h1>
+
+    <span class="post-date">28 Nov 2014</span>
+
+    <p>Just today we&#39;ve hit 1000 commits on <code>taxize</code>!  <code>taxize</code> is an R client to search across lots of taxonomic databases on the web. In honor of the 1000 commit milestone, here&#39;s some stats on the project.</p>
+
+<p>Before that, lots of people have contributed to <code>taxize</code>, it&#39;s a big group effort:</p>
+
+<ul>
+<li><a href="https://github.com/EDiLD">Eduard Szöcs</a></li>
+<li><a href="https://github.com/zachary-foster">Zachary Foster</a></li>
+<li><a href="https://github.com/cboettig">Carl Boettiger</a></li>
+<li><a href="https://github.com/karthik">Karthik Ram</a></li>
+<li><a href="https://github.com/jarioksa">Jari Oksanen</a></li>
+<li><a href="https://github.com/fmichonneau">Francis Michonneau</a></li>
+<li><a href="https://github.com/Ironholds">Oliver Keyes</a></li>
+<li><a href="https://github.com/dlebauer">David LeBauer</a></li>
+<li><a href="https://github.com/benmarwick">Ben Marwick</a></li>
+<li><a href="https://github.com/anirvan">Anirvan Chatterjee</a></li>
+</ul>
+
+<p>In addition, we&#39;ve had lots of feedback from users, including feature requests and bug reports, making <code>taxize</code> a lot better.</p>
+
+<h2>Setup</h2>
+<div class="highlight"><pre><code class="language-r" data-lang="r"><span class="kn">library</span><span class="p">(</span><span class="s">&quot;devtools&quot;</span><span class="p">)</span>
+<span class="kn">library</span><span class="p">(</span><span class="s">&quot;httr&quot;</span><span class="p">)</span>
+<span class="kn">library</span><span class="p">(</span><span class="s">&quot;ggplot2&quot;</span><span class="p">)</span>
+<span class="kn">library</span><span class="p">(</span><span class="s">&quot;stringr&quot;</span><span class="p">)</span>
+<span class="kn">library</span><span class="p">(</span><span class="s">&quot;plyr&quot;</span><span class="p">)</span>
+<span class="kn">library</span><span class="p">(</span><span class="s">&quot;dplyr&quot;</span><span class="p">)</span>
+</code></pre></div>
+<h2>Define functions</h2>
+<div class="highlight"><pre><code class="language-r" data-lang="r">github_auth <span class="o">&lt;-</span> <span class="kr">function</span><span class="p">(</span>appname <span class="o">=</span> <span class="kp">getOption</span><span class="p">(</span><span class="s">&quot;gh_appname&quot;</span><span class="p">),</span> key <span class="o">=</span> <span class="kp">getOption</span><span class="p">(</span><span class="s">&quot;gh_id&quot;</span><span class="p">),</span>
+                        secret <span class="o">=</span> <span class="kp">getOption</span><span class="p">(</span><span class="s">&quot;gh_secret&quot;</span><span class="p">))</span> <span class="p">{</span>
+  <span class="kr">if</span> <span class="p">(</span><span class="kp">is.null</span><span class="p">(</span><span class="kp">getOption</span><span class="p">(</span><span class="s">&quot;gh_token&quot;</span><span class="p">)))</span> <span class="p">{</span>
+    myapp <span class="o">&lt;-</span> oauth_app<span class="p">(</span>appname<span class="p">,</span> key<span class="p">,</span> secret<span class="p">)</span>
+    token <span class="o">&lt;-</span> oauth2.0_token<span class="p">(</span>oauth_endpoints<span class="p">(</span><span class="s">&quot;github&quot;</span><span class="p">),</span> myapp<span class="p">)</span>
+    <span class="kp">options</span><span class="p">(</span>gh_token <span class="o">=</span> token<span class="p">)</span>
+  <span class="p">}</span> <span class="kr">else</span> <span class="p">{</span>
+    token <span class="o">&lt;-</span> <span class="kp">getOption</span><span class="p">(</span><span class="s">&quot;gh_token&quot;</span><span class="p">)</span>
+  <span class="p">}</span>
+  <span class="kr">return</span><span class="p">(</span>token<span class="p">)</span>
+<span class="p">}</span>
+
+make_url <span class="o">&lt;-</span> <span class="kr">function</span><span class="p">(</span>x<span class="p">,</span> y<span class="p">,</span> z<span class="p">)</span> <span class="p">{</span>
+  <span class="kp">sprintf</span><span class="p">(</span><span class="s">&quot;https://api.github.com/repos/%s/%s/%s&quot;</span><span class="p">,</span> x<span class="p">,</span> y<span class="p">,</span> z<span class="p">)</span>
+<span class="p">}</span>
+
+process_result <span class="o">&lt;-</span> <span class="kr">function</span><span class="p">(</span>x<span class="p">)</span> <span class="p">{</span>
+  stop_for_status<span class="p">(</span>x<span class="p">)</span>
+  <span class="kr">if</span> <span class="p">(</span><span class="o">!</span>x<span class="o">$</span>headers<span class="o">$</span><span class="sb">`content-type`</span> <span class="o">==</span> <span class="s">&quot;application/json; charset=utf-8&quot;</span><span class="p">)</span>
+    <span class="kp">stop</span><span class="p">(</span><span class="s">&quot;content type mismatch&quot;</span><span class="p">)</span>
+  tmp <span class="o">&lt;-</span> content<span class="p">(</span>x<span class="p">,</span> as <span class="o">=</span> <span class="s">&quot;text&quot;</span><span class="p">)</span>
+  jsonlite<span class="o">::</span>fromJSON<span class="p">(</span>tmp<span class="p">,</span> flatten <span class="o">=</span> <span class="kc">TRUE</span><span class="p">)</span>
+<span class="p">}</span>
+
+gh_commits <span class="o">&lt;-</span> <span class="kr">function</span><span class="p">(</span>repo<span class="p">,</span> owner <span class="o">=</span> <span class="s">&quot;ropensci&quot;</span><span class="p">,</span> <span class="kc">...</span><span class="p">)</span> <span class="p">{</span>
+  token <span class="o">&lt;-</span> github_auth<span class="p">()</span>
+  outout <span class="o">&lt;-</span> <span class="kt">list</span><span class="p">();</span> iter <span class="o">&lt;-</span> <span class="m">0</span><span class="p">;</span> nexturl <span class="o">&lt;-</span> <span class="s">&quot;dontstop&quot;</span>
+  <span class="kr">while</span><span class="p">(</span>nexturl <span class="o">!=</span> <span class="s">&quot;stop&quot;</span><span class="p">){</span>
+    iter <span class="o">&lt;-</span> iter <span class="o">+</span> <span class="m">1</span>
+    req <span class="o">&lt;-</span> <span class="kr">if</span><span class="p">(</span><span class="kp">grepl</span><span class="p">(</span><span class="s">&quot;https:/&quot;</span><span class="p">,</span> nexturl<span class="p">))</span> GET<span class="p">(</span>nexturl<span class="p">,</span> config <span class="o">=</span> <span class="kt">c</span><span class="p">(</span>token <span class="o">=</span> token<span class="p">))</span> <span class="kr">else</span> GET<span class="p">(</span>make_url<span class="p">(</span>owner<span class="p">,</span> repo<span class="p">,</span> <span class="s">&quot;commits&quot;</span><span class="p">),</span> query <span class="o">=</span> <span class="kt">list</span><span class="p">(</span>per_page<span class="o">=</span><span class="m">100</span><span class="p">),</span> config <span class="o">=</span> <span class="kt">c</span><span class="p">(</span>token <span class="o">=</span> token<span class="p">))</span>
+    outout<span class="p">[[</span>iter<span class="p">]]</span> <span class="o">&lt;-</span> process_result<span class="p">(</span>req<span class="p">)</span>
+    link <span class="o">&lt;-</span> req<span class="o">$</span>headers<span class="o">$</span>link
+    nexturl <span class="o">&lt;-</span> <span class="kr">if</span><span class="p">(</span><span class="kp">is.null</span><span class="p">(</span>link<span class="p">)){</span> <span class="s">&quot;stop&quot;</span> <span class="p">}</span> <span class="kr">else</span> <span class="p">{</span>
+      <span class="kr">if</span><span class="p">(</span><span class="kp">grepl</span><span class="p">(</span><span class="s">&quot;next&quot;</span><span class="p">,</span> link<span class="p">)){</span>
+        stringr<span class="o">::</span>str_extract<span class="p">(</span>link<span class="p">,</span> <span class="s">&quot;https://[0-9A-Za-z/?=\\._&amp;]+&quot;</span><span class="p">)</span>
+      <span class="p">}</span> <span class="kr">else</span> <span class="p">{</span>
+        <span class="s">&quot;stop&quot;</span>
+      <span class="p">}</span>
+    <span class="p">}</span>
+  <span class="p">}</span>
+  outout <span class="o">&lt;-</span> outout<span class="p">[</span><span class="kp">sapply</span><span class="p">(</span>outout<span class="p">,</span> <span class="kr">function</span><span class="p">(</span>x<span class="p">)</span> <span class="o">!</span><span class="kp">identical</span><span class="p">(</span>x<span class="p">,</span> <span class="kt">list</span><span class="p">()))]</span>
+  dplyr<span class="o">::</span>rbind_all<span class="p">(</span>outout<span class="p">)</span>
+<span class="p">}</span>
+
+gh_issues <span class="o">&lt;-</span> <span class="kr">function</span><span class="p">(</span>repo<span class="p">,</span> owner <span class="o">=</span> <span class="s">&quot;ropensci&quot;</span><span class="p">,</span> <span class="kc">...</span><span class="p">)</span> <span class="p">{</span>
+  token <span class="o">&lt;-</span> github_auth<span class="p">()</span>
+  outout <span class="o">&lt;-</span> <span class="kt">list</span><span class="p">();</span> iter <span class="o">&lt;-</span> <span class="m">0</span><span class="p">;</span> nexturl <span class="o">&lt;-</span> <span class="s">&quot;dontstop&quot;</span>
+  <span class="kr">while</span><span class="p">(</span>nexturl <span class="o">!=</span> <span class="s">&quot;stop&quot;</span><span class="p">){</span>
+    iter <span class="o">&lt;-</span> iter <span class="o">+</span> <span class="m">1</span>
+    req <span class="o">&lt;-</span> <span class="kr">if</span><span class="p">(</span><span class="kp">grepl</span><span class="p">(</span><span class="s">&quot;https:/&quot;</span><span class="p">,</span> nexturl<span class="p">))</span> GET<span class="p">(</span>nexturl<span class="p">,</span> query<span class="o">=</span><span class="kt">list</span><span class="p">(</span>state<span class="o">=</span><span class="s">&quot;all&quot;</span><span class="p">),</span> config <span class="o">=</span> <span class="kt">c</span><span class="p">(</span>token <span class="o">=</span> token<span class="p">))</span> <span class="kr">else</span> GET<span class="p">(</span>make_url<span class="p">(</span>owner<span class="p">,</span> repo<span class="p">,</span> <span class="s">&quot;issues&quot;</span><span class="p">),</span> query <span class="o">=</span> <span class="kt">list</span><span class="p">(</span>per_page<span class="o">=</span><span class="m">100</span><span class="p">,</span> state<span class="o">=</span><span class="s">&quot;all&quot;</span><span class="p">),</span> config <span class="o">=</span> <span class="kt">c</span><span class="p">(</span>token <span class="o">=</span> token<span class="p">))</span>
+    outout<span class="p">[[</span>iter<span class="p">]]</span> <span class="o">&lt;-</span> process_result<span class="p">(</span>req<span class="p">)</span>
+    link <span class="o">&lt;-</span> req<span class="o">$</span>headers<span class="o">$</span>link
+    nexturl <span class="o">&lt;-</span> <span class="kr">if</span><span class="p">(</span><span class="kp">is.null</span><span class="p">(</span>link<span class="p">)){</span> <span class="s">&quot;stop&quot;</span> <span class="p">}</span> <span class="kr">else</span> <span class="p">{</span>
+      <span class="kr">if</span><span class="p">(</span><span class="kp">grepl</span><span class="p">(</span><span class="s">&quot;next&quot;</span><span class="p">,</span> link<span class="p">)){</span>
+        stringr<span class="o">::</span>str_extract<span class="p">(</span>link<span class="p">,</span> <span class="s">&quot;https://[0-9A-Za-z/?=\\._&amp;]+&quot;</span><span class="p">)</span>
+      <span class="p">}</span> <span class="kr">else</span> <span class="p">{</span>
+        <span class="s">&quot;stop&quot;</span>
+      <span class="p">}</span>
+    <span class="p">}</span>
+  <span class="p">}</span>
+  outout <span class="o">&lt;-</span> outout<span class="p">[</span><span class="kp">sapply</span><span class="p">(</span>outout<span class="p">,</span> <span class="kr">function</span><span class="p">(</span>x<span class="p">)</span> <span class="o">!</span><span class="kp">identical</span><span class="p">(</span>x<span class="p">,</span> <span class="kt">list</span><span class="p">()))]</span>
+  dplyr<span class="o">::</span>rbind_all<span class="p">(</span>outout<span class="p">)</span>
+<span class="p">}</span>
+
+gh_commit <span class="o">&lt;-</span> <span class="kr">function</span><span class="p">(</span>sha<span class="p">,</span> repo<span class="p">,</span> owner <span class="o">=</span> <span class="s">&quot;ropensci&quot;</span><span class="p">,</span> <span class="kc">...</span><span class="p">)</span> <span class="p">{</span>
+  token <span class="o">&lt;-</span> github_auth<span class="p">()</span>
+  req <span class="o">&lt;-</span> GET<span class="p">(</span><span class="kp">paste0</span><span class="p">(</span>make_url<span class="p">(</span>owner<span class="p">,</span> repo<span class="p">,</span> <span class="s">&quot;commits&quot;</span><span class="p">),</span> <span class="s">&quot;/&quot;</span><span class="p">,</span> sha<span class="p">),</span>
+             config <span class="o">=</span> <span class="kt">c</span><span class="p">(</span>token <span class="o">=</span> token<span class="p">,</span> <span class="kc">...</span><span class="p">))</span>
+  process_result<span class="p">(</span>req<span class="p">)</span>
+<span class="p">}</span>
+
+gh_verb <span class="o">&lt;-</span> <span class="kr">function</span><span class="p">(</span>owner <span class="o">=</span> <span class="s">&quot;ropensci&quot;</span><span class="p">,</span> repo<span class="p">,</span> verb<span class="p">,</span> args<span class="o">=</span><span class="kt">list</span><span class="p">(),</span> <span class="kc">...</span><span class="p">)</span> <span class="p">{</span>
+  token <span class="o">&lt;-</span> github_auth<span class="p">()</span>
+  req <span class="o">&lt;-</span> GET<span class="p">(</span>make_url<span class="p">(</span>owner<span class="p">,</span> repo<span class="p">,</span> verb<span class="p">),</span> query<span class="o">=</span><span class="kp">args</span><span class="p">,</span> config <span class="o">=</span> <span class="kt">c</span><span class="p">(</span>token <span class="o">=</span> token<span class="p">,</span> <span class="kc">...</span><span class="p">))</span>
+  process_result<span class="p">(</span>req<span class="p">)</span>
+<span class="p">}</span>
+</code></pre></div>
+<h2>Commits</h2>
+
+<p>List of commits</p>
+<div class="highlight"><pre><code class="language-r" data-lang="r">out <span class="o">&lt;-</span> gh_commits<span class="p">(</span><span class="s">&quot;taxize&quot;</span><span class="p">)</span>
+</code></pre></div>
+<p>Get changes for each commit</p>
+<div class="highlight"><pre><code class="language-r" data-lang="r">changes <span class="o">&lt;-</span> <span class="kp">vapply</span><span class="p">(</span>out<span class="o">$</span>sha<span class="p">,</span> <span class="kr">function</span><span class="p">(</span>x<span class="p">)</span> gh_commit<span class="p">(</span>x<span class="p">,</span> repo<span class="o">=</span><span class="s">&quot;taxize&quot;</span><span class="p">)</span><span class="o">$</span>stats<span class="o">$</span>total<span class="p">,</span> <span class="kt">numeric</span><span class="p">(</span><span class="m">1</span><span class="p">))</span>
+changesdf <span class="o">&lt;-</span>  <span class="kt">data.frame</span><span class="p">(</span>changes<span class="o">=</span><span class="kp">unname</span><span class="p">(</span>changes<span class="p">),</span> sha<span class="o">=</span><span class="kp">names</span><span class="p">(</span>changes<span class="p">))</span>
+</code></pre></div>
+<p>Combine</p>
+<div class="highlight"><pre><code class="language-r" data-lang="r">out <span class="o">&lt;-</span> inner_join<span class="p">(</span>out<span class="p">,</span> changesdf<span class="p">)</span>
+</code></pre></div>
+<p>Total changes through time (additions + deletions)</p>
+<div class="highlight"><pre><code class="language-r" data-lang="r">ct <span class="o">&lt;-</span> <span class="kr">function</span><span class="p">(</span>x<span class="p">)</span> <span class="kp">as.POSIXct</span><span class="p">(</span>x<span class="p">,</span> format<span class="o">=</span><span class="s">&quot;%Y-%m-%dT%H:%M:%SZ&quot;</span><span class="p">,</span> tz<span class="o">=</span><span class="s">&quot;UTC&quot;</span><span class="p">)</span>
+out <span class="o">%&gt;%</span>
+  mutate<span class="p">(</span>commit.committer.date <span class="o">=</span> ct<span class="p">(</span>commit.committer.date<span class="p">))</span> <span class="o">%&gt;%</span>
+  ggplot<span class="p">(</span>aes<span class="p">(</span>x<span class="o">=</span>commit.committer.date<span class="p">,</span> y<span class="o">=</span>changes<span class="p">))</span> <span class="o">+</span>
+    geom_area<span class="p">(</span>fill<span class="o">=</span><span class="s">&quot;#87D2A0&quot;</span><span class="p">)</span> <span class="o">+</span>
+    theme_grey<span class="p">(</span>base_size <span class="o">=</span> <span class="m">20</span><span class="p">)</span>
+</code></pre></div>
+<p><img src="/public/img/2014-11-28-taxize-1000/unnamed-chunk-7-1.png" alt=""></p>
+
+<p>By Authors</p>
+<div class="highlight"><pre><code class="language-r" data-lang="r">out <span class="o">%&gt;%</span>
+  group_by<span class="p">(</span>author.login<span class="p">)</span> <span class="o">%&gt;%</span>
+  summarise<span class="p">(</span>n <span class="o">=</span> n<span class="p">())</span> <span class="o">%&gt;%</span>
+  ggplot<span class="p">(</span>aes<span class="p">(</span>author.login<span class="p">,</span> n<span class="p">))</span> <span class="o">+</span>
+    geom_bar<span class="p">(</span>stat <span class="o">=</span> <span class="s">&quot;identity&quot;</span><span class="p">,</span> fill<span class="o">=</span><span class="s">&quot;#87D2A0&quot;</span><span class="p">)</span> <span class="o">+</span>
+    coord_flip<span class="p">()</span> <span class="o">+</span>
+    theme_grey<span class="p">(</span>base_size <span class="o">=</span> <span class="m">20</span><span class="p">)</span>
+</code></pre></div>
+<p><img src="/public/img/2014-11-28-taxize-1000/unnamed-chunk-8-1.png" alt=""></p>
+
+<h2>Issues</h2>
+<div class="highlight"><pre><code class="language-r" data-lang="r">out <span class="o">&lt;-</span> gh_issues<span class="p">(</span><span class="s">&quot;taxize&quot;</span><span class="p">)</span>
+</code></pre></div>
+<p>Number of issues</p>
+<div class="highlight"><pre><code class="language-r" data-lang="r"><span class="kp">NROW</span><span class="p">(</span>out<span class="p">)</span>
+<span class="c1">#&gt; [1] 382</span>
+</code></pre></div>
+<p>Number of open issues</p>
+<div class="highlight"><pre><code class="language-r" data-lang="r">out <span class="o">%&gt;%</span>
+  filter<span class="p">(</span>state <span class="o">==</span> <span class="s">&quot;open&quot;</span><span class="p">)</span> <span class="o">%&gt;%</span>
+  <span class="kp">NROW</span>
+<span class="c1">#&gt; [1] 35</span>
+</code></pre></div>
+<p>Number of pull requests</p>
+<div class="highlight"><pre><code class="language-r" data-lang="r">out <span class="o">%&gt;%</span>
+  filter<span class="p">(</span><span class="o">!</span><span class="kp">is.na</span><span class="p">(</span>pull_request.url<span class="p">))</span> <span class="o">%&gt;%</span>
+  <span class="kp">NROW</span>
+<span class="c1">#&gt; [1] 119</span>
+</code></pre></div>
+<h2>Forks, number of</h2>
+<div class="highlight"><pre><code class="language-r" data-lang="r"><span class="kp">NROW</span><span class="p">(</span>gh_verb<span class="p">(</span>repo <span class="o">=</span> <span class="s">&quot;taxize&quot;</span><span class="p">,</span> verb<span class="o">=</span><span class="s">&quot;forks&quot;</span><span class="p">))</span>
+<span class="c1">#&gt; [1] 16</span>
+</code></pre></div>
+<h2>Stars, number of</h2>
+<div class="highlight"><pre><code class="language-r" data-lang="r"><span class="kp">NROW</span><span class="p">(</span>gh_verb<span class="p">(</span>repo <span class="o">=</span> <span class="s">&quot;taxize&quot;</span><span class="p">,</span> verb<span class="o">=</span><span class="s">&quot;stargazers&quot;</span><span class="p">,</span> args<span class="o">=</span><span class="kt">list</span><span class="p">(</span>per_page<span class="o">=</span><span class="m">100</span><span class="p">)))</span>
+<span class="c1">#&gt; [1] 44</span>
+</code></pre></div>
+<h2>Watchers, number of</h2>
+<div class="highlight"><pre><code class="language-r" data-lang="r"><span class="kp">NROW</span><span class="p">(</span>gh_verb<span class="p">(</span>repo <span class="o">=</span> <span class="s">&quot;taxize&quot;</span><span class="p">,</span> verb<span class="o">=</span><span class="s">&quot;subscribers&quot;</span><span class="p">,</span> args<span class="o">=</span><span class="kt">list</span><span class="p">(</span>per_page<span class="o">=</span><span class="m">100</span><span class="p">)))</span>
+<span class="c1">#&gt; [1] 12</span>
+</code></pre></div>
+  </div>
+  
+  <div class="post">
+    <h1>
       <a href="/2014/11/ckanr-intro/">
         Intro to alpha ckanr - R client for CKAN RESTful API
       </a>
@@ -572,291 +752,6 @@ has_term<span class="p">(</span><span class="s">&quot;maptools&quot;</span><span
 <div class="highlight"><pre><code class="language-r" data-lang="r"><span class="kp">as.POSIXct</span><span class="p">(</span>rate_limit<span class="p">()</span><span class="o">$</span>rate<span class="o">$</span>reset<span class="p">,</span> origin<span class="o">=</span><span class="s">&quot;1970-01-01&quot;</span><span class="p">)</span>
 <span class="c1">#&gt; [1] &quot;2014-11-26 11:43:36 PST&quot;</span>
 </code></pre></div>
-  </div>
-  
-  <div class="post">
-    <h1>
-      <a href="/2014/11/sofa/">
-        sofa - reboot
-      </a>
-    </h1>
-
-    <span class="post-date">18 Nov 2014</span>
-
-    <p>I&#39;ve reworked <code>sofa</code> recently after someone reported a bug in the package. Since the last post on this package on 2013-06-21, there&#39;s a bunch of changes:</p>
-
-<ul>
-<li>Removed the <code>sofa_</code> prefix from all functions as it wasn&#39;t really necessary. </li>
-<li>Replaced <code>rjson</code>/<code>RJSONIO</code> with <code>jsonlite</code> for JSON I/O.</li>
-<li>New functions:
-
-<ul>
-<li><code>revisions()</code> - to get the revision numbers for a document.</li>
-<li><code>uuids()</code> - get any number of UUIDs - e.g., if you want to set document IDs with UUIDs</li>
-</ul></li>
-<li>Most functions that deal with documents are prefixed with <code>doc_</code></li>
-<li>Functions that deal with databases are prefixed with <code>db_</code></li>
-<li>Simplified all code, reducing duplication</li>
-<li>All functions take <code>cushion</code> as the first parameter, for consistency sake.</li>
-<li>Changed <code>cushion()</code> function so that you can only register one cushion with each function call, 
-and the function takes parameters for each element now, <code>name</code> (name of the cushion, whatever you want), <code>user</code> (user name, if applicable), <code>pwd</code> (password, if applicable), <code>type</code> (one of localhost, cloudant, or iriscouch), and <code>port</code> (if applicable).</li>
-<li>Changed package license from <code>CC0</code> to <code>MIT</code></li>
-</ul>
-
-<p>There&#39;s still more to do, but I&#39;m pretty happy with the recent changes, and I hope at least some find the package useful. Also, would love people to try it out as all bugs are shallow and all that...</p>
-
-<p>The following are a few examples of package use.</p>
-
-<h2>Install CouchDB</h2>
-
-<p>Instructions <a href="http://wiki.apache.org/couchdb/Installation">here</a></p>
-
-<h2>Start CouchDB</h2>
-
-<p>In your terminal </p>
-<div class="highlight"><pre><code class="language-sh" data-lang="sh">couchdb
-</code></pre></div>
-<p>You can interact with your CouchDB databases as well in your browser. Navigate to <a href="http://localhost:5984/_utils">http://localhost:5984/_utils</a></p>
-
-<h2>Install sofa</h2>
-<div class="highlight"><pre><code class="language-r" data-lang="r">install.packages<span class="p">(</span><span class="s">&quot;devtools&quot;</span><span class="p">)</span>
-devtools<span class="o">::</span>install_github<span class="p">(</span><span class="s">&quot;sckott/sofa&quot;</span><span class="p">)</span>
-</code></pre></div><div class="highlight"><pre><code class="language-r" data-lang="r"><span class="kn">library</span><span class="p">(</span><span class="s">&#39;sofa&#39;</span><span class="p">)</span>
-</code></pre></div>
-<h2>Authenticate - Cushions</h2>
-
-<p>As an example, here&#39;s how I set up details for connecting to my Cloudant couch:</p>
-<div class="highlight"><pre><code class="language-r" data-lang="r">cushion<span class="p">(</span>name <span class="o">=</span> <span class="s">&#39;cloudant&#39;</span><span class="p">,</span> user <span class="o">=</span> <span class="s">&#39;&lt;user name&gt;&#39;</span><span class="p">,</span> pwd <span class="o">=</span> <span class="s">&#39;&lt;password&gt;&#39;</span><span class="p">,</span> type <span class="o">=</span> <span class="s">&quot;cloudant&quot;</span><span class="p">)</span>
-</code></pre></div>
-<p>By default there is a built-in <code>cushion</code> for localhost so you don&#39;t have to do that, unless you want to change those details, e.g., the port number. Right now cushions aren&#39;t preserved across R sessions, but working on that.</p>
-
-<p>For example, I&#39;ll lay down a cushion for Cloudant, then I can call <code>cushions()</code> to see my cushions:</p>
-<div class="highlight"><pre><code class="language-r" data-lang="r">cushion<span class="p">(</span>name <span class="o">=</span> <span class="s">&#39;cloudant&#39;</span><span class="p">,</span> user <span class="o">=</span> <span class="s">&#39;&lt;user name&gt;&#39;</span><span class="p">,</span> pwd <span class="o">=</span> <span class="s">&#39;&lt;pwd&gt;&#39;</span><span class="p">,</span> type <span class="o">=</span> <span class="s">&quot;cloudant&quot;</span><span class="p">)</span>
-cushions<span class="p">()</span>
-</code></pre></div>
-<p>By default, if you don&#39;t provide a cushion name, you are using localhost.</p>
-
-<h2>Ping the server</h2>
-<div class="highlight"><pre><code class="language-r" data-lang="r">ping<span class="p">()</span>
-<span class="c1">#&gt; $couchdb</span>
-<span class="c1">#&gt; [1] &quot;Welcome&quot;</span>
-<span class="c1">#&gt; </span>
-<span class="c1">#&gt; $uuid</span>
-<span class="c1">#&gt; [1] &quot;2c10f0c6d9bd17205b692ae93cd4cf1d&quot;</span>
-<span class="c1">#&gt; </span>
-<span class="c1">#&gt; $version</span>
-<span class="c1">#&gt; [1] &quot;1.6.0&quot;</span>
-<span class="c1">#&gt; </span>
-<span class="c1">#&gt; $vendor</span>
-<span class="c1">#&gt; $vendor$version</span>
-<span class="c1">#&gt; [1] &quot;1.6.0-1&quot;</span>
-<span class="c1">#&gt; </span>
-<span class="c1">#&gt; $vendor$name</span>
-<span class="c1">#&gt; [1] &quot;Homebrew&quot;</span>
-</code></pre></div>
-<p>Nice, it&#39;s working.</p>
-
-<h2>Create a new database, and list available databases</h2>
-<div class="highlight"><pre><code class="language-r" data-lang="r">db_create<span class="p">(</span>dbname<span class="o">=</span><span class="s">&#39;sofadb&#39;</span><span class="p">)</span>
-<span class="c1">#&gt; $ok</span>
-<span class="c1">#&gt; [1] TRUE</span>
-</code></pre></div>
-<p>see if its there now</p>
-<div class="highlight"><pre><code class="language-r" data-lang="r">db_list<span class="p">()</span>
-<span class="c1">#&gt;  [1] &quot;_replicator&quot; &quot;_users&quot;      &quot;alm_couchdb&quot; &quot;cachecall&quot;   &quot;hello_earth&quot;</span>
-<span class="c1">#&gt;  [6] &quot;leothelion&quot;  &quot;mran&quot;        &quot;mydb&quot;        &quot;newdbs&quot;      &quot;sofadb&quot;</span>
-</code></pre></div>
-<h2>Create documents</h2>
-
-<p>Create a document WITH a name (uses PUT)</p>
-<div class="highlight"><pre><code class="language-r" data-lang="r">doc1 <span class="o">&lt;-</span> <span class="s">&#39;{&quot;name&quot;:&quot;sofa&quot;,&quot;beer&quot;:&quot;IPA&quot;}&#39;</span>
-doc_create<span class="p">(</span>dbname<span class="o">=</span><span class="s">&quot;sofadb&quot;</span><span class="p">,</span> doc<span class="o">=</span>doc1<span class="p">,</span> docid<span class="o">=</span><span class="s">&quot;a_beer&quot;</span><span class="p">)</span>
-<span class="c1">#&gt; $ok</span>
-<span class="c1">#&gt; [1] TRUE</span>
-<span class="c1">#&gt; </span>
-<span class="c1">#&gt; $id</span>
-<span class="c1">#&gt; [1] &quot;a_beer&quot;</span>
-<span class="c1">#&gt; </span>
-<span class="c1">#&gt; $rev</span>
-<span class="c1">#&gt; [1] &quot;1-a48c98c945bcc05d482bc6f938c89882&quot;</span>
-</code></pre></div>
-<p>Create a document WITHOUT a name (uses POST)</p>
-<div class="highlight"><pre><code class="language-r" data-lang="r">doc2 <span class="o">&lt;-</span> <span class="s">&#39;{&quot;name&quot;:&quot;sofa&quot;,&quot;icecream&quot;:&quot;rocky road&quot;}&#39;</span>
-doc_create<span class="p">(</span>dbname<span class="o">=</span><span class="s">&quot;sofadb&quot;</span><span class="p">,</span> doc<span class="o">=</span>doc2<span class="p">)</span>
-<span class="c1">#&gt; $ok</span>
-<span class="c1">#&gt; [1] TRUE</span>
-<span class="c1">#&gt; </span>
-<span class="c1">#&gt; $id</span>
-<span class="c1">#&gt; [1] &quot;c5c5c332c25cf62cc584647a81006f6d&quot;</span>
-<span class="c1">#&gt; </span>
-<span class="c1">#&gt; $rev</span>
-<span class="c1">#&gt; [1] &quot;1-fd0da7fcb8d3afbfc5757d065c92362c&quot;</span>
-</code></pre></div>
-<h2>List documents</h2>
-
-<p>List them</p>
-<div class="highlight"><pre><code class="language-r" data-lang="r">alldocs<span class="p">(</span>dbname<span class="o">=</span><span class="s">&quot;sofadb&quot;</span><span class="p">)</span>
-<span class="c1">#&gt;                                 id                              key</span>
-<span class="c1">#&gt; 1                           a_beer                           a_beer</span>
-<span class="c1">#&gt; 2 c5c5c332c25cf62cc584647a81006f6d c5c5c332c25cf62cc584647a81006f6d</span>
-<span class="c1">#&gt;                                  rev</span>
-<span class="c1">#&gt; 1 1-a48c98c945bcc05d482bc6f938c89882</span>
-<span class="c1">#&gt; 2 1-fd0da7fcb8d3afbfc5757d065c92362c</span>
-</code></pre></div>
-<p>Optionally include the documents, returned as a list by default as it would be hard to parse an endless number of document formats. </p>
-<div class="highlight"><pre><code class="language-r" data-lang="r">alldocs<span class="p">(</span>dbname<span class="o">=</span><span class="s">&quot;sofadb&quot;</span><span class="p">,</span> include_docs <span class="o">=</span> <span class="kc">TRUE</span><span class="p">)</span>
-<span class="c1">#&gt; $total_rows</span>
-<span class="c1">#&gt; [1] 2</span>
-<span class="c1">#&gt; </span>
-<span class="c1">#&gt; $offset</span>
-<span class="c1">#&gt; [1] 0</span>
-<span class="c1">#&gt; </span>
-<span class="c1">#&gt; $rows</span>
-<span class="c1">#&gt; $rows[[1]]</span>
-<span class="c1">#&gt; $rows[[1]]$id</span>
-<span class="c1">#&gt; [1] &quot;a_beer&quot;</span>
-<span class="c1">#&gt; </span>
-<span class="c1">#&gt; $rows[[1]]$key</span>
-<span class="c1">#&gt; [1] &quot;a_beer&quot;</span>
-<span class="c1">#&gt; </span>
-<span class="c1">#&gt; $rows[[1]]$value</span>
-<span class="c1">#&gt; $rows[[1]]$value$rev</span>
-<span class="c1">#&gt; [1] &quot;1-a48c98c945bcc05d482bc6f938c89882&quot;</span>
-<span class="c1">#&gt; </span>
-<span class="c1">#&gt; </span>
-<span class="c1">#&gt; $rows[[1]]$doc</span>
-<span class="c1">#&gt; $rows[[1]]$doc$`_id`</span>
-<span class="c1">#&gt; [1] &quot;a_beer&quot;</span>
-<span class="c1">#&gt; </span>
-<span class="c1">#&gt; $rows[[1]]$doc$`_rev`</span>
-<span class="c1">#&gt; [1] &quot;1-a48c98c945bcc05d482bc6f938c89882&quot;</span>
-<span class="c1">#&gt; </span>
-<span class="c1">#&gt; $rows[[1]]$doc$name</span>
-<span class="c1">#&gt; [1] &quot;sofa&quot;</span>
-<span class="c1">#&gt; </span>
-<span class="c1">#&gt; $rows[[1]]$doc$beer</span>
-<span class="c1">#&gt; [1] &quot;IPA&quot;</span>
-<span class="c1">#&gt; </span>
-<span class="c1">#&gt; </span>
-<span class="c1">#&gt; </span>
-<span class="c1">#&gt; $rows[[2]]</span>
-<span class="c1">#&gt; $rows[[2]]$id</span>
-<span class="c1">#&gt; [1] &quot;c5c5c332c25cf62cc584647a81006f6d&quot;</span>
-<span class="c1">#&gt; </span>
-<span class="c1">#&gt; $rows[[2]]$key</span>
-<span class="c1">#&gt; [1] &quot;c5c5c332c25cf62cc584647a81006f6d&quot;</span>
-<span class="c1">#&gt; </span>
-<span class="c1">#&gt; $rows[[2]]$value</span>
-<span class="c1">#&gt; $rows[[2]]$value$rev</span>
-<span class="c1">#&gt; [1] &quot;1-fd0da7fcb8d3afbfc5757d065c92362c&quot;</span>
-<span class="c1">#&gt; </span>
-<span class="c1">#&gt; </span>
-<span class="c1">#&gt; $rows[[2]]$doc</span>
-<span class="c1">#&gt; $rows[[2]]$doc$`_id`</span>
-<span class="c1">#&gt; [1] &quot;c5c5c332c25cf62cc584647a81006f6d&quot;</span>
-<span class="c1">#&gt; </span>
-<span class="c1">#&gt; $rows[[2]]$doc$`_rev`</span>
-<span class="c1">#&gt; [1] &quot;1-fd0da7fcb8d3afbfc5757d065c92362c&quot;</span>
-<span class="c1">#&gt; </span>
-<span class="c1">#&gt; $rows[[2]]$doc$name</span>
-<span class="c1">#&gt; [1] &quot;sofa&quot;</span>
-<span class="c1">#&gt; </span>
-<span class="c1">#&gt; $rows[[2]]$doc$icecream</span>
-<span class="c1">#&gt; [1] &quot;rocky road&quot;</span>
-</code></pre></div>
-<h2>Update a document</h2>
-
-<p>Change <em>IPA</em> (india pale ale) to <em>IPL</em> (india pale lager). We need to get revisions first as we need to include revision number when we update a document.</p>
-<div class="highlight"><pre><code class="language-r" data-lang="r"><span class="p">(</span>revs <span class="o">&lt;-</span> revisions<span class="p">(</span>dbname <span class="o">=</span> <span class="s">&quot;sofadb&quot;</span><span class="p">,</span> docid <span class="o">=</span> <span class="s">&quot;a_beer&quot;</span><span class="p">))</span>
-<span class="c1">#&gt; [1] &quot;1-a48c98c945bcc05d482bc6f938c89882&quot;</span>
-</code></pre></div><div class="highlight"><pre><code class="language-r" data-lang="r">newdoc <span class="o">&lt;-</span> <span class="s">&#39;{&quot;name&quot;:&quot;sofa&quot;,&quot;beer&quot;:&quot;IPL&quot;}&#39;</span>
-doc_update<span class="p">(</span>dbname <span class="o">=</span> <span class="s">&quot;sofadb&quot;</span><span class="p">,</span> doc <span class="o">=</span> newdoc<span class="p">,</span> docid <span class="o">=</span> <span class="s">&quot;a_beer&quot;</span><span class="p">,</span> rev <span class="o">=</span> revs<span class="p">[</span><span class="m">1</span><span class="p">])</span>
-<span class="c1">#&gt; $ok</span>
-<span class="c1">#&gt; [1] TRUE</span>
-<span class="c1">#&gt; </span>
-<span class="c1">#&gt; $id</span>
-<span class="c1">#&gt; [1] &quot;a_beer&quot;</span>
-<span class="c1">#&gt; </span>
-<span class="c1">#&gt; $rev</span>
-<span class="c1">#&gt; [1] &quot;2-f2390eb18b8f9a870c915c6712a7f65e&quot;</span>
-</code></pre></div>
-<p>Should be two revisions now</p>
-<div class="highlight"><pre><code class="language-r" data-lang="r">revisions<span class="p">(</span>dbname <span class="o">=</span> <span class="s">&quot;sofadb&quot;</span><span class="p">,</span> docid <span class="o">=</span> <span class="s">&quot;a_beer&quot;</span><span class="p">)</span>
-<span class="c1">#&gt; [1] &quot;2-f2390eb18b8f9a870c915c6712a7f65e&quot;</span>
-<span class="c1">#&gt; [2] &quot;1-a48c98c945bcc05d482bc6f938c89882&quot;</span>
-</code></pre></div>
-<h2>Get headers for a document</h2>
-<div class="highlight"><pre><code class="language-r" data-lang="r">doc_head<span class="p">(</span>dbname <span class="o">=</span> <span class="s">&quot;sofadb&quot;</span><span class="p">,</span> docid <span class="o">=</span> <span class="s">&quot;a_beer&quot;</span><span class="p">)</span>
-<span class="c1">#&gt; [[1]]</span>
-<span class="c1">#&gt; [[1]]$status</span>
-<span class="c1">#&gt; [1] 200</span>
-<span class="c1">#&gt; </span>
-<span class="c1">#&gt; [[1]]$version</span>
-<span class="c1">#&gt; [1] &quot;HTTP/1.1&quot;</span>
-<span class="c1">#&gt; </span>
-<span class="c1">#&gt; [[1]]$headers</span>
-<span class="c1">#&gt; $server</span>
-<span class="c1">#&gt; [1] &quot;CouchDB/1.6.0 (Erlang OTP/17)&quot;</span>
-<span class="c1">#&gt; </span>
-<span class="c1">#&gt; $etag</span>
-<span class="c1">#&gt; [1] &quot;\&quot;2-f2390eb18b8f9a870c915c6712a7f65e\&quot;&quot;</span>
-<span class="c1">#&gt; </span>
-<span class="c1">#&gt; $date</span>
-<span class="c1">#&gt; [1] &quot;Tue, 18 Nov 2014 21:19:16 GMT&quot;</span>
-<span class="c1">#&gt; </span>
-<span class="c1">#&gt; $`content-type`</span>
-<span class="c1">#&gt; [1] &quot;application/json&quot;</span>
-<span class="c1">#&gt; </span>
-<span class="c1">#&gt; $`content-length`</span>
-<span class="c1">#&gt; [1] &quot;88&quot;</span>
-<span class="c1">#&gt; </span>
-<span class="c1">#&gt; $`cache-control`</span>
-<span class="c1">#&gt; [1] &quot;must-revalidate&quot;</span>
-<span class="c1">#&gt; </span>
-<span class="c1">#&gt; attr(,&quot;class&quot;)</span>
-<span class="c1">#&gt; [1] &quot;insensitive&quot; &quot;list&quot;</span>
-</code></pre></div>
-<h2>JSON vs. list</h2>
-
-<p>Across all/most functions you can request json or list as output with the <code>as</code> parameter. </p>
-<div class="highlight"><pre><code class="language-r" data-lang="r">db_list<span class="p">(</span>as <span class="o">=</span> <span class="s">&quot;list&quot;</span><span class="p">)</span>
-<span class="c1">#&gt;  [1] &quot;_replicator&quot; &quot;_users&quot;      &quot;alm_couchdb&quot; &quot;cachecall&quot;   &quot;hello_earth&quot;</span>
-<span class="c1">#&gt;  [6] &quot;leothelion&quot;  &quot;mran&quot;        &quot;mydb&quot;        &quot;newdbs&quot;      &quot;sofadb&quot;</span>
-</code></pre></div><div class="highlight"><pre><code class="language-r" data-lang="r">db_list<span class="p">(</span>as <span class="o">=</span> <span class="s">&quot;json&quot;</span><span class="p">)</span>
-<span class="c1">#&gt; [1] &quot;[\&quot;_replicator\&quot;,\&quot;_users\&quot;,\&quot;alm_couchdb\&quot;,\&quot;cachecall\&quot;,\&quot;hello_earth\&quot;,\&quot;leothelion\&quot;,\&quot;mran\&quot;,\&quot;mydb\&quot;,\&quot;newdbs\&quot;,\&quot;sofadb\&quot;]\n&quot;</span>
-</code></pre></div>
-<h2>Curl options</h2>
-
-<p>Across all functions you can pass in curl options. We&#39;re using <code>httr</code> internally, so you can use <code>httr</code> helper functions to make some curl options easier. Examples:</p>
-
-<p>Verbose output</p>
-<div class="highlight"><pre><code class="language-r" data-lang="r"><span class="kn">library</span><span class="p">(</span><span class="s">&quot;httr&quot;</span><span class="p">)</span>
-db_list<span class="p">(</span>config<span class="o">=</span>verbose<span class="p">())</span>
-<span class="c1">#&gt;  [1] &quot;_replicator&quot; &quot;_users&quot;      &quot;alm_couchdb&quot; &quot;cachecall&quot;   &quot;hello_earth&quot;</span>
-<span class="c1">#&gt;  [6] &quot;leothelion&quot;  &quot;mran&quot;        &quot;mydb&quot;        &quot;newdbs&quot;      &quot;sofadb&quot;</span>
-</code></pre></div>
-<p>Progress</p>
-<div class="highlight"><pre><code class="language-r" data-lang="r">db_list<span class="p">(</span>config<span class="o">=</span>progress<span class="p">())</span>
-<span class="c1">#&gt; </span>
-  <span class="o">|</span>                                                                       
-  <span class="o">|</span>                                                                 <span class="o">|</span>   <span class="m">0</span><span class="o">%</span>
-<span class="o">  |                                                                       </span>
-<span class="o">  |=================================================================| 100%</span>
-<span class="c1">#&gt;  [1] &quot;_replicator&quot; &quot;_users&quot;      &quot;alm_couchdb&quot; &quot;cachecall&quot;   &quot;hello_earth&quot;</span>
-<span class="c1">#&gt;  [6] &quot;leothelion&quot;  &quot;mran&quot;        &quot;mydb&quot;        &quot;newdbs&quot;      &quot;sofadb&quot;</span>
-</code></pre></div>
-<p>Set a timeout</p>
-<div class="highlight"><pre><code class="language-r" data-lang="r">db_list<span class="p">(</span>config<span class="o">=</span>timeout<span class="p">(</span>seconds <span class="o">=</span> <span class="m">0.001</span><span class="p">))</span>
-<span class="c1">#&gt; </span>
-<span class="c1">#&gt; Error in function (type, msg, asError = TRUE)  : </span>
-<span class="c1">#&gt;    Operation timed out after 3 milliseconds with 0 out of -1 bytes received</span>
-</code></pre></div>
-<h2>Full text search</h2>
-
-<p>I&#39;m working on an R client for Elaticsearch called <code>elastic</code> - find it at <a href="https://github.com/ropensci/elastic">https://github.com/ropensci/elastic</a></p>
-
-<p>Thinking about where to include functions to allow <code>elastic</code> and <code>sofa</code> to work together...if you have any thoughts hit up the issues. I&#39;ll probably include helper functions for CouchDB search in the <code>elastic</code> package, interfacing with the <a href="https://github.com/elasticsearch/elasticsearch-river-couchdb">CouchDB plugin for Elasticsearch</a>.</p>
-
   </div>
   
 </div>
