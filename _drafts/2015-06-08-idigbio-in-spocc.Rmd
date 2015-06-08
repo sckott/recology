@@ -1,0 +1,114 @@
+---
+name: idigbio-in-spocc
+layout: post
+title: iDigBio - a new data source in spocc
+date: 2015-06-08
+author: Scott Chamberlain
+sourceslug: _drafts/2015-06-08-idigbio-in-spocc.Rmd
+tags:
+- R
+- opendata
+---
+
+```{r echo=FALSE}
+knitr::opts_chunk$set(
+  comment = "#>",
+  collapse = TRUE,
+  warning = FALSE,
+  message = FALSE
+)
+```
+
+[iDigBio](https://www.idigbio.org/), or _Integrated Digitized Biocollections_, collects and provides access to species occurrence data, and associated metadata (e.g., images of specimens, when provided). They collect data from [a lot of different providers](https://www.idigbio.org/portal/publishers). They have a nice web interface for searching, check out [idigbio.org/portal/search](https://www.idigbio.org/portal/search). 
+
+`spocc` is a package we've been working on at [rOpenSci](http://ropensci.org/) for a while now - it is a one stop shop for retrieving species ocurrence data. As new sources of species occurrence data come to our attention, and are available via a RESTful API, we incorporate them into `spocc`. 
+
+I attended last week a [hackathon put on by iDigBio](https://github.com/idigbio-api-hackathon/HackathonCentral/). One of the projects I worked on was integrating iDigBio into `spocc`.  
+
+With the addition of iDigBio, we now have in `spocc`:
+
+* [GBIF](http://www.gbif.org/)
+* [iNaturalist](http://www.inaturalist.org/)
+* [USGS Bison](http://bison.usgs.ornl.gov/)
+* [eBird](http://ebird.org/content/ebird/)
+* [Ecoengine](https://ecoengine.berkeley.edu/)
+* [Vertnet](http://vertnet.org/)
+* [iDigBio](https://www.idigbio.org/)
+
+The following is a quick demo of getting iDigBio data in `spocc`
+
+## Install
+
+Get updated versions of `rgbif` and `ridigbio` first. And get `leaflet` to make an interactive map.
+
+```{r eval=FALSE}
+devtools::install_github("ropensci/rgbif", "iDigBio/ridigbio", "rstudio/leaflet")
+devtools::install_github("ropensci/spocc")
+```
+
+```{r}
+library("spocc")
+```
+
+## Use ridigbio - the R client for iDigBio
+
+```{r}
+library("ridigbio")
+idig_search_records(rq = list(genus = "acer"), limit = 5)
+```
+
+## Use spocc
+
+### Scientific name search
+
+Same search as above with `ridigbio`
+
+```{r}
+occ(query = "Acer", from = "idigbio", limit = 5)
+```
+
+### Geographic search
+
+iDigBio uses Elasticsearch syntax to define a geographic search, but all you need to do is give a numeric vector of length 4 defining a bounding box, and you're good to go. 
+
+```{r}
+bounds <- c(-120, 40, -100, 45)
+occ(from = "idigbio", geometry = bounds, limit = 10)
+```
+
+### W/ or W/O Coordinates
+
+Don't pass `has_coords` (gives data w/ and w/o coordinates data)
+
+```{r}
+occ(query = "Acer", from = "idigbio", limit = 5)
+```
+
+Only records with coordinates data
+
+```{r}
+occ(query = "Acer", from = "idigbio", limit = 5, has_coords = TRUE)
+```
+
+Only records without coordinates data
+
+```{r}
+occ(query = "Acer", from = "idigbio", limit = 5, has_coords = FALSE)
+```
+
+### Make an interactive map
+
+```{r eval=FALSE}
+library("leaflet")
+bounds <- c(-120, 40, -100, 45)
+leaflet(data = dat) %>% 
+  addTiles() %>%
+  addMarkers(~longitude, ~latitude, popup = ~name) %>% 
+  addRectangles(
+    lng1 = bounds[1], lat1 = bounds[4],
+    lng2 = bounds[3], lat2 = bounds[2],
+    fillColor = "transparent"
+  )
+```
+
+![image](/public/img/2015-06-08-idigbio-in-spocc/plot.png)
