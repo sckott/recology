@@ -1,0 +1,267 @@
+---
+name: weather-data-with-rnoaa
+layout: post
+title: rnoaa - Weather data in R
+date: 2015-07-07
+author: Scott Chamberlain
+sourceslug: _drafts/2015-07-07-weather-data-with-rnoaa.Rmd
+tags:
+- R
+- API
+- NOAA
+- web services
+- weather
+---
+
+```{r echo=FALSE}
+library("knitr")
+hook_output <- knitr::knit_hooks$get("output")
+knitr::knit_hooks$set(output = function(x, options) {
+   lines <- options$output.lines
+   if (is.null(lines)) {
+     return(hook_output(x, options))  # pass to default hook
+   }
+   x <- unlist(strsplit(x, "\n"))
+   more <- "..."
+   if (length(lines) == 1) {        # first n lines
+     if (length(x) > lines) {
+       # truncate the output, but add ....
+       x <- c(head(x, lines), more)
+     }
+   } else {
+     x <- c(if (abs(lines[1]) > 1) more else NULL,
+            x[lines],
+            if (length(x) > lines[abs(length(lines))]) more else NULL
+           )
+   }
+   # paste these lines together
+   x <- paste(c(x, ""), collapse = "\n")
+   hook_output(x, options)
+ })
+
+knitr::opts_chunk$set(
+  comment = "#>",
+  collapse = TRUE,
+  warning = FALSE,
+  message = FALSE,
+  fig.path = "../public/img/2015-07-07-weather-data-with-rnoaa/"
+)
+```
+
+NOAA provides a lot of weather data, across many different websites under different project names. The R package `rnoaa` accesses many of these, including:
+
+* NOAA NCDC climate data, using the [NCDC API version 2](http://www.ncdc.noaa.gov/cdo-web/webservices/v2)
+* [GHCND FTP data](ftp://ftp.ncdc.noaa.gov/pub/data/ghcn/daily/)
+* [ISD FTP data](ftp://ftp.ncdc.noaa.gov/pub/data/noaa/)
+* Severe weather data docs are at [http://www.ncdc.noaa.gov/swdiws/](http://www.ncdc.noaa.gov/swdiws/)
+* [Sea ice data](ftp://sidads.colorado.edu/DATASETS/NOAA/G02135/shapefiles)
+* [NOAA buoy data](http://www.ndbc.noaa.gov/)
+* Tornadoes! Data from the [NOAA Storm Prediction Center](http://www.spc.noaa.gov/gis/svrgis/)
+* HOMR - Historical Observing Metadata Repository - from [NOAA NCDC](http://www.ncdc.noaa.gov/homr/api)
+* Storm data - from the [International Best Track Archive for Climate Stewardship (IBTrACS)](http://www.ncdc.noaa.gov/ibtracs/index.php?name=wmo-data)
+
+`rnoaa` used to provide access to [ERDDAP servers](http://upwell.pfeg.noaa.gov/erddap/index.html), but a separate package [rerddap](https://github.com/ropensci/rerddap) focuses on just those data sources.
+
+We focus on getting you the data, so there's very little in `rnoaa` for visualizing, statistics, etc.
+
+## Installation
+
+The newest version should be on CRAN in the next few days. In the meantime, let's install from GitHub
+
+```{r eval=FALSE}
+devtools::install_github("ropensci/rnoaa")
+```
+
+```{r}
+library("rnoaa")
+```
+
+There's an example using the `lawn`, `sp`, and `dplyr` packages. If you want to try those, install like
+
+```{r eval=FALSE}
+install.packages(c("lawn", "dplyr", "sp"))
+```
+
+## NCDC
+
+* NCDC = National Climatic Data Center
+* Data comes from a RESTful API described at [http://www.ncdc.noaa.gov/cdo-web/webservices/v2](http://www.ncdc.noaa.gov/cdo-web/webservices/v2)
+
+This web service requires an API key - get one at [http://www.ncdc.noaa.gov/cdo-web/token](http://www.ncdc.noaa.gov/cdo-web/token) if you don't already have one. NCDC provides access to many different datasets: 
+
+| Dataset | Description | Start date | End date |
+|---------|-------------|------------|----------|
+| ANNUAL | Annual Summaries | 1831-02-01 | 2013-11-01 |
+| GHCND | Daily Summaries | 1763-01-01 | 2014-03-15 |
+| GHCNDMS | Monthly Summaries | 1763-01-01 | 2014-01-01 |
+| NORMAL_ANN | Normals Annual/Seasonal | 2010-01-01 | 2010-01-01 |
+| NORMAL_DLY | Normals Daily | 2010-01-01 | 2010-12-31 |
+| NORMAL_HLY | Normals Hourly | 2010-01-01 | 2010-12-31 |
+| NORMAL_MLY | Normals Monthly | 2010-01-01 | 2010-12-01 |
+| PRECIP_15 | Precipitation 15 Minute | 1970-05-12 | 2013-03-01 |
+| PRECIP_HLY | Precipitation Hourly | 1900-01-01 | 2013-03-01 |
+| NEXRAD2 | Nexrad Level II | 1991-06-05 | 2014-03-14 |
+| NEXRAD3 | Nexrad Level III | 1994-05-20 | 2014-03-11 |
+
+The main function to get data from NCDC is `ncdc()`. `datasetid`, `startdate`, and `enddate` are required parameters. A quick example, here getting data from the GHCND dataset, from a particular station, and from Oct 1st 2013 to Dec 12th 2013:
+
+```{r}
+ncdc(datasetid = 'GHCND', stationid = 'GHCND:USW00014895', startdate = '2013-10-01',
+   enddate = '2013-12-01')
+```
+
+You probably won't know what station you want data from off hand though, so you can first search for  stations, in this example using a bounding box that defines a rectangular area near Seattle
+
+```{r eval=FALSE}
+library("lawn")
+lawn_bbox_polygon(c(-122.2047, 47.5204, -122.1065, 47.6139)) %>% view
+```
+
+![lawnplot](/public/img/2015-07-07-weather-data-with-rnoaa/lawnplot.png)
+
+We'll search within that bounding box for weather stations.
+
+```{r}
+ncdc_stations(extent = c(47.5204, -122.2047, 47.6139, -122.1065))
+```
+
+And there are 9 found. We could then use their station ids (e.g., `GHCND:US1WAKG0024`) to search for data using `ncdc()`, or search for what kind of data that station has with `ncdc_datasets()`, or other functions.
+
+## GHCND
+
+* GHCND = Global Historical Climatology Network Daily (Data)
+* Data comes from an FTP server
+
+```{r}
+library("dplyr")
+dat <- ghcnd(stationid = "AGE00147704")
+dat$data %>%
+  filter(element == "PRCP", year == 1909)
+```
+
+You can also get to datasets by searching by station id, date min, date max, and variable. E.g.
+
+```{r}
+ghcnd_search("AGE00147704", var = "PRCP")
+```
+
+## ISD
+
+* ISD = Integrated Surface Database
+* Data comes from an FTP server
+
+You'll likely first want to run `isd_stations()` to get list of stations
+
+```{r}
+stations <- isd_stations()
+head(stations)
+```
+
+Then get data from particular stations, like
+
+```{r}
+(res <- isd(usaf = "011490", wban = "99999", year = 1986))
+```
+
+## Severe weather
+
+* SWDI = Severe Weather Data Inventory
+* From the SWDI site
+
+> The Severe Weather Data Inventory (SWDI) is an integrated database of severe weather records for the United States. The records in SWDI come from a variety of sources in the NCDC archive. 
+
+The `swdi()` function allows you to get data in xml, csv, shp, or kmz format. You can get data from many different datasets:
+
+* nx3tvs NEXRAD Level-3 Tornado Vortex Signatures (point)
+* nx3meso NEXRAD Level-3 Mesocyclone Signatures (point)
+* nx3hail NEXRAD Level-3 Hail Signatures (point)
+* nx3structure NEXRAD Level-3 Storm Cell Structure Information (point)
+* plsr Preliminary Local Storm Reports (point)
+* warn Severe Thunderstorm, Tornado, Flash Flood and Special Marine warnings (polygon)
+* nldn Lightning strikes from Vaisala (.gov and .mil ONLY) (point)
+
+An example: Get all `plsr` within the bounding box (-91,30,-90,31)
+
+```{r}
+swdi(dataset = 'plsr', startdate = '20060505', enddate = '20060510',
+bbox = c(-91, 30, -90, 31))
+```
+
+## Sea ice
+
+The `seaice()` function simply grabs shape files that describe sea ice cover at the Northa and South poles, and can be useful for examining change through time in sea ice cover, among other things. 
+
+An example: Plot sea ice cover for April 1990 for the North pole.
+
+```{r tidy=FALSE, fig.width=10}
+urls <- seaiceeurls(mo = 'Apr', pole = 'N', yr = 1990)
+out <- seaice(urls)
+
+library('ggplot2')
+ggplot(out, aes(long, lat, group = group)) +
+   geom_polygon(fill = "steelblue") +
+   theme_ice()
+```
+
+## Buoys
+
+* Get NOAA buoy data from the National Buoy Data Center
+
+Using buoy data requires the `ncdf` package. Make sure you have that installed, like `install.packages("ncdf")`. `buoy()` and `buoys()` will fail if you don't have `ncdf` installed. 
+
+`buoys()` - Get available buoys given a dataset name
+
+```{r}
+head(buoys(dataset = 'cwind'))
+```
+
+`buoy()` - Get data for a buoy - if no year or datatype specified, we get the first file
+
+```{r}
+buoy(dataset = 'cwind', buoyid = 46085)
+```
+
+## Tornadoes
+
+The function `tornadoes()` gets tornado data from [http://www.spc.noaa.gov/gis/svrgis/](http://www.spc.noaa.gov/gis/svrgis/).
+
+```{r eval=FALSE}
+shp <- tornadoes()
+library('sp')
+plot(shp)
+```
+
+![tornadoes](/public/img/2015-07-07-weather-data-with-rnoaa/tornadoes.png)
+
+## Historical Observing Metadata Repository
+
+* HOMR = Historical Observing Metadata Repository
+* Data from RESTful API at [http://www.ncdc.noaa.gov/homr/api](http://www.ncdc.noaa.gov/homr/api)
+
+`homr_definitions()` gets you definitions and metadata for datasets
+
+```{r}
+head(homr_definitions())
+```
+
+`homr()` gets you metadata for stations given query parameters. In this example, search for data for the state of Delaware
+
+```{r}
+res <- homr(state = 'DE')
+names(res) # the stations
+```
+
+You can index to each one to get more data
+
+## Storms
+
+* Data from: International Best Track Archive for Climate Stewardship (IBTrACS)
+* Data comes from an FTP server
+
+Flat files (csv's) are served up as well as shp files. In this example, plot storm data for the year 1940
+
+```{r fig.width=10}
+(res3 <- storm_shp(year = 1940))
+res3shp <- storm_shp_read(res3)
+sp::plot(res3shp)
+```
