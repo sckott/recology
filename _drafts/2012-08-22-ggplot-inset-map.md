@@ -44,12 +44,12 @@ dat <- data.frame(ecosystem = rep(c("oak", "steppe", "prairie"), each = 8),
     lat = rnorm(24, mean = 51, sd = 1), lon = rnorm(24, mean = -113, sd = 5))
 head(dat)
 #>   ecosystem      lat       lon
-#> 1       oak 49.58285 -107.6930
-#> 2       oak 52.58942 -116.6920
-#> 3       oak 50.49277 -114.5542
-#> 4       oak 50.05943 -116.5660
-#> 5       oak 51.76492 -112.1457
-#> 6       oak 52.82153 -112.8858
+#> 1       oak 51.55706 -110.5483
+#> 2       oak 50.50828 -107.2775
+#> 3       oak 49.22599 -112.4110
+#> 4       oak 50.17093 -120.2808
+#> 5       oak 52.67612 -125.9735
+#> 6       oak 50.81003 -121.0487
 ```
 
 ### Get maps using the maps library
