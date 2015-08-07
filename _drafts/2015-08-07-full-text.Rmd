@@ -1,0 +1,238 @@
+---
+name: full-text
+layout: post
+title: fulltext - a package to help you mine text
+date: 2015-08-07
+author: Scott Chamberlain
+sourceslug: _drafts/2015-08-07-full-text.Rmd
+tags:
+- literature
+- text-mining
+- R
+---
+
+```{r echo=FALSE}
+knitr::opts_chunk$set(
+  comment = "#>",
+  collapse = TRUE,
+  warning = FALSE,
+  message = FALSE,
+  fig.path = "../public/img/2015-08-07-full-text/"
+)
+```
+
+Finally, we got `fulltext` up on CRAN - our first commit was [May last year](https://github.com/ropensci/fulltext/commit/2d4f7e270040b2c8914853113073fc4d3134445e). `fulltext` is a package to facilitate text mining. It focuses on open access journals. This package makes it easier to search for articles, download those articles in full text if available, convert pdf format to plain text, and extract text chunks for vizualization/analysis. We are planning to add bits for analysis in future versions. We've been working on this package for a while now. It has a lot of moving parts and package dependencies, so it took a while to get a first useable version.
+
+The tasks facilitated by `fulltext` in bullet form:
+
+* Search - search for articles
+* Retrieve - get full text
+* Convert - convert from format X to Y
+* Text - if needed, get text from pdfs/etc.
+* Extract - pull out the bits of articles that you want
+
+I won't be surprised if users uncover a lot of bugs in this package given the huge number of publishers/journals users want to get literature data from, and the surely wide diversity of use cases. But I thought it was important to get out a first version to get feedback on the user interface, and gather use cases. 
+
+We hope that this package can help bring text-mining to the masses - making it easy for anyone to do do, not just text-mining experts.
+
+If you have any feedback, please do get in touch in the issue tracker for `fulltext` at https://github.com/ropensci/fulltext/issues - If you have use case thoughts, the [rOpenSci discussion forum](https://discuss.ropensci.org/) might be a good place to go.
+
+Let's kick the tires, shall we?
+
+## Install
+
+Will be on CRAN soon, not as of AM PDT on 2015-08-07.
+
+```{r eval=FALSE}
+install.packages("fulltext")
+# if binaries not avail. yet on your favorite CRAN mirror
+install.packages("https://cran.rstudio.com/src/contrib/fulltext_0.1.0.tar.gz", repos = NULL, type = "source")
+```
+
+Or install development version from GitHub
+
+```{r eval=FALSE}
+devtools::install_github("ropensci/fulltext")
+```
+
+Load `fulltext`
+
+```{r}
+library("fulltext")
+```
+
+## Search for articles
+
+Currently, there are hooks for searching for articles from PLOS, BMC, Crossref, Entrez, arXiv, and BioRxiv. We'll add more in the future, but that does cover a lot of articles, especially given inclusion of Crossref (which mints most DOIs) and Entrez (which houses PMC and Pubmed). 
+
+An example: Search for the term _ecology_ in PLOS journals.
+
+```{r}
+(res1 <- ft_search(query = 'ecology', from = 'plos'))
+```
+
+Each publisher/search-engine has a slot with metadata and data, saying how many articles were found and how many were returned. We can dig into what PLOS gave us:
+
+```{r}
+res1$plos
+```
+
+For each of the data sources to search on you can pass in additional options (basically, you can use the query parameters in the functions that hit each service). Here, we can modify our search to PLOS by requesting a particular set of fields with the `fl` parameter (PLOS uses a Solr backed search engine, and `fl` is short for `fields` in Solr land):
+
+```{r}
+ft_search(query = 'ecology', from = 'plos', plosopts = list(
+   fl = c('id','author','eissn','journal','counter_total_all','alm_twitterCount')))
+```
+
+> Note that PLOS is a bit unique in allowing you to request specific parts of articles. Other sources in ft_search() don't let you do that. 
+
+## Get full text
+
+After you've found the set of articles you want to get full text for, we can use the results from `ft_search()` to grab full text. `ft_get()` accepts a character vector of list of DOIs (or PMC IDs if fetching from Entrez), or the output of `ft_search()`. 
+
+```{r}
+(out <- ft_get(res1))
+```
+
+We got eight articles in full text in the result. We didn't get 10, even though 10 were returned from `ft_search()` because PLOS often returns records for annotations, that is, comments on articles, which we auto-seive out within `ft_get()`. 
+
+Dig in to the PLOS data
+
+```{r}
+out$plos
+```
+
+Dig in further to get to one of the articles in XML format
+
+```{r}
+library("xml2")
+xml2::read_xml(out$plos$data$data$`10.1371/journal.pone.0059813`)
+```
+
+Now with the xml, you can dig into whatever you like, e.g., using `xml2` or `rvest`.
+
+## Extract text from pdfs
+
+Ideally for text mining you have access to XML or other text based formats. However, sometimes you only have access to PDFs. In this case you want to extract text from PDFs. `fulltext` can help with that.
+
+You can extract from any pdf from a file path, like:
+
+```{r}
+path <- system.file("examples", "example1.pdf", package = "fulltext")
+ft_extract(path)
+```
+
+Let's search for articles from arXiv, a preprint service. Here, get pdf from an article with ID `cond-mat/9309029`:
+
+```{r}
+res <- ft_get('cond-mat/9309029', from = "arxiv")
+res2 <- ft_extract(res)
+res2$arxiv$data
+```
+
+And a short snippet of the full text
+
+```{r eval=FALSE}
+res2$arxiv$data$data[[1]]$data
+#> "arXiv:cond-mat/9309029v8 26 Jan 1994, , FERMILAB-PUB-93/15-T March 1993, Revised:
+#> January 1994, The Thermodynamics and Economics of Waste, Dallas C. Kennedy, Research
+#> Associate, Fermi National Accelerator Laboratory, P.O. Box 500 MS106, Batavia, Illinois
+#> 60510 USA, Abstract, The increasingly relevant problem of natural resource use and
+#> waste production, disposal, and reuse is examined from several viewpoints: economic,
+#> technical, and thermodynamic. Alternative economies are studied, with emphasis on
+#> recycling of waste to close the natural resource cycle. The physical nature of human
+#> economies and constraints on recycling and energy efficiency are stated in terms
+#> ..."
+```
+
+## Extract text chunks
+
+We have a few functions to help you pull out certain parts of an article. For example, perhaps you want to get just the authors from your articles, or just the abstracts.
+
+Here, we'll search for some PLOS articles, then get their full text, then extract various parts of each article with `chunks()`.
+
+```{r}
+res <- ft_search(query = "ecology", from = "plos")
+(x <- ft_get(res))
+```
+
+Extract DOIs
+
+```{r}
+x %>% chunks("doi")
+```
+
+Extract DOIs and categories
+
+```{r}
+x %>% chunks(c("doi","categories"))
+```
+
+`tabularize` attempts to help you put the data that comes out of `chunks()` in to a `data.frame`, that we all know and love.
+
+```{r}
+x %>% chunks(c("doi", "history")) %>% tabularize()
+```
+
+
+## Bring it all together
+
+With the pieces above, let's see what it looks like all in one go. Here, we'll search for articles on _climate change_, then visualize word usage in those articles. 
+
+### Search
+
+```{r}
+(out <- ft_search(query = 'climate change', from = 'plos', limit = 100))
+```
+
+### Get full text
+
+```{r}
+(texts <- ft_get(out))
+```
+
+Because PLOS returns XML, we don't need to do a PDF extraction step. However, if we got full text from arXiv or bioRxiv, we'd need to extract from PDFs first. 
+
+### Pull out chunks
+
+```{r}
+abs <- texts %>% chunks("abstract")
+```
+
+Let's pull out just the text
+
+```{r}
+abs <- lapply(abs$plos, function(z) {
+  paste0(z$abstract, collapse = " ")
+})
+```
+
+### Analyze
+
+Using the `tm` package, we can analyze our articles
+
+```{r}
+library("tm")
+corp <- VCorpus(VectorSource(abs))
+# remove stop words, strip whitespace, remove punctuation
+corp <- tm_map(corp, removeWords, stopwords("english"))
+corp <- tm_map(corp, stripWhitespace)
+corp <- tm_map(corp, removePunctuation)
+# Make a term document matrix
+tdm <- TermDocumentMatrix(corp)
+# remove sparse terms
+tdm <- removeSparseTerms(tdm, sparse = 0.8)
+# get data
+rs <- rowSums(as.matrix(tdm))
+df <- data.frame(word = names(rs), n = unname(rs), stringsAsFactors = FALSE)
+```
+
+### Visualize
+
+```{r tidy=FALSE, fig.width=10}
+library("ggplot2")
+ggplot(df, aes(reorder(word, n), n)) +
+  geom_point() +
+  coord_flip() +
+  labs(y = "Count", x = "Word")
+```
