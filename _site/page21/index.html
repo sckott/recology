@@ -59,6 +59,127 @@
   
   <div class="post">
     <h1>
+      <a href="/2013/03/ropensci-collaboration/">
+        Visualizing rOpenSci collaboration
+      </a>
+    </h1>
+
+    <span class="post-date">08 Mar 2013</span>
+
+    <p>We (<a href="http://ropensci.org/">rOpenSci</a>) have been writing code for R packages for a couple years, so it is time to take a look back at the data. What data you ask? The commits data from GitHub ~ data that records who did what and when. </p>
+
+<p>Using the <a href="http://developer.github.com/v3/repos/commits/">Github commits API</a> we can gather data on who commited code to a Github repository, and when they did it. Then we can visualize this hitorical record. </p>
+
+<hr>
+
+<h3>Install some functions for interacting with the Github API via R</h3>
+
+<div class="highlight"><pre><code class="language-r" data-lang="r">install_github<span class="p">(</span><span class="s">&#39;sandbox&#39;</span><span class="p">,</span> <span class="s">&#39;ropensci&#39;</span><span class="p">)</span> 
+
+<span class="kn">library</span><span class="p">(</span>sandbox<span class="p">)</span>
+<span class="kn">library</span><span class="p">(</span>httr<span class="p">)</span>
+<span class="kn">library</span><span class="p">(</span>ggplot2<span class="p">)</span>
+<span class="kn">library</span><span class="p">(</span>scales<span class="p">)</span>
+<span class="kn">library</span><span class="p">(</span>reshape2<span class="p">)</span>
+<span class="kn">library</span><span class="p">(</span>bipartite<span class="p">)</span>
+<span class="kn">library</span><span class="p">(</span>doMC<span class="p">)</span>
+<span class="kn">library</span><span class="p">(</span>plyr<span class="p">)</span>
+<span class="kn">library</span><span class="p">(</span>ggthemes<span class="p">)</span>
+<span class="kn">library</span><span class="p">(</span>picante<span class="p">)</span>
+
+<span class="c1"># And authenticate - pops open a page in your default browser, then tells </span>
+<span class="c1"># you authentication was successful</span>
+github_auth<span class="p">()</span></code></pre></div>
+
+<hr>
+
+<h3>Get all repos for an organization, here ropensci of course</h3>
+
+<div class="highlight"><pre><code class="language-r" data-lang="r">ropensci_repos <span class="o">&lt;-</span> github_allrepos<span class="p">(</span>userorg <span class="o">=</span> <span class="s">&quot;ropensci&quot;</span><span class="p">)</span></code></pre></div>
+
+<hr>
+
+<h3>Get commits broken down in to additions and deletions, though below we just collapse them to all commits</h3>
+
+<div class="highlight"><pre><code class="language-r" data-lang="r">registerDoMC<span class="p">(</span>cores <span class="o">=</span> <span class="m">4</span><span class="p">)</span>
+github_commits_safe <span class="o">&lt;-</span> plyr<span class="o">::</span>failwith<span class="p">(</span><span class="kc">NULL</span><span class="p">,</span> github_commits<span class="p">)</span>
+out <span class="o">&lt;-</span> llply<span class="p">(</span>ropensci_repos<span class="p">,</span> <span class="kr">function</span><span class="p">(</span>x<span class="p">)</span> github_commits_safe<span class="p">(</span><span class="s">&quot;ropensci&quot;</span><span class="p">,</span> x<span class="p">,</span> 
+    since <span class="o">=</span> <span class="s">&quot;2009-01-01T&quot;</span><span class="p">,</span> limit <span class="o">=</span> <span class="m">500</span><span class="p">),</span> <span class="m">.</span>parallel <span class="o">=</span> <span class="kc">TRUE</span><span class="p">)</span>
+<span class="kp">names</span><span class="p">(</span>out<span class="p">)</span> <span class="o">&lt;-</span> ropensci_repos
+out2 <span class="o">&lt;-</span> compact<span class="p">(</span>out<span class="p">)</span>
+outdf <span class="o">&lt;-</span> ldply<span class="p">(</span>out2<span class="p">)</span></code></pre></div>
+
+<hr>
+
+<h3>Plot commits by date and repo</h3>
+
+<div class="highlight"><pre><code class="language-r" data-lang="r">outdf_subset <span class="o">&lt;-</span> outdf<span class="p">[</span><span class="o">!</span>outdf<span class="o">$</span><span class="m">.i</span>d <span class="o">%in%</span> <span class="kt">c</span><span class="p">(</span><span class="s">&quot;citeulike&quot;</span><span class="p">,</span> <span class="s">&quot;challenge&quot;</span><span class="p">,</span> <span class="s">&quot;docs&quot;</span><span class="p">,</span> <span class="s">&quot;ropensci-book&quot;</span><span class="p">,</span> 
+    <span class="s">&quot;usecases&quot;</span><span class="p">,</span> <span class="s">&quot;textmine&quot;</span><span class="p">,</span> <span class="s">&quot;usgs&quot;</span><span class="p">,</span> <span class="s">&quot;ropenscitoolkit&quot;</span><span class="p">,</span> <span class="s">&quot;neotoma&quot;</span><span class="p">,</span> <span class="s">&quot;rEWDB&quot;</span><span class="p">,</span> <span class="s">&quot;rgauges&quot;</span><span class="p">,</span> 
+    <span class="s">&quot;rodash&quot;</span><span class="p">,</span> <span class="s">&quot;ropensci.github.com&quot;</span><span class="p">,</span> <span class="s">&quot;ROAuth&quot;</span><span class="p">),</span> <span class="p">]</span>
+outdf_subset<span class="o">$</span><span class="m">.i</span>d <span class="o">&lt;-</span> <span class="kp">tolower</span><span class="p">(</span>outdf_subset<span class="o">$</span><span class="m">.i</span>d<span class="p">)</span>
+outdf_subset <span class="o">&lt;-</span> ddply<span class="p">(</span>outdf_subset<span class="p">,</span> <span class="m">.</span><span class="p">(</span><span class="m">.i</span>d<span class="p">,</span> <span class="kp">date</span><span class="p">),</span> summarise<span class="p">,</span> value <span class="o">=</span> <span class="kp">sum</span><span class="p">(</span>value<span class="p">))</span>
+
+mindates <span class="o">&lt;-</span> llply<span class="p">(</span><span class="kp">unique</span><span class="p">(</span>outdf_subset<span class="o">$</span><span class="m">.i</span>d<span class="p">),</span> <span class="kr">function</span><span class="p">(</span>x<span class="p">)</span> <span class="kp">min</span><span class="p">(</span>outdf_subset<span class="p">[</span>outdf_subset<span class="o">$</span><span class="m">.i</span>d <span class="o">==</span> 
+    x<span class="p">,</span> <span class="s">&quot;date&quot;</span><span class="p">]))</span>
+<span class="kp">names</span><span class="p">(</span>mindates<span class="p">)</span> <span class="o">&lt;-</span> <span class="kp">unique</span><span class="p">(</span>outdf_subset<span class="o">$</span><span class="m">.i</span>d<span class="p">)</span>
+mindates <span class="o">&lt;-</span> <span class="kp">sort</span><span class="p">(</span><span class="kp">do.call</span><span class="p">(</span><span class="kt">c</span><span class="p">,</span> mindates<span class="p">))</span>
+outdf_subset<span class="o">$</span><span class="m">.i</span>d <span class="o">&lt;-</span> <span class="kp">factor</span><span class="p">(</span>outdf_subset<span class="o">$</span><span class="m">.i</span>d<span class="p">,</span> levels <span class="o">=</span> <span class="kp">names</span><span class="p">(</span>mindates<span class="p">))</span>
+
+ggplot<span class="p">(</span>outdf_subset<span class="p">,</span> aes<span class="p">(</span><span class="kp">date</span><span class="p">,</span> value<span class="p">,</span> fill <span class="o">=</span> <span class="m">.i</span>d<span class="p">))</span> <span class="o">+</span> 
+    geom_bar<span class="p">(</span>stat <span class="o">=</span> <span class="s">&quot;identity&quot;</span><span class="p">,</span> width <span class="o">=</span> <span class="m">0.5</span><span class="p">)</span> <span class="o">+</span> 
+    geom_rangeframe<span class="p">(</span>sides <span class="o">=</span> <span class="s">&quot;b&quot;</span><span class="p">,</span> colour <span class="o">=</span> <span class="s">&quot;grey&quot;</span><span class="p">)</span> <span class="o">+</span> 
+    theme_bw<span class="p">(</span>base_size <span class="o">=</span> <span class="m">9</span><span class="p">)</span> <span class="o">+</span> 
+    scale_x_date<span class="p">(</span>labels <span class="o">=</span> date_format<span class="p">(</span><span class="s">&quot;%Y&quot;</span><span class="p">),</span> breaks <span class="o">=</span> date_breaks<span class="p">(</span><span class="s">&quot;year&quot;</span><span class="p">))</span> <span class="o">+</span> 
+    scale_y_log10<span class="p">()</span> <span class="o">+</span> 
+    facet_grid<span class="p">(</span><span class="m">.i</span>d <span class="o">~</span> <span class="m">.</span><span class="p">)</span> <span class="o">+</span> 
+    labs<span class="p">(</span>x <span class="o">=</span> <span class="s">&quot;&quot;</span><span class="p">,</span> y <span class="o">=</span> <span class="s">&quot;&quot;</span><span class="p">)</span> <span class="o">+</span> 
+    theme<span class="p">(</span>axis.text.y <span class="o">=</span> element_blank<span class="p">(),</span> 
+        axis.text.x <span class="o">=</span> element_text<span class="p">(</span>colour <span class="o">=</span> <span class="s">&quot;black&quot;</span><span class="p">),</span> 
+        axis.ticks.y <span class="o">=</span> element_blank<span class="p">(),</span> 
+        strip.text.y <span class="o">=</span> element_text<span class="p">(</span>angle <span class="o">=</span> <span class="m">0</span><span class="p">,</span> size <span class="o">=</span> <span class="m">8</span><span class="p">,</span> <span class="p">),</span> 
+        strip.background <span class="o">=</span> element_rect<span class="p">(</span>size <span class="o">=</span> <span class="m">0</span><span class="p">),</span> 
+        panel.grid.major <span class="o">=</span> element_blank<span class="p">(),</span> 
+        panel.grid.minor <span class="o">=</span> element_blank<span class="p">(),</span> 
+        legend.text <span class="o">=</span> element_text<span class="p">(</span>size <span class="o">=</span> <span class="m">8</span><span class="p">),</span> 
+        legend.position <span class="o">=</span> <span class="s">&quot;none&quot;</span><span class="p">,</span> 
+        panel.border <span class="o">=</span> element_blank<span class="p">())</span></code></pre></div>
+
+<p><img src="/public/img/commitsbydate.png" alt="center"> </p>
+
+<p>The plot above plots the sum of additions+deletions, and is sorted by the first commit date of reach repo, with the first being <a href="https://github.com/ropensci/treeBASE">treebase</a>, which wraps the <a href="http://treebase.org/treebase-web/urlAPI.html">Treebase API</a>, and the most recent being <a href="https://github.com/ropensci/rWBclimate">rwbclimate</a>, which wraps the <a href="http://data.worldbank.org/developers/climate-data-api">World Blank climate data API</a>. </p>
+
+<p>You can see that some repos have recieved commits more or less consistently over their life time, while others have seen a little development here and there. </p>
+
+<hr>
+
+<p>w</p>
+
+<h3>In addition, there are quite a few people that have committed code now to rOpenSci repos, calling for a network vizualization of course.</h3>
+
+<div class="highlight"><pre><code class="language-r" data-lang="r">outdf_network <span class="o">&lt;-</span> <span class="kp">droplevels</span><span class="p">(</span>outdf<span class="p">[</span><span class="o">!</span>outdf<span class="o">$</span><span class="m">.i</span>d <span class="o">%in%</span> <span class="kt">c</span><span class="p">(</span><span class="s">&quot;citeulike&quot;</span><span class="p">,</span> <span class="s">&quot;challenge&quot;</span><span class="p">,</span> 
+    <span class="s">&quot;docs&quot;</span><span class="p">,</span> <span class="s">&quot;ropensci-book&quot;</span><span class="p">,</span> <span class="s">&quot;usecases&quot;</span><span class="p">,</span> <span class="s">&quot;textmine&quot;</span><span class="p">,</span> <span class="s">&quot;usgs&quot;</span><span class="p">,</span> <span class="s">&quot;ropenscitoolkit&quot;</span><span class="p">,</span> 
+    <span class="s">&quot;retriever&quot;</span><span class="p">,</span> <span class="s">&quot;rodash&quot;</span><span class="p">,</span> <span class="s">&quot;ropensci.github.com&quot;</span><span class="p">,</span> <span class="s">&quot;ROAuth&quot;</span><span class="p">,</span> <span class="s">&quot;rgauges&quot;</span><span class="p">,</span> <span class="s">&quot;sandbox&quot;</span><span class="p">,</span> 
+    <span class="s">&quot;rfna&quot;</span><span class="p">,</span> <span class="s">&quot;rmetadata&quot;</span><span class="p">,</span> <span class="s">&quot;rhindawi&quot;</span><span class="p">,</span> <span class="s">&quot;rpmc&quot;</span><span class="p">,</span> <span class="s">&quot;rpensoft&quot;</span><span class="p">,</span> <span class="s">&quot;ritis&quot;</span><span class="p">),</span> <span class="p">])</span>
+casted <span class="o">&lt;-</span> dcast<span class="p">(</span>outdf_network<span class="p">,</span> <span class="m">.i</span>d <span class="o">+</span> date <span class="o">+</span> name <span class="o">~</span> variable<span class="p">,</span> fun.aggregate <span class="o">=</span> <span class="kp">length</span><span class="p">,</span> 
+    value.var <span class="o">=</span> <span class="s">&quot;value&quot;</span><span class="p">)</span>
+<span class="kp">names</span><span class="p">(</span>casted<span class="p">)[</span><span class="m">1</span><span class="p">]</span> <span class="o">&lt;-</span> <span class="s">&quot;repo&quot;</span>
+casted2 <span class="o">&lt;-</span> ddply<span class="p">(</span>casted<span class="p">,</span> <span class="m">.</span><span class="p">(</span>repo<span class="p">,</span> name<span class="p">),</span> summarise<span class="p">,</span> commits <span class="o">=</span> <span class="kp">sum</span><span class="p">(</span>additions<span class="p">))</span>
+casted2 <span class="o">&lt;-</span> <span class="kt">data.frame</span><span class="p">(</span>repo <span class="o">=</span> casted2<span class="o">$</span>repo<span class="p">,</span> weight <span class="o">=</span> casted2<span class="o">$</span>commits<span class="p">,</span> name <span class="o">=</span> casted2<span class="o">$</span>name<span class="p">)</span>
+mat <span class="o">&lt;-</span> sample2matrix<span class="p">(</span>casted2<span class="p">)</span>
+plotweb<span class="p">(</span>sortweb<span class="p">(</span>mat<span class="p">,</span> sort.order <span class="o">=</span> <span class="s">&quot;dec&quot;</span><span class="p">),</span> method <span class="o">=</span> <span class="s">&quot;normal&quot;</span><span class="p">,</span> text.rot <span class="o">=</span> <span class="m">90</span><span class="p">,</span> 
+    adj.high <span class="o">=</span> <span class="kt">c</span><span class="p">(</span><span class="m">-0.3</span><span class="p">,</span> <span class="m">0</span><span class="p">),</span> adj.low <span class="o">=</span> <span class="kt">c</span><span class="p">(</span><span class="m">1</span><span class="p">,</span> <span class="m">-0.3</span><span class="p">),</span> y.width.low <span class="o">=</span> <span class="m">0.05</span><span class="p">,</span> y.width.high <span class="o">=</span> <span class="m">0.05</span><span class="p">,</span> 
+    ybig <span class="o">=</span> <span class="m">0.09</span><span class="p">,</span> labsize <span class="o">=</span> <span class="m">0.7</span><span class="p">)</span></code></pre></div>
+
+<p><img src="/public/img/collabnetwork.png" alt="center"> </p>
+
+<p>The plot above shows repos on one side and contributors on the other. Some folks (the core rOpenSci team: cboettig, karthikram, emhart, and schamberlain) have committed quite a lot to many packages. We also have amny awesome contributors to our packages (some contributors and repos have been removed for clarity). </p>
+
+<p>rOpenSci is truly a collaborative effort to develop tools for open science, so thanks to all our contributors - keep on forking, pull requesting, and commiting. </p>
+
+  </div>
+  
+  <div class="post">
+    <h1>
       <a href="/2013/02/academia-reboot/">
         Academia reboot
       </a>
@@ -184,19 +305,6 @@ plot<span class="p">(</span>tree2<span class="p">,</span> no.margin <span class=
 <h4>Get the .Rmd file used to create this post <a href="https://github.com/sckott/sckott.github.com/tree/master/_drafts/2013-02-14-common-tree.Rmd">at my github account</a> - or <a href="https://github.com/sckott/sckott.github.com/tree/master/_posts/2013-02-14-common-tree.md">.md file</a>.</h4>
 
 <h4>Written in <a href="http://daringfireball.net/projects/markdown/">Markdown</a>, with help from <a href="http://yihui.name/knitr/">knitr</a>.</h4>
-
-  </div>
-  
-  <div class="post">
-    <h1>
-      <a href="/2013/01/ifttt-test/">
-        testing ifttt recipe, ignore
-      </a>
-    </h1>
-
-    <span class="post-date">26 Jan 2013</span>
-
-    <p>testing ifttt recipe</p>
 
   </div>
   

@@ -59,6 +59,375 @@
   
   <div class="post">
     <h1>
+      <a href="/2014/11/ckanr-intro/">
+        Intro to alpha ckanr - R client for CKAN RESTful API
+      </a>
+    </h1>
+
+    <span class="post-date">26 Nov 2014</span>
+
+    <p>Recently I had need to create a client for scraping museum metadata to help out some folks that use that kind of data. It&#39;s called <a href="https://github.com/ropensci/musemeta">musemeta</a>. One of the data sources in that package uses the open source <em>data portal software</em> <a href="http://ckan.org/">CKAN</a>, and so we can interact with <a href="http://docs.ckan.org/en/latest/api/index.html">the CKAN API</a> to get data. Since many groups can use CKAN API/etc infrastucture because it&#39;s open source, I thought why not have a general purpose R client for this, since <a href="https://github.com/ckan/ckan/wiki/CKAN-API-Clients">there are other clients</a> for Python, PHP, Ruby, etc. </p>
+
+<p>Here&#39;s a bit of an intro:</p>
+
+<h2>Setup</h2>
+
+<p>Get/load packages</p>
+<div class="highlight"><pre><code class="language-r" data-lang="r">install.packages<span class="p">(</span><span class="s">&quot;devtools&quot;</span><span class="p">)</span>
+devtools<span class="o">::</span>install_github<span class="p">(</span><span class="s">&quot;ropensci/ckanr&quot;</span><span class="p">)</span>
+</code></pre></div><div class="highlight"><pre><code class="language-r" data-lang="r"><span class="kn">library</span><span class="p">(</span><span class="s">&quot;ckanr&quot;</span><span class="p">)</span>
+</code></pre></div>
+<blockquote>
+<p>Note: the default URL is for http://data.techno-science.ca/. You can change that in the <code>url</code> parameter</p>
+</blockquote>
+
+<h2>Some package details</h2>
+
+<p>All API alls are <code>POST</code> requests, and handled through a helper function called <code>ckan_POST()</code>. See <code>ckanr:::ckan_POST</code> to see the function.</p>
+
+<p>There are some common parameters across most functions that are worth describing a bit:</p>
+
+<ul>
+<li><code>offset</code> (numeric) Where to start getting items from (optional, default: 0)</li>
+<li><code>limit</code> (numeric) The maximum number of items to return (optional, default: 31)</li>
+<li><code>url</code> Base url to use. Default: <a href="http://data.techno-science.ca">http://data.techno-science.ca</a></li>
+<li><code>as</code> (character) One of <code>list</code> (default), <code>table</code>, or <code>json</code>. Parsing with table option uses <code>jsonlite::fromJSON(..., simplifyDataFrame = TRUE)</code>, which attempts to parse data to <code>data.frame</code>&#39;s when possible, so the result can vary.</li>
+<li><code>...</code> Curl args passed on to <code>httr::POST</code></li>
+</ul>
+
+<h2>Changes</h2>
+<div class="highlight"><pre><code class="language-r" data-lang="r">changes<span class="p">(</span>limit <span class="o">=</span> <span class="m">2</span><span class="p">,</span> as <span class="o">=</span> <span class="s">&quot;table&quot;</span><span class="p">)</span>
+<span class="c1">#&gt;                                user_id                  timestamp</span>
+<span class="c1">#&gt; 1 b50449ea-1dcc-4d52-b620-fc95bf56034b 2014-11-06T18:58:08.001743</span>
+<span class="c1">#&gt; 2 b50449ea-1dcc-4d52-b620-fc95bf56034b 2014-11-06T18:55:55.059527</span>
+<span class="c1">#&gt;                              object_id</span>
+<span class="c1">#&gt; 1 cc6a523c-cecf-4a95-836b-295a11ce2bce</span>
+<span class="c1">#&gt; 2 cc6a523c-cecf-4a95-836b-295a11ce2bce</span>
+<span class="c1">#&gt;                            revision_id data.package.maintainer</span>
+<span class="c1">#&gt; 1 5d11079e-fc05-4121-9fd5-fe086f5e5f33                        </span>
+<span class="c1">#&gt; 2 4a591538-0584-487b-8ed1-3260d1d09d77                        </span>
+<span class="c1">#&gt;   data.package.name data.package.metadata_modified data.package.author</span>
+<span class="c1">#&gt; 1              test     2014-11-06T18:55:54.772675                    </span>
+<span class="c1">#&gt; 2              test     2014-11-06T18:55:54.772675                    </span>
+<span class="c1">#&gt;   data.package.url data.package.notes               data.package.owner_org</span>
+<span class="c1">#&gt; 1                                     fafa260d-e2bf-46cd-9c35-34c1dfa46c57</span>
+<span class="c1">#&gt; 2                                     fafa260d-e2bf-46cd-9c35-34c1dfa46c57</span>
+<span class="c1">#&gt;   data.package.private data.package.maintainer_email</span>
+<span class="c1">#&gt; 1                FALSE                              </span>
+<span class="c1">#&gt; 2                FALSE                              </span>
+<span class="c1">#&gt;   data.package.author_email data.package.state data.package.version</span>
+<span class="c1">#&gt; 1                                      deleted                     </span>
+<span class="c1">#&gt; 2                                       active                     </span>
+<span class="c1">#&gt;           data.package.creator_user_id</span>
+<span class="c1">#&gt; 1 b50449ea-1dcc-4d52-b620-fc95bf56034b</span>
+<span class="c1">#&gt; 2 b50449ea-1dcc-4d52-b620-fc95bf56034b</span>
+<span class="c1">#&gt;                        data.package.id data.package.title</span>
+<span class="c1">#&gt; 1 cc6a523c-cecf-4a95-836b-295a11ce2bce               test</span>
+<span class="c1">#&gt; 2 cc6a523c-cecf-4a95-836b-295a11ce2bce               test</span>
+<span class="c1">#&gt;               data.package.revision_id data.package.type</span>
+<span class="c1">#&gt; 1 5d11079e-fc05-4121-9fd5-fe086f5e5f33           dataset</span>
+<span class="c1">#&gt; 2 4a591538-0584-487b-8ed1-3260d1d09d77           dataset</span>
+<span class="c1">#&gt;   data.package.license_id                                   id</span>
+<span class="c1">#&gt; 1            notspecified 59c308c8-68b2-4b92-bc57-129378d31882</span>
+<span class="c1">#&gt; 2            notspecified a8577e2c-f742-49c2-bef3-ca3299e58704</span>
+<span class="c1">#&gt;     activity_type</span>
+<span class="c1">#&gt; 1 deleted package</span>
+<span class="c1">#&gt; 2 changed package</span>
+</code></pre></div>
+<h2>List datasets</h2>
+<div class="highlight"><pre><code class="language-r" data-lang="r">datasets<span class="p">(</span>as <span class="o">=</span> <span class="s">&quot;table&quot;</span><span class="p">)</span>
+<span class="c1">#&gt;  [1] &quot;artifact-data-agriculture&quot;                                  </span>
+<span class="c1">#&gt;  [2] &quot;artifact-data-aviation&quot;                                     </span>
+<span class="c1">#&gt;  [3] &quot;artifact-data-bookbinding&quot;                                  </span>
+<span class="c1">#&gt;  [4] &quot;artifact-data-chemistry&quot;                                    </span>
+<span class="c1">#&gt;  [5] &quot;artifact-data-communications&quot;                               </span>
+<span class="c1">#&gt;  [6] &quot;artifact-data-computing-technology&quot;                         </span>
+<span class="c1">#&gt;  [7] &quot;artifact-data-domestic-technology&quot;                          </span>
+<span class="c1">#&gt;  [8] &quot;artifact-data-energy-electric&quot;                              </span>
+<span class="c1">#&gt;  [9] &quot;artifact-data-exploration-and-survey&quot;                       </span>
+<span class="c1">#&gt; [10] &quot;artifact-data-fisheries&quot;                                    </span>
+<span class="c1">#&gt; [11] &quot;artifact-data-forestry&quot;                                     </span>
+<span class="c1">#&gt; [12] &quot;artifact-data-horology&quot;                                     </span>
+<span class="c1">#&gt; [13] &quot;artifact-data-industrial-technology&quot;                        </span>
+<span class="c1">#&gt; [14] &quot;artifact-data-lighting-technology&quot;                          </span>
+<span class="c1">#&gt; [15] &quot;artifact-data-location-canada-agriculture-and-food-museum&quot;  </span>
+<span class="c1">#&gt; [16] &quot;artifact-data-location-canada-aviation-and-space-museum&quot;    </span>
+<span class="c1">#&gt; [17] &quot;artifact-data-location-canada-science-and-technology-museum&quot;</span>
+<span class="c1">#&gt; [18] &quot;artifact-data-marine-transportation&quot;                        </span>
+<span class="c1">#&gt; [19] &quot;artifact-data-mathematics&quot;                                  </span>
+<span class="c1">#&gt; [20] &quot;artifact-data-medical-technology&quot;                           </span>
+<span class="c1">#&gt; [21] &quot;artifact-data-meteorology&quot;                                  </span>
+<span class="c1">#&gt; [22] &quot;artifact-data-metrology&quot;                                    </span>
+<span class="c1">#&gt; [23] &quot;artifact-data-mining-and-metallurgy&quot;                        </span>
+<span class="c1">#&gt; [24] &quot;artifact-data-motorized-ground-transportation&quot;              </span>
+<span class="c1">#&gt; [25] &quot;artifact-data-non-motorized-ground-transportation&quot;          </span>
+<span class="c1">#&gt; [26] &quot;artifact-data-on-loan&quot;                                      </span>
+<span class="c1">#&gt; [27] &quot;artifact-data-photography&quot;                                  </span>
+<span class="c1">#&gt; [28] &quot;artifact-data-physics&quot;                                      </span>
+<span class="c1">#&gt; [29] &quot;artifact-data-printing&quot;                                     </span>
+<span class="c1">#&gt; [30] &quot;artifact-data-railway-transportation&quot;                       </span>
+<span class="c1">#&gt; [31] &quot;artifact-dataset-fire-fighting&quot;</span>
+</code></pre></div>
+<h2>List tags</h2>
+<div class="highlight"><pre><code class="language-r" data-lang="r">tag_list<span class="p">(</span><span class="s">&#39;aviation&#39;</span><span class="p">,</span> as<span class="o">=</span><span class="s">&#39;table&#39;</span><span class="p">)</span>
+<span class="c1">#&gt;   vocabulary_id                     display_name</span>
+<span class="c1">#&gt; 1            NA                         Aviation</span>
+<span class="c1">#&gt; 2            NA Canada Aviation and Space Museum</span>
+<span class="c1">#&gt;                                     id                             name</span>
+<span class="c1">#&gt; 1 cc1db2db-b08b-4888-897f-a17eade2461b                         Aviation</span>
+<span class="c1">#&gt; 2 8d05a650-bc7b-4b89-bcc8-c10177e60119 Canada Aviation and Space Museum</span>
+</code></pre></div>
+<h2>Show tags</h2>
+
+<p>Subset for readme brevity</p>
+<div class="highlight"><pre><code class="language-r" data-lang="r">tag_show<span class="p">(</span><span class="s">&#39;Aviation&#39;</span><span class="p">)</span><span class="o">$</span>packages<span class="p">[[</span><span class="m">1</span><span class="p">]][</span><span class="m">1</span><span class="o">:</span><span class="m">3</span><span class="p">]</span>  
+<span class="c1">#&gt; $owner_org</span>
+<span class="c1">#&gt; [1] &quot;fafa260d-e2bf-46cd-9c35-34c1dfa46c57&quot;</span>
+<span class="c1">#&gt; </span>
+<span class="c1">#&gt; $maintainer</span>
+<span class="c1">#&gt; [1] &quot;&quot;</span>
+<span class="c1">#&gt; </span>
+<span class="c1">#&gt; $relationships_as_object</span>
+<span class="c1">#&gt; list()</span>
+</code></pre></div>
+<h2>List groups</h2>
+<div class="highlight"><pre><code class="language-r" data-lang="r">group_list<span class="p">(</span>as<span class="o">=</span><span class="s">&#39;table&#39;</span><span class="p">)</span>
+<span class="c1">#&gt;                         display_name description</span>
+<span class="c1">#&gt; 1                     Communications            </span>
+<span class="c1">#&gt; 2 Domestic and Industrial Technology            </span>
+<span class="c1">#&gt; 3                         Everything            </span>
+<span class="c1">#&gt; 4                           Location            </span>
+<span class="c1">#&gt; 5                          Resources            </span>
+<span class="c1">#&gt; 6         Scientific Instrumentation            </span>
+<span class="c1">#&gt; 7                     Transportation            </span>
+<span class="c1">#&gt;                                title</span>
+<span class="c1">#&gt; 1                     Communications</span>
+<span class="c1">#&gt; 2 Domestic and Industrial Technology</span>
+<span class="c1">#&gt; 3                         Everything</span>
+<span class="c1">#&gt; 4                           Location</span>
+<span class="c1">#&gt; 5                          Resources</span>
+<span class="c1">#&gt; 6         Scientific Instrumentation</span>
+<span class="c1">#&gt; 7                     Transportation</span>
+<span class="c1">#&gt;                                                                   image_display_url</span>
+<span class="c1">#&gt; 1       http://data.techno-science.ca/uploads/group/20141024-162305.6896412comm.jpg</span>
+<span class="c1">#&gt; 2    http://data.techno-science.ca/uploads/group/20141024-162324.3636615domtech.jpg</span>
+<span class="c1">#&gt; 3 http://data.techno-science.ca/uploads/group/20141024-162448.0656596everything.jpg</span>
+<span class="c1">#&gt; 4   http://data.techno-science.ca/uploads/group/20141024-162528.8786547location.jpg</span>
+<span class="c1">#&gt; 5     http://data.techno-science.ca/uploads/group/20141024-162608.3732604resour.jpg</span>
+<span class="c1">#&gt; 6    http://data.techno-science.ca/uploads/group/20141024-162549.1925831sciinst.jpg</span>
+<span class="c1">#&gt; 7  http://data.techno-science.ca/uploads/group/20141024-162624.1872823transport.jpg</span>
+<span class="c1">#&gt;   approval_status is_organization  state</span>
+<span class="c1">#&gt; 1        approved           FALSE active</span>
+<span class="c1">#&gt; 2        approved           FALSE active</span>
+<span class="c1">#&gt; 3        approved           FALSE active</span>
+<span class="c1">#&gt; 4        approved           FALSE active</span>
+<span class="c1">#&gt; 5        approved           FALSE active</span>
+<span class="c1">#&gt; 6        approved           FALSE active</span>
+<span class="c1">#&gt; 7        approved           FALSE active</span>
+<span class="c1">#&gt;                               image_url</span>
+<span class="c1">#&gt; 1       20141024-162305.6896412comm.jpg</span>
+<span class="c1">#&gt; 2    20141024-162324.3636615domtech.jpg</span>
+<span class="c1">#&gt; 3 20141024-162448.0656596everything.jpg</span>
+<span class="c1">#&gt; 4   20141024-162528.8786547location.jpg</span>
+<span class="c1">#&gt; 5     20141024-162608.3732604resour.jpg</span>
+<span class="c1">#&gt; 6    20141024-162549.1925831sciinst.jpg</span>
+<span class="c1">#&gt; 7  20141024-162624.1872823transport.jpg</span>
+<span class="c1">#&gt;                            revision_id packages  type</span>
+<span class="c1">#&gt; 1 cc302424-2e68-4fcc-9a3a-6de60748c2e4        5 group</span>
+<span class="c1">#&gt; 2 b7d95b87-5999-45f9-8775-c64094842551        2 group</span>
+<span class="c1">#&gt; 3 c2f0c59a-a543-4d67-a61f-4f387068ba53        1 group</span>
+<span class="c1">#&gt; 4 6816d571-d2bd-4131-b99d-80e7e6797492        4 group</span>
+<span class="c1">#&gt; 5 e37ee30d-577b-4349-8f0e-eaa4543497e8        6 group</span>
+<span class="c1">#&gt; 6 74eba42e-08b3-4400-b40f-3d6159ae6e9d       10 group</span>
+<span class="c1">#&gt; 7 a6cc4aab-eae9-42ba-9ab4-cbf45d5c6a0e        7 group</span>
+<span class="c1">#&gt;                                     id                               name</span>
+<span class="c1">#&gt; 1 5268ce18-e3b8-4802-b29e-30740b46e52d                     communications</span>
+<span class="c1">#&gt; 2 5a9a8095-9e0c-485e-84f6-77f577607991 domestic-and-industrial-technology</span>
+<span class="c1">#&gt; 3 d7dd233e-a1cc-43da-8152-f7ed15d26756                         everything</span>
+<span class="c1">#&gt; 4 770fc9c0-d4f3-48b0-a4ee-e00c6882df1d                           location</span>
+<span class="c1">#&gt; 5 f6c205de-cc95-4308-ac9f-5a63f1a5c7ee                          resources</span>
+<span class="c1">#&gt; 6 b98ff457-2031-48b6-b681-9adb3afc501b         scientific-instrumentation</span>
+<span class="c1">#&gt; 7 a73bf7be-310d-472e-83e1-43a3d87602ba                     transportation</span>
+</code></pre></div>
+<h2>Show groups</h2>
+
+<p>Subset for readme brevity</p>
+<div class="highlight"><pre><code class="language-r" data-lang="r">group_show<span class="p">(</span><span class="s">&#39;communications&#39;</span><span class="p">,</span> as<span class="o">=</span><span class="s">&#39;table&#39;</span><span class="p">)</span><span class="o">$</span>users
+<span class="c1">#&gt;   openid about capacity     name                    created</span>
+<span class="c1">#&gt; 1     NA  &lt;NA&gt;    admin     marc 2014-10-24T14:44:29.885262</span>
+<span class="c1">#&gt; 2     NA          admin sepandar 2014-10-23T19:40:42.056418</span>
+<span class="c1">#&gt;                         email_hash sysadmin</span>
+<span class="c1">#&gt; 1 a32002c960476614370a16e9fb81f436    FALSE</span>
+<span class="c1">#&gt; 2 10b930a228afd1da2647d62e70b71bf8     TRUE</span>
+<span class="c1">#&gt;   activity_streams_email_notifications  state number_of_edits</span>
+<span class="c1">#&gt; 1                                FALSE active             376</span>
+<span class="c1">#&gt; 2                                FALSE active              44</span>
+<span class="c1">#&gt;   number_administered_packages display_name fullname</span>
+<span class="c1">#&gt; 1                           39         marc     &lt;NA&gt;</span>
+<span class="c1">#&gt; 2                            1     sepandar         </span>
+<span class="c1">#&gt;                                     id</span>
+<span class="c1">#&gt; 1 27778230-2e90-4818-9f00-bbf778c8fa09</span>
+<span class="c1">#&gt; 2 b50449ea-1dcc-4d52-b620-fc95bf56034b</span>
+</code></pre></div>
+<h2>Show a package</h2>
+<div class="highlight"><pre><code class="language-r" data-lang="r">package_show<span class="p">(</span><span class="s">&#39;34d60b13-1fd5-430e-b0ec-c8bc7f4841cf&#39;</span><span class="p">,</span> as<span class="o">=</span><span class="s">&#39;table&#39;</span><span class="p">)</span><span class="o">$</span>resources
+<span class="c1">#&gt;                      resource_group_id cache_last_updated</span>
+<span class="c1">#&gt; 1 ea8533d9-cdc6-4e0e-97b9-894e06d50b92                 NA</span>
+<span class="c1">#&gt; 2 ea8533d9-cdc6-4e0e-97b9-894e06d50b92                 NA</span>
+<span class="c1">#&gt; 3 ea8533d9-cdc6-4e0e-97b9-894e06d50b92                 NA</span>
+<span class="c1">#&gt; 4 ea8533d9-cdc6-4e0e-97b9-894e06d50b92                 NA</span>
+<span class="c1">#&gt;           revision_timestamp webstore_last_updated</span>
+<span class="c1">#&gt; 1 2014-10-28T18:13:22.213530                    NA</span>
+<span class="c1">#&gt; 2 2014-11-04T02:59:50.567068                    NA</span>
+<span class="c1">#&gt; 3 2014-11-05T21:23:58.533397                    NA</span>
+<span class="c1">#&gt; 4 2014-11-05T21:25:16.848423                    NA</span>
+<span class="c1">#&gt;                                     id size  state hash</span>
+<span class="c1">#&gt; 1 be2b0af8-24a8-4a55-8b30-89f5459b713a   NA active     </span>
+<span class="c1">#&gt; 2 7d65910e-4bdc-4f06-a213-e24e36762767   NA active     </span>
+<span class="c1">#&gt; 3 97622ad7-1507-4f6a-8acb-14e826447389   NA active     </span>
+<span class="c1">#&gt; 4 7a72498a-c49c-4e84-8b10-58991de10df6   NA active     </span>
+<span class="c1">#&gt;                                    description format</span>
+<span class="c1">#&gt; 1                                  XML Dataset    XML</span>
+<span class="c1">#&gt; 2 Data dictionary for CSTMC artifact datasets.    XLS</span>
+<span class="c1">#&gt; 3       Tips for using the artifacts datasets.   .php</span>
+<span class="c1">#&gt; 4       Tips for using the artifacts datasets.   .php</span>
+<span class="c1">#&gt;   tracking_summary.total tracking_summary.recent mimetype_inner url_type</span>
+<span class="c1">#&gt; 1                      0                       0             NA       NA</span>
+<span class="c1">#&gt; 2                      0                       0             NA       NA</span>
+<span class="c1">#&gt; 3                      0                       0             NA       NA</span>
+<span class="c1">#&gt; 4                      0                       0             NA       NA</span>
+<span class="c1">#&gt;   mimetype cache_url                               name</span>
+<span class="c1">#&gt; 1       NA        NA Artifact Data - Vacuum Tubes (XML)</span>
+<span class="c1">#&gt; 2       NA        NA                    Data Dictionary</span>
+<span class="c1">#&gt; 3       NA        NA                     Tips (English)</span>
+<span class="c1">#&gt; 4       NA        NA                      Tips (French)</span>
+<span class="c1">#&gt;                      created</span>
+<span class="c1">#&gt; 1 2014-10-28T18:13:22.240393</span>
+<span class="c1">#&gt; 2 2014-11-04T02:59:50.643658</span>
+<span class="c1">#&gt; 3 2014-11-04T18:14:23.952937</span>
+<span class="c1">#&gt; 4 2014-11-05T21:25:16.887796</span>
+<span class="c1">#&gt;                                                                                                                                                    url</span>
+<span class="c1">#&gt; 1                         http://source.techno-science.ca/datasets-donn%C3%A9es/artifacts-artefacts/groups-groupes/vacuum-tubes-tubes-electronique.xml</span>
+<span class="c1">#&gt; 2 http://source.techno-science.ca/datasets-donn%C3%A9es/artifacts-artefacts/cstmc-artifact-data-dictionary-dictionnaire-de-donnees-artefacts-smstc.xls</span>
+<span class="c1">#&gt; 3                                                                          http://techno-science.ca/en/open-data/tips-using-artifact-open-data-set.php</span>
+<span class="c1">#&gt; 4                                                                 http://techno-science.ca/fr/donnees-ouvertes/conseils-donnees-ouvertes-artefacts.php</span>
+<span class="c1">#&gt;   webstore_url last_modified position                          revision_id</span>
+<span class="c1">#&gt; 1           NA            NA        0 9a27d884-f181-4842-ab47-cda35a8bf99a</span>
+<span class="c1">#&gt; 2           NA            NA        1 5d27b3e6-7870-4c12-a122-9e9f5adee4a0</span>
+<span class="c1">#&gt; 3           NA            NA        2 40993f16-402b-439c-9288-2f2b177e4b8f</span>
+<span class="c1">#&gt; 4           NA            NA        3 57f1488e-a140-4eb6-9329-fc13202a73af</span>
+<span class="c1">#&gt;   resource_type</span>
+<span class="c1">#&gt; 1            NA</span>
+<span class="c1">#&gt; 2            NA</span>
+<span class="c1">#&gt; 3            NA</span>
+<span class="c1">#&gt; 4            NA</span>
+</code></pre></div>
+<h2>Search for packages</h2>
+<div class="highlight"><pre><code class="language-r" data-lang="r">out <span class="o">&lt;-</span> package_search<span class="p">(</span>q <span class="o">=</span> <span class="s">&#39;*:*&#39;</span><span class="p">,</span> rows <span class="o">=</span> <span class="m">2</span><span class="p">,</span> as<span class="o">=</span><span class="s">&quot;table&quot;</span><span class="p">)</span><span class="o">$</span>results
+out<span class="p">[,</span> <span class="o">!</span><span class="kp">names</span><span class="p">(</span>out<span class="p">)</span> <span class="o">%in%</span> <span class="s">&#39;resources&#39;</span><span class="p">]</span>
+<span class="c1">#&gt;                      license_title maintainer relationships_as_object</span>
+<span class="c1">#&gt; 1 Open Government Licence - Canada                               NULL</span>
+<span class="c1">#&gt; 2 Open Government Licence - Canada                               NULL</span>
+<span class="c1">#&gt;   private maintainer_email         revision_timestamp</span>
+<span class="c1">#&gt; 1   FALSE                  2014-11-05T23:17:46.220002</span>
+<span class="c1">#&gt; 2   FALSE                  2014-11-05T23:17:04.923594</span>
+<span class="c1">#&gt;                                     id           metadata_created</span>
+<span class="c1">#&gt; 1 35d5484d-38ce-495e-8722-7857c4fd17bf 2014-10-28T20:13:11.572558</span>
+<span class="c1">#&gt; 2 da65507d-b018-4d3b-bde3-5419cf29d144 2014-10-28T14:59:21.386177</span>
+<span class="c1">#&gt;            metadata_modified author author_email  state version</span>
+<span class="c1">#&gt; 1 2014-11-05T23:17:46.220657                     active        </span>
+<span class="c1">#&gt; 2 2014-11-05T23:17:04.924229                     active        </span>
+<span class="c1">#&gt;                        creator_user_id    type num_resources</span>
+<span class="c1">#&gt; 1 27778230-2e90-4818-9f00-bbf778c8fa09 dataset             4</span>
+<span class="c1">#&gt; 2 27778230-2e90-4818-9f00-bbf778c8fa09 dataset             4</span>
+<span class="c1">#&gt;                                                                                                                       tags</span>
+<span class="c1">#&gt; 1                         NA, Location, Location, 2014-10-28T20:13:11.572558, active, da88c5a2-3766-41ea-a75b-9c87047cc528</span>
+<span class="c1">#&gt; 2 NA, Computing Technology, Computing Technology, 2014-10-28T14:59:21.386177, active, 5371dc28-9ce8-4f21-9afb-1f155f132bfe</span>
+<span class="c1">#&gt;   tracking_summary.total tracking_summary.recent</span>
+<span class="c1">#&gt; 1                     35                      10</span>
+<span class="c1">#&gt; 2                     24                       8</span>
+<span class="c1">#&gt;                                                                                                                                                                                                       groups</span>
+<span class="c1">#&gt; 1                                                      Location, , http://data.techno-science.ca/uploads/group/20141024-162528.8786547location.jpg, Location, 770fc9c0-d4f3-48b0-a4ee-e00c6882df1d, location</span>
+<span class="c1">#&gt; 2 Scientific Instrumentation, , http://data.techno-science.ca/uploads/group/20141024-162549.1925831sciinst.jpg, Scientific Instrumentation, b98ff457-2031-48b6-b681-9adb3afc501b, scientific-instrumentation</span>
+<span class="c1">#&gt;   license_id relationships_as_subject num_tags organization.description</span>
+<span class="c1">#&gt; 1 ca-ogl-lgo                     NULL        1                         </span>
+<span class="c1">#&gt; 2 ca-ogl-lgo                     NULL        1                         </span>
+<span class="c1">#&gt;         organization.created organization.title organization.name</span>
+<span class="c1">#&gt; 1 2014-10-24T14:49:36.878579              CSTMC             cstmc</span>
+<span class="c1">#&gt; 2 2014-10-24T14:49:36.878579              CSTMC             cstmc</span>
+<span class="c1">#&gt;   organization.revision_timestamp organization.is_organization</span>
+<span class="c1">#&gt; 1      2014-10-24T14:49:36.813670                         TRUE</span>
+<span class="c1">#&gt; 2      2014-10-24T14:49:36.813670                         TRUE</span>
+<span class="c1">#&gt;   organization.state organization.image_url</span>
+<span class="c1">#&gt; 1             active                       </span>
+<span class="c1">#&gt; 2             active                       </span>
+<span class="c1">#&gt;               organization.revision_id organization.type</span>
+<span class="c1">#&gt; 1 7a325a56-46f1-419c-b7b2-ec7501edb35a      organization</span>
+<span class="c1">#&gt; 2 7a325a56-46f1-419c-b7b2-ec7501edb35a      organization</span>
+<span class="c1">#&gt;                        organization.id organization.approval_status</span>
+<span class="c1">#&gt; 1 fafa260d-e2bf-46cd-9c35-34c1dfa46c57                     approved</span>
+<span class="c1">#&gt; 2 fafa260d-e2bf-46cd-9c35-34c1dfa46c57                     approved</span>
+<span class="c1">#&gt;                                                          name isopen url</span>
+<span class="c1">#&gt; 1 artifact-data-location-canada-science-and-technology-museum  FALSE    </span>
+<span class="c1">#&gt; 2                          artifact-data-computing-technology  FALSE    </span>
+<span class="c1">#&gt;                                                                                                                                                                        notes</span>
+<span class="c1">#&gt; 1 This dataset includes artifacts in the collection of the Canada Science and Technology Museums Corporation that are currently in the Canada Science and Technology Museum.</span>
+<span class="c1">#&gt; 2                                This dataset includes artifacts in the collection of the Canada Science and Technology Museums Corporation related to computing technology.</span>
+<span class="c1">#&gt;                              owner_org extras</span>
+<span class="c1">#&gt; 1 fafa260d-e2bf-46cd-9c35-34c1dfa46c57   NULL</span>
+<span class="c1">#&gt; 2 fafa260d-e2bf-46cd-9c35-34c1dfa46c57   NULL</span>
+<span class="c1">#&gt;                                            license_url</span>
+<span class="c1">#&gt; 1 http://data.gc.ca/eng/open-government-licence-canada</span>
+<span class="c1">#&gt; 2 http://data.gc.ca/eng/open-government-licence-canada</span>
+<span class="c1">#&gt;                                                             title</span>
+<span class="c1">#&gt; 1 Artifact Data - Location - Canada Science and Technology Museum</span>
+<span class="c1">#&gt; 2                            Artifact Data - Computing Technology</span>
+<span class="c1">#&gt;                            revision_id</span>
+<span class="c1">#&gt; 1 694a977a-c238-47a4-8671-caddca4edfca</span>
+<span class="c1">#&gt; 2 858cb240-76a0-406a-800c-e4ae6cc56ab9</span>
+</code></pre></div>
+<h2>Search for resources</h2>
+<div class="highlight"><pre><code class="language-r" data-lang="r">resource_search<span class="p">(</span>q <span class="o">=</span> <span class="s">&#39;name:data&#39;</span><span class="p">,</span> limit <span class="o">=</span> <span class="m">2</span><span class="p">,</span> as<span class="o">=</span><span class="s">&#39;table&#39;</span><span class="p">)</span>
+<span class="c1">#&gt; $count</span>
+<span class="c1">#&gt; [1] 71</span>
+<span class="c1">#&gt; </span>
+<span class="c1">#&gt; $results</span>
+<span class="c1">#&gt;                      resource_group_id cache_last_updated</span>
+<span class="c1">#&gt; 1 01a82e52-01bf-4a9c-9b45-c4f9b92529fa                 NA</span>
+<span class="c1">#&gt; 2 01a82e52-01bf-4a9c-9b45-c4f9b92529fa                 NA</span>
+<span class="c1">#&gt;   webstore_last_updated                                   id size  state</span>
+<span class="c1">#&gt; 1                    NA e179e910-27fb-44f4-a627-99822af49ffa   NA active</span>
+<span class="c1">#&gt; 2                    NA ba84e8b7-b388-4d2a-873a-7b107eb7f135   NA active</span>
+<span class="c1">#&gt;   last_modified hash                                  description format</span>
+<span class="c1">#&gt; 1            NA                                       XML Dataset    XML</span>
+<span class="c1">#&gt; 2            NA      Data dictionary for CSTMC artifact datasets.    XLS</span>
+<span class="c1">#&gt;   mimetype_inner url_type mimetype cache_url</span>
+<span class="c1">#&gt; 1             NA       NA       NA        NA</span>
+<span class="c1">#&gt; 2             NA       NA       NA        NA</span>
+<span class="c1">#&gt;                                           name                    created</span>
+<span class="c1">#&gt; 1 Artifact Data - Exploration and Survey (XML) 2014-10-28T15:50:35.374303</span>
+<span class="c1">#&gt; 2                              Data Dictionary 2014-11-03T18:01:02.094210</span>
+<span class="c1">#&gt;                                                                                                                                                    url</span>
+<span class="c1">#&gt; 1              http://source.techno-science.ca/datasets-donn%C3%A9es/artifacts-artefacts/groups-groupes/exploration-and-survey-exploration-et-leve.xml</span>
+<span class="c1">#&gt; 2 http://source.techno-science.ca/datasets-donn%C3%A9es/artifacts-artefacts/cstmc-artifact-data-dictionary-dictionnaire-de-donnees-artefacts-smstc.xls</span>
+<span class="c1">#&gt;   webstore_url position                          revision_id resource_type</span>
+<span class="c1">#&gt; 1           NA        0 a22e6741-3e89-4db0-a802-ba594b1c1fad            NA</span>
+<span class="c1">#&gt; 2           NA        1 da1f8585-521d-47ef-8ead-7832474a3421            NA</span>
+</code></pre></div>
+<h2>Future work</h2>
+
+<ul>
+<li>There&#39;s already <a href="https://github.com/ropensci/ckanr/issues/4">an issue</a> to add support for <a href="http://docs.ckan.org/en/latest/maintaining/datastore.html">DataStore</a></li>
+<li>This client needs to be tested against many other CKAN API instances to make sure it&#39;s robust</li>
+<li>Add a test suite</li>
+<li>Use cases: would be nice to include in the package documentation use cases</li>
+<li>Other things? Get in touch on twitter <code>@recology_</code> or below</li>
+</ul>
+
+  </div>
+  
+  <div class="post">
+    <h1>
       <a href="/2014/11/github-fun/">
         Fun with the GitHub API
       </a>
@@ -487,139 +856,6 @@ db_list<span class="p">(</span>config<span class="o">=</span>verbose<span class=
 <p>I&#39;m working on an R client for Elaticsearch called <code>elastic</code> - find it at <a href="https://github.com/ropensci/elastic">https://github.com/ropensci/elastic</a></p>
 
 <p>Thinking about where to include functions to allow <code>elastic</code> and <code>sofa</code> to work together...if you have any thoughts hit up the issues. I&#39;ll probably include helper functions for CouchDB search in the <code>elastic</code> package, interfacing with the <a href="https://github.com/elasticsearch/elasticsearch-river-couchdb">CouchDB plugin for Elasticsearch</a>.</p>
-
-  </div>
-  
-  <div class="post">
-    <h1>
-      <a href="/2014/10/conditionality-meta-analysis/">
-        Conditionality meta-analysis data
-      </a>
-    </h1>
-
-    <span class="post-date">06 Oct 2014</span>
-
-    <h2>The paper</h2>
-
-<p>One paper from my graduate work asked most generally ~ &quot;How much does the variation in magnitudes and signs of species interaction outcomes vary?&quot;. More specifically, we wanted to know if variation differed among species interaction classes (mutualism, competition, predation), and among various &quot;gradients&quot; (space, time, etc.). To answer this question, we used a meta-analysis approach (rather than e.g., a field experiment). We <a href="http://scottchamberlain.info/publications/">published the paper</a> recently.</p>
-
-<blockquote>
-<p>p.s. I really really wish we would have put it in an open access journal...</p>
-</blockquote>
-
-<h2>The data</h2>
-
-<p>Anyway, I&#39;m here to talk about the <strong>data</strong>. We didn&#39;t get the data up with the paper, but it is <a href="http://figshare.com/articles/Conditionality_data/1097657">up on Figshare</a> now. The files there are the following:</p>
-
-<ul>
-<li><code>coniditionality.R</code> - script used to process the data from <code>variables_prelim.csv</code></li>
-<li><code>variables_prelim.csv</code> - description of variables in the preliminary data set, matches <code>conditionality_data_prelim.csv</code></li>
-<li><code>variables_used.csv</code> - description of variables in the used data set, matches <code>conditionality_data_used.csv</code></li>
-<li><code>conditionality_data_prelim.csv</code> - preliminary data, the raw data</li>
-<li><code>conditionality_data_used.csv</code> - the data used for our paper</li>
-<li><code>README.md</code> - the readme</li>
-<li><code>paper_selection.csv</code> - the list of papers we went through, with remarks about paper selection</li>
-</ul>
-
-<p>Please do play with the data, publish some papers, etc, etc. It took 6 of us about 4 years to collect this data; we skimmed through ~11,000 papers on the first pass (aka. skimming through abstracts in Google Scholar and Web of Science), then decided on nearly 500 papers to get data from, and narrowed down to 247 papers for the publication mentioned above. Now, there was no funding for this, so it was sort of done in between other projects, but still, it was simply <strong>A LOT</strong> of tables to digitize, and graphs to extract data points from. <strong>Anyway</strong>, hopefully you will find this data useful :p</p>
-
-<h2>EML</h2>
-
-<p>I think this dataset would be a great introduction to the potential power of EML (<a href="https://knb.ecoinformatics.org/#external//emlparser/docs/index.html">Ecological Metadata Langauge</a>). At <a href="http://ropensci.org/">rOpenSci</a>, one of our team <a href="http://www.carlboettiger.info/">Carl Boettiger</a>, along with Claas-Thido Pfaff, Duncan Temple Lang, Karthik Ram, and Matt Jones, have created an R client for EML, to parse EML files and to create and publish them.</p>
-
-<h2>What is EML?/Why EML?</h2>
-
-<p>A demonstration is in order...</p>
-
-<h2>Example using EML with this dataset</h2>
-
-<h3>Install EML</h3>
-<div class="highlight"><pre><code class="language-r" data-lang="r"><span class="kn">library</span><span class="p">(</span><span class="s">&quot;devtools&quot;</span><span class="p">)</span>
-install.packages<span class="p">(</span><span class="s">&quot;RHTMLForms&quot;</span><span class="p">,</span> repos <span class="o">=</span> <span class="s">&quot;http://www.omegahat.org/R/&quot;</span><span class="p">,</span> type<span class="o">=</span><span class="s">&quot;source&quot;</span><span class="p">)</span>
-install_github<span class="p">(</span><span class="s">&quot;ropensci/EML&quot;</span><span class="p">,</span> build<span class="o">=</span><span class="kc">FALSE</span><span class="p">,</span> dependencies<span class="o">=</span><span class="kt">c</span><span class="p">(</span><span class="s">&quot;DEPENDS&quot;</span><span class="p">,</span> <span class="s">&quot;IMPORTS&quot;</span><span class="p">))</span>
-</code></pre></div>
-<p>Load <code>EML</code></p>
-<div class="highlight"><pre><code class="language-r" data-lang="r"><span class="kn">library</span><span class="p">(</span><span class="s">&#39;EML&#39;</span><span class="p">)</span>
-</code></pre></div>
-<h3>Prepare metadata</h3>
-<div class="highlight"><pre><code class="language-r" data-lang="r"><span class="c1"># dataset</span>
-prelim_dat <span class="o">&lt;-</span> read.csv<span class="p">(</span><span class="s">&quot;conditionality_data_prelim.csv&quot;</span><span class="p">)</span>
-<span class="c1"># variable descriptions for each column</span>
-prelim_vars <span class="o">&lt;-</span> read.csv<span class="p">(</span><span class="s">&quot;variables_prelim.csv&quot;</span><span class="p">,</span> stringsAsFactors <span class="o">=</span> <span class="kc">FALSE</span><span class="p">)</span>
-</code></pre></div>
-<p>Get column definitions in a vector</p>
-<div class="highlight"><pre><code class="language-r" data-lang="r">col_defs <span class="o">&lt;-</span> prelim_vars<span class="o">$</span>description
-</code></pre></div>
-<p>Create unit definitions for each column</p>
-<div class="highlight"><pre><code class="language-r" data-lang="r">unit_defs <span class="o">&lt;-</span> <span class="kt">list</span><span class="p">(</span>
-  <span class="kt">c</span><span class="p">(</span>unit <span class="o">=</span> <span class="s">&quot;number&quot;</span><span class="p">,</span>
-    bounds <span class="o">=</span> <span class="kt">c</span><span class="p">(</span><span class="m">0</span><span class="p">,</span> <span class="kc">Inf</span><span class="p">)),</span>
-  <span class="kt">c</span><span class="p">(</span>unit <span class="o">=</span> <span class="s">&quot;number&quot;</span><span class="p">,</span>
-    bounds <span class="o">=</span> <span class="kt">c</span><span class="p">(</span><span class="m">0</span><span class="p">,</span> <span class="kc">Inf</span><span class="p">)),</span>
-  <span class="s">&quot;independent replicates&quot;</span><span class="p">,</span>
-  <span class="kt">c</span><span class="p">(</span>unit <span class="o">=</span> <span class="s">&quot;number&quot;</span><span class="p">,</span>
-    bounds <span class="o">=</span> <span class="kt">c</span><span class="p">(</span><span class="m">0</span><span class="p">,</span> <span class="kc">Inf</span><span class="p">)),</span>
-
-  <span class="kc">...</span> <span class="o">&lt;</span>CUTOFF<span class="o">&gt;</span>
-<span class="p">)</span>
-</code></pre></div>
-<h3>Write an EML file</h3>
-<div class="highlight"><pre><code class="language-r" data-lang="r">eml_write<span class="p">(</span>prelim_dat<span class="p">,</span>
-          unit.defs <span class="o">=</span> unit_defs<span class="p">,</span>
-          col.defs <span class="o">=</span> col_defs<span class="p">,</span>
-          creator <span class="o">=</span> <span class="s">&quot;Scott Chamberlain&quot;</span><span class="p">,</span>
-          contact <span class="o">=</span> <span class="s">&quot;myrmecocystus@gmail.com&quot;</span><span class="p">,</span>
-          file <span class="o">=</span> <span class="s">&quot;conditionality_data_prelim_eml.xml&quot;</span><span class="p">)</span>
-</code></pre></div><div class="highlight"><pre><code class="language-text" data-lang="text">## [1] &quot;conditionality_data_prelim_eml.xml&quot;
-</code></pre></div>
-<h3>Validate the EML file</h3>
-<div class="highlight"><pre><code class="language-r" data-lang="r">eml_validate<span class="p">(</span><span class="s">&quot;conditionality_data_prelim_eml.xml&quot;</span><span class="p">)</span>
-</code></pre></div><div class="highlight"><pre><code class="language-text" data-lang="text">## EML specific tests XML specific tests 
-##               TRUE               TRUE
-</code></pre></div>
-<h3>Read data and metadata</h3>
-<div class="highlight"><pre><code class="language-r" data-lang="r">gg <span class="o">&lt;-</span> eml_read<span class="p">(</span><span class="s">&quot;conditionality_data_prelim_eml.xml&quot;</span><span class="p">)</span>
-eml_get<span class="p">(</span>gg<span class="p">,</span> <span class="s">&quot;contact&quot;</span><span class="p">)</span>
-</code></pre></div><div class="highlight"><pre><code class="language-text" data-lang="text">## [1] &quot;myrmecocystus@gmail.com&quot;
-</code></pre></div><div class="highlight"><pre><code class="language-r" data-lang="r">eml_get<span class="p">(</span>gg<span class="p">,</span> <span class="s">&quot;citation_info&quot;</span><span class="p">)</span>
-</code></pre></div><div class="highlight"><pre><code class="language-text" data-lang="text">## Chamberlain S (2014-10-06). _metadata_.
-</code></pre></div><div class="highlight"><pre><code class="language-r" data-lang="r">dat <span class="o">&lt;-</span> eml_get<span class="p">(</span>gg<span class="p">,</span> <span class="s">&quot;data.frame&quot;</span><span class="p">)</span>
-<span class="kp">head</span><span class="p">(</span>dat<span class="p">[,</span><span class="kt">c</span><span class="p">(</span><span class="m">1</span><span class="o">:</span><span class="m">10</span><span class="p">)])</span>
-</code></pre></div><div class="highlight"><pre><code class="language-text" data-lang="text">##   order i indrep avg author_last  finit_1 finit_2 finit_abv co_author
-## 1     1 1      a   1      Devall margaret       s        ms     Thein
-## 2     2 1      a   2      Devall margaret       s        ms     Thein
-## 3     3 1      a   3      Devall margaret       s        ms     Thein
-## 4     4 1      a   4      Devall margaret       s        ms     Thein
-## 5     5 1      a   5      Devall margaret       s        ms     Thein
-## 6     6 1      a   6      Devall margaret       s        ms     Thein
-##   sinit_1
-## 1 leonard
-## 2 leonard
-## 3 leonard
-## 4 leonard
-## 5 leonard
-## 6 leonard
-</code></pre></div>
-<h3>Publish</h3>
-
-<p>We can also use the <code>EML</code> package to publish the data, here to <a href="http://figshare.com">Figshare</a>.</p>
-
-<p>First, install <code>rfigshare</code></p>
-<div class="highlight"><pre><code class="language-r" data-lang="r">install.packages<span class="p">(</span><span class="s">&quot;rfigshare&quot;</span><span class="p">)</span>
-<span class="kn">library</span><span class="p">(</span><span class="s">&#39;rfigshare&#39;</span><span class="p">)</span>
-</code></pre></div>
-<p>Then publish using <code>eml_publish()</code></p>
-<div class="highlight"><pre><code class="language-r" data-lang="r">figid <span class="o">&lt;-</span> eml_publish<span class="p">(</span>
-            file <span class="o">=</span> <span class="s">&quot;conditionality_data_prelim_eml.xml&quot;</span><span class="p">,</span>
-            description <span class="o">=</span> <span class="s">&quot;EML file for Chamberlain, S.A., J.A. Rudgers, and J.L. Bronstein. 2014. How context-dependent are species interactions. Ecology Letters&quot;</span><span class="p">,</span>
-            categories <span class="o">=</span> <span class="s">&quot;Ecology&quot;</span><span class="p">,</span>
-            tags <span class="o">=</span> <span class="s">&quot;EML&quot;</span><span class="p">,</span>
-            destination <span class="o">=</span> <span class="s">&quot;figshare&quot;</span><span class="p">,</span>
-            visibility <span class="o">=</span> <span class="s">&quot;public&quot;</span><span class="p">,</span>
-            title <span class="o">=</span> <span class="s">&quot;condionality data, EML&quot;</span><span class="p">)</span>
-fs_make_public<span class="p">(</span>figid<span class="p">)</span>
-</code></pre></div>
-<p><img src="/public/img/2014-10-06-conditionality-meta-analysis/figshare_conditional.png" alt=""></p>
 
   </div>
   
