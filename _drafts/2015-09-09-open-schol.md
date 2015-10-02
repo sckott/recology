@@ -2,9 +2,9 @@
 name: open-schol
 layout: post
 title: Thoughts on principles for open scholarly infrastructure
-date: 2015-09-09
+date: 2015-09-29
 author: Scott Chamberlain
-sourceslug: _drafts/2015-09-09-open-schol.Rmd
+sourceslug: _drafts/2015-09-29-open-schol.Rmd
 tags:
 - infrastructure
 - open science
@@ -56,9 +56,10 @@ In some ways, rOpenSci isn't infrastructure. For example, we are specific to a s
 
 ### Addressing principles in software
 
+* Insurance - The open source nature of our software only addresses this principle. That is, liberally licensed open source software goes a long way towards making sure that the software is owned by the community (even if properietary derivatives are made).
 * Governance - xxx
 * Sustainability - xxx
-* Insurance - xxx
+
 
 [geoff]: http://www.gbilder.com/blog/
 [jlin]: https://about.me/jenniferlin
