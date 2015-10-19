@@ -6,15 +6,25 @@ date: 2015-10-19
 author: Scott Chamberlain
 sourceslug: _drafts/2015-10-19-open-source-metrics.Rmd
 tags:
-- API
+- data
 - open source
+- altmetrics
+- code
+- ropensci
+- R
 ---
 
 
 
-Measuring use of open source software isn't always straightforward. The problem is especially acute for software targeted largely at academics, where usage is not measured just by software downloads, but by citations. Citations are a known pain point because citation data is largely privately held (e.g., [Scopus][scopus], or [Google Scholar][schol]). New ventures aim to open up citation data, but of course it's an immense amount of work, and so does not come quickly.
+Measuring use of open source software isn't always straightforward. The problem is especially acute for software targeted largely at academia, where usage is not measured just by software downloads, but also by citations.
 
-The following is a laundry list of metrics on software of which I am aware. I primarily develop software for the R language, so some of the metrics are specific to R, but most are not. I organized the things by source instead of type of data because some sources give multiple kinds of data - I note what kinds of data they give with <span class="label label-default">labels</span>.
+Citations are a well-known pain point because the citation graph is privately held by iron doors (e.g., [Scopus][scopus], [Google Scholar][schol]). New ventures aim to open up citation data, but of course it's an immense amount of work, and so does not come quickly.
+
+The following is a laundry list of metrics on software of which I am aware, and some of which I use in our [rOpenSci twice monthly updates][news].
+
+I primarily develop software for the R language, so some of the metrics are specific to R, but many are not. In addition, we (rOpenSci) don't develop web apps, which may bring in an additional set of metrics not covered below.
+
+I organize by source instead of type of data because some sources give multiple kinds of data - I note what kinds of data they give with <span class="label label-default">labels</span>.
 
 ## CRAN downloads
 
@@ -29,7 +39,7 @@ The following is a laundry list of metrics on software of which I am aware. I pr
 <small><span class="label label-success">citations</span>&nbsp;<span class="label label-info">github</span>&nbsp;<span class="label label-primary">social-media</span></small>
 
 - Link: [http://software.lagotto.io/works](http://software.lagotto.io/works)
-- Lagotto is a Rails application originally designed to collect and provide article level metrics for scientific publications at Public Library of Science. It is now used by many publishers, and there are installations of Lagotto targeting [datasets](http://mdc.lagotto.io/) and [software](http://software.lagotto.io/works).
+- Lagotto is a Rails application, developed by [Martin Fenner](https://github.com/mfenner), originally designed to collect and provide article level metrics for scientific publications at Public Library of Science. It is now used by many publishers, and there are installations of Lagotto targeting [datasets](http://mdc.lagotto.io/) and [software](http://software.lagotto.io/works).
 - Discussion forum: [http://discuss.lagotto.io/](http://discuss.lagotto.io/)
 
 ## Depsy
@@ -71,12 +81,17 @@ The following is a laundry list of metrics on software of which I am aware. I pr
 - Links: [https://developer.github.com/v3/](https://developer.github.com/v3/)
 - I keep a list of rOpenSci uses found in GitHub repos at [https://discuss.ropensci.org/t/use-of-some-ropensci-packages-on-github/137](https://discuss.ropensci.org/t/use-of-some-ropensci-packages-on-github/137)
 - GitHub does collect traffic data on each repo (clones, downloads, page views), but they are not exposed in the API. I've bugged them a bit about this - hopefully we'll be able to get that dat in their API soon.
+- Bitbucket/Gitlab - don't use them, but I assume they also provide some metrics via their APIs
 
 ## Other
 
 - Support forums: Whether you use UserVoice, Discourse, Google Groups, Gitter, etc., depending on your viewpoint, these interactions could be counted as metrics of software usage. 
 - Emails: I personally get a lot of emails asking for help with software I maintain. I imagine this is true for most software developers. Counting these could be another metric of software usage, although I never have counted mine.
 - Social media: See Lagotto above, which tracks some social media outlets.
+- Code coverage: There are many options now for code coverage, integrated with each Travis-CI build. A good option is [CodeCov](https://codecov.io). CodeCov gives percentage test coverage, which one could use as one measure of code quality.
+- Reviews: There isn't a lot of code review going on that I'm aware of. Even if there was, I suppose this would just be a logical TRUE/FALSE.
+- Cash money y'all: Grants/consulting income/etc. could be counted as a metric.
+- Users: If you require users to create an account or similar before getting your software, you have a sense of number of users and perhaps their demographics.
 
 ## Promising
 
@@ -89,7 +104,7 @@ Some software metrics things on the horizon that look interesting:
 
 ## Missed?
 
-Anything I missed? let me know 
+I'm sure I missed things. Let me know.
 
 [scopus]: http://www.scopus.com/
 [schol]: https://scholar.google.com/
@@ -98,3 +113,4 @@ Anything I missed? let me know
 [crmaybe]: https://github.com/CrossRef/rest-api-doc/issues/46
 [neil]: https://youtu.be/jMH7FTGqQEE?t=1h3m41s
 [wssspe3]: http://wssspe.researchcomputing.org.uk/wssspe3/
+[news]: http://ropensci.github.io/biweekly/

@@ -61,6 +61,154 @@
   
   <div class="post">
     <h1>
+      <a href="/2014/11/github-fun/">
+        Fun with the GitHub API
+      </a>
+    </h1>
+
+    <span class="post-date">26 Nov 2014</span>
+
+    <p>Recently I&#39;ve had fun playing with the GitHub API, and here are some notes to self about this fun having.</p>
+
+<h2>Setup</h2>
+
+<p>Get/load packages</p>
+<div class="highlight"><pre><code class="language-r" data-lang="r">install.packages<span class="p">(</span><span class="kt">c</span><span class="p">(</span><span class="s">&#39;devtools&#39;</span><span class="p">,</span><span class="s">&#39;jsonlite&#39;</span><span class="p">,</span><span class="s">&#39;httr&#39;</span><span class="p">,</span><span class="s">&#39;yaml&#39;</span><span class="p">))</span>
+</code></pre></div><div class="highlight"><pre><code class="language-r" data-lang="r"><span class="kn">library</span><span class="p">(</span><span class="s">&quot;devtools&quot;</span><span class="p">)</span>
+<span class="kn">library</span><span class="p">(</span><span class="s">&quot;httr&quot;</span><span class="p">)</span>
+<span class="kn">library</span><span class="p">(</span><span class="s">&quot;yaml&quot;</span><span class="p">)</span>
+</code></pre></div>
+<h2>Define a vector of package names</h2>
+<div class="highlight"><pre><code class="language-r" data-lang="r">pkgs <span class="o">&lt;-</span> <span class="kt">c</span><span class="p">(</span><span class="s">&quot;alm&quot;</span><span class="p">,</span> <span class="s">&quot;bmc&quot;</span><span class="p">,</span> <span class="s">&quot;bold&quot;</span><span class="p">,</span> <span class="s">&quot;clifro&quot;</span><span class="p">,</span> <span class="s">&quot;ecoengine&quot;</span><span class="p">,</span>
+  <span class="s">&quot;elastic&quot;</span><span class="p">,</span> <span class="s">&quot;fulltext&quot;</span><span class="p">,</span> <span class="s">&quot;geonames&quot;</span><span class="p">,</span> <span class="s">&quot;gistr&quot;</span><span class="p">,</span>
+  <span class="s">&quot;RNeXML&quot;</span><span class="p">,</span> <span class="s">&quot;rnoaa&quot;</span><span class="p">,</span> <span class="s">&quot;rnpn&quot;</span><span class="p">,</span> <span class="s">&quot;traits&quot;</span><span class="p">,</span> <span class="s">&quot;rplos&quot;</span><span class="p">,</span> <span class="s">&quot;rsnps&quot;</span><span class="p">,</span>
+  <span class="s">&quot;rWBclimate&quot;</span><span class="p">,</span> <span class="s">&quot;solr&quot;</span><span class="p">,</span> <span class="s">&quot;spocc&quot;</span><span class="p">,</span> <span class="s">&quot;taxize&quot;</span><span class="p">,</span> <span class="s">&quot;togeojson&quot;</span><span class="p">,</span> <span class="s">&quot;treeBASE&quot;</span><span class="p">)</span>
+pkgs <span class="o">&lt;-</span> <span class="kp">sort</span><span class="p">(</span>pkgs<span class="p">)</span>
+</code></pre></div>
+<h2>Define functions</h2>
+<div class="highlight"><pre><code class="language-r" data-lang="r">github_auth <span class="o">&lt;-</span> <span class="kr">function</span><span class="p">(</span>appname <span class="o">=</span> <span class="kp">getOption</span><span class="p">(</span><span class="s">&quot;gh_appname&quot;</span><span class="p">),</span> key <span class="o">=</span> <span class="kp">getOption</span><span class="p">(</span><span class="s">&quot;gh_id&quot;</span><span class="p">),</span>
+                        secret <span class="o">=</span> <span class="kp">getOption</span><span class="p">(</span><span class="s">&quot;gh_secret&quot;</span><span class="p">))</span> <span class="p">{</span>
+  <span class="kr">if</span> <span class="p">(</span><span class="kp">is.null</span><span class="p">(</span><span class="kp">getOption</span><span class="p">(</span><span class="s">&quot;gh_token&quot;</span><span class="p">)))</span> <span class="p">{</span>
+    myapp <span class="o">&lt;-</span> oauth_app<span class="p">(</span>appname<span class="p">,</span> key<span class="p">,</span> secret<span class="p">)</span>
+    token <span class="o">&lt;-</span> oauth2.0_token<span class="p">(</span>oauth_endpoints<span class="p">(</span><span class="s">&quot;github&quot;</span><span class="p">),</span> myapp<span class="p">)</span>
+    <span class="kp">options</span><span class="p">(</span>gh_token <span class="o">=</span> token<span class="p">)</span>
+  <span class="p">}</span> <span class="kr">else</span> <span class="p">{</span>
+    token <span class="o">&lt;-</span> <span class="kp">getOption</span><span class="p">(</span><span class="s">&quot;gh_token&quot;</span><span class="p">)</span>
+  <span class="p">}</span>
+  <span class="kr">return</span><span class="p">(</span>token<span class="p">)</span>
+<span class="p">}</span>
+
+make_url <span class="o">&lt;-</span> <span class="kr">function</span><span class="p">(</span>x<span class="p">,</span> y<span class="p">,</span> z<span class="p">)</span> <span class="p">{</span>
+  <span class="kp">sprintf</span><span class="p">(</span><span class="s">&quot;https://api.github.com/repos/%s/%s/%s&quot;</span><span class="p">,</span> x<span class="p">,</span> y<span class="p">,</span> z<span class="p">)</span>
+<span class="p">}</span>
+
+process_result <span class="o">&lt;-</span> <span class="kr">function</span><span class="p">(</span>x<span class="p">)</span> <span class="p">{</span>
+  stop_for_status<span class="p">(</span>x<span class="p">)</span>
+  <span class="kr">if</span> <span class="p">(</span><span class="o">!</span>x<span class="o">$</span>headers<span class="o">$</span><span class="sb">`content-type`</span> <span class="o">==</span> <span class="s">&quot;application/json; charset=utf-8&quot;</span><span class="p">)</span>
+    <span class="kp">stop</span><span class="p">(</span><span class="s">&quot;content type mismatch&quot;</span><span class="p">)</span>
+  tmp <span class="o">&lt;-</span> content<span class="p">(</span>x<span class="p">,</span> as <span class="o">=</span> <span class="s">&quot;text&quot;</span><span class="p">)</span>
+  jsonlite<span class="o">::</span>fromJSON<span class="p">(</span>tmp<span class="p">,</span> flatten <span class="o">=</span> <span class="kc">TRUE</span><span class="p">)</span>
+<span class="p">}</span>
+
+parse_file <span class="o">&lt;-</span> <span class="kr">function</span><span class="p">(</span>x<span class="p">)</span> <span class="p">{</span>
+  tmp <span class="o">&lt;-</span> <span class="kp">gsub</span><span class="p">(</span><span class="s">&quot;\n\\s+&quot;</span><span class="p">,</span> <span class="s">&quot;\n&quot;</span><span class="p">,</span> 
+              <span class="kp">paste</span><span class="p">(</span><span class="kp">vapply</span><span class="p">(</span><span class="kp">strsplit</span><span class="p">(</span>x<span class="p">,</span> <span class="s">&quot;\n&quot;</span><span class="p">)[[</span><span class="m">1</span><span class="p">]],</span> RCurl<span class="o">::</span>base64Decode<span class="p">,</span>
+                           <span class="kt">character</span><span class="p">(</span><span class="m">1</span><span class="p">),</span> USE.NAMES <span class="o">=</span> <span class="kc">FALSE</span><span class="p">),</span> collapse <span class="o">=</span> <span class="s">&quot; &quot;</span><span class="p">))</span>
+  lines <span class="o">&lt;-</span> <span class="kp">readLines</span><span class="p">(</span><span class="kp">textConnection</span><span class="p">(</span>tmp<span class="p">))</span>
+  <span class="kp">vapply</span><span class="p">(</span>lines<span class="p">,</span> <span class="kp">gsub</span><span class="p">,</span> <span class="kt">character</span><span class="p">(</span><span class="m">1</span><span class="p">),</span> pattern <span class="o">=</span> <span class="s">&quot;\\s&quot;</span><span class="p">,</span> replacement <span class="o">=</span> <span class="s">&quot;&quot;</span><span class="p">,</span>
+         USE.NAMES <span class="o">=</span> <span class="kc">FALSE</span><span class="p">)</span>
+<span class="p">}</span>
+
+request <span class="o">&lt;-</span> <span class="kr">function</span><span class="p">(</span>owner <span class="o">=</span> <span class="s">&quot;ropensci&quot;</span><span class="p">,</span> repo<span class="p">,</span> file<span class="o">=</span><span class="s">&quot;DESCRIPTION&quot;</span><span class="p">,</span> <span class="kc">...</span><span class="p">)</span> <span class="p">{</span>
+  req <span class="o">&lt;-</span> GET<span class="p">(</span>make_url<span class="p">(</span>owner<span class="p">,</span> repo<span class="p">,</span> <span class="kp">paste0</span><span class="p">(</span><span class="s">&quot;contents/&quot;</span><span class="p">,</span> <span class="kp">file</span><span class="p">)),</span> 
+             config <span class="o">=</span> <span class="kt">c</span><span class="p">(</span>token <span class="o">=</span> github_auth<span class="p">(),</span> <span class="kc">...</span><span class="p">))</span>
+  <span class="kr">if</span><span class="p">(</span>req<span class="o">$</span>status_code <span class="o">!=</span> <span class="m">200</span><span class="p">)</span> <span class="p">{</span> <span class="kc">NA</span> <span class="p">}</span> <span class="kr">else</span> <span class="p">{</span>
+    cts <span class="o">&lt;-</span> process_result<span class="p">(</span>req<span class="p">)</span><span class="o">$</span>content
+    parse_file<span class="p">(</span>cts<span class="p">)</span>
+  <span class="p">}</span>
+<span class="p">}</span>
+
+has_term <span class="o">&lt;-</span> <span class="kr">function</span><span class="p">(</span>what<span class="p">,</span> <span class="kc">...</span><span class="p">)</span> <span class="kp">any</span><span class="p">(</span><span class="kp">grepl</span><span class="p">(</span>what<span class="p">,</span> request<span class="p">(</span><span class="kc">...</span><span class="p">)))</span>
+has_file <span class="o">&lt;-</span> <span class="kr">function</span><span class="p">(</span>what<span class="p">,</span> <span class="kc">...</span><span class="p">)</span> <span class="kr">if</span><span class="p">(</span><span class="kp">all</span><span class="p">(</span><span class="kp">is.na</span><span class="p">(</span>request<span class="p">(</span>file <span class="o">=</span> what<span class="p">,</span> <span class="kc">...</span><span class="p">))))</span> <span class="kc">FALSE</span> <span class="kr">else</span> <span class="kc">TRUE</span>
+</code></pre></div>
+<h2>Do stuff</h2>
+
+<p>Does a package depend on a particular package? e.g., look for <code>httr</code> in the <code>DESCRIPTION</code> file (which is the default file name in <code>request()</code> above)</p>
+<div class="highlight"><pre><code class="language-r" data-lang="r">has_term<span class="p">(</span><span class="s">&quot;httr&quot;</span><span class="p">,</span> repo<span class="o">=</span><span class="s">&quot;taxize&quot;</span><span class="p">)</span>
+<span class="c1">#&gt; [1] TRUE</span>
+has_term<span class="p">(</span><span class="s">&quot;maptools&quot;</span><span class="p">,</span> repo<span class="o">=</span><span class="s">&quot;taxize&quot;</span><span class="p">)</span>
+<span class="c1">#&gt; [1] FALSE</span>
+</code></pre></div>
+<p>Do a series of R packages have a file for how to contribute <code>CONTRIBUTING.md</code>?</p>
+
+<p>Yes</p>
+<div class="highlight"><pre><code class="language-r" data-lang="r">has_file<span class="p">(</span><span class="s">&quot;CONTRIBUTING.md&quot;</span><span class="p">,</span> repo<span class="o">=</span><span class="s">&quot;taxize&quot;</span><span class="p">)</span>
+<span class="c1">#&gt; [1] TRUE</span>
+</code></pre></div>
+<p>Many packages</p>
+<div class="highlight"><pre><code class="language-r" data-lang="r"><span class="kp">vapply</span><span class="p">(</span>pkgs<span class="p">,</span> <span class="kr">function</span><span class="p">(</span>x<span class="p">)</span> has_file<span class="p">(</span><span class="s">&quot;CONTRIBUTING.md&quot;</span><span class="p">,</span> repo<span class="o">=</span>x<span class="p">),</span> <span class="kt">logical</span><span class="p">(</span><span class="m">1</span><span class="p">))</span>
+<span class="c1">#&gt;        alm        bmc       bold     clifro  ecoengine    elastic </span>
+<span class="c1">#&gt;      FALSE      FALSE      FALSE      FALSE      FALSE      FALSE </span>
+<span class="c1">#&gt;   fulltext   geonames      gistr     RNeXML      rnoaa       rnpn </span>
+<span class="c1">#&gt;       TRUE      FALSE      FALSE       TRUE       TRUE      FALSE </span>
+<span class="c1">#&gt;      rplos      rsnps rWBclimate       solr      spocc     taxize </span>
+<span class="c1">#&gt;      FALSE      FALSE      FALSE      FALSE       TRUE       TRUE </span>
+<span class="c1">#&gt;  togeojson     traits   treeBASE </span>
+<span class="c1">#&gt;      FALSE      FALSE      FALSE</span>
+</code></pre></div>
+<h2>Check rate limit</h2>
+
+<p>Define function</p>
+<div class="highlight"><pre><code class="language-r" data-lang="r">rate_limit <span class="o">&lt;-</span> <span class="kr">function</span><span class="p">(</span><span class="kc">...</span><span class="p">)</span> <span class="p">{</span>
+  token <span class="o">&lt;-</span> github_auth<span class="p">()</span>
+  req <span class="o">&lt;-</span> GET<span class="p">(</span><span class="s">&quot;https://api.github.com/rate_limit&quot;</span><span class="p">,</span> config <span class="o">=</span> <span class="kt">c</span><span class="p">(</span>token <span class="o">=</span> token<span class="p">,</span> <span class="kc">...</span><span class="p">))</span>
+  process_result<span class="p">(</span>req<span class="p">)</span>
+<span class="p">}</span>
+</code></pre></div>
+<p>Check it</p>
+<div class="highlight"><pre><code class="language-r" data-lang="r">rate_limit<span class="p">()</span>
+<span class="c1">#&gt; $resources</span>
+<span class="c1">#&gt; $resources$core</span>
+<span class="c1">#&gt; $resources$core$limit</span>
+<span class="c1">#&gt; [1] 5000</span>
+<span class="c1">#&gt; </span>
+<span class="c1">#&gt; $resources$core$remaining</span>
+<span class="c1">#&gt; [1] 4925</span>
+<span class="c1">#&gt; </span>
+<span class="c1">#&gt; $resources$core$reset</span>
+<span class="c1">#&gt; [1] 1417031016</span>
+<span class="c1">#&gt; </span>
+<span class="c1">#&gt; </span>
+<span class="c1">#&gt; $resources$search</span>
+<span class="c1">#&gt; $resources$search$limit</span>
+<span class="c1">#&gt; [1] 30</span>
+<span class="c1">#&gt; </span>
+<span class="c1">#&gt; $resources$search$remaining</span>
+<span class="c1">#&gt; [1] 30</span>
+<span class="c1">#&gt; </span>
+<span class="c1">#&gt; $resources$search$reset</span>
+<span class="c1">#&gt; [1] 1417028069</span>
+<span class="c1">#&gt; </span>
+<span class="c1">#&gt; </span>
+<span class="c1">#&gt; </span>
+<span class="c1">#&gt; $rate</span>
+<span class="c1">#&gt; $rate$limit</span>
+<span class="c1">#&gt; [1] 5000</span>
+<span class="c1">#&gt; </span>
+<span class="c1">#&gt; $rate$remaining</span>
+<span class="c1">#&gt; [1] 4925</span>
+<span class="c1">#&gt; </span>
+<span class="c1">#&gt; $rate$reset</span>
+<span class="c1">#&gt; [1] 1417031016</span>
+</code></pre></div>
+<p>Convert time to reset to human readable form</p>
+<div class="highlight"><pre><code class="language-r" data-lang="r"><span class="kp">as.POSIXct</span><span class="p">(</span>rate_limit<span class="p">()</span><span class="o">$</span>rate<span class="o">$</span>reset<span class="p">,</span> origin<span class="o">=</span><span class="s">&quot;1970-01-01&quot;</span><span class="p">)</span>
+<span class="c1">#&gt; [1] &quot;2014-11-26 11:43:36 PST&quot;</span>
+</code></pre></div>
+  </div>
+  
+  <div class="post">
+    <h1>
       <a href="/2014/11/sofa/">
         sofa - reboot
       </a>
@@ -474,258 +622,6 @@ eml_get<span class="p">(</span>gg<span class="p">,</span> <span class="s">&quot;
 fs_make_public<span class="p">(</span>figid<span class="p">)</span>
 </code></pre></div>
 <p><img src="/public/img/2014-10-06-conditionality-meta-analysis/figshare_conditional.png" alt=""></p>
-
-  </div>
-  
-  <div class="post">
-    <h1>
-      <a href="/2014/08/rsunlight/">
-        rsunlight - R client for Sunlight Labs APIs
-      </a>
-    </h1>
-
-    <span class="post-date">11 Aug 2014</span>
-
-    <p>My <a href="http://recology.info/2014/05/rsunlight/">last blog post on this package</a> was so long ago the package wrapped both New York Times APIs and Sunlight Labs APIs and the package was called <code>govdat</code>. I split that package up into <code>rsunlight</code> for Sunlight Labs APIs and <code>rtimes</code> for some New York Times APIs. <code>rtimes</code> is <a href="https://github.com/ropengov/rtimes">in development at Github</a>.</p>
-
-<p>We&#39;ve updated the package to include four sets of functions, one set for each of four Sunlight Labs APIs (with a separate prefix for each API):</p>
-
-<ul>
-<li>Congress API (<code>cg_</code>)</li>
-<li>Open States API (<code>os_</code>)</li>
-<li>Capitol Words API (<code>cw_</code>)</li>
-<li>Influence Explorer API (<code>ie_</code>)</li>
-</ul>
-
-<p>Then there are many methods for each API.</p>
-
-<h2>rsunlight intro</h2>
-
-<h3>Installation</h3>
-
-<p>First, installation</p>
-<div class="highlight"><pre><code class="language-r" data-lang="r">devtools<span class="o">::</span>install_github<span class="p">(</span><span class="s">&quot;ropengov/rsunlight&quot;</span><span class="p">)</span>
-</code></pre></div>
-<p>Load the library</p>
-<div class="highlight"><pre><code class="language-r" data-lang="r"><span class="kn">library</span><span class="p">(</span><span class="s">&quot;rsunlight&quot;</span><span class="p">)</span>
-</code></pre></div>
-<h3>Congress API</h3>
-
-<p>Search for Fed level bills that include the term <em>health care</em> in them.</p>
-<div class="highlight"><pre><code class="language-r" data-lang="r">res <span class="o">&lt;-</span> cg_bills<span class="p">(</span>query<span class="o">=</span><span class="s">&#39;health care&#39;</span><span class="p">)</span>
-<span class="kp">head</span><span class="p">(</span>res<span class="o">$</span>results<span class="p">[,</span><span class="m">1</span><span class="o">:</span><span class="m">4</span><span class="p">])</span>
-</code></pre></div><div class="highlight"><pre><code class="language-text" data-lang="text">##          nicknames congress last_version_on sponsor_id
-## 1        obamacare      111      2010-08-25    S000749
-## 2 obamacare, ppaca      111      2010-08-25    R000053
-## 3             NULL      113      2013-10-09    K000220
-## 4             NULL      111      2009-01-06    I000056
-## 5             NULL      112      2011-01-05    I000056
-## 6             NULL      111      2009-05-05    D000197
-</code></pre></div>
-<p>Search for bills that have the two terms <em>transparency</em> and <em>accountability</em> within 5 words of each other in the bill.</p>
-<div class="highlight"><pre><code class="language-r" data-lang="r">res <span class="o">&lt;-</span> cg_bills<span class="p">(</span>query<span class="o">=</span><span class="s">&#39;transparency accountability&#39;</span><span class="o">~</span><span class="m">5</span><span class="p">)</span>
-<span class="kp">head</span><span class="p">(</span>res<span class="o">$</span>results<span class="p">[,</span><span class="m">1</span><span class="o">:</span><span class="m">4</span><span class="p">])</span>
-</code></pre></div><div class="highlight"><pre><code class="language-text" data-lang="text">##   congress last_version_on sponsor_id
-## 1      111      2009-01-15    R000435
-## 2      113      2013-07-17    R000595
-## 3      112      2011-12-08    R000435
-## 4      113      2013-09-19    R000435
-## 5      112      2011-11-10    R000595
-## 6      113      2013-07-23    C000560
-##                                       urls.govtrack
-## 1   http://www.govtrack.us/congress/bills/111/hr557
-## 2  https://www.govtrack.us/congress/bills/113/s1313
-## 3  http://www.govtrack.us/congress/bills/112/hr2829
-## 4 https://www.govtrack.us/congress/bills/113/hr3155
-## 5   http://www.govtrack.us/congress/bills/112/s1848
-## 6  https://www.govtrack.us/congress/bills/113/s1347
-##                                 urls.opencongress
-## 1  http://www.opencongress.org/bill/111-h557/show
-## 2      http://www.opencongress.org/bill/s1313-113
-## 3 http://www.opencongress.org/bill/112-h2829/show
-## 4     http://www.opencongress.org/bill/hr3155-113
-## 5 http://www.opencongress.org/bill/112-s1848/show
-## 6      http://www.opencongress.org/bill/s1347-113
-##                                          urls.congress
-## 1   http://beta.congress.gov/bill/111th/house-bill/557
-## 2 http://beta.congress.gov/bill/113th/senate-bill/1313
-## 3  http://beta.congress.gov/bill/112th/house-bill/2829
-## 4  http://beta.congress.gov/bill/113th/house-bill/3155
-## 5 http://beta.congress.gov/bill/112th/senate-bill/1848
-## 6 http://beta.congress.gov/bill/113th/senate-bill/1347
-</code></pre></div>
-<h3>Open States API</h3>
-
-<p>Search State Bills, in this case search for the term <em>agriculture</em> in Texas.</p>
-<div class="highlight"><pre><code class="language-r" data-lang="r">res <span class="o">&lt;-</span> os_billsearch<span class="p">(</span>terms <span class="o">=</span> <span class="s">&#39;agriculture&#39;</span><span class="p">,</span> state <span class="o">=</span> <span class="s">&#39;tx&#39;</span><span class="p">)</span>
-<span class="kp">head</span><span class="p">(</span>res<span class="p">)</span>
-</code></pre></div><div class="highlight"><pre><code class="language-text" data-lang="text">##                                                                                                                                                 title
-## 1 Relating to authorizing the issuance of revenue bonds to fund capital projects at public institutions of higher education; making an appropriation.
-## 2                          Relating to authorizing the issuance of revenue bonds to fund capital projects at public institutions of higher education.
-## 3                          Relating to authorizing the issuance of revenue bonds to fund capital projects at public institutions of higher education.
-## 4                          Relating to authorizing the issuance of revenue bonds to fund capital projects at public institutions of higher education.
-## 5 Relating to authorizing the issuance of revenue bonds to fund capital projects at public institutions of higher education; making an appropriation.
-## 6                                Relating to access to certain facilities by search and rescue dogs and their handlers; providing a criminal penalty.
-##            created_at          updated_at          id chamber state
-## 1 2013-08-01 03:33:40 2013-08-07 03:10:10 TXB00034894   upper    tx
-## 2 2013-08-01 03:33:38 2013-08-02 03:20:14 TXB00034893   upper    tx
-## 3 2013-07-21 03:03:53 2013-07-28 03:28:30 TXB00034814   upper    tx
-## 4 2013-07-03 02:44:03 2013-07-14 03:00:31 TXB00034514   upper    tx
-## 5 2013-06-16 03:48:13 2013-06-23 04:02:49 TXB00033988   upper    tx
-## 6 2013-03-03 04:47:26 2013-07-01 21:25:36 TXB00027556   upper    tx
-##   session type
-## 1     833 bill
-## 2     833 bill
-## 3     832 bill
-## 4     832 bill
-## 5     831 bill
-## 6      83 bill
-##                                                                             subjects
-## 1                                   Commerce, Education, Budget, Spending, and Taxes
-## 2                                   Commerce, Education, Budget, Spending, and Taxes
-## 3                                   Commerce, Education, Budget, Spending, and Taxes
-## 4                                   Commerce, Education, Budget, Spending, and Taxes
-## 5                                   Commerce, Education, Budget, Spending, and Taxes
-## 6 Commerce, Business and Consumers, Animal Rights and Wildlife Issues, Health, Crime
-##   bill_id
-## 1    SB 3
-## 2   SB 10
-## 3   SB 40
-## 4    SB 6
-## 5   SB 44
-## 6 SB 1010
-</code></pre></div>
-<p>Search for legislators in California (<em>ca</em>) and in the democratic party</p>
-<div class="highlight"><pre><code class="language-r" data-lang="r">res <span class="o">&lt;-</span> os_legislatorsearch<span class="p">(</span>state <span class="o">=</span> <span class="s">&#39;ca&#39;</span><span class="p">,</span> party <span class="o">=</span> <span class="s">&#39;democratic&#39;</span><span class="p">,</span> fields <span class="o">=</span> <span class="kt">c</span><span class="p">(</span><span class="s">&#39;full_name&#39;</span><span class="p">,</span><span class="s">&#39;+capitol_office.phone&#39;</span><span class="p">))</span>
-<span class="kp">head</span><span class="p">(</span>res<span class="p">)</span>
-</code></pre></div><div class="highlight"><pre><code class="language-text" data-lang="text">##            phone        id       full_name
-## 1 (916) 319-2014 CAL000058   Nancy Skinner
-## 2 (916) 319-2015 CAL000059   Joan Buchanan
-## 3 (916) 319-2022 CAL000084       Paul Fong
-## 4 (916) 319-2046 CAL000089      John Pérez
-## 5 (916) 319-2080 CAL000098 V. Manuel Pérez
-## 6 (916) 319-2001 CAL000101  Wesley Chesbro
-</code></pre></div>
-<p>Now you can call each representative, yay!</p>
-
-<h3>Capitol Words API</h3>
-
-<p>Search for phrase <em>climate change</em> used by politicians between September 5th and 16th, 2011:</p>
-<div class="highlight"><pre><code class="language-r" data-lang="r"><span class="kp">head</span><span class="p">(</span>cw_text<span class="p">(</span>phrase<span class="o">=</span><span class="s">&#39;climate change&#39;</span><span class="p">,</span> start_date<span class="o">=</span><span class="s">&#39;2011-09-05&#39;</span><span class="p">,</span> end_date<span class="o">=</span><span class="s">&#39;2011-09-16&#39;</span><span class="p">,</span> party<span class="o">=</span><span class="s">&#39;D&#39;</span><span class="p">)[,</span><span class="kt">c</span><span class="p">(</span><span class="s">&#39;speaker_last&#39;</span><span class="p">,</span><span class="s">&#39;origin_url&#39;</span><span class="p">)])</span>
-</code></pre></div><div class="highlight"><pre><code class="language-text" data-lang="text">##   speaker_last
-## 1      Tsongas
-## 2       Inslee
-## 3        Costa
-## 4        Boxer
-## 5       Durbin
-## 6        Boxer
-##                                                                                   origin_url
-## 1 http://origin.www.gpo.gov/fdsys/pkg/CREC-2011-09-14/html/CREC-2011-09-14-pt1-PgH6149-5.htm
-## 2   http://origin.www.gpo.gov/fdsys/pkg/CREC-2011-09-15/html/CREC-2011-09-15-pt1-PgH6186.htm
-## 3 http://origin.www.gpo.gov/fdsys/pkg/CREC-2011-09-13/html/CREC-2011-09-13-pt1-PgE1609-2.htm
-## 4   http://origin.www.gpo.gov/fdsys/pkg/CREC-2011-09-15/html/CREC-2011-09-15-pt1-PgS5650.htm
-## 5   http://origin.www.gpo.gov/fdsys/pkg/CREC-2011-09-13/html/CREC-2011-09-13-pt1-PgS5510.htm
-## 6 http://origin.www.gpo.gov/fdsys/pkg/CREC-2011-09-13/html/CREC-2011-09-13-pt1-PgS5513-2.htm
-</code></pre></div>
-<p>Plot mentions of the term <em>climate change</em> over time for Democrats vs. Republicans</p>
-<div class="highlight"><pre><code class="language-r" data-lang="r"><span class="kn">library</span><span class="p">(</span><span class="s">&#39;ggplot2&#39;</span><span class="p">)</span>
-dat_d <span class="o">&lt;-</span> cw_timeseries<span class="p">(</span>phrase<span class="o">=</span><span class="s">&#39;climate change&#39;</span><span class="p">,</span> party<span class="o">=</span><span class="s">&quot;D&quot;</span><span class="p">)</span>
-dat_d<span class="o">$</span>party <span class="o">&lt;-</span> <span class="kp">rep</span><span class="p">(</span><span class="s">&quot;D&quot;</span><span class="p">,</span> <span class="kp">nrow</span><span class="p">(</span>dat_d<span class="p">))</span>
-dat_r <span class="o">&lt;-</span> cw_timeseries<span class="p">(</span>phrase<span class="o">=</span><span class="s">&#39;climate change&#39;</span><span class="p">,</span> party<span class="o">=</span><span class="s">&quot;R&quot;</span><span class="p">)</span>
-dat_r<span class="o">$</span>party <span class="o">&lt;-</span> <span class="kp">rep</span><span class="p">(</span><span class="s">&quot;R&quot;</span><span class="p">,</span> <span class="kp">nrow</span><span class="p">(</span>dat_r<span class="p">))</span>
-dat_both <span class="o">&lt;-</span> <span class="kp">rbind</span><span class="p">(</span>dat_d<span class="p">,</span> dat_r<span class="p">)</span>
-ggplot<span class="p">(</span>dat_both<span class="p">,</span> aes<span class="p">(</span>day<span class="p">,</span> count<span class="p">,</span> colour<span class="o">=</span>party<span class="p">))</span> <span class="o">+</span>
-   geom_line<span class="p">()</span> <span class="o">+</span>
-   theme_grey<span class="p">(</span>base_size<span class="o">=</span><span class="m">20</span><span class="p">)</span> <span class="o">+</span>
-   scale_colour_manual<span class="p">(</span>values<span class="o">=</span><span class="kt">c</span><span class="p">(</span><span class="s">&quot;blue&quot;</span><span class="p">,</span><span class="s">&quot;red&quot;</span><span class="p">))</span>
-</code></pre></div>
-<p><img src="/public/img/2014-08-11-rsunlight/unnamed-chunk-9.png" alt="plot of chunk unnamed-chunk-9"></p>
-
-<h3>Influence Explorer API</h3>
-
-<p>Search for contributions of equal to or more than <code>$20,000,000</code>.</p>
-<div class="highlight"><pre><code class="language-r" data-lang="r">ie_contr<span class="p">(</span>amount<span class="o">=</span><span class="s">&#39;&gt;|20000000&#39;</span><span class="p">)[,</span><span class="kt">c</span><span class="p">(</span><span class="s">&#39;amount&#39;</span><span class="p">,</span><span class="s">&#39;recipient_name&#39;</span><span class="p">,</span><span class="s">&#39;contributor_name&#39;</span><span class="p">)]</span>
-</code></pre></div><div class="highlight"><pre><code class="language-text" data-lang="text">##         amount
-## 1  25177212.00
-## 2  20000000.00
-## 3  20000000.00
-## 4  20000000.00
-## 5  20000000.00
-## 6  20000000.00
-## 7  50000000.00
-## 8  34000000.00
-## 9  28000000.00
-## 10 20000000.00
-##                                                   recipient_name
-## 1                                       Republican National Cmte
-## 2  CALIFORNIANS TO CLOSE THE OUT-OF-STATE CORPORATE TAX LOOPHOLE
-## 3                                                   WHITMAN, MEG
-## 4                                                   WHITMAN, MEG
-## 5                                                   WHITMAN, MEG
-## 6                                                   WHITMAN, MEG
-## 7                                         GOLISANO, B THOMAS (G)
-## 8                                         GOLISANO, B THOMAS (G)
-## 9                                         GOLISANO, B THOMAS (G)
-## 10                                        GOLISANO, B THOMAS (G)
-##           contributor_name
-## 1           Romney Victory
-## 2         STEYER, THOMAS F
-## 3  WHITMAN, MARGARET (MEG)
-## 4  WHITMAN, MARGARET (MEG)
-## 5  WHITMAN, MARGARET (MEG)
-## 6  WHITMAN, MARGARET (MEG)
-## 7       GOLISANO, B THOMAS
-## 8       GOLISANO, B THOMAS
-## 9       GOLISANO, B THOMAS
-## 10      GOLISANO, B THOMAS
-</code></pre></div>
-<p>Top industries, by contributions given. <em>UNKOWN</em> is a very influential industry. Of course <em>law firms</em> are high up there, as well as <em>real estate</em>. I&#39;m sure <em>oil and gas</em> is embarrased that they&#39;re contributing less than <em>pulic sector unions</em>.</p>
-<div class="highlight"><pre><code class="language-r" data-lang="r"><span class="p">(</span>res <span class="o">&lt;-</span> ie_industries<span class="p">(</span>method<span class="o">=</span><span class="s">&#39;top_ind&#39;</span><span class="p">,</span> limit<span class="o">=</span><span class="m">10</span><span class="p">))</span>
-</code></pre></div><div class="highlight"><pre><code class="language-text" data-lang="text">##       count        amount                               id
-## 1  14919818 3825359507.21 cdb3f500a3f74179bb4a5eb8b2932fa6
-## 2   3600761 2787678962.95 f50cf984a2e3477c8167d32e2b14e052
-## 3    329906 1717649914.58 9cac88377c3b400e89c2d6762e3f28f6
-## 4   1386613 1707457092.04 7500030dffe24844aa467a75f7aedfd1
-## 5    774496 1563637586.57 0af3f418f426497e8bbf916bfc074ebc
-## 6    546367 1389220855.35 52e5d4c6c0fa47c3bdb199a28f96d434
-## 7   2134350 1384221307.53 a05a0d06f6814b31bece35a81fcb40c7
-## 8   1003850  986588892.83 8ada0fc2d6994f2ab06c7e025dff2284
-## 9    567082  775241387.17 52766c4910a846f2813a1dda212b7027
-## 10   151006  706747646.35 13718be68388456d9b6e8db753f06e72
-##    should_show_entity                    name
-## 1                TRUE                 UNKNOWN
-## 2                TRUE       LAWYERS/LAW FIRMS
-## 3                TRUE  CANDIDATE SELF-FINANCE
-## 4                TRUE             REAL ESTATE
-## 5                TRUE SECURITIES &amp; INVESTMENT
-## 6                TRUE    PUBLIC SECTOR UNIONS
-## 7                TRUE    HEALTH PROFESSIONALS
-## 8                TRUE               INSURANCE
-## 9                TRUE               OIL &amp; GAS
-## 10               TRUE        CASINOS/GAMBLING
-</code></pre></div><div class="highlight"><pre><code class="language-r" data-lang="r">res<span class="o">$</span>amount <span class="o">&lt;-</span> <span class="kp">as.numeric</span><span class="p">(</span>res<span class="o">$</span>amount<span class="p">)</span>
-ggplot<span class="p">(</span>res<span class="p">,</span> aes<span class="p">(</span>reorder<span class="p">(</span>name<span class="p">,</span> amount<span class="p">),</span> amount<span class="p">))</span> <span class="o">+</span>
-  geom_bar<span class="p">(</span>stat <span class="o">=</span> <span class="s">&quot;identity&quot;</span><span class="p">)</span> <span class="o">+</span>
-  coord_flip<span class="p">()</span> <span class="o">+</span>
-  scale_y_continuous<span class="p">(</span>labels<span class="o">=</span>dollar<span class="p">)</span> <span class="o">+</span>
-  theme_grey<span class="p">(</span>base_size <span class="o">=</span> <span class="m">14</span><span class="p">)</span>
-</code></pre></div>
-<p><img src="/public/img/2014-08-11-rsunlight/unnamed-chunk-11.png" alt="plot of chunk unnamed-chunk-11"></p>
-
-<hr>
-
-<h2>Feedback</h2>
-
-<p>Please do use <code>rsunlight</code>, and let us know what you want fixed, new features, etc.</p>
-
-<h2>Still to come:</h2>
-
-<ul>
-<li>Functions to visualize data from each API. You can do this yourself, but a few functions will be created to help those that are new to R.</li>
-<li>Vectorize functions so that you can give many inputs to a function instead of a single input.</li>
-<li>test suite: embarrasingly, there is no test suite yet, boo me.</li>
-<li>I plan to push <code>rsunlight</code> to CRAN soon as <code>v0.3</code></li>
-</ul>
 
   </div>
   
