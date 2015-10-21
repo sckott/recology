@@ -61,6 +61,70 @@
   
   <div class="post">
     <h1>
+      <a href="/2014/12/multi-handle/">
+        Dealing with multi handle errors
+      </a>
+    </h1>
+
+    <span class="post-date">08 Dec 2014</span>
+
+    <p>At rOpenSci we occasssionally hear from our users that they run into an error like:</p>
+<div class="highlight"><pre><code class="language-r" data-lang="r">Error <span class="kr">in</span> <span class="kr">function</span> <span class="p">(</span>type<span class="p">,</span> msg<span class="p">,</span> asError <span class="o">=</span> <span class="kc">TRUE</span><span class="p">)</span>  <span class="o">:</span> 
+  easy handled already used <span class="kr">in</span> multi handle
+</code></pre></div>
+<p>This error occurs in the <code>httr</code> package that we use to do http requests to sources of data on the web. It happens when e.g., you make a lot of requests to a resource, then it gets interrupted somehow - then you make another call, and you get the error above. Let&#39;s try it with the an version of <code>httr</code> (<code>v0.5</code>): </p>
+<div class="highlight"><pre><code class="language-r" data-lang="r"><span class="kn">library</span><span class="p">(</span><span class="s">&quot;httr&quot;</span><span class="p">)</span>
+<span class="c1"># run, then esc to cause multi handle error</span>
+<span class="kp">replicate</span><span class="p">(</span><span class="m">50</span><span class="p">,</span> GET<span class="p">(</span><span class="s">&quot;http://google.com/&quot;</span><span class="p">))</span>
+<span class="c1"># then retry single call, which trows multi handle error</span>
+GET<span class="p">(</span><span class="s">&quot;http://google.com/&quot;</span><span class="p">)</span>
+<span class="c1">#&gt; Error in function (type, msg, asError = TRUE)  : </span>
+<span class="c1">#&gt;   easy handled already used in multi handle</span>
+</code></pre></div>
+<p>There are any number of reasons why your session may get interrupted, including an internet outage, the web service you are requesesting data from times out, etc.  There hasn&#39;t been a straight-forward way to handle this, until recently. </p>
+
+<p>In <code>httr</code> version <code>0.6</code>, there are two new functions <code>handle_find()</code> and <code>handle_reset()</code> to help deal with this error.</p>
+
+<p>First, install newest httr from Github</p>
+<div class="highlight"><pre><code class="language-r" data-lang="r">install.packages<span class="p">(</span><span class="s">&quot;devtools&quot;</span><span class="p">)</span>
+devtools<span class="o">::</span>install_github<span class="p">(</span><span class="s">&quot;hadley/httr&quot;</span><span class="p">)</span>
+</code></pre></div><div class="highlight"><pre><code class="language-r" data-lang="r"><span class="kn">library</span><span class="p">(</span><span class="s">&quot;httr&quot;</span><span class="p">)</span>
+</code></pre></div>
+<p>Make a bunch of requests to google, interrupting part way through</p>
+<div class="highlight"><pre><code class="language-r" data-lang="r"><span class="kp">replicate</span><span class="p">(</span><span class="m">50</span><span class="p">,</span> HEAD<span class="p">(</span><span class="s">&quot;http://google.com/&quot;</span><span class="p">))</span>
+</code></pre></div>
+<p>Then retry single call, which trows multi handle error</p>
+<div class="highlight"><pre><code class="language-r" data-lang="r">HEAD<span class="p">(</span><span class="s">&quot;http://google.com/&quot;</span><span class="p">)</span>
+<span class="c1">#&gt; Error in function (type, msg, asError = TRUE)  : </span>
+<span class="c1">#&gt;   easy handled already used in multi handle</span>
+</code></pre></div>
+<p>Find handle</p>
+<div class="highlight"><pre><code class="language-r" data-lang="r">handle_find<span class="p">(</span><span class="s">&quot;http://google.com/&quot;</span><span class="p">)</span>
+<span class="c1">#&gt; Host: http://google.com/ &lt;0x10f3d1600&gt;</span>
+</code></pre></div>
+<p>Reset handle</p>
+<div class="highlight"><pre><code class="language-r" data-lang="r">handle_reset<span class="p">(</span><span class="s">&quot;http://google.com/&quot;</span><span class="p">)</span>
+</code></pre></div>
+<p>Try call again, this time it should work</p>
+<div class="highlight"><pre><code class="language-r" data-lang="r">HEAD<span class="p">(</span><span class="s">&quot;http://google.com/&quot;</span><span class="p">)</span>
+<span class="c1">#&gt; Response [http://www.google.com/]</span>
+<span class="c1">#&gt;   Date: 2014-12-08 13:37</span>
+<span class="c1">#&gt;   Status: 200</span>
+<span class="c1">#&gt;   Content-Type: text/html; charset=ISO-8859-1</span>
+<span class="c1">#&gt; &lt;EMPTY BODY&gt;</span>
+</code></pre></div>
+<h2>Usage in ropensci packages</h2>
+
+<p>We have more work to do yet to integrate this into our packages. It&#39;s great you can reset a handle as above, but to reset the handle you need to search for the URL used in the request, which our users would have to dig into the code for the function they are using. That is easy-ish to do, but perhaps not everyone knows they can get to the code easily.  So, we may try seting a parameter in functions that would let reset the handle to clear this error. </p>
+
+<h2>Note</h2>
+
+<p>Note that Hadley is planning on eliminating <code>RCurl</code> dependency (https://github.com/hadley/httr/issues/172), so there may be a different solution in the future. </p>
+
+  </div>
+  
+  <div class="post">
+    <h1>
       <a href="/2014/12/altmetrics-anywhere/">
         Altmetrics from anywhere
       </a>
@@ -321,215 +385,6 @@ ggplot<span class="p">(</span>df<span class="p">,</span> aes<span class="p">(</s
 
 <p>We&#39;ll probably add a function like this into <code>rplos</code>, as a convenient way to handle this use case.</p>
 
-  </div>
-  
-  <div class="post">
-    <h1>
-      <a href="/2014/12/http-codes/">
-        http codes
-      </a>
-    </h1>
-
-    <span class="post-date">02 Dec 2014</span>
-
-    <p>Recently noticed a little Python library called <a href="https://github.com/rspivak/httpcode">httpcode</a> that does a simple thing: gives information on http codes in the CLI. I thought this could maybe potentially be useful for R. So I made an R version. </p>
-
-<h2>Installation</h2>
-<div class="highlight"><pre><code class="language-r" data-lang="r">devtools<span class="o">::</span>install_github<span class="p">(</span><span class="s">&quot;sckott/httpcode&quot;</span><span class="p">)</span>
-</code></pre></div><div class="highlight"><pre><code class="language-r" data-lang="r"><span class="kn">library</span><span class="p">(</span><span class="s">&quot;httpcode&quot;</span><span class="p">)</span>
-</code></pre></div>
-<h2>Search by http code</h2>
-<div class="highlight"><pre><code class="language-r" data-lang="r">http_code<span class="p">(</span><span class="m">100</span><span class="p">)</span>
-<span class="c1">#&gt; &lt;Status code: 100&gt;</span>
-<span class="c1">#&gt;   Message: Continue</span>
-<span class="c1">#&gt;   Explanation: Request received, please continue</span>
-</code></pre></div><div class="highlight"><pre><code class="language-r" data-lang="r">http_code<span class="p">(</span><span class="m">400</span><span class="p">)</span>
-<span class="c1">#&gt; &lt;Status code: 400&gt;</span>
-<span class="c1">#&gt;   Message: Bad Request</span>
-<span class="c1">#&gt;   Explanation: Bad request syntax or unsupported method</span>
-</code></pre></div><div class="highlight"><pre><code class="language-r" data-lang="r">http_code<span class="p">(</span><span class="m">503</span><span class="p">)</span>
-<span class="c1">#&gt; &lt;Status code: 503&gt;</span>
-<span class="c1">#&gt;   Message: Service Unavailable</span>
-<span class="c1">#&gt;   Explanation: The server cannot process the request due to a high load</span>
-</code></pre></div><div class="highlight"><pre><code class="language-r" data-lang="r">http_code<span class="p">(</span><span class="m">999</span><span class="p">)</span>
-<span class="c1">#&gt; Error: No description found for code: 999</span>
-</code></pre></div>
-<h2>Fuzzy code search</h2>
-<div class="highlight"><pre><code class="language-r" data-lang="r">http_code<span class="p">(</span><span class="s">&#39;1xx&#39;</span><span class="p">)</span>
-<span class="c1">#&gt; [[1]]</span>
-<span class="c1">#&gt; &lt;Status code: 100&gt;</span>
-<span class="c1">#&gt;   Message: Continue</span>
-<span class="c1">#&gt;   Explanation: Request received, please continue</span>
-<span class="c1">#&gt; </span>
-<span class="c1">#&gt; [[2]]</span>
-<span class="c1">#&gt; &lt;Status code: 101&gt;</span>
-<span class="c1">#&gt;   Message: Switching Protocols</span>
-<span class="c1">#&gt;   Explanation: Switching to new protocol; obey Upgrade header</span>
-<span class="c1">#&gt; </span>
-<span class="c1">#&gt; [[3]]</span>
-<span class="c1">#&gt; &lt;Status code: 102&gt;</span>
-<span class="c1">#&gt;   Message: Processing</span>
-<span class="c1">#&gt;   Explanation: WebDAV; RFC 2518</span>
-</code></pre></div><div class="highlight"><pre><code class="language-r" data-lang="r">http_code<span class="p">(</span><span class="s">&#39;3xx&#39;</span><span class="p">)</span>
-<span class="c1">#&gt; [[1]]</span>
-<span class="c1">#&gt; &lt;Status code: 300&gt;</span>
-<span class="c1">#&gt;   Message: Multiple Choices</span>
-<span class="c1">#&gt;   Explanation: Object has several resources -- see URI list</span>
-<span class="c1">#&gt; </span>
-<span class="c1">#&gt; [[2]]</span>
-<span class="c1">#&gt; &lt;Status code: 301&gt;</span>
-<span class="c1">#&gt;   Message: Moved Permanently</span>
-<span class="c1">#&gt;   Explanation: Object moved permanently -- see URI list</span>
-<span class="c1">#&gt; </span>
-<span class="c1">#&gt; [[3]]</span>
-<span class="c1">#&gt; &lt;Status code: 302&gt;</span>
-<span class="c1">#&gt;   Message: Found</span>
-<span class="c1">#&gt;   Explanation: Object moved temporarily -- see URI list</span>
-<span class="c1">#&gt; </span>
-<span class="c1">#&gt; [[4]]</span>
-<span class="c1">#&gt; &lt;Status code: 303&gt;</span>
-<span class="c1">#&gt;   Message: See Other</span>
-<span class="c1">#&gt;   Explanation: Object moved -- see Method and URL list</span>
-<span class="c1">#&gt; </span>
-<span class="c1">#&gt; [[5]]</span>
-<span class="c1">#&gt; &lt;Status code: 304&gt;</span>
-<span class="c1">#&gt;   Message: Not Modified</span>
-<span class="c1">#&gt;   Explanation: Document has not changed since given time</span>
-<span class="c1">#&gt; </span>
-<span class="c1">#&gt; [[6]]</span>
-<span class="c1">#&gt; &lt;Status code: 305&gt;</span>
-<span class="c1">#&gt;   Message: Use Proxy</span>
-<span class="c1">#&gt;   Explanation: You must use proxy specified in Location to access this resource.</span>
-<span class="c1">#&gt; </span>
-<span class="c1">#&gt; [[7]]</span>
-<span class="c1">#&gt; &lt;Status code: 306&gt;</span>
-<span class="c1">#&gt;   Message: Switch Proxy</span>
-<span class="c1">#&gt;   Explanation: Subsequent requests should use the specified proxy</span>
-<span class="c1">#&gt; </span>
-<span class="c1">#&gt; [[8]]</span>
-<span class="c1">#&gt; &lt;Status code: 307&gt;</span>
-<span class="c1">#&gt;   Message: Temporary Redirect</span>
-<span class="c1">#&gt;   Explanation: Object moved temporarily -- see URI list</span>
-<span class="c1">#&gt; </span>
-<span class="c1">#&gt; [[9]]</span>
-<span class="c1">#&gt; &lt;Status code: 308&gt;</span>
-<span class="c1">#&gt;   Message: Permanent Redirect</span>
-<span class="c1">#&gt;   Explanation: Object moved permanently</span>
-</code></pre></div><div class="highlight"><pre><code class="language-r" data-lang="r">http_code<span class="p">(</span><span class="s">&#39;30[12]&#39;</span><span class="p">)</span>
-<span class="c1">#&gt; [[1]]</span>
-<span class="c1">#&gt; &lt;Status code: 301&gt;</span>
-<span class="c1">#&gt;   Message: Moved Permanently</span>
-<span class="c1">#&gt;   Explanation: Object moved permanently -- see URI list</span>
-<span class="c1">#&gt; </span>
-<span class="c1">#&gt; [[2]]</span>
-<span class="c1">#&gt; &lt;Status code: 302&gt;</span>
-<span class="c1">#&gt;   Message: Found</span>
-<span class="c1">#&gt;   Explanation: Object moved temporarily -- see URI list</span>
-</code></pre></div><div class="highlight"><pre><code class="language-r" data-lang="r">http_code<span class="p">(</span><span class="s">&#39;30[34]&#39;</span><span class="p">)</span>
-<span class="c1">#&gt; [[1]]</span>
-<span class="c1">#&gt; &lt;Status code: 303&gt;</span>
-<span class="c1">#&gt;   Message: See Other</span>
-<span class="c1">#&gt;   Explanation: Object moved -- see Method and URL list</span>
-<span class="c1">#&gt; </span>
-<span class="c1">#&gt; [[2]]</span>
-<span class="c1">#&gt; &lt;Status code: 304&gt;</span>
-<span class="c1">#&gt;   Message: Not Modified</span>
-<span class="c1">#&gt;   Explanation: Document has not changed since given time</span>
-</code></pre></div>
-<h2>Search by text message</h2>
-<div class="highlight"><pre><code class="language-r" data-lang="r">http_search<span class="p">(</span><span class="s">&quot;request&quot;</span><span class="p">)</span>
-<span class="c1">#&gt; [[1]]</span>
-<span class="c1">#&gt; &lt;Status code: 100&gt;</span>
-<span class="c1">#&gt;   Message: Continue</span>
-<span class="c1">#&gt;   Explanation: Request received, please continue</span>
-<span class="c1">#&gt; </span>
-<span class="c1">#&gt; [[2]]</span>
-<span class="c1">#&gt; &lt;Status code: 200&gt;</span>
-<span class="c1">#&gt;   Message: OK</span>
-<span class="c1">#&gt;   Explanation: Request fulfilled, document follows</span>
-<span class="c1">#&gt; </span>
-<span class="c1">#&gt; [[3]]</span>
-<span class="c1">#&gt; &lt;Status code: 202&gt;</span>
-<span class="c1">#&gt;   Message: Accepted</span>
-<span class="c1">#&gt;   Explanation: Request accepted, processing continues off-line</span>
-<span class="c1">#&gt; </span>
-<span class="c1">#&gt; [[4]]</span>
-<span class="c1">#&gt; &lt;Status code: 203&gt;</span>
-<span class="c1">#&gt;   Message: Non-Authoritative Information</span>
-<span class="c1">#&gt;   Explanation: Request fulfilled from cache</span>
-<span class="c1">#&gt; </span>
-<span class="c1">#&gt; [[5]]</span>
-<span class="c1">#&gt; &lt;Status code: 204&gt;</span>
-<span class="c1">#&gt;   Message: No Content</span>
-<span class="c1">#&gt;   Explanation: Request fulfilled, nothing follows</span>
-<span class="c1">#&gt; </span>
-<span class="c1">#&gt; [[6]]</span>
-<span class="c1">#&gt; &lt;Status code: 306&gt;</span>
-<span class="c1">#&gt;   Message: Switch Proxy</span>
-<span class="c1">#&gt;   Explanation: Subsequent requests should use the specified proxy</span>
-<span class="c1">#&gt; </span>
-<span class="c1">#&gt; [[7]]</span>
-<span class="c1">#&gt; &lt;Status code: 400&gt;</span>
-<span class="c1">#&gt;   Message: Bad Request</span>
-<span class="c1">#&gt;   Explanation: Bad request syntax or unsupported method</span>
-<span class="c1">#&gt; </span>
-<span class="c1">#&gt; [[8]]</span>
-<span class="c1">#&gt; &lt;Status code: 403&gt;</span>
-<span class="c1">#&gt;   Message: Forbidden</span>
-<span class="c1">#&gt;   Explanation: Request forbidden -- authorization will not help</span>
-<span class="c1">#&gt; </span>
-<span class="c1">#&gt; [[9]]</span>
-<span class="c1">#&gt; &lt;Status code: 408&gt;</span>
-<span class="c1">#&gt;   Message: Request Timeout</span>
-<span class="c1">#&gt;   Explanation: Request timed out; try again later.</span>
-<span class="c1">#&gt; </span>
-<span class="c1">#&gt; [[10]]</span>
-<span class="c1">#&gt; &lt;Status code: 409&gt;</span>
-<span class="c1">#&gt;   Message: Conflict</span>
-<span class="c1">#&gt;   Explanation: Request conflict.</span>
-<span class="c1">#&gt; </span>
-<span class="c1">#&gt; [[11]]</span>
-<span class="c1">#&gt; &lt;Status code: 413&gt;</span>
-<span class="c1">#&gt;   Message: Request Entity Too Large</span>
-<span class="c1">#&gt;   Explanation: Entity is too large.</span>
-<span class="c1">#&gt; </span>
-<span class="c1">#&gt; [[12]]</span>
-<span class="c1">#&gt; &lt;Status code: 414&gt;</span>
-<span class="c1">#&gt;   Message: Request-URI Too Long</span>
-<span class="c1">#&gt;   Explanation: URI is too long.</span>
-<span class="c1">#&gt; </span>
-<span class="c1">#&gt; [[13]]</span>
-<span class="c1">#&gt; &lt;Status code: 416&gt;</span>
-<span class="c1">#&gt;   Message: Requested Range Not Satisfiable</span>
-<span class="c1">#&gt;   Explanation: Cannot satisfy request range.</span>
-<span class="c1">#&gt; </span>
-<span class="c1">#&gt; [[14]]</span>
-<span class="c1">#&gt; &lt;Status code: 503&gt;</span>
-<span class="c1">#&gt;   Message: Service Unavailable</span>
-<span class="c1">#&gt;   Explanation: The server cannot process the request due to a high load</span>
-<span class="c1">#&gt; </span>
-<span class="c1">#&gt; [[15]]</span>
-<span class="c1">#&gt; &lt;Status code: 505&gt;</span>
-<span class="c1">#&gt;   Message: HTTP Version Not Supported</span>
-<span class="c1">#&gt;   Explanation: Cannot fulfill request.</span>
-</code></pre></div><div class="highlight"><pre><code class="language-r" data-lang="r">http_search<span class="p">(</span><span class="s">&quot;forbidden&quot;</span><span class="p">)</span>
-<span class="c1">#&gt; [[1]]</span>
-<span class="c1">#&gt; &lt;Status code: 403&gt;</span>
-<span class="c1">#&gt;   Message: Forbidden</span>
-<span class="c1">#&gt;   Explanation: Request forbidden -- authorization will not help</span>
-</code></pre></div><div class="highlight"><pre><code class="language-r" data-lang="r">http_search<span class="p">(</span><span class="s">&quot;too&quot;</span><span class="p">)</span>
-<span class="c1">#&gt; [[1]]</span>
-<span class="c1">#&gt; &lt;Status code: 413&gt;</span>
-<span class="c1">#&gt;   Message: Request Entity Too Large</span>
-<span class="c1">#&gt;   Explanation: Entity is too large.</span>
-<span class="c1">#&gt; </span>
-<span class="c1">#&gt; [[2]]</span>
-<span class="c1">#&gt; &lt;Status code: 414&gt;</span>
-<span class="c1">#&gt;   Message: Request-URI Too Long</span>
-<span class="c1">#&gt;   Explanation: URI is too long.</span>
-</code></pre></div><div class="highlight"><pre><code class="language-r" data-lang="r">http_search<span class="p">(</span><span class="s">&quot;birds&quot;</span><span class="p">)</span>
-<span class="c1">#&gt; Error: No status code found for search: : birds</span>
-</code></pre></div>
   </div>
   
 </div>
