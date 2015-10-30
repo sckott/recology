@@ -1,20 +1,20 @@
 ---
 name: open-schol
 layout: post
-title: Thoughts on principles for open scholarly infrastructure
-date: 2015-10-19
+title: On principles for open scholarly infrastructure for software
+date: 2015-10-30
 author: Scott Chamberlain
-sourceslug: _drafts/2015-10-19-open-schol.Rmd
+sourceslug: _drafts/2015-10-30-open-schol.Rmd
 tags:
 - infrastructure
 - open science
 ---
 
-[Geoff Bilder][geoff], [Jennifer Lin][jlin], and [Cameron Neylon][cam] wrote a great [post][post] back in February this year titled _Principles for Open Scholarly Infrastructures_ [^1]. In it, they explore the principles, describe why we need them, and talk a bit about implementation.
+[Geoff Bilder][geoff], [Jennifer Lin][jlin], and [Cameron Neylon][cam] wrote a great [post][post] back in February this year titled [_Principles for Open Scholarly Infrastructures_][post]. In it, they explore the principles, describe why we need them, and talk a bit about implementation.
 
-We thought this could be applied to software as well. We discuss this with respect to rOpenSci specifically, but make broader points about software.
+I thought this could be applied to software as well. I discuss this with respect to rOpenSci specifically, but try to make broader points about software.
 
-## Their principles
+## The principles
 
 They discussed three principles, and within each of the three principles they outlined a set of guidelines to follow. What follows is a short synopsis of each guideline, and we address some of the (paraphrased) points they brought up under each principle (those that apply more to software).
 
@@ -22,13 +22,25 @@ They discussed three principles, and within each of the three principles they ou
 
 > If an infrastructure is successful and becomes critical to the community, we need to ensure it is not co-opted by particular interest groups.
 
+
+* __Be cross-disiplinary__: We started out narrowly focused on ecology and evolution, as we started rOpenSci while during graduate work on the topic. Since then, we've recognized many pain points across disciplines that could be greatly ameliorated by good software.
+* __Be transparent__: We've strived to be open about our governance, and will continue to do so. The Jupyter and Dat projects are great examples of this.
+
 ### Sustainability
 
 > An organisation that is both well meaning and has the right expertise will still not be trusted if it does not have sustainable resources to execute its mission.
 
+
+* __Mission consistent revenue__: We're lucky in that we've found funding from foundations that share our goals. This is critical to our long-term success so that our mission doesn't diverge from its path.
+* __Revenue based on services, not data__: Exactly! In software, this means make open source software, which we do - all open licensed, free to use from academic to non-profit to enterprise. Instead of value-added services, we offer assurance of quality and long-term maintenance, both hard to to in academic software given short-term nature of most grants.
+
 ### Insurance
 
 > Long term trust requires the community to believe it retains control.
+
+* The open source nature of our software only addresses this principle. That is, liberally licensed open source software goes a long way towards making sure that the software is owned by the community (even if properietary derivatives are made).
+    * __Open source__: Bingo! Everything we do is open source. This is suprisingly not ubiquotous in academic software, due to combination of some not bothering to use a license (essentially meaning it can't be re-used anywhere), or using a very restrictive license, either out of not considering the consequences or on purpose for competitive or monetary gain.
+    * __Open data__: We're not a data provider, but if/when we do, it will surely be completely open.
 
 ## Software principles
 
@@ -56,17 +68,11 @@ In some ways, rOpenSci isn't infrastructure. For example, we are specific to a s
 
 ### Addressing principles in software
 
-* Insurance - The open source nature of our software only addresses this principle. That is, liberally licensed open source software goes a long way towards making sure that the software is owned by the community (even if properietary derivatives are made).
-    * __Open source__: Bingo! Everything we do is open source. This is suprisingly not ubiquotous in academic software, due to combination of some not bothering to use a license (essentially meaning it can't be re-used anywhere), or using a very restrictive license, either out of not considering the consequences or on purpose for competitive or monetary gain.
-    * __Open data__: We're not a data provider, but if/when we do, it will surely be completely open.
-* Governance 
-    * __Be cross-disiplinary__: We started out narrowly focused on ecology and evolution, as we started rOpenSci while during graduate work on the topic. Since then, we've recognized many pain points across disciplines that could be greatly ameliorated by good software.
-    * __Be transparent__: We've strived to be open about our governance, and will continue to do so. The Jupyter and Dat projects are great examples of this.
-* Sustainability
-    * __Mission consistent revenue__: We're lucky in that we've found funding from foundations that share our goals. This is critical to our long-term success so that our mission doesn't diverge from its path.
-    * __Revenue based on services, not data__: Exactly! In software, this means make open source software, which we do - all open licensed, free to use from academic to non-profit to enterprise. Instead of value-added services, we offer assurance of quality and long-term maintenance, both in short supply in academic software.
+xxxx
 
-[^1]: “Bilder G, Lin J, Neylon C (2015) Principles for Open Scholarly Infrastructure-v1, retrieved 2015-10-15, http://dx.doi.org/10.6084/m9.figshare.1314859”
+### References
+
+Bilder G, Lin J, Neylon C (2015) Principles for Open Scholarly Infrastructure-v1, retrieved 2015-10-15, http://dx.doi.org/10.6084/m9.figshare.1314859
 
 [geoff]: http://www.gbilder.com/blog/
 [jlin]: https://about.me/jenniferlin
