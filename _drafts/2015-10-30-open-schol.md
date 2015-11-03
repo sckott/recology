@@ -23,7 +23,7 @@ They discussed three principles, and within each of the three principles they ou
 > If an infrastructure is successful and becomes critical to the community, we need to ensure it is not co-opted by particular interest groups.
 
 
-* __Be cross-disiplinary__: rOpenSci started out narrowly focused on ecology and evolution. Since then, we've recognized many pain points across disciplines that could be greatly ameliorated by good software. We've been accumulating colleagues from a variety of disciplines.
+* __Be cross-disciplinary__: rOpenSci started out narrowly focused on ecology and evolution. Since then, we've recognized many pain points across disciplines that could be greatly ameliorated by good software. We've been accumulating colleagues from a variety of disciplines.
 * __Be transparent__: We've strived to be open about our governance, and will continue to do so. The [Jupyter][jupyter] and [Dat][dat] projects are other good examples of this.
 
 ### Sustainability
@@ -32,7 +32,7 @@ They discussed three principles, and within each of the three principles they ou
 
 
 * __Mission consistent revenue__: We're lucky in that we've found funding from foundations that share our goals. This is critical to our long-term success so that our mission doesn't diverge from its path.
-* __Revenue based on services, not data__: Exactly! In software, this means make open source software, which we do - all open licensed, free to use from academic to non-profit to enterprise. Instead of value-added services, we offer assurance of quality and long-term maintenance, both hard to to in academic software given short-term nature of most grants, graduate student positions, etc.
+* __Revenue based on services, not data__: Exactly! In software, this means make open source software, which we do - all open licensed, free to use from academic to non-profit to enterprise. Instead of value-added services, we offer assurance of quality and long-term maintenance, both hard to do in academic software given the short-term nature of most grants, graduate student positions, etc.
 
 ### Insurance
 
@@ -40,7 +40,7 @@ They discussed three principles, and within each of the three principles they ou
 
 
 * Liberally licensed open source software goes a long way towards making sure that the software is owned by the community (even if properietary derivatives are made).
-    * __Open source__: Bingo! Everything we do is open source. This is suprisingly not ubiquotous in academic software, due to combination of some not bothering to use a license (essentially meaning it can't be re-used anywhere), or using a very restrictive license, either out of not considering the consequences or on purpose for competitive or monetary gain.
+    * __Open source__: Bingo! Everything we do is open source. This is suprisingly not ubiquitous in academic software, due to a combination of some not bothering to use a license (essentially meaning it can't be re-used anywhere), or using a very restrictive license, either out of not considering the consequences or on purpose for competitive or monetary gain.
     * __Open data__: We're generally not a data provider, but if/when we do, it will surely be completely open. As an example, we do maintain a web API for the [Fishbase](http://www.fishbase.org/) dataset at [ropensci/fishbaseapi](https://github.com/ropensci/fishbaseapi/).
 
 ## rOpenSci as infrastructure?
@@ -57,7 +57,7 @@ We provide a number of services that places us more into the role of infrastruct
 
 * Code review (see our [onboarding process][onboarding])
 * Community standards for quality software (see our [development guidlines][guide] and [policies][policies])
-* General purpose software that solves all reasonable use cases
+* General purpose software that addresses a wide variety of reasonable use cases
 * Liberally licensed software that can be used in all settings (almost all our software is [MIT][mit] licensed)
 * Low level clients for many data science tools
 
@@ -75,7 +75,7 @@ This is a key point about the rOpenSci model. We do centralize software of a par
 * Maintain a certain level of software quality
 * Enforce a community that is welcoming to all, that encourages less experienced contributors, and marginalized groups
 
-We try to balance nurturing less experienced developers with 
+We try to balance nurturing less experienced developers with WHAT GOES HERE?
 
 ## References
 
