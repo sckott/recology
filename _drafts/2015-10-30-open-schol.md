@@ -12,7 +12,7 @@ tags:
 
 [Geoff Bilder][geoff], [Jennifer Lin][jlin], and [Cameron Neylon][cam] wrote a [blog post][post] back in February this year titled [_Principles for Open Scholarly Infrastructures_][post]. In it, they explore the principles, describe why we need them, and talk a bit about implementation.
 
-They don't disuss an organization that primarily makes software, but I thought exploring these principles with respect to software would be a useful exercise. I discuss this with respect to rOpenSci specifically, but try to make broader points about software where possible.
+They don't discuss an organization that primarily makes software, but I thought exploring these principles with respect to software would be a useful exercise. I discuss this with respect to rOpenSci specifically, but try to make broader points about software where possible.
 
 ## The principles
 
@@ -39,8 +39,8 @@ They discussed three principles, and within each of the three principles they ou
 > Long term trust requires the community to believe it retains control.
 
 
-* Liberally licensed open source software goes a long way towards making sure that the software is owned by the community (even if properietary derivatives are made).
-    * __Open source__: Bingo! Everything we do is open source. This is suprisingly not ubiquitous in academic software, due to a combination of some not bothering to use a license (essentially meaning it can't be re-used anywhere), or using a very restrictive license, either out of not considering the consequences or on purpose for competitive or monetary gain.
+* Liberally licensed open source software goes a long way towards making sure that the software is owned by the community (even if proprietary derivatives are made).
+    * __Open source__: Bingo! Everything we do is open source. This is surprisingly not ubiquitous in academic software, due to a combination of some not bothering to use a license (essentially meaning it can't be re-used anywhere), or using a very restrictive license, either out of not considering the consequences or on purpose for competitive or monetary gain.
     * __Open data__: We're generally not a data provider, but if/when we do, it will surely be completely open. As an example, we do maintain a web API for the [Fishbase](http://www.fishbase.org/) dataset at [ropensci/fishbaseapi](https://github.com/ropensci/fishbaseapi/).
 
 ## rOpenSci as infrastructure?
@@ -51,12 +51,12 @@ Towards the end of the post, Bilder et al. ask:
 
 They list [ORCID][orcid] and [CERN][cern] as examples. They didn't mention software per se, but I think software can be thought of as infrastructure. I think [rOpenSci][ros] is an example of software infrastructure. Let me explain.
 
-But wait, are we actually infrastructure? I think we are in a sense. We are building a long-lasting framework for building and maintaining software, supporting the people that make the software, and maintaing the underlying tools to make it all run smoothly. 
+But wait, are we actually infrastructure? I think we are in a sense. We are building a long-lasting framework for building and maintaining software, supporting the people that make the software, and maintaining the underlying tools to make it all run smoothly. 
 
 We provide a number of services that places us more into the role of infrastructure:
 
 * Code review (see our [onboarding process][onboarding])
-* Community standards for quality software (see our [development guidlines][guide] and [policies][policies])
+* Community standards for quality software (see our [development guidelines][guide] and [policies][policies])
 * General purpose software that addresses a wide variety of reasonable use cases
 * Liberally licensed software that can be used in all settings (almost all our software is [MIT][mit] licensed)
 * Low level clients for many data science tools
