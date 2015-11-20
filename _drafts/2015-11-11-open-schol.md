@@ -47,9 +47,9 @@ They discussed three principles, and within each of the three principles they ou
 
 > What would an organisation actually look like if run on these principles?
 
-They list [ORCID][orcid] and [CERN][cern] as examples. They didn't mention software per se, but I think software can be thought of as infrastructure. I think [rOpenSci][ros] is an example of software infrastructure. Let me explain.
+They list [ORCID][orcid] and [CERN][cern] as examples. They didn't mention software per se. Can an organization that makes software be considered infrastructure? And if not, how do these principles apply to software, if at all?
 
-Are we actually infrastructure? I think we are in a sense. We are building a long-lasting framework for building and maintaining software, supporting the people that make the software, and maintaining the underlying tools to make it all run smoothly.
+Can we consider rOpenSci as infrastructure? I think we can in a sense. We are building a long-lasting framework for building and maintaining software, supporting the people that make the software, and maintaining the underlying tools to make it all run smoothly.
 
 We provide a number of services that places us more into the role of infrastructure:
 
@@ -59,7 +59,7 @@ We provide a number of services that places us more into the role of infrastruct
 * Openly licensed software that can be used in all settings (almost all our software is [MIT][mit] licensed)
 * Low level clients for many data science tools
 
-In some ways, rOpenSci could be considered to not be infrastructure. For example, we are specific to a single programming language. However, this could change in time as our focus changes. In addition, R is used widely across disciplines.
+In some ways, rOpenSci could be considered to not be infrastructure. For example, we are specific to a single programming language. However, this could change in time as our focus changes. In addition, R is used widely across disciplines, making our community of users and contributors quite diverse.
 
 ## Centralization
 
@@ -67,9 +67,9 @@ In some ways, rOpenSci could be considered to not be infrastructure. For example
 
 This is a key point about the rOpenSci model. We do centralize software of a particular type that fits our mission. Because we centralize in terms of physical location in our GitHub account, we can:
 
-* Jump in to fix a problem quickly in case one of our community maintainers is away or unable to respond in a timely manner
-* Maintain a certain level of software quality
-* Enforce a community that is welcoming to all, that encourages less experienced contributors, and marginalized groups
+* Jump in to fix a problem quickly in case one of our community maintainers is away or unable to respond in a timely manner.
+* Maintain a certain level of software quality. Although we may not be there now with every package, we are trying hard to get there.
+* Enforce a community that is welcoming to all, that encourages less experienced contributors, and marginalized groups.
 
 We try to balance nurturing novice or inexperienced developers with ....(NOT DONE WITH THE THOUGHT YET)
 
