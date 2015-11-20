@@ -51,7 +51,7 @@ Towards the end of the post, Bilder et al. ask:
 
 They list [ORCID][orcid] and [CERN][cern] as examples. They didn't mention software per se, but I think software can be thought of as infrastructure. I think [rOpenSci][ros] is an example of software infrastructure. Let me explain.
 
-But wait, are we actually infrastructure? I think we are in a sense. We are building a long-lasting framework for building and maintaining software, supporting the people that make the software, and maintaing the underlying tools to make it all run smoothly. 
+But wait, are we actually infrastructure? I think we are in a sense. We are building a long-lasting framework for building and maintaining software, supporting the people that make the software, and maintaing the underlying tools to make it all run smoothly.
 
 We provide a number of services that places us more into the role of infrastructure:
 
@@ -61,7 +61,7 @@ We provide a number of services that places us more into the role of infrastruct
 * Liberally licensed software that can be used in all settings (almost all our software is [MIT][mit] licensed)
 * Low level clients for many data science tools
 
-In some ways, rOpenSci isn't infrastructure. For example, we are specific to a single programming language. However, this could change in time, and anyway, R is one language, but used widely across most sectors and in most disciplines. 
+In some ways, rOpenSci isn't infrastructure. For example, we are specific to a single programming language. However, this could change in time, and anyway, R is one language, but used widely across most sectors and in most disciplines.
 
 ## Centralization
 
