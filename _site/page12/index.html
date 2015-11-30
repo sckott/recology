@@ -61,6 +61,239 @@
   
   <div class="post">
     <h1>
+      <a href="/2014/12/taxize-workflows/">
+        taxize workflows
+      </a>
+    </h1>
+
+    <span class="post-date">02 Dec 2014</span>
+
+    A missed chat on the rOpenSci website the other day asked:
+
+> Hi there, i am trying to use the taxize package and have a .csv file of species names to run through taxize updating them. What would be the code i would need to run to achieve this?
+
+One way to answer this is to talk about the basic approach to importing data, doing stuff to the data, then recombining data. There are many ways to do this, but I'll go over a few of them.
+
+## Install taxize
+
+
+```r
+install.packages("taxize")
+install.packages("downloader")
+```
+
+
+```r
+library("taxize")
+```
+
+## Import data
+
+We'll use Winston Chang's new `downloader` package to avoid problems with `https`, and get a dataset from our ropensci datasets repo [https://github.com/ropensci/datasets](https://github.com/ropensci/datasets)
+
+
+```r
+downloader::download("https://raw.githubusercontent.com/ropensci/datasets/master/planttraits/morphological.csv", "morphological.csv")
+dat <- read.csv("morphological.csv", stringsAsFactors = FALSE)
+head(dat)
+#>                  species log_SLA leaf_water_content log_wood_density
+#> 1         Abies concolor    3.46               0.51            -0.52
+#> 2          Abies grandis    3.58               0.49            -0.51
+#> 3        Abies magnifica    3.87               0.62            -0.53
+#> 4      Acacia farnesiana      NA                 NA               NA
+#> 5           Acer glabrum    5.07               0.69            -0.54
+#> 6 Adenostoma fasciculata    3.56               0.46            -0.31
+#>   log_ht log_N
+#> 1   7.72  0.02
+#> 2   7.51 -0.31
+#> 3   7.58 -0.14
+#> 4   5.70    NA
+#> 5   3.25  1.02
+#> 6   5.33  0.29
+```
+
+After importing data, there are a variety of approaches you could take:
+
+1. Vector: Take species names as vector from your `data.frame`, cleaning them, then re-attching to the `data.frame` later, or
+2. In-Place: Use for loops or `lapply` family functions to iterate over each name while simultaneously re-inserting into the `data.frame`
+
+## 1. Vector
+
+Make a vector of names
+
+
+```r
+splist <- dat$species
+```
+
+Then proceed to do name cleaning, e.g, we can use the `tnrs` function to see if any names are potentially not spelled correctly. 
+
+
+```r
+tnrs_out <- tnrs(splist, source = "iPlant_TNRS")
+head(tnrs_out)
+#>              submittedname             acceptedname    sourceid score
+#> 1     Ceanothus prostratus     Ceanothus prostratus iPlant_TNRS     1
+#> 2          Abies magnifica          Abies magnifica iPlant_TNRS     1
+#> 3 Arctostaphylos canescens Arctostaphylos canescens iPlant_TNRS     1
+#> 4         Berberis nervosa         Berberis nervosa iPlant_TNRS     1
+#> 5        Arbutus menziesii        Arbutus menziesii iPlant_TNRS     1
+#> 6     Calocedrus decurrens     Calocedrus decurrens iPlant_TNRS     1
+#>                matchedname      authority
+#> 1     Ceanothus prostratus         Benth.
+#> 2          Abies magnifica  A. Murray bis
+#> 3 Arctostaphylos canescens         Eastw.
+#> 4         Berberis nervosa          Pursh
+#> 5        Arbutus menziesii          Pursh
+#> 6     Calocedrus decurrens (Torr.) Florin
+#>                                     uri
+#> 1 http://www.tropicos.org/Name/27500276
+#> 2 http://www.tropicos.org/Name/24900142
+#> 3 http://www.tropicos.org/Name/12302547
+#> 4  http://www.tropicos.org/Name/3500175
+#> 5 http://www.tropicos.org/Name/12302436
+#> 6  http://www.tropicos.org/Name/9400069
+```
+
+Those with score of less than 1 may have misspellings
+
+
+```r
+tnrs_out[ tnrs_out$score < 1, ]
+#>                 submittedname              acceptedname    sourceid score
+#> 23     Adenostoma fasciculata   Adenostoma fasciculatum iPlant_TNRS  0.97
+#> 24 Arctostaphylos glandulosus Arctostaphylos glandulosa iPlant_TNRS  0.97
+#> 36        Chamaebatia foliosa     Chamaebatia foliolosa iPlant_TNRS  0.95
+#> 38     Juniperus californicus     Juniperus californica iPlant_TNRS  0.97
+#> 77         Prunus illicifolia         Prunus ilicifolia iPlant_TNRS  0.99
+#> 78         Prunus subcordatus         Prunus subcordata iPlant_TNRS  0.97
+#>                  matchedname                         authority
+#> 23   Adenostoma fasciculatum                      Hook. & Arn.
+#> 24 Arctostaphylos glandulosa                            Eastw.
+#> 36     Chamaebatia foliolosa                            Benth.
+#> 38     Juniperus californica                          Carrière
+#> 77         Prunus ilicifolia (Nutt. ex Hook. & Arn.) D. Dietr.
+#> 78         Prunus subcordata                            Benth.
+#>                                      uri
+#> 23 http://www.tropicos.org/Name/27801458
+#> 24 http://www.tropicos.org/Name/12300542
+#> 36 http://www.tropicos.org/Name/27801486
+#> 38  http://www.tropicos.org/Name/9400374
+#> 77 http://www.tropicos.org/Name/27801102
+#> 78 http://www.tropicos.org/Name/27801124
+```
+
+So let's take the `acceptedname` column as a the new names and assign to a new vector
+
+
+```r
+cleaned_names <- tnrs_out$acceptedname
+```
+
+Then join names back, replacing them, or adding as a new column
+
+Replace
+
+
+```r
+dat$species <- cleaned_names
+head(dat)
+#>                    species log_SLA leaf_water_content log_wood_density
+#> 1     Ceanothus prostratus    3.46               0.51            -0.52
+#> 2          Abies magnifica    3.58               0.49            -0.51
+#> 3 Arctostaphylos canescens    3.87               0.62            -0.53
+#> 4         Berberis nervosa      NA                 NA               NA
+#> 5        Arbutus menziesii    5.07               0.69            -0.54
+#> 6     Calocedrus decurrens    3.56               0.46            -0.31
+#>   log_ht log_N
+#> 1   7.72  0.02
+#> 2   7.51 -0.31
+#> 3   7.58 -0.14
+#> 4   5.70    NA
+#> 5   3.25  1.02
+#> 6   5.33  0.29
+```
+
+New column
+
+
+```r
+dat$species_cleaned <- cleaned_names
+head(dat)
+#>                    species log_SLA leaf_water_content log_wood_density
+#> 1     Ceanothus prostratus    3.46               0.51            -0.52
+#> 2          Abies magnifica    3.58               0.49            -0.51
+#> 3 Arctostaphylos canescens    3.87               0.62            -0.53
+#> 4         Berberis nervosa      NA                 NA               NA
+#> 5        Arbutus menziesii    5.07               0.69            -0.54
+#> 6     Calocedrus decurrens    3.56               0.46            -0.31
+#>   log_ht log_N          species_cleaned
+#> 1   7.72  0.02     Ceanothus prostratus
+#> 2   7.51 -0.31          Abies magnifica
+#> 3   7.58 -0.14 Arctostaphylos canescens
+#> 4   5.70    NA         Berberis nervosa
+#> 5   3.25  1.02        Arbutus menziesii
+#> 6   5.33  0.29     Calocedrus decurrens
+```
+
+## 2. In-place
+
+You can use functions from the `dplyr` package to `split-apply-combine`, where `split` is split apart your vector for each taxon, `apply` to apply a function or functions to do name cleaning, then `combine` to put them back together. 
+
+Here, we'll attach taxonomic ids from the Catalogue of Life to each species (each row) (with just a subset of the data to save time):
+
+
+```r
+library("dplyr")
+tbl_df(dat)[1:5,] %>%
+  rowwise() %>%
+  mutate(colid = get_colid(species)) %>%
+  select(species, colid)
+#> Source: local data frame [5 x 2]
+#> Groups: <by row>
+#> 
+#>                    species    colid
+#> 1     Ceanothus prostratus 19544732
+#> 2          Abies magnifica 18158318
+#> 3 Arctostaphylos canescens 19358934
+#> 4         Berberis nervosa 19374077
+#> 5        Arbutus menziesii 19358819
+```
+
+Let's do something a bit more complicated. Get common names for each taxon in a new column, if more than 1, concatenate into a single character string for easy inclusion in a `data.frame`
+
+
+```r
+sci2comm_concat <- function(x){
+  temp <- sci2comm(x, db = "eol")
+  if(length(temp) == 0) NA else paste0(temp[[1]], collapse = ", ")
+}
+
+dat_new <- tbl_df(dat)[1:5,] %>%
+  rowwise() %>%
+  mutate(comm = sci2comm_concat(species))
+```
+
+To see the new column, do 
+
+
+```r
+dat_new %>% select(comm)
+#> Source: local data frame [5 x 1]
+#> Groups: <by row>
+#> 
+#>                                                                          comm
+#> 1                      Mahala-mat Ceanothus, prostrate ceanothus, squawcarpet
+#> 2 Prächtige Tanne, Goldtanne (Gold-Tanne), Kalifornische Rot-Tanne, Pracht-Ta
+#> 3                          hoary manzanita, hoary manzanita, Sonoma manzanita
+#> 4 Longleaf Oregon-grape, Cascade barberry, Dull Oregon grape, Oregon grape-ho
+#> 5                   pacific madrone, Madrona, madrone, Kalifornianmansikkapuu
+```
+
+  </div>
+  
+  <div class="post">
+    <h1>
       <a href="/2014/11/taxize-1000/">
         1000 commits to taxize
       </a>
@@ -68,175 +301,229 @@
 
     <span class="post-date">28 Nov 2014</span>
 
-    <p>Just today we&#39;ve hit 1000 commits on <code>taxize</code>!  <code>taxize</code> is an R client to search across lots of taxonomic databases on the web. In honor of the 1000 commit milestone, here&#39;s some stats on the project.</p>
+    Just today we've hit 1000 commits on `taxize`!  `taxize` is an R client to search across lots of taxonomic databases on the web. In honor of the 1000 commit milestone, here's some stats on the project.
 
-<p>Before that, lots of people have contributed to <code>taxize</code>, it&#39;s a big group effort:</p>
+Before that, lots of people have contributed to `taxize`, it's a big group effort:
 
-<ul>
-<li><a href="https://github.com/EDiLD">Eduard Szöcs</a></li>
-<li><a href="https://github.com/zachary-foster">Zachary Foster</a></li>
-<li><a href="https://github.com/cboettig">Carl Boettiger</a></li>
-<li><a href="https://github.com/karthik">Karthik Ram</a></li>
-<li><a href="https://github.com/jarioksa">Jari Oksanen</a></li>
-<li><a href="https://github.com/fmichonneau">Francis Michonneau</a></li>
-<li><a href="https://github.com/Ironholds">Oliver Keyes</a></li>
-<li><a href="https://github.com/dlebauer">David LeBauer</a></li>
-<li><a href="https://github.com/benmarwick">Ben Marwick</a></li>
-<li><a href="https://github.com/anirvan">Anirvan Chatterjee</a></li>
-</ul>
+* [Eduard Szöcs](https://github.com/EDiLD)
+* [Zachary Foster](https://github.com/zachary-foster)
+* [Carl Boettiger](https://github.com/cboettig)
+* [Karthik Ram](https://github.com/karthik)
+* [Jari Oksanen](https://github.com/jarioksa)
+* [Francis Michonneau](https://github.com/fmichonneau)
+* [Oliver Keyes](https://github.com/Ironholds)
+* [David LeBauer](https://github.com/dlebauer)
+* [Ben Marwick](https://github.com/benmarwick)
+* [Anirvan Chatterjee](https://github.com/anirvan)
 
-<p>In addition, we&#39;ve had lots of feedback from users, including feature requests and bug reports, making <code>taxize</code> a lot better.</p>
+In addition, we've had lots of feedback from users, including feature requests and bug reports, making `taxize` a lot better.
 
-<h2>Setup</h2>
-<div class="highlight"><pre><code class="language-r" data-lang="r"><span class="kn">library</span><span class="p">(</span><span class="s">&quot;devtools&quot;</span><span class="p">)</span>
-<span class="kn">library</span><span class="p">(</span><span class="s">&quot;httr&quot;</span><span class="p">)</span>
-<span class="kn">library</span><span class="p">(</span><span class="s">&quot;ggplot2&quot;</span><span class="p">)</span>
-<span class="kn">library</span><span class="p">(</span><span class="s">&quot;stringr&quot;</span><span class="p">)</span>
-<span class="kn">library</span><span class="p">(</span><span class="s">&quot;plyr&quot;</span><span class="p">)</span>
-<span class="kn">library</span><span class="p">(</span><span class="s">&quot;dplyr&quot;</span><span class="p">)</span>
-</code></pre></div>
-<h2>Define functions</h2>
-<div class="highlight"><pre><code class="language-r" data-lang="r">github_auth <span class="o">&lt;-</span> <span class="kr">function</span><span class="p">(</span>appname <span class="o">=</span> <span class="kp">getOption</span><span class="p">(</span><span class="s">&quot;gh_appname&quot;</span><span class="p">),</span> key <span class="o">=</span> <span class="kp">getOption</span><span class="p">(</span><span class="s">&quot;gh_id&quot;</span><span class="p">),</span>
-                        secret <span class="o">=</span> <span class="kp">getOption</span><span class="p">(</span><span class="s">&quot;gh_secret&quot;</span><span class="p">))</span> <span class="p">{</span>
-  <span class="kr">if</span> <span class="p">(</span><span class="kp">is.null</span><span class="p">(</span><span class="kp">getOption</span><span class="p">(</span><span class="s">&quot;gh_token&quot;</span><span class="p">)))</span> <span class="p">{</span>
-    myapp <span class="o">&lt;-</span> oauth_app<span class="p">(</span>appname<span class="p">,</span> key<span class="p">,</span> secret<span class="p">)</span>
-    token <span class="o">&lt;-</span> oauth2.0_token<span class="p">(</span>oauth_endpoints<span class="p">(</span><span class="s">&quot;github&quot;</span><span class="p">),</span> myapp<span class="p">)</span>
-    <span class="kp">options</span><span class="p">(</span>gh_token <span class="o">=</span> token<span class="p">)</span>
-  <span class="p">}</span> <span class="kr">else</span> <span class="p">{</span>
-    token <span class="o">&lt;-</span> <span class="kp">getOption</span><span class="p">(</span><span class="s">&quot;gh_token&quot;</span><span class="p">)</span>
-  <span class="p">}</span>
-  <span class="kr">return</span><span class="p">(</span>token<span class="p">)</span>
-<span class="p">}</span>
+## Setup
 
-make_url <span class="o">&lt;-</span> <span class="kr">function</span><span class="p">(</span>x<span class="p">,</span> y<span class="p">,</span> z<span class="p">)</span> <span class="p">{</span>
-  <span class="kp">sprintf</span><span class="p">(</span><span class="s">&quot;https://api.github.com/repos/%s/%s/%s&quot;</span><span class="p">,</span> x<span class="p">,</span> y<span class="p">,</span> z<span class="p">)</span>
-<span class="p">}</span>
 
-process_result <span class="o">&lt;-</span> <span class="kr">function</span><span class="p">(</span>x<span class="p">)</span> <span class="p">{</span>
-  stop_for_status<span class="p">(</span>x<span class="p">)</span>
-  <span class="kr">if</span> <span class="p">(</span><span class="o">!</span>x<span class="o">$</span>headers<span class="o">$</span><span class="sb">`content-type`</span> <span class="o">==</span> <span class="s">&quot;application/json; charset=utf-8&quot;</span><span class="p">)</span>
-    <span class="kp">stop</span><span class="p">(</span><span class="s">&quot;content type mismatch&quot;</span><span class="p">)</span>
-  tmp <span class="o">&lt;-</span> content<span class="p">(</span>x<span class="p">,</span> as <span class="o">=</span> <span class="s">&quot;text&quot;</span><span class="p">)</span>
-  jsonlite<span class="o">::</span>fromJSON<span class="p">(</span>tmp<span class="p">,</span> flatten <span class="o">=</span> <span class="kc">TRUE</span><span class="p">)</span>
-<span class="p">}</span>
+```r
+library("devtools")
+library("httr")
+library("ggplot2")
+library("stringr")
+library("plyr")
+library("dplyr")
+```
 
-gh_commits <span class="o">&lt;-</span> <span class="kr">function</span><span class="p">(</span>repo<span class="p">,</span> owner <span class="o">=</span> <span class="s">&quot;ropensci&quot;</span><span class="p">,</span> <span class="kc">...</span><span class="p">)</span> <span class="p">{</span>
-  token <span class="o">&lt;-</span> github_auth<span class="p">()</span>
-  outout <span class="o">&lt;-</span> <span class="kt">list</span><span class="p">();</span> iter <span class="o">&lt;-</span> <span class="m">0</span><span class="p">;</span> nexturl <span class="o">&lt;-</span> <span class="s">&quot;dontstop&quot;</span>
-  <span class="kr">while</span><span class="p">(</span>nexturl <span class="o">!=</span> <span class="s">&quot;stop&quot;</span><span class="p">){</span>
-    iter <span class="o">&lt;-</span> iter <span class="o">+</span> <span class="m">1</span>
-    req <span class="o">&lt;-</span> <span class="kr">if</span><span class="p">(</span><span class="kp">grepl</span><span class="p">(</span><span class="s">&quot;https:/&quot;</span><span class="p">,</span> nexturl<span class="p">))</span> GET<span class="p">(</span>nexturl<span class="p">,</span> config <span class="o">=</span> <span class="kt">c</span><span class="p">(</span>token <span class="o">=</span> token<span class="p">))</span> <span class="kr">else</span> GET<span class="p">(</span>make_url<span class="p">(</span>owner<span class="p">,</span> repo<span class="p">,</span> <span class="s">&quot;commits&quot;</span><span class="p">),</span> query <span class="o">=</span> <span class="kt">list</span><span class="p">(</span>per_page<span class="o">=</span><span class="m">100</span><span class="p">),</span> config <span class="o">=</span> <span class="kt">c</span><span class="p">(</span>token <span class="o">=</span> token<span class="p">))</span>
-    outout<span class="p">[[</span>iter<span class="p">]]</span> <span class="o">&lt;-</span> process_result<span class="p">(</span>req<span class="p">)</span>
-    link <span class="o">&lt;-</span> req<span class="o">$</span>headers<span class="o">$</span>link
-    nexturl <span class="o">&lt;-</span> <span class="kr">if</span><span class="p">(</span><span class="kp">is.null</span><span class="p">(</span>link<span class="p">)){</span> <span class="s">&quot;stop&quot;</span> <span class="p">}</span> <span class="kr">else</span> <span class="p">{</span>
-      <span class="kr">if</span><span class="p">(</span><span class="kp">grepl</span><span class="p">(</span><span class="s">&quot;next&quot;</span><span class="p">,</span> link<span class="p">)){</span>
-        stringr<span class="o">::</span>str_extract<span class="p">(</span>link<span class="p">,</span> <span class="s">&quot;https://[0-9A-Za-z/?=\\._&amp;]+&quot;</span><span class="p">)</span>
-      <span class="p">}</span> <span class="kr">else</span> <span class="p">{</span>
-        <span class="s">&quot;stop&quot;</span>
-      <span class="p">}</span>
-    <span class="p">}</span>
-  <span class="p">}</span>
-  outout <span class="o">&lt;-</span> outout<span class="p">[</span><span class="kp">sapply</span><span class="p">(</span>outout<span class="p">,</span> <span class="kr">function</span><span class="p">(</span>x<span class="p">)</span> <span class="o">!</span><span class="kp">identical</span><span class="p">(</span>x<span class="p">,</span> <span class="kt">list</span><span class="p">()))]</span>
-  dplyr<span class="o">::</span>rbind_all<span class="p">(</span>outout<span class="p">)</span>
-<span class="p">}</span>
+## Define functions
 
-gh_issues <span class="o">&lt;-</span> <span class="kr">function</span><span class="p">(</span>repo<span class="p">,</span> owner <span class="o">=</span> <span class="s">&quot;ropensci&quot;</span><span class="p">,</span> <span class="kc">...</span><span class="p">)</span> <span class="p">{</span>
-  token <span class="o">&lt;-</span> github_auth<span class="p">()</span>
-  outout <span class="o">&lt;-</span> <span class="kt">list</span><span class="p">();</span> iter <span class="o">&lt;-</span> <span class="m">0</span><span class="p">;</span> nexturl <span class="o">&lt;-</span> <span class="s">&quot;dontstop&quot;</span>
-  <span class="kr">while</span><span class="p">(</span>nexturl <span class="o">!=</span> <span class="s">&quot;stop&quot;</span><span class="p">){</span>
-    iter <span class="o">&lt;-</span> iter <span class="o">+</span> <span class="m">1</span>
-    req <span class="o">&lt;-</span> <span class="kr">if</span><span class="p">(</span><span class="kp">grepl</span><span class="p">(</span><span class="s">&quot;https:/&quot;</span><span class="p">,</span> nexturl<span class="p">))</span> GET<span class="p">(</span>nexturl<span class="p">,</span> query<span class="o">=</span><span class="kt">list</span><span class="p">(</span>state<span class="o">=</span><span class="s">&quot;all&quot;</span><span class="p">),</span> config <span class="o">=</span> <span class="kt">c</span><span class="p">(</span>token <span class="o">=</span> token<span class="p">))</span> <span class="kr">else</span> GET<span class="p">(</span>make_url<span class="p">(</span>owner<span class="p">,</span> repo<span class="p">,</span> <span class="s">&quot;issues&quot;</span><span class="p">),</span> query <span class="o">=</span> <span class="kt">list</span><span class="p">(</span>per_page<span class="o">=</span><span class="m">100</span><span class="p">,</span> state<span class="o">=</span><span class="s">&quot;all&quot;</span><span class="p">),</span> config <span class="o">=</span> <span class="kt">c</span><span class="p">(</span>token <span class="o">=</span> token<span class="p">))</span>
-    outout<span class="p">[[</span>iter<span class="p">]]</span> <span class="o">&lt;-</span> process_result<span class="p">(</span>req<span class="p">)</span>
-    link <span class="o">&lt;-</span> req<span class="o">$</span>headers<span class="o">$</span>link
-    nexturl <span class="o">&lt;-</span> <span class="kr">if</span><span class="p">(</span><span class="kp">is.null</span><span class="p">(</span>link<span class="p">)){</span> <span class="s">&quot;stop&quot;</span> <span class="p">}</span> <span class="kr">else</span> <span class="p">{</span>
-      <span class="kr">if</span><span class="p">(</span><span class="kp">grepl</span><span class="p">(</span><span class="s">&quot;next&quot;</span><span class="p">,</span> link<span class="p">)){</span>
-        stringr<span class="o">::</span>str_extract<span class="p">(</span>link<span class="p">,</span> <span class="s">&quot;https://[0-9A-Za-z/?=\\._&amp;]+&quot;</span><span class="p">)</span>
-      <span class="p">}</span> <span class="kr">else</span> <span class="p">{</span>
-        <span class="s">&quot;stop&quot;</span>
-      <span class="p">}</span>
-    <span class="p">}</span>
-  <span class="p">}</span>
-  outout <span class="o">&lt;-</span> outout<span class="p">[</span><span class="kp">sapply</span><span class="p">(</span>outout<span class="p">,</span> <span class="kr">function</span><span class="p">(</span>x<span class="p">)</span> <span class="o">!</span><span class="kp">identical</span><span class="p">(</span>x<span class="p">,</span> <span class="kt">list</span><span class="p">()))]</span>
-  dplyr<span class="o">::</span>rbind_all<span class="p">(</span>outout<span class="p">)</span>
-<span class="p">}</span>
 
-gh_commit <span class="o">&lt;-</span> <span class="kr">function</span><span class="p">(</span>sha<span class="p">,</span> repo<span class="p">,</span> owner <span class="o">=</span> <span class="s">&quot;ropensci&quot;</span><span class="p">,</span> <span class="kc">...</span><span class="p">)</span> <span class="p">{</span>
-  token <span class="o">&lt;-</span> github_auth<span class="p">()</span>
-  req <span class="o">&lt;-</span> GET<span class="p">(</span><span class="kp">paste0</span><span class="p">(</span>make_url<span class="p">(</span>owner<span class="p">,</span> repo<span class="p">,</span> <span class="s">&quot;commits&quot;</span><span class="p">),</span> <span class="s">&quot;/&quot;</span><span class="p">,</span> sha<span class="p">),</span>
-             config <span class="o">=</span> <span class="kt">c</span><span class="p">(</span>token <span class="o">=</span> token<span class="p">,</span> <span class="kc">...</span><span class="p">))</span>
-  process_result<span class="p">(</span>req<span class="p">)</span>
-<span class="p">}</span>
+```r
+github_auth <- function(appname = getOption("gh_appname"), key = getOption("gh_id"),
+                        secret = getOption("gh_secret")) {
+  if (is.null(getOption("gh_token"))) {
+    myapp <- oauth_app(appname, key, secret)
+    token <- oauth2.0_token(oauth_endpoints("github"), myapp)
+    options(gh_token = token)
+  } else {
+    token <- getOption("gh_token")
+  }
+  return(token)
+}
 
-gh_verb <span class="o">&lt;-</span> <span class="kr">function</span><span class="p">(</span>owner <span class="o">=</span> <span class="s">&quot;ropensci&quot;</span><span class="p">,</span> repo<span class="p">,</span> verb<span class="p">,</span> args<span class="o">=</span><span class="kt">list</span><span class="p">(),</span> <span class="kc">...</span><span class="p">)</span> <span class="p">{</span>
-  token <span class="o">&lt;-</span> github_auth<span class="p">()</span>
-  req <span class="o">&lt;-</span> GET<span class="p">(</span>make_url<span class="p">(</span>owner<span class="p">,</span> repo<span class="p">,</span> verb<span class="p">),</span> query<span class="o">=</span><span class="kp">args</span><span class="p">,</span> config <span class="o">=</span> <span class="kt">c</span><span class="p">(</span>token <span class="o">=</span> token<span class="p">,</span> <span class="kc">...</span><span class="p">))</span>
-  process_result<span class="p">(</span>req<span class="p">)</span>
-<span class="p">}</span>
-</code></pre></div>
-<h2>Commits</h2>
+make_url <- function(x, y, z) {
+  sprintf("https://api.github.com/repos/%s/%s/%s", x, y, z)
+}
 
-<p>List of commits</p>
-<div class="highlight"><pre><code class="language-r" data-lang="r">out <span class="o">&lt;-</span> gh_commits<span class="p">(</span><span class="s">&quot;taxize&quot;</span><span class="p">)</span>
-</code></pre></div>
-<p>Get changes for each commit</p>
-<div class="highlight"><pre><code class="language-r" data-lang="r">changes <span class="o">&lt;-</span> <span class="kp">vapply</span><span class="p">(</span>out<span class="o">$</span>sha<span class="p">,</span> <span class="kr">function</span><span class="p">(</span>x<span class="p">)</span> gh_commit<span class="p">(</span>x<span class="p">,</span> repo<span class="o">=</span><span class="s">&quot;taxize&quot;</span><span class="p">)</span><span class="o">$</span>stats<span class="o">$</span>total<span class="p">,</span> <span class="kt">numeric</span><span class="p">(</span><span class="m">1</span><span class="p">))</span>
-changesdf <span class="o">&lt;-</span>  <span class="kt">data.frame</span><span class="p">(</span>changes<span class="o">=</span><span class="kp">unname</span><span class="p">(</span>changes<span class="p">),</span> sha<span class="o">=</span><span class="kp">names</span><span class="p">(</span>changes<span class="p">))</span>
-</code></pre></div>
-<p>Combine</p>
-<div class="highlight"><pre><code class="language-r" data-lang="r">out <span class="o">&lt;-</span> inner_join<span class="p">(</span>out<span class="p">,</span> changesdf<span class="p">)</span>
-</code></pre></div>
-<p>Total changes through time (additions + deletions)</p>
-<div class="highlight"><pre><code class="language-r" data-lang="r">ct <span class="o">&lt;-</span> <span class="kr">function</span><span class="p">(</span>x<span class="p">)</span> <span class="kp">as.POSIXct</span><span class="p">(</span>x<span class="p">,</span> format<span class="o">=</span><span class="s">&quot;%Y-%m-%dT%H:%M:%SZ&quot;</span><span class="p">,</span> tz<span class="o">=</span><span class="s">&quot;UTC&quot;</span><span class="p">)</span>
-out <span class="o">%&gt;%</span>
-  mutate<span class="p">(</span>commit.committer.date <span class="o">=</span> ct<span class="p">(</span>commit.committer.date<span class="p">))</span> <span class="o">%&gt;%</span>
-  ggplot<span class="p">(</span>aes<span class="p">(</span>x<span class="o">=</span>commit.committer.date<span class="p">,</span> y<span class="o">=</span>changes<span class="p">))</span> <span class="o">+</span>
-    geom_area<span class="p">(</span>fill<span class="o">=</span><span class="s">&quot;#87D2A0&quot;</span><span class="p">)</span> <span class="o">+</span>
-    theme_grey<span class="p">(</span>base_size <span class="o">=</span> <span class="m">20</span><span class="p">)</span>
-</code></pre></div>
-<p><img src="/public/img/2014-11-28-taxize-1000/unnamed-chunk-7-1.png" alt=""></p>
+process_result <- function(x) {
+  stop_for_status(x)
+  if (!x$headers$`content-type` == "application/json; charset=utf-8")
+    stop("content type mismatch")
+  tmp <- content(x, as = "text")
+  jsonlite::fromJSON(tmp, flatten = TRUE)
+}
 
-<p>By Authors</p>
-<div class="highlight"><pre><code class="language-r" data-lang="r">out <span class="o">%&gt;%</span>
-  group_by<span class="p">(</span>author.login<span class="p">)</span> <span class="o">%&gt;%</span>
-  summarise<span class="p">(</span>n <span class="o">=</span> n<span class="p">())</span> <span class="o">%&gt;%</span>
-  ggplot<span class="p">(</span>aes<span class="p">(</span>author.login<span class="p">,</span> n<span class="p">))</span> <span class="o">+</span>
-    geom_bar<span class="p">(</span>stat <span class="o">=</span> <span class="s">&quot;identity&quot;</span><span class="p">,</span> fill<span class="o">=</span><span class="s">&quot;#87D2A0&quot;</span><span class="p">)</span> <span class="o">+</span>
-    coord_flip<span class="p">()</span> <span class="o">+</span>
-    theme_grey<span class="p">(</span>base_size <span class="o">=</span> <span class="m">20</span><span class="p">)</span>
-</code></pre></div>
-<p><img src="/public/img/2014-11-28-taxize-1000/unnamed-chunk-8-1.png" alt=""></p>
+gh_commits <- function(repo, owner = "ropensci", ...) {
+  token <- github_auth()
+  outout <- list(); iter <- 0; nexturl <- "dontstop"
+  while(nexturl != "stop"){
+    iter <- iter + 1
+    req <- if(grepl("https:/", nexturl)) GET(nexturl, config = c(token = token)) else GET(make_url(owner, repo, "commits"), query = list(per_page=100), config = c(token = token))
+    outout[[iter]] <- process_result(req)
+    link <- req$headers$link
+    nexturl <- if(is.null(link)){ "stop" } else {
+      if(grepl("next", link)){
+        stringr::str_extract(link, "https://[0-9A-Za-z/?=\\._&]+")
+      } else {
+        "stop"
+      }
+    }
+  }
+  outout <- outout[sapply(outout, function(x) !identical(x, list()))]
+  dplyr::rbind_all(outout)
+}
 
-<h2>Issues</h2>
-<div class="highlight"><pre><code class="language-r" data-lang="r">out <span class="o">&lt;-</span> gh_issues<span class="p">(</span><span class="s">&quot;taxize&quot;</span><span class="p">)</span>
-</code></pre></div>
-<p>Number of issues</p>
-<div class="highlight"><pre><code class="language-r" data-lang="r"><span class="kp">NROW</span><span class="p">(</span>out<span class="p">)</span>
-<span class="c1">#&gt; [1] 382</span>
-</code></pre></div>
-<p>Number of open issues</p>
-<div class="highlight"><pre><code class="language-r" data-lang="r">out <span class="o">%&gt;%</span>
-  filter<span class="p">(</span>state <span class="o">==</span> <span class="s">&quot;open&quot;</span><span class="p">)</span> <span class="o">%&gt;%</span>
-  <span class="kp">NROW</span>
-<span class="c1">#&gt; [1] 35</span>
-</code></pre></div>
-<p>Number of pull requests</p>
-<div class="highlight"><pre><code class="language-r" data-lang="r">out <span class="o">%&gt;%</span>
-  filter<span class="p">(</span><span class="o">!</span><span class="kp">is.na</span><span class="p">(</span>pull_request.url<span class="p">))</span> <span class="o">%&gt;%</span>
-  <span class="kp">NROW</span>
-<span class="c1">#&gt; [1] 119</span>
-</code></pre></div>
-<h2>Forks, number of</h2>
-<div class="highlight"><pre><code class="language-r" data-lang="r"><span class="kp">NROW</span><span class="p">(</span>gh_verb<span class="p">(</span>repo <span class="o">=</span> <span class="s">&quot;taxize&quot;</span><span class="p">,</span> verb<span class="o">=</span><span class="s">&quot;forks&quot;</span><span class="p">))</span>
-<span class="c1">#&gt; [1] 16</span>
-</code></pre></div>
-<h2>Stars, number of</h2>
-<div class="highlight"><pre><code class="language-r" data-lang="r"><span class="kp">NROW</span><span class="p">(</span>gh_verb<span class="p">(</span>repo <span class="o">=</span> <span class="s">&quot;taxize&quot;</span><span class="p">,</span> verb<span class="o">=</span><span class="s">&quot;stargazers&quot;</span><span class="p">,</span> args<span class="o">=</span><span class="kt">list</span><span class="p">(</span>per_page<span class="o">=</span><span class="m">100</span><span class="p">)))</span>
-<span class="c1">#&gt; [1] 44</span>
-</code></pre></div>
-<h2>Watchers, number of</h2>
-<div class="highlight"><pre><code class="language-r" data-lang="r"><span class="kp">NROW</span><span class="p">(</span>gh_verb<span class="p">(</span>repo <span class="o">=</span> <span class="s">&quot;taxize&quot;</span><span class="p">,</span> verb<span class="o">=</span><span class="s">&quot;subscribers&quot;</span><span class="p">,</span> args<span class="o">=</span><span class="kt">list</span><span class="p">(</span>per_page<span class="o">=</span><span class="m">100</span><span class="p">)))</span>
-<span class="c1">#&gt; [1] 12</span>
-</code></pre></div>
+gh_issues <- function(repo, owner = "ropensci", ...) {
+  token <- github_auth()
+  outout <- list(); iter <- 0; nexturl <- "dontstop"
+  while(nexturl != "stop"){
+    iter <- iter + 1
+    req <- if(grepl("https:/", nexturl)) GET(nexturl, query=list(state="all"), config = c(token = token)) else GET(make_url(owner, repo, "issues"), query = list(per_page=100, state="all"), config = c(token = token))
+    outout[[iter]] <- process_result(req)
+    link <- req$headers$link
+    nexturl <- if(is.null(link)){ "stop" } else {
+      if(grepl("next", link)){
+        stringr::str_extract(link, "https://[0-9A-Za-z/?=\\._&]+")
+      } else {
+        "stop"
+      }
+    }
+  }
+  outout <- outout[sapply(outout, function(x) !identical(x, list()))]
+  dplyr::rbind_all(outout)
+}
+
+gh_commit <- function(sha, repo, owner = "ropensci", ...) {
+  token <- github_auth()
+  req <- GET(paste0(make_url(owner, repo, "commits"), "/", sha),
+             config = c(token = token, ...))
+  process_result(req)
+}
+
+gh_verb <- function(owner = "ropensci", repo, verb, args=list(), ...) {
+  token <- github_auth()
+  req <- GET(make_url(owner, repo, verb), query=args, config = c(token = token, ...))
+  process_result(req)
+}
+```
+
+## Commits
+
+List of commits
+
+
+```r
+out <- gh_commits("taxize")
+```
+
+Get changes for each commit
+
+
+```r
+changes <- vapply(out$sha, function(x) gh_commit(x, repo="taxize")$stats$total, numeric(1))
+changesdf <-  data.frame(changes=unname(changes), sha=names(changes))
+```
+
+Combine
+
+
+```r
+out <- inner_join(out, changesdf)
+```
+
+Total changes through time (additions + deletions)
+
+
+```r
+ct <- function(x) as.POSIXct(x, format="%Y-%m-%dT%H:%M:%SZ", tz="UTC")
+out %>%
+  mutate(commit.committer.date = ct(commit.committer.date)) %>%
+  ggplot(aes(x=commit.committer.date, y=changes)) +
+    geom_area(fill="#87D2A0") +
+    theme_grey(base_size = 20)
+```
+
+![](/public/img/2014-11-28-taxize-1000/unnamed-chunk-7-1.png)
+
+By Authors
+
+
+```r
+out %>%
+  group_by(author.login) %>%
+  summarise(n = n()) %>%
+  ggplot(aes(author.login, n)) +
+    geom_bar(stat = "identity", fill="#87D2A0") +
+    coord_flip() +
+    theme_grey(base_size = 20)
+```
+
+![](/public/img/2014-11-28-taxize-1000/unnamed-chunk-8-1.png)
+
+## Issues
+
+
+```r
+out <- gh_issues("taxize")
+```
+
+Number of issues
+
+
+```r
+NROW(out)
+#> [1] 382
+```
+
+Number of open issues
+
+
+```r
+out %>%
+  filter(state == "open") %>%
+  NROW
+#> [1] 35
+```
+
+Number of pull requests
+
+
+```r
+out %>%
+  filter(!is.na(pull_request.url)) %>%
+  NROW
+#> [1] 119
+```
+
+## Forks, number of
+
+
+```r
+NROW(gh_verb(repo = "taxize", verb="forks"))
+#> [1] 16
+```
+
+## Stars, number of
+
+
+```r
+NROW(gh_verb(repo = "taxize", verb="stargazers", args=list(per_page=100)))
+#> [1] 44
+```
+
+## Watchers, number of
+
+
+```r
+NROW(gh_verb(repo = "taxize", verb="subscribers", args=list(per_page=100)))
+#> [1] 12
+```
+
   </div>
   
   <div class="post">
@@ -248,512 +535,402 @@ out <span class="o">%&gt;%</span>
 
     <span class="post-date">26 Nov 2014</span>
 
-    <p>Recently I had need to create a client for scraping museum metadata to help out some folks that use that kind of data. It&#39;s called <a href="https://github.com/ropensci/musemeta">musemeta</a>. One of the data sources in that package uses the open source <em>data portal software</em> <a href="http://ckan.org/">CKAN</a>, and so we can interact with <a href="http://docs.ckan.org/en/latest/api/index.html">the CKAN API</a> to get data. Since many groups can use CKAN API/etc infrastucture because it&#39;s open source, I thought why not have a general purpose R client for this, since <a href="https://github.com/ckan/ckan/wiki/CKAN-API-Clients">there are other clients</a> for Python, PHP, Ruby, etc. </p>
+    Recently I had need to create a client for scraping museum metadata to help out some folks that use that kind of data. It's called [musemeta](https://github.com/ropensci/musemeta). One of the data sources in that package uses the open source _data portal software_ [CKAN](http://ckan.org/), and so we can interact with [the CKAN API](http://docs.ckan.org/en/latest/api/index.html) to get data. Since many groups can use CKAN API/etc infrastucture because it's open source, I thought why not have a general purpose R client for this, since [there are other clients](https://github.com/ckan/ckan/wiki/CKAN-API-Clients) for Python, PHP, Ruby, etc. 
 
-<p>Here&#39;s a bit of an intro:</p>
+Here's a bit of an intro:
 
-<h2>Setup</h2>
+## Setup
 
-<p>Get/load packages</p>
-<div class="highlight"><pre><code class="language-r" data-lang="r">install.packages<span class="p">(</span><span class="s">&quot;devtools&quot;</span><span class="p">)</span>
-devtools<span class="o">::</span>install_github<span class="p">(</span><span class="s">&quot;ropensci/ckanr&quot;</span><span class="p">)</span>
-</code></pre></div><div class="highlight"><pre><code class="language-r" data-lang="r"><span class="kn">library</span><span class="p">(</span><span class="s">&quot;ckanr&quot;</span><span class="p">)</span>
-</code></pre></div>
-<blockquote>
-<p>Note: the default URL is for http://data.techno-science.ca/. You can change that in the <code>url</code> parameter</p>
-</blockquote>
+Get/load packages
 
-<h2>Some package details</h2>
 
-<p>All API alls are <code>POST</code> requests, and handled through a helper function called <code>ckan_POST()</code>. See <code>ckanr:::ckan_POST</code> to see the function.</p>
+```r
+install.packages("devtools")
+devtools::install_github("ropensci/ckanr")
+```
 
-<p>There are some common parameters across most functions that are worth describing a bit:</p>
 
-<ul>
-<li><code>offset</code> (numeric) Where to start getting items from (optional, default: 0)</li>
-<li><code>limit</code> (numeric) The maximum number of items to return (optional, default: 31)</li>
-<li><code>url</code> Base url to use. Default: <a href="http://data.techno-science.ca">http://data.techno-science.ca</a></li>
-<li><code>as</code> (character) One of <code>list</code> (default), <code>table</code>, or <code>json</code>. Parsing with table option uses <code>jsonlite::fromJSON(..., simplifyDataFrame = TRUE)</code>, which attempts to parse data to <code>data.frame</code>&#39;s when possible, so the result can vary.</li>
-<li><code>...</code> Curl args passed on to <code>httr::POST</code></li>
-</ul>
+```r
+library("ckanr")
+```
 
-<h2>Changes</h2>
-<div class="highlight"><pre><code class="language-r" data-lang="r">changes<span class="p">(</span>limit <span class="o">=</span> <span class="m">2</span><span class="p">,</span> as <span class="o">=</span> <span class="s">&quot;table&quot;</span><span class="p">)</span>
-<span class="c1">#&gt;                                user_id                  timestamp</span>
-<span class="c1">#&gt; 1 b50449ea-1dcc-4d52-b620-fc95bf56034b 2014-11-06T18:58:08.001743</span>
-<span class="c1">#&gt; 2 b50449ea-1dcc-4d52-b620-fc95bf56034b 2014-11-06T18:55:55.059527</span>
-<span class="c1">#&gt;                              object_id</span>
-<span class="c1">#&gt; 1 cc6a523c-cecf-4a95-836b-295a11ce2bce</span>
-<span class="c1">#&gt; 2 cc6a523c-cecf-4a95-836b-295a11ce2bce</span>
-<span class="c1">#&gt;                            revision_id data.package.maintainer</span>
-<span class="c1">#&gt; 1 5d11079e-fc05-4121-9fd5-fe086f5e5f33                        </span>
-<span class="c1">#&gt; 2 4a591538-0584-487b-8ed1-3260d1d09d77                        </span>
-<span class="c1">#&gt;   data.package.name data.package.metadata_modified data.package.author</span>
-<span class="c1">#&gt; 1              test     2014-11-06T18:55:54.772675                    </span>
-<span class="c1">#&gt; 2              test     2014-11-06T18:55:54.772675                    </span>
-<span class="c1">#&gt;   data.package.url data.package.notes               data.package.owner_org</span>
-<span class="c1">#&gt; 1                                     fafa260d-e2bf-46cd-9c35-34c1dfa46c57</span>
-<span class="c1">#&gt; 2                                     fafa260d-e2bf-46cd-9c35-34c1dfa46c57</span>
-<span class="c1">#&gt;   data.package.private data.package.maintainer_email</span>
-<span class="c1">#&gt; 1                FALSE                              </span>
-<span class="c1">#&gt; 2                FALSE                              </span>
-<span class="c1">#&gt;   data.package.author_email data.package.state data.package.version</span>
-<span class="c1">#&gt; 1                                      deleted                     </span>
-<span class="c1">#&gt; 2                                       active                     </span>
-<span class="c1">#&gt;           data.package.creator_user_id</span>
-<span class="c1">#&gt; 1 b50449ea-1dcc-4d52-b620-fc95bf56034b</span>
-<span class="c1">#&gt; 2 b50449ea-1dcc-4d52-b620-fc95bf56034b</span>
-<span class="c1">#&gt;                        data.package.id data.package.title</span>
-<span class="c1">#&gt; 1 cc6a523c-cecf-4a95-836b-295a11ce2bce               test</span>
-<span class="c1">#&gt; 2 cc6a523c-cecf-4a95-836b-295a11ce2bce               test</span>
-<span class="c1">#&gt;               data.package.revision_id data.package.type</span>
-<span class="c1">#&gt; 1 5d11079e-fc05-4121-9fd5-fe086f5e5f33           dataset</span>
-<span class="c1">#&gt; 2 4a591538-0584-487b-8ed1-3260d1d09d77           dataset</span>
-<span class="c1">#&gt;   data.package.license_id                                   id</span>
-<span class="c1">#&gt; 1            notspecified 59c308c8-68b2-4b92-bc57-129378d31882</span>
-<span class="c1">#&gt; 2            notspecified a8577e2c-f742-49c2-bef3-ca3299e58704</span>
-<span class="c1">#&gt;     activity_type</span>
-<span class="c1">#&gt; 1 deleted package</span>
-<span class="c1">#&gt; 2 changed package</span>
-</code></pre></div>
-<h2>List datasets</h2>
-<div class="highlight"><pre><code class="language-r" data-lang="r">datasets<span class="p">(</span>as <span class="o">=</span> <span class="s">&quot;table&quot;</span><span class="p">)</span>
-<span class="c1">#&gt;  [1] &quot;artifact-data-agriculture&quot;                                  </span>
-<span class="c1">#&gt;  [2] &quot;artifact-data-aviation&quot;                                     </span>
-<span class="c1">#&gt;  [3] &quot;artifact-data-bookbinding&quot;                                  </span>
-<span class="c1">#&gt;  [4] &quot;artifact-data-chemistry&quot;                                    </span>
-<span class="c1">#&gt;  [5] &quot;artifact-data-communications&quot;                               </span>
-<span class="c1">#&gt;  [6] &quot;artifact-data-computing-technology&quot;                         </span>
-<span class="c1">#&gt;  [7] &quot;artifact-data-domestic-technology&quot;                          </span>
-<span class="c1">#&gt;  [8] &quot;artifact-data-energy-electric&quot;                              </span>
-<span class="c1">#&gt;  [9] &quot;artifact-data-exploration-and-survey&quot;                       </span>
-<span class="c1">#&gt; [10] &quot;artifact-data-fisheries&quot;                                    </span>
-<span class="c1">#&gt; [11] &quot;artifact-data-forestry&quot;                                     </span>
-<span class="c1">#&gt; [12] &quot;artifact-data-horology&quot;                                     </span>
-<span class="c1">#&gt; [13] &quot;artifact-data-industrial-technology&quot;                        </span>
-<span class="c1">#&gt; [14] &quot;artifact-data-lighting-technology&quot;                          </span>
-<span class="c1">#&gt; [15] &quot;artifact-data-location-canada-agriculture-and-food-museum&quot;  </span>
-<span class="c1">#&gt; [16] &quot;artifact-data-location-canada-aviation-and-space-museum&quot;    </span>
-<span class="c1">#&gt; [17] &quot;artifact-data-location-canada-science-and-technology-museum&quot;</span>
-<span class="c1">#&gt; [18] &quot;artifact-data-marine-transportation&quot;                        </span>
-<span class="c1">#&gt; [19] &quot;artifact-data-mathematics&quot;                                  </span>
-<span class="c1">#&gt; [20] &quot;artifact-data-medical-technology&quot;                           </span>
-<span class="c1">#&gt; [21] &quot;artifact-data-meteorology&quot;                                  </span>
-<span class="c1">#&gt; [22] &quot;artifact-data-metrology&quot;                                    </span>
-<span class="c1">#&gt; [23] &quot;artifact-data-mining-and-metallurgy&quot;                        </span>
-<span class="c1">#&gt; [24] &quot;artifact-data-motorized-ground-transportation&quot;              </span>
-<span class="c1">#&gt; [25] &quot;artifact-data-non-motorized-ground-transportation&quot;          </span>
-<span class="c1">#&gt; [26] &quot;artifact-data-on-loan&quot;                                      </span>
-<span class="c1">#&gt; [27] &quot;artifact-data-photography&quot;                                  </span>
-<span class="c1">#&gt; [28] &quot;artifact-data-physics&quot;                                      </span>
-<span class="c1">#&gt; [29] &quot;artifact-data-printing&quot;                                     </span>
-<span class="c1">#&gt; [30] &quot;artifact-data-railway-transportation&quot;                       </span>
-<span class="c1">#&gt; [31] &quot;artifact-dataset-fire-fighting&quot;</span>
-</code></pre></div>
-<h2>List tags</h2>
-<div class="highlight"><pre><code class="language-r" data-lang="r">tag_list<span class="p">(</span><span class="s">&#39;aviation&#39;</span><span class="p">,</span> as<span class="o">=</span><span class="s">&#39;table&#39;</span><span class="p">)</span>
-<span class="c1">#&gt;   vocabulary_id                     display_name</span>
-<span class="c1">#&gt; 1            NA                         Aviation</span>
-<span class="c1">#&gt; 2            NA Canada Aviation and Space Museum</span>
-<span class="c1">#&gt;                                     id                             name</span>
-<span class="c1">#&gt; 1 cc1db2db-b08b-4888-897f-a17eade2461b                         Aviation</span>
-<span class="c1">#&gt; 2 8d05a650-bc7b-4b89-bcc8-c10177e60119 Canada Aviation and Space Museum</span>
-</code></pre></div>
-<h2>Show tags</h2>
+> Note: the default URL is for http://data.techno-science.ca/. You can change that in the `url` parameter
 
-<p>Subset for readme brevity</p>
-<div class="highlight"><pre><code class="language-r" data-lang="r">tag_show<span class="p">(</span><span class="s">&#39;Aviation&#39;</span><span class="p">)</span><span class="o">$</span>packages<span class="p">[[</span><span class="m">1</span><span class="p">]][</span><span class="m">1</span><span class="o">:</span><span class="m">3</span><span class="p">]</span>  
-<span class="c1">#&gt; $owner_org</span>
-<span class="c1">#&gt; [1] &quot;fafa260d-e2bf-46cd-9c35-34c1dfa46c57&quot;</span>
-<span class="c1">#&gt; </span>
-<span class="c1">#&gt; $maintainer</span>
-<span class="c1">#&gt; [1] &quot;&quot;</span>
-<span class="c1">#&gt; </span>
-<span class="c1">#&gt; $relationships_as_object</span>
-<span class="c1">#&gt; list()</span>
-</code></pre></div>
-<h2>List groups</h2>
-<div class="highlight"><pre><code class="language-r" data-lang="r">group_list<span class="p">(</span>as<span class="o">=</span><span class="s">&#39;table&#39;</span><span class="p">)</span>
-<span class="c1">#&gt;                         display_name description</span>
-<span class="c1">#&gt; 1                     Communications            </span>
-<span class="c1">#&gt; 2 Domestic and Industrial Technology            </span>
-<span class="c1">#&gt; 3                         Everything            </span>
-<span class="c1">#&gt; 4                           Location            </span>
-<span class="c1">#&gt; 5                          Resources            </span>
-<span class="c1">#&gt; 6         Scientific Instrumentation            </span>
-<span class="c1">#&gt; 7                     Transportation            </span>
-<span class="c1">#&gt;                                title</span>
-<span class="c1">#&gt; 1                     Communications</span>
-<span class="c1">#&gt; 2 Domestic and Industrial Technology</span>
-<span class="c1">#&gt; 3                         Everything</span>
-<span class="c1">#&gt; 4                           Location</span>
-<span class="c1">#&gt; 5                          Resources</span>
-<span class="c1">#&gt; 6         Scientific Instrumentation</span>
-<span class="c1">#&gt; 7                     Transportation</span>
-<span class="c1">#&gt;                                                                   image_display_url</span>
-<span class="c1">#&gt; 1       http://data.techno-science.ca/uploads/group/20141024-162305.6896412comm.jpg</span>
-<span class="c1">#&gt; 2    http://data.techno-science.ca/uploads/group/20141024-162324.3636615domtech.jpg</span>
-<span class="c1">#&gt; 3 http://data.techno-science.ca/uploads/group/20141024-162448.0656596everything.jpg</span>
-<span class="c1">#&gt; 4   http://data.techno-science.ca/uploads/group/20141024-162528.8786547location.jpg</span>
-<span class="c1">#&gt; 5     http://data.techno-science.ca/uploads/group/20141024-162608.3732604resour.jpg</span>
-<span class="c1">#&gt; 6    http://data.techno-science.ca/uploads/group/20141024-162549.1925831sciinst.jpg</span>
-<span class="c1">#&gt; 7  http://data.techno-science.ca/uploads/group/20141024-162624.1872823transport.jpg</span>
-<span class="c1">#&gt;   approval_status is_organization  state</span>
-<span class="c1">#&gt; 1        approved           FALSE active</span>
-<span class="c1">#&gt; 2        approved           FALSE active</span>
-<span class="c1">#&gt; 3        approved           FALSE active</span>
-<span class="c1">#&gt; 4        approved           FALSE active</span>
-<span class="c1">#&gt; 5        approved           FALSE active</span>
-<span class="c1">#&gt; 6        approved           FALSE active</span>
-<span class="c1">#&gt; 7        approved           FALSE active</span>
-<span class="c1">#&gt;                               image_url</span>
-<span class="c1">#&gt; 1       20141024-162305.6896412comm.jpg</span>
-<span class="c1">#&gt; 2    20141024-162324.3636615domtech.jpg</span>
-<span class="c1">#&gt; 3 20141024-162448.0656596everything.jpg</span>
-<span class="c1">#&gt; 4   20141024-162528.8786547location.jpg</span>
-<span class="c1">#&gt; 5     20141024-162608.3732604resour.jpg</span>
-<span class="c1">#&gt; 6    20141024-162549.1925831sciinst.jpg</span>
-<span class="c1">#&gt; 7  20141024-162624.1872823transport.jpg</span>
-<span class="c1">#&gt;                            revision_id packages  type</span>
-<span class="c1">#&gt; 1 cc302424-2e68-4fcc-9a3a-6de60748c2e4        5 group</span>
-<span class="c1">#&gt; 2 b7d95b87-5999-45f9-8775-c64094842551        2 group</span>
-<span class="c1">#&gt; 3 c2f0c59a-a543-4d67-a61f-4f387068ba53        1 group</span>
-<span class="c1">#&gt; 4 6816d571-d2bd-4131-b99d-80e7e6797492        4 group</span>
-<span class="c1">#&gt; 5 e37ee30d-577b-4349-8f0e-eaa4543497e8        6 group</span>
-<span class="c1">#&gt; 6 74eba42e-08b3-4400-b40f-3d6159ae6e9d       10 group</span>
-<span class="c1">#&gt; 7 a6cc4aab-eae9-42ba-9ab4-cbf45d5c6a0e        7 group</span>
-<span class="c1">#&gt;                                     id                               name</span>
-<span class="c1">#&gt; 1 5268ce18-e3b8-4802-b29e-30740b46e52d                     communications</span>
-<span class="c1">#&gt; 2 5a9a8095-9e0c-485e-84f6-77f577607991 domestic-and-industrial-technology</span>
-<span class="c1">#&gt; 3 d7dd233e-a1cc-43da-8152-f7ed15d26756                         everything</span>
-<span class="c1">#&gt; 4 770fc9c0-d4f3-48b0-a4ee-e00c6882df1d                           location</span>
-<span class="c1">#&gt; 5 f6c205de-cc95-4308-ac9f-5a63f1a5c7ee                          resources</span>
-<span class="c1">#&gt; 6 b98ff457-2031-48b6-b681-9adb3afc501b         scientific-instrumentation</span>
-<span class="c1">#&gt; 7 a73bf7be-310d-472e-83e1-43a3d87602ba                     transportation</span>
-</code></pre></div>
-<h2>Show groups</h2>
+## Some package details
 
-<p>Subset for readme brevity</p>
-<div class="highlight"><pre><code class="language-r" data-lang="r">group_show<span class="p">(</span><span class="s">&#39;communications&#39;</span><span class="p">,</span> as<span class="o">=</span><span class="s">&#39;table&#39;</span><span class="p">)</span><span class="o">$</span>users
-<span class="c1">#&gt;   openid about capacity     name                    created</span>
-<span class="c1">#&gt; 1     NA  &lt;NA&gt;    admin     marc 2014-10-24T14:44:29.885262</span>
-<span class="c1">#&gt; 2     NA          admin sepandar 2014-10-23T19:40:42.056418</span>
-<span class="c1">#&gt;                         email_hash sysadmin</span>
-<span class="c1">#&gt; 1 a32002c960476614370a16e9fb81f436    FALSE</span>
-<span class="c1">#&gt; 2 10b930a228afd1da2647d62e70b71bf8     TRUE</span>
-<span class="c1">#&gt;   activity_streams_email_notifications  state number_of_edits</span>
-<span class="c1">#&gt; 1                                FALSE active             376</span>
-<span class="c1">#&gt; 2                                FALSE active              44</span>
-<span class="c1">#&gt;   number_administered_packages display_name fullname</span>
-<span class="c1">#&gt; 1                           39         marc     &lt;NA&gt;</span>
-<span class="c1">#&gt; 2                            1     sepandar         </span>
-<span class="c1">#&gt;                                     id</span>
-<span class="c1">#&gt; 1 27778230-2e90-4818-9f00-bbf778c8fa09</span>
-<span class="c1">#&gt; 2 b50449ea-1dcc-4d52-b620-fc95bf56034b</span>
-</code></pre></div>
-<h2>Show a package</h2>
-<div class="highlight"><pre><code class="language-r" data-lang="r">package_show<span class="p">(</span><span class="s">&#39;34d60b13-1fd5-430e-b0ec-c8bc7f4841cf&#39;</span><span class="p">,</span> as<span class="o">=</span><span class="s">&#39;table&#39;</span><span class="p">)</span><span class="o">$</span>resources
-<span class="c1">#&gt;                      resource_group_id cache_last_updated</span>
-<span class="c1">#&gt; 1 ea8533d9-cdc6-4e0e-97b9-894e06d50b92                 NA</span>
-<span class="c1">#&gt; 2 ea8533d9-cdc6-4e0e-97b9-894e06d50b92                 NA</span>
-<span class="c1">#&gt; 3 ea8533d9-cdc6-4e0e-97b9-894e06d50b92                 NA</span>
-<span class="c1">#&gt; 4 ea8533d9-cdc6-4e0e-97b9-894e06d50b92                 NA</span>
-<span class="c1">#&gt;           revision_timestamp webstore_last_updated</span>
-<span class="c1">#&gt; 1 2014-10-28T18:13:22.213530                    NA</span>
-<span class="c1">#&gt; 2 2014-11-04T02:59:50.567068                    NA</span>
-<span class="c1">#&gt; 3 2014-11-05T21:23:58.533397                    NA</span>
-<span class="c1">#&gt; 4 2014-11-05T21:25:16.848423                    NA</span>
-<span class="c1">#&gt;                                     id size  state hash</span>
-<span class="c1">#&gt; 1 be2b0af8-24a8-4a55-8b30-89f5459b713a   NA active     </span>
-<span class="c1">#&gt; 2 7d65910e-4bdc-4f06-a213-e24e36762767   NA active     </span>
-<span class="c1">#&gt; 3 97622ad7-1507-4f6a-8acb-14e826447389   NA active     </span>
-<span class="c1">#&gt; 4 7a72498a-c49c-4e84-8b10-58991de10df6   NA active     </span>
-<span class="c1">#&gt;                                    description format</span>
-<span class="c1">#&gt; 1                                  XML Dataset    XML</span>
-<span class="c1">#&gt; 2 Data dictionary for CSTMC artifact datasets.    XLS</span>
-<span class="c1">#&gt; 3       Tips for using the artifacts datasets.   .php</span>
-<span class="c1">#&gt; 4       Tips for using the artifacts datasets.   .php</span>
-<span class="c1">#&gt;   tracking_summary.total tracking_summary.recent mimetype_inner url_type</span>
-<span class="c1">#&gt; 1                      0                       0             NA       NA</span>
-<span class="c1">#&gt; 2                      0                       0             NA       NA</span>
-<span class="c1">#&gt; 3                      0                       0             NA       NA</span>
-<span class="c1">#&gt; 4                      0                       0             NA       NA</span>
-<span class="c1">#&gt;   mimetype cache_url                               name</span>
-<span class="c1">#&gt; 1       NA        NA Artifact Data - Vacuum Tubes (XML)</span>
-<span class="c1">#&gt; 2       NA        NA                    Data Dictionary</span>
-<span class="c1">#&gt; 3       NA        NA                     Tips (English)</span>
-<span class="c1">#&gt; 4       NA        NA                      Tips (French)</span>
-<span class="c1">#&gt;                      created</span>
-<span class="c1">#&gt; 1 2014-10-28T18:13:22.240393</span>
-<span class="c1">#&gt; 2 2014-11-04T02:59:50.643658</span>
-<span class="c1">#&gt; 3 2014-11-04T18:14:23.952937</span>
-<span class="c1">#&gt; 4 2014-11-05T21:25:16.887796</span>
-<span class="c1">#&gt;                                                                                                                                                    url</span>
-<span class="c1">#&gt; 1                         http://source.techno-science.ca/datasets-donn%C3%A9es/artifacts-artefacts/groups-groupes/vacuum-tubes-tubes-electronique.xml</span>
-<span class="c1">#&gt; 2 http://source.techno-science.ca/datasets-donn%C3%A9es/artifacts-artefacts/cstmc-artifact-data-dictionary-dictionnaire-de-donnees-artefacts-smstc.xls</span>
-<span class="c1">#&gt; 3                                                                          http://techno-science.ca/en/open-data/tips-using-artifact-open-data-set.php</span>
-<span class="c1">#&gt; 4                                                                 http://techno-science.ca/fr/donnees-ouvertes/conseils-donnees-ouvertes-artefacts.php</span>
-<span class="c1">#&gt;   webstore_url last_modified position                          revision_id</span>
-<span class="c1">#&gt; 1           NA            NA        0 9a27d884-f181-4842-ab47-cda35a8bf99a</span>
-<span class="c1">#&gt; 2           NA            NA        1 5d27b3e6-7870-4c12-a122-9e9f5adee4a0</span>
-<span class="c1">#&gt; 3           NA            NA        2 40993f16-402b-439c-9288-2f2b177e4b8f</span>
-<span class="c1">#&gt; 4           NA            NA        3 57f1488e-a140-4eb6-9329-fc13202a73af</span>
-<span class="c1">#&gt;   resource_type</span>
-<span class="c1">#&gt; 1            NA</span>
-<span class="c1">#&gt; 2            NA</span>
-<span class="c1">#&gt; 3            NA</span>
-<span class="c1">#&gt; 4            NA</span>
-</code></pre></div>
-<h2>Search for packages</h2>
-<div class="highlight"><pre><code class="language-r" data-lang="r">out <span class="o">&lt;-</span> package_search<span class="p">(</span>q <span class="o">=</span> <span class="s">&#39;*:*&#39;</span><span class="p">,</span> rows <span class="o">=</span> <span class="m">2</span><span class="p">,</span> as<span class="o">=</span><span class="s">&quot;table&quot;</span><span class="p">)</span><span class="o">$</span>results
-out<span class="p">[,</span> <span class="o">!</span><span class="kp">names</span><span class="p">(</span>out<span class="p">)</span> <span class="o">%in%</span> <span class="s">&#39;resources&#39;</span><span class="p">]</span>
-<span class="c1">#&gt;                      license_title maintainer relationships_as_object</span>
-<span class="c1">#&gt; 1 Open Government Licence - Canada                               NULL</span>
-<span class="c1">#&gt; 2 Open Government Licence - Canada                               NULL</span>
-<span class="c1">#&gt;   private maintainer_email         revision_timestamp</span>
-<span class="c1">#&gt; 1   FALSE                  2014-11-05T23:17:46.220002</span>
-<span class="c1">#&gt; 2   FALSE                  2014-11-05T23:17:04.923594</span>
-<span class="c1">#&gt;                                     id           metadata_created</span>
-<span class="c1">#&gt; 1 35d5484d-38ce-495e-8722-7857c4fd17bf 2014-10-28T20:13:11.572558</span>
-<span class="c1">#&gt; 2 da65507d-b018-4d3b-bde3-5419cf29d144 2014-10-28T14:59:21.386177</span>
-<span class="c1">#&gt;            metadata_modified author author_email  state version</span>
-<span class="c1">#&gt; 1 2014-11-05T23:17:46.220657                     active        </span>
-<span class="c1">#&gt; 2 2014-11-05T23:17:04.924229                     active        </span>
-<span class="c1">#&gt;                        creator_user_id    type num_resources</span>
-<span class="c1">#&gt; 1 27778230-2e90-4818-9f00-bbf778c8fa09 dataset             4</span>
-<span class="c1">#&gt; 2 27778230-2e90-4818-9f00-bbf778c8fa09 dataset             4</span>
-<span class="c1">#&gt;                                                                                                                       tags</span>
-<span class="c1">#&gt; 1                         NA, Location, Location, 2014-10-28T20:13:11.572558, active, da88c5a2-3766-41ea-a75b-9c87047cc528</span>
-<span class="c1">#&gt; 2 NA, Computing Technology, Computing Technology, 2014-10-28T14:59:21.386177, active, 5371dc28-9ce8-4f21-9afb-1f155f132bfe</span>
-<span class="c1">#&gt;   tracking_summary.total tracking_summary.recent</span>
-<span class="c1">#&gt; 1                     35                      10</span>
-<span class="c1">#&gt; 2                     24                       8</span>
-<span class="c1">#&gt;                                                                                                                                                                                                       groups</span>
-<span class="c1">#&gt; 1                                                      Location, , http://data.techno-science.ca/uploads/group/20141024-162528.8786547location.jpg, Location, 770fc9c0-d4f3-48b0-a4ee-e00c6882df1d, location</span>
-<span class="c1">#&gt; 2 Scientific Instrumentation, , http://data.techno-science.ca/uploads/group/20141024-162549.1925831sciinst.jpg, Scientific Instrumentation, b98ff457-2031-48b6-b681-9adb3afc501b, scientific-instrumentation</span>
-<span class="c1">#&gt;   license_id relationships_as_subject num_tags organization.description</span>
-<span class="c1">#&gt; 1 ca-ogl-lgo                     NULL        1                         </span>
-<span class="c1">#&gt; 2 ca-ogl-lgo                     NULL        1                         </span>
-<span class="c1">#&gt;         organization.created organization.title organization.name</span>
-<span class="c1">#&gt; 1 2014-10-24T14:49:36.878579              CSTMC             cstmc</span>
-<span class="c1">#&gt; 2 2014-10-24T14:49:36.878579              CSTMC             cstmc</span>
-<span class="c1">#&gt;   organization.revision_timestamp organization.is_organization</span>
-<span class="c1">#&gt; 1      2014-10-24T14:49:36.813670                         TRUE</span>
-<span class="c1">#&gt; 2      2014-10-24T14:49:36.813670                         TRUE</span>
-<span class="c1">#&gt;   organization.state organization.image_url</span>
-<span class="c1">#&gt; 1             active                       </span>
-<span class="c1">#&gt; 2             active                       </span>
-<span class="c1">#&gt;               organization.revision_id organization.type</span>
-<span class="c1">#&gt; 1 7a325a56-46f1-419c-b7b2-ec7501edb35a      organization</span>
-<span class="c1">#&gt; 2 7a325a56-46f1-419c-b7b2-ec7501edb35a      organization</span>
-<span class="c1">#&gt;                        organization.id organization.approval_status</span>
-<span class="c1">#&gt; 1 fafa260d-e2bf-46cd-9c35-34c1dfa46c57                     approved</span>
-<span class="c1">#&gt; 2 fafa260d-e2bf-46cd-9c35-34c1dfa46c57                     approved</span>
-<span class="c1">#&gt;                                                          name isopen url</span>
-<span class="c1">#&gt; 1 artifact-data-location-canada-science-and-technology-museum  FALSE    </span>
-<span class="c1">#&gt; 2                          artifact-data-computing-technology  FALSE    </span>
-<span class="c1">#&gt;                                                                                                                                                                        notes</span>
-<span class="c1">#&gt; 1 This dataset includes artifacts in the collection of the Canada Science and Technology Museums Corporation that are currently in the Canada Science and Technology Museum.</span>
-<span class="c1">#&gt; 2                                This dataset includes artifacts in the collection of the Canada Science and Technology Museums Corporation related to computing technology.</span>
-<span class="c1">#&gt;                              owner_org extras</span>
-<span class="c1">#&gt; 1 fafa260d-e2bf-46cd-9c35-34c1dfa46c57   NULL</span>
-<span class="c1">#&gt; 2 fafa260d-e2bf-46cd-9c35-34c1dfa46c57   NULL</span>
-<span class="c1">#&gt;                                            license_url</span>
-<span class="c1">#&gt; 1 http://data.gc.ca/eng/open-government-licence-canada</span>
-<span class="c1">#&gt; 2 http://data.gc.ca/eng/open-government-licence-canada</span>
-<span class="c1">#&gt;                                                             title</span>
-<span class="c1">#&gt; 1 Artifact Data - Location - Canada Science and Technology Museum</span>
-<span class="c1">#&gt; 2                            Artifact Data - Computing Technology</span>
-<span class="c1">#&gt;                            revision_id</span>
-<span class="c1">#&gt; 1 694a977a-c238-47a4-8671-caddca4edfca</span>
-<span class="c1">#&gt; 2 858cb240-76a0-406a-800c-e4ae6cc56ab9</span>
-</code></pre></div>
-<h2>Search for resources</h2>
-<div class="highlight"><pre><code class="language-r" data-lang="r">resource_search<span class="p">(</span>q <span class="o">=</span> <span class="s">&#39;name:data&#39;</span><span class="p">,</span> limit <span class="o">=</span> <span class="m">2</span><span class="p">,</span> as<span class="o">=</span><span class="s">&#39;table&#39;</span><span class="p">)</span>
-<span class="c1">#&gt; $count</span>
-<span class="c1">#&gt; [1] 71</span>
-<span class="c1">#&gt; </span>
-<span class="c1">#&gt; $results</span>
-<span class="c1">#&gt;                      resource_group_id cache_last_updated</span>
-<span class="c1">#&gt; 1 01a82e52-01bf-4a9c-9b45-c4f9b92529fa                 NA</span>
-<span class="c1">#&gt; 2 01a82e52-01bf-4a9c-9b45-c4f9b92529fa                 NA</span>
-<span class="c1">#&gt;   webstore_last_updated                                   id size  state</span>
-<span class="c1">#&gt; 1                    NA e179e910-27fb-44f4-a627-99822af49ffa   NA active</span>
-<span class="c1">#&gt; 2                    NA ba84e8b7-b388-4d2a-873a-7b107eb7f135   NA active</span>
-<span class="c1">#&gt;   last_modified hash                                  description format</span>
-<span class="c1">#&gt; 1            NA                                       XML Dataset    XML</span>
-<span class="c1">#&gt; 2            NA      Data dictionary for CSTMC artifact datasets.    XLS</span>
-<span class="c1">#&gt;   mimetype_inner url_type mimetype cache_url</span>
-<span class="c1">#&gt; 1             NA       NA       NA        NA</span>
-<span class="c1">#&gt; 2             NA       NA       NA        NA</span>
-<span class="c1">#&gt;                                           name                    created</span>
-<span class="c1">#&gt; 1 Artifact Data - Exploration and Survey (XML) 2014-10-28T15:50:35.374303</span>
-<span class="c1">#&gt; 2                              Data Dictionary 2014-11-03T18:01:02.094210</span>
-<span class="c1">#&gt;                                                                                                                                                    url</span>
-<span class="c1">#&gt; 1              http://source.techno-science.ca/datasets-donn%C3%A9es/artifacts-artefacts/groups-groupes/exploration-and-survey-exploration-et-leve.xml</span>
-<span class="c1">#&gt; 2 http://source.techno-science.ca/datasets-donn%C3%A9es/artifacts-artefacts/cstmc-artifact-data-dictionary-dictionnaire-de-donnees-artefacts-smstc.xls</span>
-<span class="c1">#&gt;   webstore_url position                          revision_id resource_type</span>
-<span class="c1">#&gt; 1           NA        0 a22e6741-3e89-4db0-a802-ba594b1c1fad            NA</span>
-<span class="c1">#&gt; 2           NA        1 da1f8585-521d-47ef-8ead-7832474a3421            NA</span>
-</code></pre></div>
-<h2>Future work</h2>
+All API alls are `POST` requests, and handled through a helper function called `ckan_POST()`. See `ckanr:::ckan_POST` to see the function.
 
-<ul>
-<li>There&#39;s already <a href="https://github.com/ropensci/ckanr/issues/4">an issue</a> to add support for <a href="http://docs.ckan.org/en/latest/maintaining/datastore.html">DataStore</a></li>
-<li>This client needs to be tested against many other CKAN API instances to make sure it&#39;s robust</li>
-<li>Add a test suite</li>
-<li>Use cases: would be nice to include in the package documentation use cases</li>
-<li>Other things? Get in touch on twitter <code>@recology_</code> or below</li>
-</ul>
+There are some common parameters across most functions that are worth describing a bit:
 
-  </div>
-  
-  <div class="post">
-    <h1>
-      <a href="/2014/11/github-fun/">
-        Fun with the GitHub API
-      </a>
-    </h1>
+* `offset` (numeric) Where to start getting items from (optional, default: 0)
+* `limit` (numeric) The maximum number of items to return (optional, default: 31)
+* `url` Base url to use. Default: [http://data.techno-science.ca](http://data.techno-science.ca)
+* `as` (character) One of `list` (default), `table`, or `json`. Parsing with table option uses `jsonlite::fromJSON(..., simplifyDataFrame = TRUE)`, which attempts to parse data to `data.frame`'s when possible, so the result can vary.
+* `...` Curl args passed on to `httr::POST`
 
-    <span class="post-date">26 Nov 2014</span>
+## Changes
 
-    <p>Recently I&#39;ve had fun playing with the GitHub API, and here are some notes to self about this fun having.</p>
 
-<h2>Setup</h2>
+```r
+changes(limit = 2, as = "table")
+#>                                user_id                  timestamp
+#> 1 b50449ea-1dcc-4d52-b620-fc95bf56034b 2014-11-06T18:58:08.001743
+#> 2 b50449ea-1dcc-4d52-b620-fc95bf56034b 2014-11-06T18:55:55.059527
+#>                              object_id
+#> 1 cc6a523c-cecf-4a95-836b-295a11ce2bce
+#> 2 cc6a523c-cecf-4a95-836b-295a11ce2bce
+#>                            revision_id data.package.maintainer
+#> 1 5d11079e-fc05-4121-9fd5-fe086f5e5f33                        
+#> 2 4a591538-0584-487b-8ed1-3260d1d09d77                        
+#>   data.package.name data.package.metadata_modified data.package.author
+#> 1              test     2014-11-06T18:55:54.772675                    
+#> 2              test     2014-11-06T18:55:54.772675                    
+#>   data.package.url data.package.notes               data.package.owner_org
+#> 1                                     fafa260d-e2bf-46cd-9c35-34c1dfa46c57
+#> 2                                     fafa260d-e2bf-46cd-9c35-34c1dfa46c57
+#>   data.package.private data.package.maintainer_email
+#> 1                FALSE                              
+#> 2                FALSE                              
+#>   data.package.author_email data.package.state data.package.version
+#> 1                                      deleted                     
+#> 2                                       active                     
+#>           data.package.creator_user_id
+#> 1 b50449ea-1dcc-4d52-b620-fc95bf56034b
+#> 2 b50449ea-1dcc-4d52-b620-fc95bf56034b
+#>                        data.package.id data.package.title
+#> 1 cc6a523c-cecf-4a95-836b-295a11ce2bce               test
+#> 2 cc6a523c-cecf-4a95-836b-295a11ce2bce               test
+#>               data.package.revision_id data.package.type
+#> 1 5d11079e-fc05-4121-9fd5-fe086f5e5f33           dataset
+#> 2 4a591538-0584-487b-8ed1-3260d1d09d77           dataset
+#>   data.package.license_id                                   id
+#> 1            notspecified 59c308c8-68b2-4b92-bc57-129378d31882
+#> 2            notspecified a8577e2c-f742-49c2-bef3-ca3299e58704
+#>     activity_type
+#> 1 deleted package
+#> 2 changed package
+```
 
-<p>Get/load packages</p>
-<div class="highlight"><pre><code class="language-r" data-lang="r">install.packages<span class="p">(</span><span class="kt">c</span><span class="p">(</span><span class="s">&#39;devtools&#39;</span><span class="p">,</span><span class="s">&#39;jsonlite&#39;</span><span class="p">,</span><span class="s">&#39;httr&#39;</span><span class="p">,</span><span class="s">&#39;yaml&#39;</span><span class="p">))</span>
-</code></pre></div><div class="highlight"><pre><code class="language-r" data-lang="r"><span class="kn">library</span><span class="p">(</span><span class="s">&quot;devtools&quot;</span><span class="p">)</span>
-<span class="kn">library</span><span class="p">(</span><span class="s">&quot;httr&quot;</span><span class="p">)</span>
-<span class="kn">library</span><span class="p">(</span><span class="s">&quot;yaml&quot;</span><span class="p">)</span>
-</code></pre></div>
-<h2>Define a vector of package names</h2>
-<div class="highlight"><pre><code class="language-r" data-lang="r">pkgs <span class="o">&lt;-</span> <span class="kt">c</span><span class="p">(</span><span class="s">&quot;alm&quot;</span><span class="p">,</span> <span class="s">&quot;bmc&quot;</span><span class="p">,</span> <span class="s">&quot;bold&quot;</span><span class="p">,</span> <span class="s">&quot;clifro&quot;</span><span class="p">,</span> <span class="s">&quot;ecoengine&quot;</span><span class="p">,</span>
-  <span class="s">&quot;elastic&quot;</span><span class="p">,</span> <span class="s">&quot;fulltext&quot;</span><span class="p">,</span> <span class="s">&quot;geonames&quot;</span><span class="p">,</span> <span class="s">&quot;gistr&quot;</span><span class="p">,</span>
-  <span class="s">&quot;RNeXML&quot;</span><span class="p">,</span> <span class="s">&quot;rnoaa&quot;</span><span class="p">,</span> <span class="s">&quot;rnpn&quot;</span><span class="p">,</span> <span class="s">&quot;traits&quot;</span><span class="p">,</span> <span class="s">&quot;rplos&quot;</span><span class="p">,</span> <span class="s">&quot;rsnps&quot;</span><span class="p">,</span>
-  <span class="s">&quot;rWBclimate&quot;</span><span class="p">,</span> <span class="s">&quot;solr&quot;</span><span class="p">,</span> <span class="s">&quot;spocc&quot;</span><span class="p">,</span> <span class="s">&quot;taxize&quot;</span><span class="p">,</span> <span class="s">&quot;togeojson&quot;</span><span class="p">,</span> <span class="s">&quot;treeBASE&quot;</span><span class="p">)</span>
-pkgs <span class="o">&lt;-</span> <span class="kp">sort</span><span class="p">(</span>pkgs<span class="p">)</span>
-</code></pre></div>
-<h2>Define functions</h2>
-<div class="highlight"><pre><code class="language-r" data-lang="r">github_auth <span class="o">&lt;-</span> <span class="kr">function</span><span class="p">(</span>appname <span class="o">=</span> <span class="kp">getOption</span><span class="p">(</span><span class="s">&quot;gh_appname&quot;</span><span class="p">),</span> key <span class="o">=</span> <span class="kp">getOption</span><span class="p">(</span><span class="s">&quot;gh_id&quot;</span><span class="p">),</span>
-                        secret <span class="o">=</span> <span class="kp">getOption</span><span class="p">(</span><span class="s">&quot;gh_secret&quot;</span><span class="p">))</span> <span class="p">{</span>
-  <span class="kr">if</span> <span class="p">(</span><span class="kp">is.null</span><span class="p">(</span><span class="kp">getOption</span><span class="p">(</span><span class="s">&quot;gh_token&quot;</span><span class="p">)))</span> <span class="p">{</span>
-    myapp <span class="o">&lt;-</span> oauth_app<span class="p">(</span>appname<span class="p">,</span> key<span class="p">,</span> secret<span class="p">)</span>
-    token <span class="o">&lt;-</span> oauth2.0_token<span class="p">(</span>oauth_endpoints<span class="p">(</span><span class="s">&quot;github&quot;</span><span class="p">),</span> myapp<span class="p">)</span>
-    <span class="kp">options</span><span class="p">(</span>gh_token <span class="o">=</span> token<span class="p">)</span>
-  <span class="p">}</span> <span class="kr">else</span> <span class="p">{</span>
-    token <span class="o">&lt;-</span> <span class="kp">getOption</span><span class="p">(</span><span class="s">&quot;gh_token&quot;</span><span class="p">)</span>
-  <span class="p">}</span>
-  <span class="kr">return</span><span class="p">(</span>token<span class="p">)</span>
-<span class="p">}</span>
+## List datasets
 
-make_url <span class="o">&lt;-</span> <span class="kr">function</span><span class="p">(</span>x<span class="p">,</span> y<span class="p">,</span> z<span class="p">)</span> <span class="p">{</span>
-  <span class="kp">sprintf</span><span class="p">(</span><span class="s">&quot;https://api.github.com/repos/%s/%s/%s&quot;</span><span class="p">,</span> x<span class="p">,</span> y<span class="p">,</span> z<span class="p">)</span>
-<span class="p">}</span>
 
-process_result <span class="o">&lt;-</span> <span class="kr">function</span><span class="p">(</span>x<span class="p">)</span> <span class="p">{</span>
-  stop_for_status<span class="p">(</span>x<span class="p">)</span>
-  <span class="kr">if</span> <span class="p">(</span><span class="o">!</span>x<span class="o">$</span>headers<span class="o">$</span><span class="sb">`content-type`</span> <span class="o">==</span> <span class="s">&quot;application/json; charset=utf-8&quot;</span><span class="p">)</span>
-    <span class="kp">stop</span><span class="p">(</span><span class="s">&quot;content type mismatch&quot;</span><span class="p">)</span>
-  tmp <span class="o">&lt;-</span> content<span class="p">(</span>x<span class="p">,</span> as <span class="o">=</span> <span class="s">&quot;text&quot;</span><span class="p">)</span>
-  jsonlite<span class="o">::</span>fromJSON<span class="p">(</span>tmp<span class="p">,</span> flatten <span class="o">=</span> <span class="kc">TRUE</span><span class="p">)</span>
-<span class="p">}</span>
+```r
+datasets(as = "table")
+#>  [1] "artifact-data-agriculture"                                  
+#>  [2] "artifact-data-aviation"                                     
+#>  [3] "artifact-data-bookbinding"                                  
+#>  [4] "artifact-data-chemistry"                                    
+#>  [5] "artifact-data-communications"                               
+#>  [6] "artifact-data-computing-technology"                         
+#>  [7] "artifact-data-domestic-technology"                          
+#>  [8] "artifact-data-energy-electric"                              
+#>  [9] "artifact-data-exploration-and-survey"                       
+#> [10] "artifact-data-fisheries"                                    
+#> [11] "artifact-data-forestry"                                     
+#> [12] "artifact-data-horology"                                     
+#> [13] "artifact-data-industrial-technology"                        
+#> [14] "artifact-data-lighting-technology"                          
+#> [15] "artifact-data-location-canada-agriculture-and-food-museum"  
+#> [16] "artifact-data-location-canada-aviation-and-space-museum"    
+#> [17] "artifact-data-location-canada-science-and-technology-museum"
+#> [18] "artifact-data-marine-transportation"                        
+#> [19] "artifact-data-mathematics"                                  
+#> [20] "artifact-data-medical-technology"                           
+#> [21] "artifact-data-meteorology"                                  
+#> [22] "artifact-data-metrology"                                    
+#> [23] "artifact-data-mining-and-metallurgy"                        
+#> [24] "artifact-data-motorized-ground-transportation"              
+#> [25] "artifact-data-non-motorized-ground-transportation"          
+#> [26] "artifact-data-on-loan"                                      
+#> [27] "artifact-data-photography"                                  
+#> [28] "artifact-data-physics"                                      
+#> [29] "artifact-data-printing"                                     
+#> [30] "artifact-data-railway-transportation"                       
+#> [31] "artifact-dataset-fire-fighting"
+```
 
-parse_file <span class="o">&lt;-</span> <span class="kr">function</span><span class="p">(</span>x<span class="p">)</span> <span class="p">{</span>
-  tmp <span class="o">&lt;-</span> <span class="kp">gsub</span><span class="p">(</span><span class="s">&quot;\n\\s+&quot;</span><span class="p">,</span> <span class="s">&quot;\n&quot;</span><span class="p">,</span> 
-              <span class="kp">paste</span><span class="p">(</span><span class="kp">vapply</span><span class="p">(</span><span class="kp">strsplit</span><span class="p">(</span>x<span class="p">,</span> <span class="s">&quot;\n&quot;</span><span class="p">)[[</span><span class="m">1</span><span class="p">]],</span> RCurl<span class="o">::</span>base64Decode<span class="p">,</span>
-                           <span class="kt">character</span><span class="p">(</span><span class="m">1</span><span class="p">),</span> USE.NAMES <span class="o">=</span> <span class="kc">FALSE</span><span class="p">),</span> collapse <span class="o">=</span> <span class="s">&quot; &quot;</span><span class="p">))</span>
-  lines <span class="o">&lt;-</span> <span class="kp">readLines</span><span class="p">(</span><span class="kp">textConnection</span><span class="p">(</span>tmp<span class="p">))</span>
-  <span class="kp">vapply</span><span class="p">(</span>lines<span class="p">,</span> <span class="kp">gsub</span><span class="p">,</span> <span class="kt">character</span><span class="p">(</span><span class="m">1</span><span class="p">),</span> pattern <span class="o">=</span> <span class="s">&quot;\\s&quot;</span><span class="p">,</span> replacement <span class="o">=</span> <span class="s">&quot;&quot;</span><span class="p">,</span>
-         USE.NAMES <span class="o">=</span> <span class="kc">FALSE</span><span class="p">)</span>
-<span class="p">}</span>
+## List tags
 
-request <span class="o">&lt;-</span> <span class="kr">function</span><span class="p">(</span>owner <span class="o">=</span> <span class="s">&quot;ropensci&quot;</span><span class="p">,</span> repo<span class="p">,</span> file<span class="o">=</span><span class="s">&quot;DESCRIPTION&quot;</span><span class="p">,</span> <span class="kc">...</span><span class="p">)</span> <span class="p">{</span>
-  req <span class="o">&lt;-</span> GET<span class="p">(</span>make_url<span class="p">(</span>owner<span class="p">,</span> repo<span class="p">,</span> <span class="kp">paste0</span><span class="p">(</span><span class="s">&quot;contents/&quot;</span><span class="p">,</span> <span class="kp">file</span><span class="p">)),</span> 
-             config <span class="o">=</span> <span class="kt">c</span><span class="p">(</span>token <span class="o">=</span> github_auth<span class="p">(),</span> <span class="kc">...</span><span class="p">))</span>
-  <span class="kr">if</span><span class="p">(</span>req<span class="o">$</span>status_code <span class="o">!=</span> <span class="m">200</span><span class="p">)</span> <span class="p">{</span> <span class="kc">NA</span> <span class="p">}</span> <span class="kr">else</span> <span class="p">{</span>
-    cts <span class="o">&lt;-</span> process_result<span class="p">(</span>req<span class="p">)</span><span class="o">$</span>content
-    parse_file<span class="p">(</span>cts<span class="p">)</span>
-  <span class="p">}</span>
-<span class="p">}</span>
 
-has_term <span class="o">&lt;-</span> <span class="kr">function</span><span class="p">(</span>what<span class="p">,</span> <span class="kc">...</span><span class="p">)</span> <span class="kp">any</span><span class="p">(</span><span class="kp">grepl</span><span class="p">(</span>what<span class="p">,</span> request<span class="p">(</span><span class="kc">...</span><span class="p">)))</span>
-has_file <span class="o">&lt;-</span> <span class="kr">function</span><span class="p">(</span>what<span class="p">,</span> <span class="kc">...</span><span class="p">)</span> <span class="kr">if</span><span class="p">(</span><span class="kp">all</span><span class="p">(</span><span class="kp">is.na</span><span class="p">(</span>request<span class="p">(</span>file <span class="o">=</span> what<span class="p">,</span> <span class="kc">...</span><span class="p">))))</span> <span class="kc">FALSE</span> <span class="kr">else</span> <span class="kc">TRUE</span>
-</code></pre></div>
-<h2>Do stuff</h2>
+```r
+tag_list('aviation', as='table')
+#>   vocabulary_id                     display_name
+#> 1            NA                         Aviation
+#> 2            NA Canada Aviation and Space Museum
+#>                                     id                             name
+#> 1 cc1db2db-b08b-4888-897f-a17eade2461b                         Aviation
+#> 2 8d05a650-bc7b-4b89-bcc8-c10177e60119 Canada Aviation and Space Museum
+```
 
-<p>Does a package depend on a particular package? e.g., look for <code>httr</code> in the <code>DESCRIPTION</code> file (which is the default file name in <code>request()</code> above)</p>
-<div class="highlight"><pre><code class="language-r" data-lang="r">has_term<span class="p">(</span><span class="s">&quot;httr&quot;</span><span class="p">,</span> repo<span class="o">=</span><span class="s">&quot;taxize&quot;</span><span class="p">)</span>
-<span class="c1">#&gt; [1] TRUE</span>
-has_term<span class="p">(</span><span class="s">&quot;maptools&quot;</span><span class="p">,</span> repo<span class="o">=</span><span class="s">&quot;taxize&quot;</span><span class="p">)</span>
-<span class="c1">#&gt; [1] FALSE</span>
-</code></pre></div>
-<p>Do a series of R packages have a file for how to contribute <code>CONTRIBUTING.md</code>?</p>
+## Show tags
 
-<p>Yes</p>
-<div class="highlight"><pre><code class="language-r" data-lang="r">has_file<span class="p">(</span><span class="s">&quot;CONTRIBUTING.md&quot;</span><span class="p">,</span> repo<span class="o">=</span><span class="s">&quot;taxize&quot;</span><span class="p">)</span>
-<span class="c1">#&gt; [1] TRUE</span>
-</code></pre></div>
-<p>Many packages</p>
-<div class="highlight"><pre><code class="language-r" data-lang="r"><span class="kp">vapply</span><span class="p">(</span>pkgs<span class="p">,</span> <span class="kr">function</span><span class="p">(</span>x<span class="p">)</span> has_file<span class="p">(</span><span class="s">&quot;CONTRIBUTING.md&quot;</span><span class="p">,</span> repo<span class="o">=</span>x<span class="p">),</span> <span class="kt">logical</span><span class="p">(</span><span class="m">1</span><span class="p">))</span>
-<span class="c1">#&gt;        alm        bmc       bold     clifro  ecoengine    elastic </span>
-<span class="c1">#&gt;      FALSE      FALSE      FALSE      FALSE      FALSE      FALSE </span>
-<span class="c1">#&gt;   fulltext   geonames      gistr     RNeXML      rnoaa       rnpn </span>
-<span class="c1">#&gt;       TRUE      FALSE      FALSE       TRUE       TRUE      FALSE </span>
-<span class="c1">#&gt;      rplos      rsnps rWBclimate       solr      spocc     taxize </span>
-<span class="c1">#&gt;      FALSE      FALSE      FALSE      FALSE       TRUE       TRUE </span>
-<span class="c1">#&gt;  togeojson     traits   treeBASE </span>
-<span class="c1">#&gt;      FALSE      FALSE      FALSE</span>
-</code></pre></div>
-<h2>Check rate limit</h2>
+Subset for readme brevity
 
-<p>Define function</p>
-<div class="highlight"><pre><code class="language-r" data-lang="r">rate_limit <span class="o">&lt;-</span> <span class="kr">function</span><span class="p">(</span><span class="kc">...</span><span class="p">)</span> <span class="p">{</span>
-  token <span class="o">&lt;-</span> github_auth<span class="p">()</span>
-  req <span class="o">&lt;-</span> GET<span class="p">(</span><span class="s">&quot;https://api.github.com/rate_limit&quot;</span><span class="p">,</span> config <span class="o">=</span> <span class="kt">c</span><span class="p">(</span>token <span class="o">=</span> token<span class="p">,</span> <span class="kc">...</span><span class="p">))</span>
-  process_result<span class="p">(</span>req<span class="p">)</span>
-<span class="p">}</span>
-</code></pre></div>
-<p>Check it</p>
-<div class="highlight"><pre><code class="language-r" data-lang="r">rate_limit<span class="p">()</span>
-<span class="c1">#&gt; $resources</span>
-<span class="c1">#&gt; $resources$core</span>
-<span class="c1">#&gt; $resources$core$limit</span>
-<span class="c1">#&gt; [1] 5000</span>
-<span class="c1">#&gt; </span>
-<span class="c1">#&gt; $resources$core$remaining</span>
-<span class="c1">#&gt; [1] 4925</span>
-<span class="c1">#&gt; </span>
-<span class="c1">#&gt; $resources$core$reset</span>
-<span class="c1">#&gt; [1] 1417031016</span>
-<span class="c1">#&gt; </span>
-<span class="c1">#&gt; </span>
-<span class="c1">#&gt; $resources$search</span>
-<span class="c1">#&gt; $resources$search$limit</span>
-<span class="c1">#&gt; [1] 30</span>
-<span class="c1">#&gt; </span>
-<span class="c1">#&gt; $resources$search$remaining</span>
-<span class="c1">#&gt; [1] 30</span>
-<span class="c1">#&gt; </span>
-<span class="c1">#&gt; $resources$search$reset</span>
-<span class="c1">#&gt; [1] 1417028069</span>
-<span class="c1">#&gt; </span>
-<span class="c1">#&gt; </span>
-<span class="c1">#&gt; </span>
-<span class="c1">#&gt; $rate</span>
-<span class="c1">#&gt; $rate$limit</span>
-<span class="c1">#&gt; [1] 5000</span>
-<span class="c1">#&gt; </span>
-<span class="c1">#&gt; $rate$remaining</span>
-<span class="c1">#&gt; [1] 4925</span>
-<span class="c1">#&gt; </span>
-<span class="c1">#&gt; $rate$reset</span>
-<span class="c1">#&gt; [1] 1417031016</span>
-</code></pre></div>
-<p>Convert time to reset to human readable form</p>
-<div class="highlight"><pre><code class="language-r" data-lang="r"><span class="kp">as.POSIXct</span><span class="p">(</span>rate_limit<span class="p">()</span><span class="o">$</span>rate<span class="o">$</span>reset<span class="p">,</span> origin<span class="o">=</span><span class="s">&quot;1970-01-01&quot;</span><span class="p">)</span>
-<span class="c1">#&gt; [1] &quot;2014-11-26 11:43:36 PST&quot;</span>
-</code></pre></div>
+
+```r
+tag_show('Aviation')$packages[[1]][1:3]  
+#> $owner_org
+#> [1] "fafa260d-e2bf-46cd-9c35-34c1dfa46c57"
+#> 
+#> $maintainer
+#> [1] ""
+#> 
+#> $relationships_as_object
+#> list()
+```
+
+## List groups
+
+
+```r
+group_list(as='table')
+#>                         display_name description
+#> 1                     Communications            
+#> 2 Domestic and Industrial Technology            
+#> 3                         Everything            
+#> 4                           Location            
+#> 5                          Resources            
+#> 6         Scientific Instrumentation            
+#> 7                     Transportation            
+#>                                title
+#> 1                     Communications
+#> 2 Domestic and Industrial Technology
+#> 3                         Everything
+#> 4                           Location
+#> 5                          Resources
+#> 6         Scientific Instrumentation
+#> 7                     Transportation
+#>                                                                   image_display_url
+#> 1       http://data.techno-science.ca/uploads/group/20141024-162305.6896412comm.jpg
+#> 2    http://data.techno-science.ca/uploads/group/20141024-162324.3636615domtech.jpg
+#> 3 http://data.techno-science.ca/uploads/group/20141024-162448.0656596everything.jpg
+#> 4   http://data.techno-science.ca/uploads/group/20141024-162528.8786547location.jpg
+#> 5     http://data.techno-science.ca/uploads/group/20141024-162608.3732604resour.jpg
+#> 6    http://data.techno-science.ca/uploads/group/20141024-162549.1925831sciinst.jpg
+#> 7  http://data.techno-science.ca/uploads/group/20141024-162624.1872823transport.jpg
+#>   approval_status is_organization  state
+#> 1        approved           FALSE active
+#> 2        approved           FALSE active
+#> 3        approved           FALSE active
+#> 4        approved           FALSE active
+#> 5        approved           FALSE active
+#> 6        approved           FALSE active
+#> 7        approved           FALSE active
+#>                               image_url
+#> 1       20141024-162305.6896412comm.jpg
+#> 2    20141024-162324.3636615domtech.jpg
+#> 3 20141024-162448.0656596everything.jpg
+#> 4   20141024-162528.8786547location.jpg
+#> 5     20141024-162608.3732604resour.jpg
+#> 6    20141024-162549.1925831sciinst.jpg
+#> 7  20141024-162624.1872823transport.jpg
+#>                            revision_id packages  type
+#> 1 cc302424-2e68-4fcc-9a3a-6de60748c2e4        5 group
+#> 2 b7d95b87-5999-45f9-8775-c64094842551        2 group
+#> 3 c2f0c59a-a543-4d67-a61f-4f387068ba53        1 group
+#> 4 6816d571-d2bd-4131-b99d-80e7e6797492        4 group
+#> 5 e37ee30d-577b-4349-8f0e-eaa4543497e8        6 group
+#> 6 74eba42e-08b3-4400-b40f-3d6159ae6e9d       10 group
+#> 7 a6cc4aab-eae9-42ba-9ab4-cbf45d5c6a0e        7 group
+#>                                     id                               name
+#> 1 5268ce18-e3b8-4802-b29e-30740b46e52d                     communications
+#> 2 5a9a8095-9e0c-485e-84f6-77f577607991 domestic-and-industrial-technology
+#> 3 d7dd233e-a1cc-43da-8152-f7ed15d26756                         everything
+#> 4 770fc9c0-d4f3-48b0-a4ee-e00c6882df1d                           location
+#> 5 f6c205de-cc95-4308-ac9f-5a63f1a5c7ee                          resources
+#> 6 b98ff457-2031-48b6-b681-9adb3afc501b         scientific-instrumentation
+#> 7 a73bf7be-310d-472e-83e1-43a3d87602ba                     transportation
+```
+
+## Show groups
+
+Subset for readme brevity
+
+
+```r
+group_show('communications', as='table')$users
+#>   openid about capacity     name                    created
+#> 1     NA  <NA>    admin     marc 2014-10-24T14:44:29.885262
+#> 2     NA          admin sepandar 2014-10-23T19:40:42.056418
+#>                         email_hash sysadmin
+#> 1 a32002c960476614370a16e9fb81f436    FALSE
+#> 2 10b930a228afd1da2647d62e70b71bf8     TRUE
+#>   activity_streams_email_notifications  state number_of_edits
+#> 1                                FALSE active             376
+#> 2                                FALSE active              44
+#>   number_administered_packages display_name fullname
+#> 1                           39         marc     <NA>
+#> 2                            1     sepandar         
+#>                                     id
+#> 1 27778230-2e90-4818-9f00-bbf778c8fa09
+#> 2 b50449ea-1dcc-4d52-b620-fc95bf56034b
+```
+
+## Show a package
+
+
+```r
+package_show('34d60b13-1fd5-430e-b0ec-c8bc7f4841cf', as='table')$resources
+#>                      resource_group_id cache_last_updated
+#> 1 ea8533d9-cdc6-4e0e-97b9-894e06d50b92                 NA
+#> 2 ea8533d9-cdc6-4e0e-97b9-894e06d50b92                 NA
+#> 3 ea8533d9-cdc6-4e0e-97b9-894e06d50b92                 NA
+#> 4 ea8533d9-cdc6-4e0e-97b9-894e06d50b92                 NA
+#>           revision_timestamp webstore_last_updated
+#> 1 2014-10-28T18:13:22.213530                    NA
+#> 2 2014-11-04T02:59:50.567068                    NA
+#> 3 2014-11-05T21:23:58.533397                    NA
+#> 4 2014-11-05T21:25:16.848423                    NA
+#>                                     id size  state hash
+#> 1 be2b0af8-24a8-4a55-8b30-89f5459b713a   NA active     
+#> 2 7d65910e-4bdc-4f06-a213-e24e36762767   NA active     
+#> 3 97622ad7-1507-4f6a-8acb-14e826447389   NA active     
+#> 4 7a72498a-c49c-4e84-8b10-58991de10df6   NA active     
+#>                                    description format
+#> 1                                  XML Dataset    XML
+#> 2 Data dictionary for CSTMC artifact datasets.    XLS
+#> 3       Tips for using the artifacts datasets.   .php
+#> 4       Tips for using the artifacts datasets.   .php
+#>   tracking_summary.total tracking_summary.recent mimetype_inner url_type
+#> 1                      0                       0             NA       NA
+#> 2                      0                       0             NA       NA
+#> 3                      0                       0             NA       NA
+#> 4                      0                       0             NA       NA
+#>   mimetype cache_url                               name
+#> 1       NA        NA Artifact Data - Vacuum Tubes (XML)
+#> 2       NA        NA                    Data Dictionary
+#> 3       NA        NA                     Tips (English)
+#> 4       NA        NA                      Tips (French)
+#>                      created
+#> 1 2014-10-28T18:13:22.240393
+#> 2 2014-11-04T02:59:50.643658
+#> 3 2014-11-04T18:14:23.952937
+#> 4 2014-11-05T21:25:16.887796
+#>                                                                                                                                                    url
+#> 1                         http://source.techno-science.ca/datasets-donn%C3%A9es/artifacts-artefacts/groups-groupes/vacuum-tubes-tubes-electronique.xml
+#> 2 http://source.techno-science.ca/datasets-donn%C3%A9es/artifacts-artefacts/cstmc-artifact-data-dictionary-dictionnaire-de-donnees-artefacts-smstc.xls
+#> 3                                                                          http://techno-science.ca/en/open-data/tips-using-artifact-open-data-set.php
+#> 4                                                                 http://techno-science.ca/fr/donnees-ouvertes/conseils-donnees-ouvertes-artefacts.php
+#>   webstore_url last_modified position                          revision_id
+#> 1           NA            NA        0 9a27d884-f181-4842-ab47-cda35a8bf99a
+#> 2           NA            NA        1 5d27b3e6-7870-4c12-a122-9e9f5adee4a0
+#> 3           NA            NA        2 40993f16-402b-439c-9288-2f2b177e4b8f
+#> 4           NA            NA        3 57f1488e-a140-4eb6-9329-fc13202a73af
+#>   resource_type
+#> 1            NA
+#> 2            NA
+#> 3            NA
+#> 4            NA
+```
+
+## Search for packages
+
+
+```r
+out <- package_search(q = '*:*', rows = 2, as="table")$results
+out[, !names(out) %in% 'resources']
+#>                      license_title maintainer relationships_as_object
+#> 1 Open Government Licence - Canada                               NULL
+#> 2 Open Government Licence - Canada                               NULL
+#>   private maintainer_email         revision_timestamp
+#> 1   FALSE                  2014-11-05T23:17:46.220002
+#> 2   FALSE                  2014-11-05T23:17:04.923594
+#>                                     id           metadata_created
+#> 1 35d5484d-38ce-495e-8722-7857c4fd17bf 2014-10-28T20:13:11.572558
+#> 2 da65507d-b018-4d3b-bde3-5419cf29d144 2014-10-28T14:59:21.386177
+#>            metadata_modified author author_email  state version
+#> 1 2014-11-05T23:17:46.220657                     active        
+#> 2 2014-11-05T23:17:04.924229                     active        
+#>                        creator_user_id    type num_resources
+#> 1 27778230-2e90-4818-9f00-bbf778c8fa09 dataset             4
+#> 2 27778230-2e90-4818-9f00-bbf778c8fa09 dataset             4
+#>                                                                                                                       tags
+#> 1                         NA, Location, Location, 2014-10-28T20:13:11.572558, active, da88c5a2-3766-41ea-a75b-9c87047cc528
+#> 2 NA, Computing Technology, Computing Technology, 2014-10-28T14:59:21.386177, active, 5371dc28-9ce8-4f21-9afb-1f155f132bfe
+#>   tracking_summary.total tracking_summary.recent
+#> 1                     35                      10
+#> 2                     24                       8
+#>                                                                                                                                                                                                       groups
+#> 1                                                      Location, , http://data.techno-science.ca/uploads/group/20141024-162528.8786547location.jpg, Location, 770fc9c0-d4f3-48b0-a4ee-e00c6882df1d, location
+#> 2 Scientific Instrumentation, , http://data.techno-science.ca/uploads/group/20141024-162549.1925831sciinst.jpg, Scientific Instrumentation, b98ff457-2031-48b6-b681-9adb3afc501b, scientific-instrumentation
+#>   license_id relationships_as_subject num_tags organization.description
+#> 1 ca-ogl-lgo                     NULL        1                         
+#> 2 ca-ogl-lgo                     NULL        1                         
+#>         organization.created organization.title organization.name
+#> 1 2014-10-24T14:49:36.878579              CSTMC             cstmc
+#> 2 2014-10-24T14:49:36.878579              CSTMC             cstmc
+#>   organization.revision_timestamp organization.is_organization
+#> 1      2014-10-24T14:49:36.813670                         TRUE
+#> 2      2014-10-24T14:49:36.813670                         TRUE
+#>   organization.state organization.image_url
+#> 1             active                       
+#> 2             active                       
+#>               organization.revision_id organization.type
+#> 1 7a325a56-46f1-419c-b7b2-ec7501edb35a      organization
+#> 2 7a325a56-46f1-419c-b7b2-ec7501edb35a      organization
+#>                        organization.id organization.approval_status
+#> 1 fafa260d-e2bf-46cd-9c35-34c1dfa46c57                     approved
+#> 2 fafa260d-e2bf-46cd-9c35-34c1dfa46c57                     approved
+#>                                                          name isopen url
+#> 1 artifact-data-location-canada-science-and-technology-museum  FALSE    
+#> 2                          artifact-data-computing-technology  FALSE    
+#>                                                                                                                                                                        notes
+#> 1 This dataset includes artifacts in the collection of the Canada Science and Technology Museums Corporation that are currently in the Canada Science and Technology Museum.
+#> 2                                This dataset includes artifacts in the collection of the Canada Science and Technology Museums Corporation related to computing technology.
+#>                              owner_org extras
+#> 1 fafa260d-e2bf-46cd-9c35-34c1dfa46c57   NULL
+#> 2 fafa260d-e2bf-46cd-9c35-34c1dfa46c57   NULL
+#>                                            license_url
+#> 1 http://data.gc.ca/eng/open-government-licence-canada
+#> 2 http://data.gc.ca/eng/open-government-licence-canada
+#>                                                             title
+#> 1 Artifact Data - Location - Canada Science and Technology Museum
+#> 2                            Artifact Data - Computing Technology
+#>                            revision_id
+#> 1 694a977a-c238-47a4-8671-caddca4edfca
+#> 2 858cb240-76a0-406a-800c-e4ae6cc56ab9
+```
+
+## Search for resources
+
+
+```r
+resource_search(q = 'name:data', limit = 2, as='table')
+#> $count
+#> [1] 71
+#> 
+#> $results
+#>                      resource_group_id cache_last_updated
+#> 1 01a82e52-01bf-4a9c-9b45-c4f9b92529fa                 NA
+#> 2 01a82e52-01bf-4a9c-9b45-c4f9b92529fa                 NA
+#>   webstore_last_updated                                   id size  state
+#> 1                    NA e179e910-27fb-44f4-a627-99822af49ffa   NA active
+#> 2                    NA ba84e8b7-b388-4d2a-873a-7b107eb7f135   NA active
+#>   last_modified hash                                  description format
+#> 1            NA                                       XML Dataset    XML
+#> 2            NA      Data dictionary for CSTMC artifact datasets.    XLS
+#>   mimetype_inner url_type mimetype cache_url
+#> 1             NA       NA       NA        NA
+#> 2             NA       NA       NA        NA
+#>                                           name                    created
+#> 1 Artifact Data - Exploration and Survey (XML) 2014-10-28T15:50:35.374303
+#> 2                              Data Dictionary 2014-11-03T18:01:02.094210
+#>                                                                                                                                                    url
+#> 1              http://source.techno-science.ca/datasets-donn%C3%A9es/artifacts-artefacts/groups-groupes/exploration-and-survey-exploration-et-leve.xml
+#> 2 http://source.techno-science.ca/datasets-donn%C3%A9es/artifacts-artefacts/cstmc-artifact-data-dictionary-dictionnaire-de-donnees-artefacts-smstc.xls
+#>   webstore_url position                          revision_id resource_type
+#> 1           NA        0 a22e6741-3e89-4db0-a802-ba594b1c1fad            NA
+#> 2           NA        1 da1f8585-521d-47ef-8ead-7832474a3421            NA
+```
+
+## Future work
+
+* There's already [an issue](https://github.com/ropensci/ckanr/issues/4) to add support for [DataStore](http://docs.ckan.org/en/latest/maintaining/datastore.html)
+* This client needs to be tested against many other CKAN API instances to make sure it's robust
+* Add a test suite
+* Use cases: would be nice to include in the package documentation use cases
+* Other things? Get in touch on twitter `@recology_` or below
+
   </div>
   
 </div>

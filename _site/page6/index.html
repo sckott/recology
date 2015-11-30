@@ -61,6 +61,251 @@
   
   <div class="post">
     <h1>
+      <a href="/2015/03/couch-dataframes/">
+        PUT dataframes on your couch
+      </a>
+    </h1>
+
+    <span class="post-date">12 Mar 2015</span>
+
+    It would be nice to easily push each row or column of a data.frame into CouchDB instead of having to prepare them yourself into JSON, then push in to couch. I recently added ability to push data.frame's into couch using the normal `PUT /{db}` method, and added support for the couch bulk API.
+
+## Install
+
+
+```r
+install.packages("devtools")
+devtools::install_github("sckott/sofa")
+```
+
+
+```r
+library("sofa")
+```
+
+## PUT /db
+
+You can write directly from a data.frame, either by rows or columns. First, rows:
+
+
+```
+#> $ok
+#> [1] TRUE
+```
+
+Create a database
+
+
+```r
+db_create(dbname="mtcarsdb")
+#> $ok
+#> [1] TRUE
+```
+
+
+```r
+out <- doc_create(mtcars, dbname="mtcarsdb", how="rows")
+out[1:2]
+#> $`Mazda RX4`
+#> $`Mazda RX4`$ok
+#> [1] TRUE
+#> 
+#> $`Mazda RX4`$id
+#> [1] "0063109bfb1c15765854cbc9525c3a7a"
+#> 
+#> $`Mazda RX4`$rev
+#> [1] "1-3946941c894a874697554e3e6d9bc176"
+#> 
+#> 
+#> $`Mazda RX4 Wag`
+#> $`Mazda RX4 Wag`$ok
+#> [1] TRUE
+#> 
+#> $`Mazda RX4 Wag`$id
+#> [1] "0063109bfb1c15765854cbc9525c461d"
+#> 
+#> $`Mazda RX4 Wag`$rev
+#> [1] "1-273ff17a938cb956cba21051ab428b95"
+```
+
+Then by columns
+
+
+```r
+out <- doc_create(mtcars, dbname="mtcarsdb", how="columns")
+out[1:2]
+#> $mpg
+#> $mpg$ok
+#> [1] TRUE
+#> 
+#> $mpg$id
+#> [1] "0063109bfb1c15765854cbc9525d4f1f"
+#> 
+#> $mpg$rev
+#> [1] "1-4b83d0ef53a28849a872d47ad03fef9a"
+#> 
+#> 
+#> $cyl
+#> $cyl$ok
+#> [1] TRUE
+#> 
+#> $cyl$id
+#> [1] "0063109bfb1c15765854cbc9525d57d3"
+#> 
+#> $cyl$rev
+#> [1] "1-c21bfa5425c67743f0826fd4b44b0dbf"
+```
+
+## Bulk API
+
+The bulk API will/should be faster for larger data.frames
+
+
+```
+#> $ok
+#> [1] TRUE
+```
+
+We'll use part of the diamonds dataset
+
+
+```r
+library("ggplot2")
+dat <- diamonds[1:20000,]
+```
+
+Create a database
+
+
+```r
+db_create(dbname="bulktest")
+#> $ok
+#> [1] TRUE
+```
+
+Load by row (could instead do each column, see `how` parameter), printing the time it takes
+
+
+```r
+system.time(out <- bulk_create(dat, dbname="bulktest"))
+#>    user  system elapsed 
+#>  16.832   6.039  24.432
+```
+
+The returned data is the same as with `doc_create()`
+
+
+```r
+out[1:2]
+#> [[1]]
+#> [[1]]$ok
+#> [1] TRUE
+#> 
+#> [[1]]$id
+#> [1] "0063109bfb1c15765854cbc9525d8b8d"
+#> 
+#> [[1]]$rev
+#> [1] "1-f407fe4935af7fd17c101f13d3c81679"
+#> 
+#> 
+#> [[2]]
+#> [[2]]$ok
+#> [1] TRUE
+#> 
+#> [[2]]$id
+#> [1] "0063109bfb1c15765854cbc9525d998b"
+#> 
+#> [[2]]$rev
+#> [1] "1-cf8b9a9dcdc026052a663d6fef8a36fe"
+```
+
+So that's 20,000 rows in not that much time, not bad.
+
+### not dataframes
+
+You can also pass in lists or vectors of json as character strings, e.g., 
+
+_lists_
+
+
+```
+#> $ok
+#> [1] TRUE
+```
+
+
+```r
+row.names(mtcars) <- NULL # get rid of row.names
+lst <- parse_df(mtcars, tojson=FALSE)
+db_create(dbname="bulkfromlist")
+#> $ok
+#> [1] TRUE
+out <- bulk_create(lst, dbname="bulkfromlist")
+out[1:2]
+#> [[1]]
+#> [[1]]$ok
+#> [1] TRUE
+#> 
+#> [[1]]$id
+#> [1] "ba70c46d73707662b1e204a90fcd9bb8"
+#> 
+#> [[1]]$rev
+#> [1] "1-3946941c894a874697554e3e6d9bc176"
+#> 
+#> 
+#> [[2]]
+#> [[2]]$ok
+#> [1] TRUE
+#> 
+#> [[2]]$id
+#> [1] "ba70c46d73707662b1e204a90fcda9f6"
+#> 
+#> [[2]]$rev
+#> [1] "1-273ff17a938cb956cba21051ab428b95"
+```
+
+_json_
+
+
+```
+#> $ok
+#> [1] TRUE
+```
+
+
+```r
+strs <- as.character(parse_df(mtcars, "columns"))
+db_create(dbname="bulkfromchr")
+#> $ok
+#> [1] TRUE
+out <- bulk_create(strs, dbname="bulkfromchr")
+out[1:2]
+#> [[1]]
+#> [[1]]$ok
+#> [1] TRUE
+#> 
+#> [[1]]$id
+#> [1] "ba70c46d73707662b1e204a90fce8c20"
+#> 
+#> [[1]]$rev
+#> [1] "1-4b83d0ef53a28849a872d47ad03fef9a"
+#> 
+#> 
+#> [[2]]
+#> [[2]]$ok
+#> [1] TRUE
+#> 
+#> [[2]]$id
+#> [1] "ba70c46d73707662b1e204a90fce9bc1"
+#> 
+#> [[2]]$rev
+#> [1] "1-c21bfa5425c67743f0826fd4b44b0dbf"
+```
+
+  </div>
+  
+  <div class="post">
+    <h1>
       <a href="/2015/03/csl-client/">
         csl - an R client for Citation Style Language data
       </a>
@@ -68,132 +313,197 @@
 
     <span class="post-date">11 Mar 2015</span>
 
-    <p>CSL (Citation Style Language) is used quite widely now to specify citations in a standard fashion. <code>csl</code> is an R client for exploring CSL styles, and is inspired by the Ruby gem <a href="https://github.com/inukshuk/csl-ruby">csl</a>. For example, csl is given back in the PLOS Lagotto article level metric API (follow <a href="http://alm.plos.org/api/v5/articles?ids=10.1371%252Fjournal.pone.0025110&amp;info=detail&amp;source_id=crossref">http://alm.plos.org/api/v5/articles?ids=10.1371%252Fjournal.pone.0025110&amp;info=detail&amp;source_id=crossref</a>).</p>
+    CSL (Citation Style Language) is used quite widely now to specify citations in a standard fashion. `csl` is an R client for exploring CSL styles, and is inspired by the Ruby gem [csl](https://github.com/inukshuk/csl-ruby). For example, csl is given back in the PLOS Lagotto article level metric API (follow [http://alm.plos.org/api/v5/articles?ids=10.1371%252Fjournal.pone.0025110&info=detail&source_id=crossref](http://alm.plos.org/api/v5/articles?ids=10.1371%252Fjournal.pone.0025110&info=detail&source_id=crossref)).
 
-<p>Let me know if you have any feedback at the repo <a href="https://github.com/ropensci/csl">https://github.com/ropensci/csl</a></p>
+Let me know if you have any feedback at the repo [https://github.com/ropensci/csl](https://github.com/ropensci/csl)
 
-<h2>Install</h2>
-<div class="highlight"><pre><code class="language-r" data-lang="r">install.packages<span class="p">(</span><span class="s">&quot;devtools&quot;</span><span class="p">)</span>
-devtools<span class="o">::</span>install_github<span class="p">(</span><span class="s">&quot;ropensci/csl&quot;</span><span class="p">)</span>
-</code></pre></div><div class="highlight"><pre><code class="language-r" data-lang="r"><span class="kn">library</span><span class="p">(</span><span class="s">&quot;csl&quot;</span><span class="p">)</span>
-</code></pre></div>
-<h2>Load CSL style from a URL</h2>
+## Install
 
-<p>You can load CSL styles from either a URL or a local file on your machine. Firt, from a URL. In this case from the Zotero style repository, for the American Journal or Political Science.</p>
-<div class="highlight"><pre><code class="language-r" data-lang="r">jps <span class="o">&lt;-</span> style_load<span class="p">(</span><span class="s">&#39;http://www.zotero.org/styles/american-journal-of-political-science&#39;</span><span class="p">)</span>
-</code></pre></div>
-<p>A list is returned, which you can index to various parts of the style specification.</p>
-<div class="highlight"><pre><code class="language-r" data-lang="r">jps<span class="o">$</span>info
-<span class="c1">#&gt; $title</span>
-<span class="c1">#&gt; [1] &quot;American Journal of Political Science&quot;</span>
-<span class="c1">#&gt; </span>
-<span class="c1">#&gt; $title_short</span>
-<span class="c1">#&gt; [1] &quot;AJPS&quot;</span>
-<span class="c1">#&gt; </span>
-<span class="c1">#&gt; $id</span>
-<span class="c1">#&gt; [1] &quot;http://www.zotero.org/styles/american-journal-of-political-science&quot;</span>
-<span class="c1">#&gt; </span>
-<span class="c1">#&gt; $author</span>
-<span class="kc">...</span>
-</code></pre></div><div class="highlight"><pre><code class="language-r" data-lang="r">jps<span class="o">$</span>title
-<span class="c1">#&gt; [1] &quot;American Journal of Political Science&quot;</span>
-</code></pre></div><div class="highlight"><pre><code class="language-r" data-lang="r">jps<span class="o">$</span>citation_format
-<span class="c1">#&gt; [1] &quot;author-date&quot;</span>
-</code></pre></div><div class="highlight"><pre><code class="language-r" data-lang="r">jps<span class="o">$</span>links_template
-<span class="c1">#&gt; [1] &quot;http://www.zotero.org/styles/american-political-science-association&quot;</span>
-</code></pre></div><div class="highlight"><pre><code class="language-r" data-lang="r">jps<span class="o">$</span>editor
-<span class="c1">#&gt; $editor</span>
-<span class="c1">#&gt; $editor$variable</span>
-<span class="c1">#&gt; [1] &quot;editor&quot;</span>
-<span class="c1">#&gt; </span>
-<span class="c1">#&gt; $editor$delimiter</span>
-<span class="c1">#&gt; [1] &quot;, &quot;</span>
-<span class="c1">#&gt; </span>
-<span class="c1">#&gt; </span>
-<span class="c1">#&gt; $label</span>
-<span class="c1">#&gt; $label$form</span>
-<span class="kc">...</span>
-</code></pre></div><div class="highlight"><pre><code class="language-r" data-lang="r">jps<span class="o">$</span>author
-<span class="c1">#&gt; $author</span>
-<span class="c1">#&gt; $author$variable</span>
-<span class="c1">#&gt; [1] &quot;author&quot;</span>
-<span class="c1">#&gt; </span>
-<span class="c1">#&gt; </span>
-<span class="c1">#&gt; $label</span>
-<span class="c1">#&gt; $label$form</span>
-<span class="c1">#&gt; [1] &quot;short&quot;</span>
-<span class="c1">#&gt; </span>
-<span class="c1">#&gt; $label$prefix</span>
-<span class="kc">...</span>
-</code></pre></div>
-<h2>Get raw XML</h2>
 
-<p>You can also get raw XML if you&#39;d rather deal with that format.</p>
-<div class="highlight"><pre><code class="language-r" data-lang="r">style_xml<span class="p">(</span><span class="s">&#39;http://www.zotero.org/styles/american-journal-of-political-science&#39;</span><span class="p">)</span>
-<span class="c1">#&gt; &lt;?xml version=&quot;1.0&quot; encoding=&quot;utf-8&quot;?&gt;</span>
-<span class="c1">#&gt; &lt;style xmlns=&quot;http://purl.org/net/xbiblio/csl&quot; class=&quot;in-text&quot; version=&quot;1.0&quot; demote-non-dropping-particle=&quot;sort-only&quot; default-locale=&quot;en-US&quot;&gt;</span>
-<span class="c1">#&gt;   &lt;info&gt;</span>
-<span class="c1">#&gt;     &lt;title&gt;American Journal of Political Science&lt;/title&gt;</span>
-<span class="c1">#&gt;     &lt;title-short&gt;AJPS&lt;/title-short&gt;</span>
-<span class="c1">#&gt;     &lt;id&gt;http://www.zotero.org/styles/american-journal-of-political-science&lt;/id&gt;</span>
-<span class="c1">#&gt;     &lt;link href=&quot;http://www.zotero.org/styles/american-journal-of-political-science&quot; rel=&quot;self&quot;/&gt;</span>
-<span class="c1">#&gt;     &lt;link href=&quot;http://www.zotero.org/styles/american-political-science-association&quot; rel=&quot;template&quot;/&gt;</span>
-<span class="c1">#&gt;     &lt;link href=&quot;http://www.ajps.org/AJPS%20Style%20Guide.pdf&quot; rel=&quot;documentation&quot;/&gt;</span>
-<span class="c1">#&gt;     &lt;author&gt;</span>
-<span class="kc">...</span>
-</code></pre></div>
-<h2>Get styles</h2>
+```r
+install.packages("devtools")
+devtools::install_github("ropensci/csl")
+```
 
-<p>There is a GitHub repository of CSL styles at  <a href="https://github.com/citation-style-language/styles-distribution">https://github.com/citation-style-language/styles-distribution</a>. These don&#39;t come with the <code>csl</code> package, so you have to run <code>get_styles()</code> to get them on your machine. The default path is <code>Sys.getenv(&quot;HOME&quot;)/styles</code>, which for me is <code>/Users/sacmac/styles</code>. You can change where files are saved by using the <code>path</code> parameter.</p>
-<div class="highlight"><pre><code class="language-r" data-lang="r">get_styles<span class="p">()</span>
-<span class="c1">#&gt; </span>
-<span class="c1">#&gt; Done! Files put in /Users/sacmac/styles</span>
-</code></pre></div>
-<p>After getting styles locally you can load them just as we did with <code>style_load()</code>, but from your machine. However, since the file is local, we can make this easier by allowing just the name of the style, like</p>
-<div class="highlight"><pre><code class="language-r" data-lang="r">style_load<span class="p">(</span><span class="s">&quot;apa&quot;</span><span class="p">)</span>
-<span class="c1">#&gt; $info</span>
-<span class="c1">#&gt; $info$title</span>
-<span class="c1">#&gt; [1] &quot;American Psychological Association 6th edition&quot;</span>
-<span class="c1">#&gt; </span>
-<span class="c1">#&gt; $info$title_short</span>
-<span class="c1">#&gt; [1] &quot;APA&quot;</span>
-<span class="c1">#&gt; </span>
-<span class="c1">#&gt; $info$id</span>
-<span class="c1">#&gt; [1] &quot;http://www.zotero.org/styles/apa&quot;</span>
-<span class="c1">#&gt; </span>
-<span class="kc">...</span>
-</code></pre></div>
-<p>If you are unsure if a style exists, you can use <code>style_exists()</code></p>
-<div class="highlight"><pre><code class="language-r" data-lang="r">style_exists<span class="p">(</span><span class="s">&quot;helloworld&quot;</span><span class="p">)</span>
-<span class="c1">#&gt; [1] FALSE</span>
-style_exists<span class="p">(</span><span class="s">&quot;acs-nano&quot;</span><span class="p">)</span>
-<span class="c1">#&gt; [1] TRUE</span>
-</code></pre></div>
-<p>In addition, you can list the path for a single style, more than 1, or all styles with <code>styles()</code></p>
-<div class="highlight"><pre><code class="language-r" data-lang="r">styles<span class="p">(</span><span class="s">&quot;apa&quot;</span><span class="p">)</span>
-<span class="c1">#&gt; [1] &quot;/Users/sacmac/styles/apa.csl&quot;</span>
-</code></pre></div>
-<p>All of them, truncated for blog brevity</p>
-<div class="highlight"><pre><code class="language-r" data-lang="r">styles<span class="p">()</span>
-<span class="c1">#&gt; $independent</span>
-<span class="c1">#&gt;    [1] &quot;academy-of-management-review&quot;                                                         </span>
-<span class="c1">#&gt;    [2] &quot;acm-sig-proceedings-long-author-list&quot;                                                 </span>
-<span class="c1">#&gt;    [3] &quot;acm-sig-proceedings&quot;                                                                  </span>
-<span class="c1">#&gt;    [4] &quot;acm-sigchi-proceedings-extended-abstract-format&quot;                                      </span>
-<span class="c1">#&gt;    [5] &quot;acm-sigchi-proceedings&quot;                                                               </span>
-<span class="c1">#&gt;    [6] &quot;acm-siggraph&quot;                                                                         </span>
-<span class="c1">#&gt;    [7] &quot;acs-nano&quot;                                                                             </span>
-<span class="c1">#&gt;    [8] &quot;acta-anaesthesiologica-scandinavica&quot;                                                  </span>
-<span class="c1">#&gt;    [9] &quot;acta-anaesthesiologica-taiwanica&quot;                                                     </span>
-<span class="kc">...</span>
-</code></pre></div>
-<h2>Get locales</h2>
 
-<p>In addition to styles, there is a GitHub repo for locales at  <a href="https://github.com/citation-style-language/locales">https://github.com/citation-style-language/locales</a>. These also don&#39;t come with the <code>csl</code> package, so you have to run <code>get_locales()</code> to get them on your machine. Same goes here for paths as above for styles.</p>
-<div class="highlight"><pre><code class="language-r" data-lang="r">get_locales<span class="p">()</span>
-<span class="c1">#&gt; </span>
-<span class="c1">#&gt; Done! Files put in /Users/sacmac/locales</span>
-</code></pre></div>
+```r
+library("csl")
+```
+
+## Load CSL style from a URL
+
+You can load CSL styles from either a URL or a local file on your machine. Firt, from a URL. In this case from the Zotero style repository, for the American Journal or Political Science.
+
+
+```r
+jps <- style_load('http://www.zotero.org/styles/american-journal-of-political-science')
+```
+
+A list is returned, which you can index to various parts of the style specification.
+
+
+```r
+jps$info
+#> $title
+#> [1] "American Journal of Political Science"
+#> 
+#> $title_short
+#> [1] "AJPS"
+#> 
+#> $id
+#> [1] "http://www.zotero.org/styles/american-journal-of-political-science"
+#> 
+#> $author
+...
+```
+
+
+```r
+jps$title
+#> [1] "American Journal of Political Science"
+```
+
+
+```r
+jps$citation_format
+#> [1] "author-date"
+```
+
+
+```r
+jps$links_template
+#> [1] "http://www.zotero.org/styles/american-political-science-association"
+```
+
+
+```r
+jps$editor
+#> $editor
+#> $editor$variable
+#> [1] "editor"
+#> 
+#> $editor$delimiter
+#> [1] ", "
+#> 
+#> 
+#> $label
+#> $label$form
+...
+```
+
+
+```r
+jps$author
+#> $author
+#> $author$variable
+#> [1] "author"
+#> 
+#> 
+#> $label
+#> $label$form
+#> [1] "short"
+#> 
+#> $label$prefix
+...
+```
+
+## Get raw XML
+
+You can also get raw XML if you'd rather deal with that format.
+
+
+```r
+style_xml('http://www.zotero.org/styles/american-journal-of-political-science')
+#> <?xml version="1.0" encoding="utf-8"?>
+#> <style xmlns="http://purl.org/net/xbiblio/csl" class="in-text" version="1.0" demote-non-dropping-particle="sort-only" default-locale="en-US">
+#>   <info>
+#>     <title>American Journal of Political Science</title>
+#>     <title-short>AJPS</title-short>
+#>     <id>http://www.zotero.org/styles/american-journal-of-political-science</id>
+#>     <link href="http://www.zotero.org/styles/american-journal-of-political-science" rel="self"/>
+#>     <link href="http://www.zotero.org/styles/american-political-science-association" rel="template"/>
+#>     <link href="http://www.ajps.org/AJPS%20Style%20Guide.pdf" rel="documentation"/>
+#>     <author>
+...
+```
+
+## Get styles
+
+There is a GitHub repository of CSL styles at  [https://github.com/citation-style-language/styles-distribution](https://github.com/citation-style-language/styles-distribution). These don't come with the `csl` package, so you have to run `get_styles()` to get them on your machine. The default path is `Sys.getenv("HOME")/styles`, which for me is `/Users/sacmac/styles`. You can change where files are saved by using the `path` parameter.
+
+
+```r
+get_styles()
+#> 
+#> Done! Files put in /Users/sacmac/styles
+```
+
+After getting styles locally you can load them just as we did with `style_load()`, but from your machine. However, since the file is local, we can make this easier by allowing just the name of the style, like
+
+
+```r
+style_load("apa")
+#> $info
+#> $info$title
+#> [1] "American Psychological Association 6th edition"
+#> 
+#> $info$title_short
+#> [1] "APA"
+#> 
+#> $info$id
+#> [1] "http://www.zotero.org/styles/apa"
+#> 
+...
+```
+
+If you are unsure if a style exists, you can use `style_exists()`
+
+
+```r
+style_exists("helloworld")
+#> [1] FALSE
+style_exists("acs-nano")
+#> [1] TRUE
+```
+
+In addition, you can list the path for a single style, more than 1, or all styles with `styles()`
+
+
+```r
+styles("apa")
+#> [1] "/Users/sacmac/styles/apa.csl"
+```
+
+All of them, truncated for blog brevity
+
+
+```r
+styles()
+#> $independent
+#>    [1] "academy-of-management-review"                                                         
+#>    [2] "acm-sig-proceedings-long-author-list"                                                 
+#>    [3] "acm-sig-proceedings"                                                                  
+#>    [4] "acm-sigchi-proceedings-extended-abstract-format"                                      
+#>    [5] "acm-sigchi-proceedings"                                                               
+#>    [6] "acm-siggraph"                                                                         
+#>    [7] "acs-nano"                                                                             
+#>    [8] "acta-anaesthesiologica-scandinavica"                                                  
+#>    [9] "acta-anaesthesiologica-taiwanica"                                                     
+...
+```
+
+## Get locales
+
+In addition to styles, there is a GitHub repo for locales at  [https://github.com/citation-style-language/locales](https://github.com/citation-style-language/locales). These also don't come with the `csl` package, so you have to run `get_locales()` to get them on your machine. Same goes here for paths as above for styles.
+
+
+```r
+get_locales()
+#> 
+#> Done! Files put in /Users/sacmac/locales
+```
+
+
   </div>
   
   <div class="post">
@@ -205,71 +515,47 @@ style_exists<span class="p">(</span><span class="s">&quot;acs-nano&quot;</span><
 
     <span class="post-date">26 Feb 2015</span>
 
-    <h2>setup backup</h2>
-<div class="highlight"><pre><code class="language-text" data-lang="text">curl -XPUT &#39;http://localhost:9200/_snapshot/my_backup/&#39; -d &#39;{
-    &quot;type&quot;: &quot;fs&quot;,
-    &quot;settings&quot;: {
-        &quot;location&quot;: &quot;/Users/sacmac/esbackups/my_backup&quot;,
-        &quot;compress&quot;: true
+    ## setup backup
+
+```
+curl -XPUT 'http://localhost:9200/_snapshot/my_backup/' -d '{
+    "type": "fs",
+    "settings": {
+        "location": "/Users/sacmac/esbackups/my_backup",
+        "compress": true
     }
-}&#39;
-</code></pre></div>
-<h2>create backup</h2>
-<div class="highlight"><pre><code class="language-text" data-lang="text">http PUT &quot;localhost:9200/_snapshot/my_backup/snapshot_2?wait_for_completion=true&quot;
-</code></pre></div>
-<h2>get info on snapshot</h2>
-<div class="highlight"><pre><code class="language-text" data-lang="text">http &quot;localhost:9200/_snapshot/my_backup/snapshot_2&quot;
-</code></pre></div>
-<h2>restore</h2>
-<div class="highlight"><pre><code class="language-text" data-lang="text">curl -XPOST &quot;localhost:9200/_snapshot/my_backup/snapshot_2/_restore&quot;
-</code></pre></div>
-<h2>partial restore, including various options that can be used</h2>
-<div class="highlight"><pre><code class="language-text" data-lang="text">curl -XPOST &quot;localhost:9200/_snapshot/my_backup/snapshot_2/_restore&quot; -d &#39;{
-    &quot;indices&quot;: &quot;index_1,index_2&quot;,
-    &quot;ignore_unavailable&quot;: &quot;true&quot;,
-    &quot;include_global_state&quot;: false,
-    &quot;rename_pattern&quot;: &quot;index_(.+)&quot;,
-    &quot;rename_replacement&quot;: &quot;restored_index_$1&quot;
-}&#39;
-</code></pre></div>
-  </div>
-  
-  <div class="post">
-    <h1>
-      <a href="/2015/02/secure-elasticsearch/">
-        note to self, secure elasticsearch
-      </a>
-    </h1>
+}'
+```
 
-    <span class="post-date">26 Feb 2015</span>
+## create backup
 
-    <p>Recently I spun up a box on a cloud hosting provider planning to make a tens of thousdands of queries to an Elasticsearch instance on the same box. I could have done this on my own machine, but didn&#39;t want to take up compute resources.</p>
+```
+http PUT "localhost:9200/_snapshot/my_backup/snapshot_2?wait_for_completion=true"
+```
 
-<p>I installed R and Elasticsearch on the box, then went about doing my thang.</p>
+## get info on snapshot
 
-<p>A day later when things were still running, the hosting provider sent me a message that apparently my box had been serving up a DDoS attack.</p>
+```
+http "localhost:9200/_snapshot/my_backup/snapshot_2"
+```
 
-<p>This was incredibly surprising, as I don&#39;t even know how to do such a thing.</p>
+## restore
 
-<p>After some digging it seems that the culprit was likely Elasticsearch, as a number of tutorials/blog posts state that Elaticsearch is insecure by default, so if it&#39;s exposed on a public port, someone can hack in. I had only used Elasticsearch locally on my own machine, so I hadn&#39;t thought about security. Here&#39;s a few resources for security help:</p>
+```
+curl -XPOST "localhost:9200/_snapshot/my_backup/snapshot_2/_restore"
+```
 
-<ul>
-<li><a href="https://www.digitalocean.com/community/tutorials/how-to-install-elasticsearch-on-an-ubuntu-vps">DigitalOcean tutorial no. 1</a></li>
-<li><a href="https://www.digitalocean.com/community/tutorials/elasticsearch-fluentd-and-kibana-open-source-log-search-and-visualization">DigitalOcean tutorial no. 2</a></li>
-<li><a href="http://saskia-vola.com/install-secure-elasticsearch-1-x-digital-ocean/">Blog post on securing ES</a></li>
-<li><a href="http://stackoverflow.com/questions/26006373/how-to-secure-a-digital-ocean-elasticsearch-cluster">SO answer on securing ES</a></li>
-</ul>
+## partial restore, including various options that can be used
 
-<p>Trying to narrow down the various pieces of advice for securing Elasticsearch, here&#39;s a list:</p>
-
-<ul>
-<li>Use <code>iptables</code> (or rather <a href="http://en.wikipedia.org/wiki/Nftables">nftables</a>?) to firewall the box</li>
-<li>Whitelist certain trusted IPs </li>
-<li>Use the <a href="https://github.com/Asquera/elasticsearch-http-basic"><code>elasticsearch-http-basic</code></a> plugin, adds basic username/pwd login</li>
-<li>Remove public access: use <code>network.bind_host: localhost</code> and <code>script.disable_dynamic: true</code> in the <code>elasticsearch.yml</code> config file <a href="https://www.digitalocean.com/community/tutorials/how-to-install-elasticsearch-on-an-ubuntu-vps">from</a></li>
-</ul>
-
-<p>Elasticsearch provides a new feature for security that&#39;s built into Elasticsearch, <a href="http://www.elasticsearch.org/overview/shield/">Shield</a>, but I believe it&#39;s only available to enterprise customers. Boo. </p>
+```
+curl -XPOST "localhost:9200/_snapshot/my_backup/snapshot_2/_restore" -d '{
+    "indices": "index_1,index_2",
+    "ignore_unavailable": "true",
+    "include_global_state": false,
+    "rename_pattern": "index_(.+)",
+    "rename_replacement": "restored_index_$1"
+}'
+```
 
   </div>
   

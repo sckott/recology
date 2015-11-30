@@ -61,6 +61,160 @@
   
   <div class="post">
     <h1>
+      <a href="/2014/05/logplotreboot/">
+        Logistic plot reboot
+      </a>
+    </h1>
+
+    <span class="post-date">22 May 2014</span>
+
+    Someone asked about plotting something like this today
+
+I [wrote a few functions previously](http://recology.info/2012/01/logistic-regression-barplot-fig/) to do something like this. However, since then `ggplot2` has changed, and one of the functions no longer works.
+
+Hence, I fixed `opts()` to `theme()`, `theme_blank()` to `element_blank()`, and `panel.background = element_blank()` to `plot.background = element_blank()` to get the histograms to show up with the line plot and not cover it.
+
+The new functions:
+
+
+```r
+loghistplot  <- function(data) {
+  names(data) <- c('x','y') # rename columns
+
+  # get min and max axis values
+  min_x <- min(data$x)
+  max_x <- max(data$x)
+  min_y <- min(data$y)
+  max_y <- max(data$y)
+
+  # get bin numbers
+  bin_no <- max(hist(data$x, plot = FALSE)$counts) + 5
+
+  # create plots
+  a <- ggplot(data, aes(x = x, y = y)) +
+    theme_bw(base_size=16) +
+    geom_smooth(method = "glm", family = "binomial", se = TRUE,
+                colour='black', size=1.5, alpha = 0.3) +
+    scale_x_continuous(limits=c(min_x,max_x)) +
+    theme(panel.grid.major = element_blank(),
+          panel.grid.minor=element_blank(),
+          panel.background = element_blank(),
+          plot.background = element_blank()) +
+    labs(y = "Probability\n", x = "\nYour X Variable")
+
+  theme_loghist <- list(
+    theme(panel.grid.major = element_blank(),
+          panel.grid.minor=element_blank(),
+          axis.text.y = element_blank(),
+          axis.text.x = element_blank(),
+          axis.ticks = element_blank(),
+          panel.border = element_blank(),
+          panel.background = element_blank(),
+          plot.background = element_blank())
+  )
+
+  b <-
+  ggplot(data[data$y == unique(data$y)[1], ], aes(x = x)) +
+    theme_bw(base_size=16) +
+    geom_histogram(fill = "grey") +
+    scale_y_continuous(limits=c(0,bin_no)) +
+    scale_x_continuous(limits=c(min_x,max_x)) +
+    theme_loghist +
+    labs(y='\n', x='\n')
+
+  c <- ggplot(data[data$y == unique(data$y)[2], ], aes(x = x)) +
+    theme_bw(base_size=16) +
+    geom_histogram(fill = "grey") +
+    scale_y_continuous(trans='reverse', limits=c(bin_no,0)) +
+    scale_x_continuous(limits=c(min_x,max_x)) +
+    theme_loghist +
+    labs(y='\n', x='\n')
+
+  grid.newpage()
+  pushViewport(viewport(layout = grid.layout(1,1)))
+
+  vpa_ <- viewport(width = 1, height = 1, x = 0.5, y = 0.5)
+  vpb_ <- viewport(width = 1, height = 1, x = 0.5, y = 0.5)
+  vpc_ <- viewport(width = 1, height = 1, x = 0.5, y = 0.5)
+
+  print(b, vp = vpb_)
+  print(c, vp = vpc_)
+  print(a, vp = vpa_)
+}
+```
+
+
+```r
+logpointplot  <- function(data) {
+  names(data) <- c('x','y') # rename columns
+
+  # get min and max axis values
+  min_x <- min(data$x)
+  max_x <- max(data$x)
+  min_y <- min(data$y)
+  max_y <- max(data$y)
+
+  # create plots
+  ggplot(data, aes(x = x, y = y)) +
+    theme_bw(base_size=16) +
+    geom_point(size = 3, alpha = 0.5, position = position_jitter(w=0, h=0.02)) +
+    geom_smooth(method = "glm", family = "binomial", se = TRUE,
+                colour='black', size=1.5, alpha = 0.3) +
+    scale_x_continuous(limits=c(min_x,max_x)) +
+    theme(panel.grid.major = element_blank(),
+          panel.grid.minor=element_blank(),
+          panel.background = element_blank()) +
+    labs(y = "Probability\n", x = "\nYour X Variable")
+
+}
+```
+
+Install `ggplot2` and `gridExtra` if you don't have them:
+
+
+```r
+install.packages(c("ggplot2","gridExtra"), repos = "http://cran.rstudio.com")
+```
+
+And their use:
+
+__Logistic histogram plots__
+
+
+```r
+loghistplot(data=mtcars[,c("mpg","vs")])
+```
+
+![plot of chunk unnamed-chunk-5](/public/img/2014-05-22-logplotreboot/unnamed-chunk-5.png)
+
+
+```r
+loghistplot(movies[,c("rating","Action")])
+```
+
+![plot of chunk unnamed-chunk-6](/public/img/2014-05-22-logplotreboot/unnamed-chunk-6.png)
+
+
+__Logistic point plots__
+
+
+```r
+loghistplot(data=mtcars[,c("mpg","vs")])
+```
+
+![plot of chunk unnamed-chunk-7](/public/img/2014-05-22-logplotreboot/unnamed-chunk-7.png)
+
+
+```r
+loghistplot(movies[,c("rating","Action")])
+```
+
+![plot of chunk unnamed-chunk-8](/public/img/2014-05-22-logplotreboot/unnamed-chunk-8.png)
+
+  </div>
+  
+  <div class="post">
+    <h1>
       <a href="/2014/02/cowsay/">
         cowsay - ascii messages and warnings for R
       </a>
@@ -68,32 +222,43 @@
 
     <span class="post-date">20 Feb 2014</span>
 
-    <h2>The history</h2>
+    ## The history
 
-<p>Cowsay is a terminal program that generates ascii pictures of a cow saying what you tell the cow to say in a bubble. See the Wikipedia page for more information: <a href="http://en.wikipedia.org/wiki/Cowsay">http://en.wikipedia.org/wiki/Cowsay</a>. </p>
+Cowsay is a terminal program that generates ascii pictures of a cow saying what you tell the cow to say in a bubble. See the Wikipedia page for more information: [http://en.wikipedia.org/wiki/Cowsay](http://en.wikipedia.org/wiki/Cowsay). 
 
-<p>Install cowsay to use in your terminal (on OSX):</p>
-<div class="highlight"><pre><code class="language-text" data-lang="text">brew update
+Install cowsay to use in your terminal (on OSX):
+
+```
+brew update
 brew install cowsay
-</code></pre></div>
-<p>Type <code>cowsay hello world!</code>, and you get:</p>
-<div class="highlight"><pre><code class="language-text" data-lang="text"> ______________
-&lt; hello world! &gt;
+```
+
+Type `cowsay hello world!`, and you get:
+
+```
+ ______________
+< hello world! >
  --------------
         \   ^__^
          \  (oo)\_______
             (__)\       )\/\
                 ||----w |
                 ||     ||
-</code></pre></div>
-<p>Optionally, you can install <a href="http://en.wikipedia.org/wiki/Fortune_(Unix)">fortune</a> to get pseudorandom messages from a database of quotations. On OSX do <code>brew install fortune</code>, then you can pipe a fortune quote to <code>cowsay</code>:</p>
-<div class="highlight"><pre><code class="language-text" data-lang="text">fortune | cowsay
-</code></pre></div>
-<p>And get something like:</p>
-<div class="highlight"><pre><code class="language-text" data-lang="text"> ______________________________________
-/ &quot;To take a significant step forward, \
+```
+
+Optionally, you can install [fortune](http://en.wikipedia.org/wiki/Fortune_(Unix)) to get pseudorandom messages from a database of quotations. On OSX do `brew install fortune`, then you can pipe a fortune quote to `cowsay`:
+
+```
+fortune | cowsay
+```
+
+And get something like:
+
+```
+ ______________________________________
+/ "To take a significant step forward, \
 | you must make a series of finite     |
-| improvements.&quot; -- Donald J. Atwood,  |
+| improvements." -- Donald J. Atwood,  |
 \ General Motors                       /
  --------------------------------------
         \   ^__^
@@ -101,37 +266,51 @@ brew install cowsay
             (__)\       )\/\
                 ||----w |
                 ||     ||
-</code></pre></div>
-<p>You can also get different animals. Try <code>cowsay -f tux &lt;yourmessage&gt;</code></p>
+```
 
-<h2>Cowsay in R</h2>
+You can also get different animals. Try `cowsay -f tux <yourmessage>`
 
-<p>Why cowsay for R?  Why not. You never know what you will learn in fun side projects. Basically, this cowsay R package we are making prints messages that you pass to the function <code>say</code>.  There are three arguments to the <code>say</code> function:</p>
+## Cowsay in R
 
-<ul>
-<li><strong>what</strong>: What do you want to say?  You can pass it a custom message, anything you want, like <em>what&#39;s up</em>, or <em>howdy!</em>. You can also get R&#39;s version of fortunes, quotes about R. Just pass the exact term <em>forture</em>. If you want a fact about cats from the <a href="http://catfacts-api.appspot.com/">Cat Facts API</a>, pass in <em>catfact</em>. Last, you can get the current time by passing <em>time</em> to this parameter.</li>
-<li><strong>by</strong>: Type of animal, one of cow, chicken, poop, cat, ant, pumpkin, ghost, spider, rabbit, pig, snowman, or frog. If you want more animals, send a pull request, or ask and at some point it will be added. </li>
-<li><strong>type</strong>: One of message (default), warning, or string (returns string). You could use string to pass into other functions, etc., instead of printing a warning or message.</li>
-</ul>
+Why cowsay for R?  Why not. You never know what you will learn in fun side projects. Basically, this cowsay R package we are making prints messages that you pass to the function `say`.  There are three arguments to the `say` function:
 
-<p>There are three other contributors so far (a big thanks to them):</p>
+* __what__: What do you want to say?  You can pass it a custom message, anything you want, like _what's up_, or _howdy!_. You can also get R's version of fortunes, quotes about R. Just pass the exact term _forture_. If you want a fact about cats from the [Cat Facts API](http://catfacts-api.appspot.com/), pass in _catfact_. Last, you can get the current time by passing _time_ to this parameter.
+* __by__: Type of animal, one of cow, chicken, poop, cat, ant, pumpkin, ghost, spider, rabbit, pig, snowman, or frog. If you want more animals, send a pull request, or ask and at some point it will be added. 
+* __type__: One of message (default), warning, or string (returns string). You could use string to pass into other functions, etc., instead of printing a warning or message.
 
-<ul>
-<li>Tyler Rinker</li>
-<li>Thomas Leeper</li>
-<li>Noam Ross</li>
-</ul>
+There are three other contributors so far (a big thanks to them):
 
-<h3>Installation</h3>
-<div class="highlight"><pre><code class="language-r" data-lang="r"><span class="kn">library</span><span class="p">(</span>devtools<span class="p">)</span>
-install_github<span class="p">(</span><span class="s">&quot;cowsay&quot;</span><span class="p">,</span> <span class="s">&quot;sckott&quot;</span><span class="p">)</span>
-</code></pre></div><div class="highlight"><pre><code class="language-r" data-lang="r"><span class="kn">library</span><span class="p">(</span>cowsay<span class="p">)</span>
-</code></pre></div>
-<p>p.s. or <code>install_github(&quot;sckott/cowsay&quot;)</code> if you have a newer version of devtools</p>
+* Tyler Rinker
+* Thomas Leeper
+* Noam Ross
 
-<h3>Get time</h3>
-<div class="highlight"><pre><code class="language-r" data-lang="r">say<span class="p">(</span><span class="s">&quot;time&quot;</span><span class="p">)</span>
-</code></pre></div><div class="highlight"><pre><code class="language-text" data-lang="text"> ----- 
+### Installation
+
+
+```r
+library(devtools)
+install_github("cowsay", "sckott")
+```
+
+
+
+```r
+library(cowsay)
+```
+
+
+p.s. or `install_github("sckott/cowsay")` if you have a newer version of devtools
+
+### Get time
+
+
+```r
+say("time")
+```
+
+```
+
+ ----- 
  2014-02-20 14:15:35 
  ------ 
     \   ^__^ 
@@ -139,36 +318,46 @@ install_github<span class="p">(</span><span class="s">&quot;cowsay&quot;</span><
         (__)\         )\ /\ 
              ||------w|
              ||      ||
-</code></pre></div><div class="highlight"><pre><code class="language-r" data-lang="r">say<span class="p">(</span><span class="s">&quot;time&quot;</span><span class="p">,</span> <span class="s">&quot;chicken&quot;</span><span class="p">)</span>
-</code></pre></div><div class="highlight"><pre><code class="language-text" data-lang="text"> ----- 
+```
+
+
+
+```r
+say("time", "chicken")
+```
+
+```
+
+
+ ----- 
  2014-02-20 14:15:35 
  ------ 
     \   
      \  
          _
        _/ }
-      `&gt;&#39; \
+      `>' \
       `|   \
-       |   /&#39;-.     .-.
-        \&#39;     &#39;;`--&#39; .&#39;
-         \&#39;.    `&#39;-./
-          &#39;.`-..-;`
-            `;-..&#39;
+       |   /'-.     .-.
+        \'     ';`--' .'
+         \'.    `'-./
+          '.`-..-;`
+            `;-..'
             _| _|
             /` /`
-</code></pre></div>
-<h3>Vary type of output, default calls message</h3>
-<div class="highlight"><pre><code class="language-r" data-lang="r">say<span class="p">(</span><span class="s">&quot;hello world&quot;</span><span class="p">)</span>
-</code></pre></div><div class="highlight"><pre><code class="language-text" data-lang="text"> ----- 
- hello world 
- ------ 
-    \   ^__^ 
-     \  (oo)\ ________ 
-        (__)\         )\ /\ 
-             ||------w|
-             ||      ||
-</code></pre></div><div class="highlight"><pre><code class="language-r" data-lang="r">say<span class="p">(</span><span class="s">&quot;hello world&quot;</span><span class="p">,</span> type <span class="o">=</span> <span class="s">&quot;warning&quot;</span><span class="p">)</span>
-</code></pre></div><div class="highlight"><pre><code class="language-text" data-lang="text">Warning: 
+  
+```
+
+
+### Vary type of output, default calls message
+
+
+```r
+say("hello world")
+```
+
+```
+
  ----- 
  hello world 
  ------ 
@@ -177,14 +366,50 @@ install_github<span class="p">(</span><span class="s">&quot;cowsay&quot;</span><
         (__)\         )\ /\ 
              ||------w|
              ||      ||
-</code></pre></div><div class="highlight"><pre><code class="language-r" data-lang="r">say<span class="p">(</span><span class="s">&quot;hello world&quot;</span><span class="p">,</span> type <span class="o">=</span> <span class="s">&quot;string&quot;</span><span class="p">)</span>
-</code></pre></div><div class="highlight"><pre><code class="language-text" data-lang="text">[1] &quot;\n ----- \n hello world \n ------ \n    \\   ^__^ \n     \\  (oo)\\ ________ \n        (__)\\         )\\ /\\ \n             ||------w|\n             ||      ||&quot;
-</code></pre></div>
-<h3>Catfacts!!!!</h3>
+```
 
-<p>From the <a href="http://catfacts-api.appspot.com/">catfacts API</a>, we can get random cat facts. If you put in <em>catfact</em> you by default get a cat saying it. </p>
-<div class="highlight"><pre><code class="language-r" data-lang="r">say<span class="p">(</span><span class="s">&quot;catfact&quot;</span><span class="p">,</span> <span class="s">&quot;cat&quot;</span><span class="p">)</span>
-</code></pre></div><div class="highlight"><pre><code class="language-text" data-lang="text"> ----- 
+
+
+```r
+say("hello world", type = "warning")
+```
+
+```
+Warning: 
+ ----- 
+ hello world 
+ ------ 
+    \   ^__^ 
+     \  (oo)\ ________ 
+        (__)\         )\ /\ 
+             ||------w|
+             ||      ||
+```
+
+
+
+```r
+say("hello world", type = "string")
+```
+
+```
+[1] "\n ----- \n hello world \n ------ \n    \\   ^__^ \n     \\  (oo)\\ ________ \n        (__)\\         )\\ /\\ \n             ||------w|\n             ||      ||"
+```
+
+
+### Catfacts!!!!
+
+From the [catfacts API](http://catfacts-api.appspot.com/), we can get random cat facts. If you put in _catfact_ you by default get a cat saying it. 
+
+
+```r
+say("catfact", "cat")
+```
+
+```
+
+
+ ----- 
  Neutering a cat extends its life span by two or three years. 
  ------ 
     \   
@@ -192,21 +417,31 @@ install_github<span class="p">(</span><span class="s">&quot;cowsay&quot;</span><
                \`*-.
                  )  _`-.                 
                 .  : `. .                
-                : _   &#39;                 
+                : _   '                 
                 ; *` _.   `*-._          
-                `-.-&#39;          `-.       
+                `-.-'          `-.       
                   ;       `       `.     
                   :.       .       \
-                  .\  .   :   .-&#39;   .   
-                  &#39;  `+.;  ;  &#39;      :   
-                  :  &#39;  |    ;       ;-. 
-                  ; &#39;   : :`-:     _.`* ;
-               .*&#39; /  .*&#39; ; .*`- +&#39;  `*&#39; 
-               `*-*   `*-*  `*-*&#39;        
-</code></pre></div>
-<h3>R fortunes</h3>
-<div class="highlight"><pre><code class="language-r" data-lang="r">say<span class="p">(</span><span class="s">&quot;fortune&quot;</span><span class="p">)</span>
-</code></pre></div><div class="highlight"><pre><code class="language-text" data-lang="text"> ----- 
+                  .\  .   :   .-'   .   
+                  '  `+.;  ;  '      :   
+                  :  '  |    ;       ;-. 
+                  ; '   : :`-:     _.`* ;
+               .*' /  .*' ; .*`- +'  `*' 
+               `*-*   `*-*  `*-*'        
+    
+```
+
+
+### R fortunes
+
+
+```r
+say("fortune")
+```
+
+```
+
+ ----- 
  If I were to be treated by a cure created by stepwise regression, I would prefer voodoo.
  Dieter Menne
  in a thread about regressions with many variables
@@ -218,8 +453,18 @@ install_github<span class="p">(</span><span class="s">&quot;cowsay&quot;</span><
         (__)\         )\ /\ 
              ||------w|
              ||      ||
-</code></pre></div><div class="highlight"><pre><code class="language-r" data-lang="r">say<span class="p">(</span><span class="s">&quot;fortune&quot;</span><span class="p">,</span> <span class="s">&quot;pig&quot;</span><span class="p">)</span>
-</code></pre></div><div class="highlight"><pre><code class="language-text" data-lang="text"> ----- 
+```
+
+
+
+```r
+say("fortune", "pig")
+```
+
+```
+
+
+ ----- 
  Cross posting is sociopathic.
  Roger Koenker
  NA
@@ -230,21 +475,36 @@ install_github<span class="p">(</span><span class="s">&quot;cowsay&quot;</span><
      \  
        _//| .-~~~-.
      _/oo  }       }-@
-    (&#39;&#39;)_  }       |
-     `--&#39;| { }--{  }
+    ('')_  }       |
+     `--'| { }--{  }
           //_/  /_/
-</code></pre></div>
-<h3>Incorporate into a function</h3>
+  
+```
 
-<p>Define a function</p>
-<div class="highlight"><pre><code class="language-r" data-lang="r">foo <span class="o">&lt;-</span> <span class="kr">function</span><span class="p">(</span>x<span class="p">)</span> <span class="p">{</span>
-    <span class="kr">if</span> <span class="p">(</span>x <span class="o">&lt;</span> <span class="m">5</span><span class="p">)</span> 
-        say<span class="p">(</span><span class="s">&quot;woops, x should be 5 or greater&quot;</span><span class="p">)</span>
-<span class="p">}</span>
-</code></pre></div>
-<p>Call the function, with an error on purpose</p>
-<div class="highlight"><pre><code class="language-r" data-lang="r">foo<span class="p">(</span><span class="m">3</span><span class="p">)</span>
-</code></pre></div><div class="highlight"><pre><code class="language-text" data-lang="text"> ----- 
+
+### Incorporate into a function
+
+Define a function
+
+
+```r
+foo <- function(x) {
+    if (x < 5) 
+        say("woops, x should be 5 or greater")
+}
+```
+
+
+Call the function, with an error on purpose
+
+
+```r
+foo(3)
+```
+
+```
+
+ ----- 
  woops, x should be 5 or greater 
  ------ 
     \   ^__^ 
@@ -252,28 +512,46 @@ install_github<span class="p">(</span><span class="s">&quot;cowsay&quot;</span><
         (__)\         )\ /\ 
              ||------w|
              ||      ||
-</code></pre></div>
-<p>Or capture a warning or message and pass to the <code>say</code> function</p>
-<div class="highlight"><pre><code class="language-r" data-lang="r">foo2 <span class="o">&lt;-</span> <span class="kr">function</span><span class="p">(</span>x<span class="p">)</span> <span class="p">{</span>
-    err <span class="o">&lt;-</span> <span class="kp">tryCatch</span><span class="p">(</span>x<span class="o">^</span><span class="m">2</span><span class="p">,</span> error <span class="o">=</span> <span class="kr">function</span><span class="p">(</span>e<span class="p">)</span> e<span class="p">)</span>
-    say<span class="p">(</span>err<span class="o">$</span><span class="kp">message</span><span class="p">,</span> <span class="s">&quot;frog&quot;</span><span class="p">)</span>
-<span class="p">}</span>
-</code></pre></div>
-<p>Then call the function </p>
-<div class="highlight"><pre><code class="language-r" data-lang="r">foo2<span class="p">(</span><span class="s">&quot;hello&quot;</span><span class="p">)</span>
-</code></pre></div><div class="highlight"><pre><code class="language-text" data-lang="text"> ----- 
+```
+
+
+Or capture a warning or message and pass to the `say` function
+
+
+```r
+foo2 <- function(x) {
+    err <- tryCatch(x^2, error = function(e) e)
+    say(err$message, "frog")
+}
+```
+
+
+Then call the function 
+
+
+```r
+foo2("hello")
+```
+
+```
+
+
+ ----- 
  non-numeric argument to binary operator 
  ------ 
     \   
      \  
         (.)_(.)
      _ (   _   ) _
-    / \/`-----&#39;\/ \
+    / \/`-----'\/ \
   __\ ( (     ) ) /__
   )   /\ \._./ /\   (
    )_/ /|\   /|\ \_(
-</code></pre></div>
-<p>Awesome. Much better to have an error message from a frog than just the harsh console alone :)</p>
+  
+```
+
+
+Awesome. Much better to have an error message from a frog than just the harsh console alone :)
 
   </div>
   
@@ -286,41 +564,54 @@ install_github<span class="p">(</span><span class="s">&quot;cowsay&quot;</span><
 
     <span class="post-date">18 Jan 2014</span>
 
-    <p>I&#39;ve been learning Ruby, and decided to scratch an itch: getting citations for papers to put in a bibtex file or my Zotero library. This usually requires two parts: 1) searching for an article with keywords, and then 2) getting the citation once the paper is found.  Since I am lazy, I would prefer to do this from the command line instead of opening up a browser.  Thus =&gt; <code>cites</code>. (Note, I&#39;m sure someone has created something better - the point is I&#39;m learnin&#39; me some Ruby)
+    I've been learning Ruby, and decided to scratch an itch: getting citations for papers to put in a bibtex file or my Zotero library. This usually requires two parts: 1) searching for an article with keywords, and then 2) getting the citation once the paper is found.  Since I am lazy, I would prefer to do this from the command line instead of opening up a browser.  Thus => `cites`. (Note, I'm sure someone has created something better - the point is I'm learnin' me some Ruby)
 <br><br>
-<strong>cites does two things:</strong> </p>
+__cites does two things:__ 
 
-<ul>
-<li>Search for a paper. Uses the <a href="http://search.crossref.org/help/api">CrossRef Metadata Search API</a>, which allows POST requests of free form text. </li>
-<li>Get a citation from a DOI. Uses CrossRef <a href="http://labs.crossref.org/citation-formatting-service/">citation formatting service</a> to search for citation information.</li>
-</ul>
+* Search for a paper. Uses the [CrossRef Metadata Search API](http://search.crossref.org/help/api), which allows POST requests of free form text. 
+* Get a citation from a DOI. Uses CrossRef [citation formatting service](http://labs.crossref.org/citation-formatting-service/) to search for citation information.
 
-<p>Each of the two above tasks are functions that you can use within Ruby, and are available from the command line/terminal so that you don&#39;t have to spin up Ruby. During a typical writing workflow (in which you are using bibtex formatted references) one can want a citation for their paper, and instead of opening up a browser and using Google Scholar or Web of Science, etc., you can quickly search in your terminal by doing e.g., <code>thor cite:search &#39;keywords that will help find the paper, including author, year, etc.&#39;</code>. Which if matches will give you a DOI. Then you can do <code>thor cite:getcite DOI/string | pbcopy</code> and you get the bibtex reference in your clipboard. Then just paste into your bibtex file or references manager. See more examples below.
+Each of the two above tasks are functions that you can use within Ruby, and are available from the command line/terminal so that you don't have to spin up Ruby. During a typical writing workflow (in which you are using bibtex formatted references) one can want a citation for their paper, and instead of opening up a browser and using Google Scholar or Web of Science, etc., you can quickly search in your terminal by doing e.g., `thor cite:search 'keywords that will help find the paper, including author, year, etc.'`. Which if matches will give you a DOI. Then you can do `thor cite:getcite DOI/string | pbcopy` and you get the bibtex reference in your clipboard. Then just paste into your bibtex file or references manager. See more examples below.
 <br><br>
-First, we need to install dependencies</p>
-<div class="highlight"><pre><code class="language-text" data-lang="text">gem install httparty bibtex-ruby launchy
+First, we need to install dependencies
+
+```
+gem install httparty bibtex-ruby launchy
 sudo gem install thor
-</code></pre></div>
-<p>Then clone the repo down. The <code>Makefile</code> in the repo builds the gem, and installs the Thor module so you have access to it from anywhere. If you don&#39;t want the Thor commands, just do <code>make install</code> and just the gem will be installed.</p>
-<div class="highlight"><pre><code class="language-text" data-lang="text">git clone git@github.com:sckott/cites.git
+```
+
+Then clone the repo down. The `Makefile` in the repo builds the gem, and installs the Thor module so you have access to it from anywhere. If you don't want the Thor commands, just do `make install` and just the gem will be installed.
+
+```
+git clone git@github.com:sckott/cites.git
 cd cites
 make
-</code></pre></div>
-<p><br><br></p>
+```
+<br><br>
+### From the command line: Thor
 
-<h3>From the command line: Thor</h3>
+I decided to use [Thor](http://whatisthor.com/) to make functions within `cites` available on the cli. Thor is cool. For example, you can list the commands available like
 
-<p>I decided to use <a href="http://whatisthor.com/">Thor</a> to make functions within <code>cites</code> available on the cli. Thor is cool. For example, you can list the commands available like</p>
-<div class="highlight"><pre><code class="language-text" data-lang="text">thor list
-</code></pre></div><div class="highlight"><pre><code class="language-text" data-lang="text">cite
+```
+thor list
+```
+
+```
+cite
 -----
 thor cite:getcite        # Get a citation from a DOI
 thor cite:launch paper   # Open a paper from a given DOI in your default browser
 thor cite:search STRING  # Get a DOI from a search string
-</code></pre></div>
-<p>Get help for a particular method</p>
-<div class="highlight"><pre><code class="language-text" data-lang="text">thor help cite:getcite
-</code></pre></div><div class="highlight"><pre><code class="language-text" data-lang="text">Usage:
+```
+
+Get help for a particular method
+
+```
+thor help cite:getcite
+```
+
+```
+Usage:
   thor cite:getcite
 
 Options:
@@ -332,39 +623,63 @@ Options:
                      # Default: en-US
 
 Get a citation from a DOI
-</code></pre></div>
-<p>This is what&#39;s associated with <code>cites</code> from the cli using Thor.</p>
+```
 
-<p>Other commands are available, just type <code>thor</code> on the cli, and press enter. 
-<br><br></p>
+This is what's associated with `cites` from the cli using Thor.
 
-<h3>Search for a paper</h3>
+Other commands are available, just type `thor` on the cli, and press enter. 
+<br><br>
+### Search for a paper 
 
-<p>From the CLI</p>
-<div class="highlight"><pre><code class="language-text" data-lang="text">thor cite:search &#39;Piwowar sharing data increases citation PLOS&#39;
-</code></pre></div><div class="highlight"><pre><code class="language-text" data-lang="text">{&quot;match&quot;=&gt;true, &quot;doi&quot;=&gt;&quot;10.1371/journal.pone.0000308&quot;, &quot;text&quot;=&gt;&quot;Piwowar sharing data increases citation PLOS&quot;}
-</code></pre></div>
-<p>And you can do many searches, separated with commas, like</p>
-<div class="highlight"><pre><code class="language-text" data-lang="text">thor cite:search &#39;Piwowar sharing data increases citation PLOS,boettiger Modeling stabilizing selection&#39;
-</code></pre></div>
-<p>Search within Ruby</p>
-<div class="highlight"><pre><code class="language-ruby" data-lang="ruby"><span class="nb">require</span> <span class="s1">&#39;cites&#39;</span>
-<span class="no">Cites</span><span class="o">.</span><span class="n">search</span><span class="p">(</span><span class="s1">&#39;Piwowar sharing data increases citation PLOS&#39;</span><span class="p">)</span>
-</code></pre></div><div class="highlight"><pre><code class="language-ruby" data-lang="ruby"><span class="o">=&gt;</span> <span class="o">[</span><span class="p">{</span><span class="s2">&quot;match&quot;</span><span class="o">=&gt;</span><span class="kp">true</span><span class="p">,</span>
-  <span class="s2">&quot;doi&quot;</span><span class="o">=&gt;</span><span class="s2">&quot;10.1371/journal.pone.0000308&quot;</span><span class="p">,</span>
-  <span class="s2">&quot;text&quot;</span><span class="o">=&gt;</span><span class="s2">&quot;Piwowar sharing data increases citation PLOS&quot;</span><span class="p">}</span><span class="o">]</span>
-</code></pre></div>
-<p><br><br></p>
+From the CLI
 
-<h3>Get a reference from a DOI</h3>
+```
+thor cite:search 'Piwowar sharing data increases citation PLOS'
+```
 
-<p>From the CLI, default output is text format, apa style, locale en-US</p>
-<div class="highlight"><pre><code class="language-text" data-lang="text">thor cite:getcite &#39;10.1186/1471-2105-14-16&#39;
-</code></pre></div><div class="highlight"><pre><code class="language-text" data-lang="text">Boyle, B., Hopkins, N., Lu, Z., Raygoza Garay, J. A., Mozzherin, D., Rees, T., Matasci, N., et al. (2013). The taxonomic name resolution service: an online tool for automated standardization of plant names. BMC Bioinformatics, 14(1), 16. Springer (Biomed Central Ltd.). doi:10.1186/1471-2105-14-16
-</code></pre></div>
-<p>Because we&#39;re using <a href="http://whatisthor.com/">thor</a> you can pass in options to the call on the cli, like here choose <code>ris</code> for the format</p>
-<div class="highlight"><pre><code class="language-text" data-lang="text">thor cite:getcite &#39;10.1371/journal.pone.0000308&#39; --format=ris
-</code></pre></div><div class="highlight"><pre><code class="language-text" data-lang="text">TY  - JOUR
+```
+{"match"=>true, "doi"=>"10.1371/journal.pone.0000308", "text"=>"Piwowar sharing data increases citation PLOS"}
+```
+
+And you can do many searches, separated with commas, like
+
+```
+thor cite:search 'Piwowar sharing data increases citation PLOS,boettiger Modeling stabilizing selection'
+```
+
+Search within Ruby
+
+```ruby
+require 'cites'
+Cites.search('Piwowar sharing data increases citation PLOS')
+```
+
+```ruby
+=> [{"match"=>true,
+  "doi"=>"10.1371/journal.pone.0000308",
+  "text"=>"Piwowar sharing data increases citation PLOS"}]
+```
+<br><br>
+### Get a reference from a DOI
+
+From the CLI, default output is text format, apa style, locale en-US
+
+```
+thor cite:getcite '10.1186/1471-2105-14-16'
+```
+
+```
+Boyle, B., Hopkins, N., Lu, Z., Raygoza Garay, J. A., Mozzherin, D., Rees, T., Matasci, N., et al. (2013). The taxonomic name resolution service: an online tool for automated standardization of plant names. BMC Bioinformatics, 14(1), 16. Springer (Biomed Central Ltd.). doi:10.1186/1471-2105-14-16
+```
+
+Because we're using [thor](http://whatisthor.com/) you can pass in options to the call on the cli, like here choose `ris` for the format
+
+```
+thor cite:getcite '10.1371/journal.pone.0000308' --format=ris
+```
+
+```
+TY  - JOUR
 T2  - PLoS ONE
 AU  - Piwowar, Heather A.
 AU  - Day, Roger S.
@@ -378,10 +693,16 @@ DO  - 10.1371/journal.pone.0000308
 PY  - 2007
 UR  - http://dx.doi.org/10.1371/journal.pone.0000308
 ER  -
-</code></pre></div>
-<p>And here <code>bibtex</code> for the format</p>
-<div class="highlight"><pre><code class="language-text" data-lang="text">thor cite:getcite &#39;10.1371/journal.pone.0000308&#39; --format=bibtex
-</code></pre></div><div class="highlight"><pre><code class="language-text" data-lang="text">@article{Piwowar_Day_Fridsma_2007,
+```
+
+And here `bibtex` for the format
+
+```
+thor cite:getcite '10.1371/journal.pone.0000308' --format=bibtex
+```
+
+```
+@article{Piwowar_Day_Fridsma_2007,
   title = {Sharing Detailed Research Data Is Associated with Increased Citation Rate},
   volume = {2},
   url = {http://dx.doi.org/10.1371/journal.pone.0000308},
@@ -395,317 +716,46 @@ ER  -
   month = {mar},
   pages = {e308}
 }
-</code></pre></div>
-<p>Two more options, <code>style</code> and <code>locale</code> are only available with text format, like</p>
-<div class="highlight"><pre><code class="language-text" data-lang="text">thor cite:getcite &#39;10.1371/journal.pone.0000308&#39; --format=text --style=mla --locale=fr-FR
-</code></pre></div><div class="highlight"><pre><code class="language-text" data-lang="text">Piwowar, Heather A., Roger S. Day, et Douglas B. Fridsma. « Sharing Detailed Research Data Is Associated with Increased Citation Rate ». éd par. John Ioannidis. PLoS ONE 2.3 (2007): e308.
-</code></pre></div>
-<p>Within Ruby</p>
-<div class="highlight"><pre><code class="language-ruby" data-lang="ruby"><span class="nb">require</span> <span class="s1">&#39;cites&#39;</span>
-<span class="no">Cites</span><span class="o">.</span><span class="n">doi2cit</span><span class="p">(</span><span class="s1">&#39;10.1371/journal.pone.0000308&#39;</span><span class="p">)</span>
-</code></pre></div><div class="highlight"><pre><code class="language-ruby" data-lang="ruby"><span class="o">=&gt;</span> <span class="o">[</span><span class="s2">&quot;Piwowar, H. A., Day, R. S., &amp; Fridsma, D. B. (2007). Sharing Detailed Research Data Is Associated with Increased Citation Rate. (J. Ioannidis, Ed.)PLoS ONE, 2(3), e308. Public Library of Science. doi:10.1371/journal.pone.0000308&quot;</span><span class="o">]</span>
-</code></pre></div>
-<p><br><br></p>
+```
 
-<h3>Open paper in browser</h3>
+Two more options, `style` and `locale` are only available with text format, like
 
-<p>Uses <a href="http://macrodocs.org/">Macrodocs</a>. The default, using Macrodocs, only works for open access (#OA) articles. You can set the option <code>oa</code> to be false. </p>
-<div class="highlight"><pre><code class="language-text" data-lang="text">thor cite:launch &#39;10.1371/journal.pone.0000308&#39;
-</code></pre></div>
-<p>It&#39;s super simple, it just concatenates your DOI onto <code>http://macrodocs.org/?doi=</code> to give in this case <a href="http://macrodocs.org/?doi=10.1371/journal.pone.0000308">http://macrodocs.org/?doi=10.1371/journal.pone.0000308</a> for what you will get from that command. </p>
+```
+thor cite:getcite '10.1371/journal.pone.0000308' --format=text --style=mla --locale=fr-FR
+```
 
-<p>When you don&#39;t have an open access article, set the oa option flag to false, like <code>--oa=false</code></p>
-<div class="highlight"><pre><code class="language-text" data-lang="text">thor cite:launch &#39;10.1111/1365-2745.12157&#39; --oa=false
-</code></pre></div>
-<p>Setting <code>--oa=false</code> simply concatenates your doi onto <code>http://dx.doi.org/</code>, which then attempts to resolve to likely the publishers page for the article.</p>
+```
+Piwowar, Heather A., Roger S. Day, et Douglas B. Fridsma. « Sharing Detailed Research Data Is Associated with Increased Citation Rate ». éd par. John Ioannidis. PLoS ONE 2.3 (2007): e308.
+```
 
-  </div>
-  
-  <div class="post">
-    <h1>
-      <a href="/2014/01/rgauges-hourly/">
-        rgauges - fun with hourly web site analytics
-      </a>
-    </h1>
+Within Ruby
 
-    <span class="post-date">17 Jan 2014</span>
+```ruby
+require 'cites'
+Cites.doi2cit('10.1371/journal.pone.0000308')
+```
 
-    <p><a href="http://get.gaug.es/">Gaug.es</a> is a really nice looking analytics platform as an alternative to Google Analytics. It is a paid service, but not that expensive really. </p>
+```ruby
+=> ["Piwowar, H. A., Day, R. S., & Fridsma, D. B. (2007). Sharing Detailed Research Data Is Associated with Increased Citation Rate. (J. Ioannidis, Ed.)PLoS ONE, 2(3), e308. Public Library of Science. doi:10.1371/journal.pone.0000308"]
+```
+<br><br>
+### Open paper in browser
 
-<p>We&#39;ve made an R package to interact with the Gaug.es API called <code>rgauges</code>. Find it <a href="https://github.com/ropensci/rgauges">on Github</a> and <a href="http://cran.r-project.org/web/packages/rgauges/index.html">on CRAN</a>.</p>
+Uses [Macrodocs](http://macrodocs.org/). The default, using Macrodocs, only works for open access (#OA) articles. You can set the option `oa` to be false. 
 
-<p>Although working with the Gaug.es API is nice and easy, they don&#39;t keep hourly visit stats and provide those via the API, so that you have to continually collect them yourself if you want them. That&#39;s what I have done for my own website. </p>
+```
+thor cite:launch '10.1371/journal.pone.0000308'
+```
 
-<p>It took a few steps to get this data:</p>
+It's super simple, it just concatenates your DOI onto `http://macrodocs.org/?doi=` to give in this case [http://macrodocs.org/?doi=10.1371/journal.pone.0000308](http://macrodocs.org/?doi=10.1371/journal.pone.0000308) for what you will get from that command. 
 
-<ul>
-<li>I wrote a little Ruby script using <a href="http://rubygems.org/gems/twelve">Twelve gem</a> to collect data from the Gaug.es API every day at the same time, which just gets the patst 24 hours of data. This script makes a call to the Gaug.es API and sends the data to a <a href="http://couchdb.apache.org/">CouchDB</a> database hosted on <a href="https://cloudant.com/">Cloudant</a>. In reality, the script is is embeded in a rack app as I don&#39;t think you can throw up a standalone script to Heroku. Here&#39;s the script:</li>
-</ul>
-<div class="highlight"><pre><code class="language-ruby" data-lang="ruby"><span class="k">class</span> <span class="nc">MyApp</span>
-  <span class="nb">require</span> <span class="s1">&#39;couchrest&#39;</span>
-  <span class="nb">require</span> <span class="s1">&#39;twelve&#39;</span>
-  <span class="nb">require</span> <span class="s1">&#39;date&#39;</span>
-  <span class="nb">require</span> <span class="s1">&#39;time&#39;</span>
+When you don't have an open access article, set the oa option flag to false, like `--oa=false`
 
-  <span class="k">def</span> <span class="nc">self</span><span class="o">.</span><span class="nf">getgaugesdata_scott</span>
-    <span class="n">bfg</span> <span class="o">=</span> <span class="no">Twelve</span><span class="o">.</span><span class="n">new</span><span class="p">(</span><span class="s1">&#39;&lt;gaugeskey&gt;&#39;</span><span class="p">)</span>
-    <span class="n">out</span> <span class="o">=</span> <span class="n">bfg</span><span class="o">.</span><span class="n">gauges</span><span class="p">(</span><span class="s1">&#39;&lt;gaugeskey&gt;&#39;</span><span class="p">)</span><span class="o">[</span><span class="s1">&#39;recent_hours&#39;</span><span class="o">]</span>
-    <span class="n">yip</span> <span class="o">=</span> <span class="p">{</span> <span class="s2">&quot;from_url&quot;</span><span class="o">=&gt;</span> <span class="s2">&quot;http://sckott.github.io/&quot;</span><span class="p">,</span> <span class="s2">&quot;coll_date&quot;</span><span class="o">=&gt;</span> <span class="no">Date</span><span class="o">.</span><span class="n">today</span><span class="o">.</span><span class="n">to_s</span><span class="p">,</span> <span class="s2">&quot;coll_time&quot;</span><span class="o">=&gt;</span> <span class="no">Time</span><span class="o">.</span><span class="n">now</span><span class="o">.</span><span class="n">utc</span><span class="o">.</span><span class="n">localtime</span><span class="o">.</span><span class="n">to_s</span><span class="p">,</span> <span class="s2">&quot;recent_hours&quot;</span><span class="o">=&gt;</span> <span class="n">out</span> <span class="p">}</span>
-    <span class="vi">@db</span> <span class="o">=</span> <span class="no">CouchRest</span><span class="o">.</span><span class="n">database!</span><span class="p">(</span><span class="s2">&quot;https://app16517180.heroku:&lt;key&gt;@app16517180.heroku.cloudant.com/gaugesdb_scott&quot;</span><span class="p">)</span>
-    <span class="vi">@db</span><span class="o">.</span><span class="n">save_doc</span><span class="p">(</span><span class="n">yip</span><span class="p">)</span>
+```
+thor cite:launch '10.1111/1365-2745.12157' --oa=false
+```
 
-  <span class="k">def</span> <span class="nf">call</span> <span class="n">env</span>
-    <span class="o">[</span><span class="mi">200</span><span class="p">,</span> <span class="p">{</span><span class="s2">&quot;Content-Type&quot;</span> <span class="o">=&gt;</span> <span class="s2">&quot;text/html&quot;</span><span class="p">},</span> <span class="o">[</span><span class="s2">&quot;no output printed here&quot;</span><span class="o">]]</span> 
-  <span class="k">end</span>
-<span class="k">end</span>
-</code></pre></div>
-<ul>
-<li><p>One little catch though: I run the Ruby script on Heroku, so I don&#39;t have to do it locally, but Heroku free instance goes down unless it&#39;s doing something. So I used a little service called <a href="http://uptimerobot.com/">UptimeRobot</a> to ping the Heroku app every 5 minutes. UptimeRobot also is giving you uptime stats too on your app, which I don&#39;t really need, but is a cool feature. </p></li>
-<li><p>And that&#39;s it. Now the data is stored from each day&#39;s collection of visitor stats to a free Cloudant CouchDB database. </p></li>
-</ul>
-
-<h2>Regular Gaug.es data</h2>
-
-<p>First, let&#39;s look at what you can do with data that Gaug.es does give to you, using the <code>rgauges</code> R package.</p>
-
-<hr>
-
-<h3>Install rgauges</h3>
-
-<figure class="highlight"><pre><code class="language-r" data-lang="r">install.packages<span class="p">(</span><span class="s">&quot;devtools&quot;</span><span class="p">)</span>
-<span class="kn">library</span><span class="p">(</span>devtools<span class="p">)</span>
-install_github<span class="p">(</span><span class="s">&quot;rgauges&quot;</span><span class="p">,</span> <span class="s">&quot;ropensci&quot;</span><span class="p">)</span></code></pre></figure>
-
-<h3>Load rgauges and other dependency libraries</h3>
-
-<figure class="highlight"><pre><code class="language-r" data-lang="r"><span class="kn">library</span><span class="p">(</span>rgauges<span class="p">)</span>
-<span class="kn">library</span><span class="p">(</span>ggplot2<span class="p">)</span></code></pre></figure>
-
-<h3>Your info</h3>
-
-<figure class="highlight"><pre><code class="language-r" data-lang="r">gs_me<span class="p">()</span></code></pre></figure>
-
-<figure class="highlight"><pre><code class="language-text" data-lang="text">## $user
-## $user$name
-## [1] &quot;Scott Chamberlain&quot;
-## 
-## $user$email
-## [1] &quot;myrmecocystus@gmail.com&quot;
-## 
-## $user$id
-## [1] &quot;4eddbafb613f5d5139000001&quot;
-## 
-## $user$last_name
-## [1] &quot;Chamberlain&quot;
-## 
-## $user$urls
-## $user$urls$self
-## [1] &quot;https://secure.gaug.es/me&quot;
-## 
-## $user$urls$clients
-## [1] &quot;https://secure.gaug.es/clients&quot;
-## 
-## $user$urls$gauges
-## [1] &quot;https://secure.gaug.es/gauges&quot;
-## 
-## 
-## $user$first_name
-## [1] &quot;Scott&quot;</code></pre></figure>
-
-<h4>Traffic</h4>
-
-<figure class="highlight"><pre><code class="language-r" data-lang="r">gs_traffic<span class="p">(</span>id <span class="o">=</span> <span class="s">&quot;4efd83a6f5a1f5158a000004&quot;</span><span class="p">)</span></code></pre></figure>
-
-<figure class="highlight"><pre><code class="language-text" data-lang="text">## $metadata
-## $metadata$views
-## [1] 386
-## 
-## $metadata$urls
-## $metadata$urls$older
-## [1] &quot;https://secure.gaug.es/gauges/4efd83a6f5a1f5158a000004/traffic?date=2013-12-01&quot;
-## 
-## $metadata$urls$newer
-## NULL
-## 
-## 
-## $metadata$date
-## [1] &quot;2014-01-17&quot;
-## 
-## $metadata$people
-## [1] 208
-## 
-## 
-## $data
-##    views       date people
-## 1      7 2014-01-01      5
-## 2     17 2014-01-02      7
-## 3     39 2014-01-03     17
-## 4     15 2014-01-04      9
-## 5     14 2014-01-05      7
-## 6     33 2014-01-06     22
-## 7     19 2014-01-07     11
-## 8     15 2014-01-08     11
-## 9     53 2014-01-09     24
-## 10    53 2014-01-10     13
-## 11    14 2014-01-11      9
-## 12    11 2014-01-12     10
-## 13    14 2014-01-13     14
-## 14    11 2014-01-14      9
-## 15    23 2014-01-15     16
-## 16    16 2014-01-16     14
-## 17    32 2014-01-17     25</code></pre></figure>
-
-<h3>Screen/browser information</h3>
-
-<figure class="highlight"><pre><code class="language-r" data-lang="r">gs_reso<span class="p">(</span>id <span class="o">=</span> <span class="s">&quot;4efd83a6f5a1f5158a000004&quot;</span><span class="p">)</span></code></pre></figure>
-
-<figure class="highlight"><pre><code class="language-text" data-lang="text">## $browser_height
-##   views title
-## 1   190   600
-## 2    77   768
-## 3    53   900
-## 4    38   480
-## 5    28  1024
-## 
-## $browser_width
-##   views title
-## 1   153  1280
-## 2    91  1024
-## 3    58  1600
-## 4    36   800
-## 5    30  1440
-## 6     6  2000
-## 7     6   320
-## 8     6   480
-## 
-## $screen_width
-##   views title
-## 1   176  1280
-## 2    90  1600
-## 3    55  1440
-## 4    35  1024
-## 5    14  2000
-## 6     6   320
-## 7     6   480
-## 8     4   800</code></pre></figure>
-
-<h3>Visualize traffic data</h3>
-
-<p>You&#39;ll need to load ggplot2 </p>
-
-<figure class="highlight"><pre><code class="language-r" data-lang="r"><span class="kn">library</span><span class="p">(</span>ggplot2<span class="p">)</span>
-out <span class="o">&lt;-</span> gs_gauge_detail<span class="p">(</span>id <span class="o">=</span> <span class="s">&quot;4efd83a6f5a1f5158a000004&quot;</span><span class="p">)</span>
-vis_gauge<span class="p">(</span>out<span class="p">)</span></code></pre></figure>
-
-<figure class="highlight"><pre><code class="language-text" data-lang="text">## Using hour, time as id variables
-## Using date as id variables
-## Using date as id variables</code></pre></figure>
-
-<p><img src="/public/img/2014-01-17-rgauges-hourly/unnamed-chunk-4.png" alt="center"> </p>
-
-<figure class="highlight"><pre><code class="language-text" data-lang="text">## NULL</code></pre></figure>
-
-<hr>
-
-<hr>
-
-<h2>Historic hourly Gaug.es data</h2>
-
-<p>Now let&#39;s play with the hourly data. To do that we aren&#39;t going to use <code>rgauges</code>, but rather call the Cloudant API. CouchDB provides a RESTful API out of the box, so we can do a call like <code>https://app16517180.heroku.cloudant.com/gaugesdb_scott/_all_docs?limit=20</code> to get metadata (or other calls to get the documents themselves). (note: that url won&#39;t work for you since you don&#39;t have my login info) </p>
-
-<h3>Get some data</h3>
-
-<figure class="highlight"><pre><code class="language-r" data-lang="r"><span class="kn">library</span><span class="p">(</span>devtools<span class="p">)</span>
-install_github<span class="p">(</span><span class="s">&quot;sckott/sofa&quot;</span><span class="p">)</span>  <span class="c1"># or install_github(&#39;sofa&#39;, &#39;sckott&#39;)</span></code></pre></figure>
-
-<figure class="highlight"><pre><code class="language-r" data-lang="r"><span class="kn">library</span><span class="p">(</span>sofa<span class="p">)</span>
-cloudant_name <span class="o">&lt;-</span> <span class="s">&quot;app16517180.heroku&quot;</span>
-cloudant_pwd <span class="o">&lt;-</span> <span class="kp">getOption</span><span class="p">(</span><span class="s">&quot;sofa_cloudant_heroku&quot;</span><span class="p">)[[</span><span class="m">2</span><span class="p">]]</span>
-cushion<span class="p">(</span>sofa_cloudant <span class="o">=</span> <span class="kt">c</span><span class="p">(</span>cloudant_name<span class="p">,</span> cloudant_pwd<span class="p">))</span>
-dat <span class="o">&lt;-</span> sofa_alldocs<span class="p">(</span>cushion <span class="o">=</span> <span class="s">&quot;sofa_cloudant&quot;</span><span class="p">,</span> dbname <span class="o">=</span> <span class="s">&quot;gaugesdb_scott&quot;</span><span class="p">,</span> include_docs <span class="o">=</span> <span class="s">&quot;true&quot;</span><span class="p">)</span></code></pre></figure>
-
-<h3>Manipulate and visualize</h3>
-
-<figure class="highlight"><pre><code class="language-r" data-lang="r"><span class="kn">library</span><span class="p">(</span>plyr<span class="p">)</span>
-dates <span class="o">&lt;-</span> ldply<span class="p">(</span>dat<span class="o">$</span>rows<span class="p">,</span> <span class="kr">function</span><span class="p">(</span>x<span class="p">)</span> x<span class="o">$</span>doc<span class="o">$</span>coll_date<span class="p">)</span>
-<span class="kp">min</span><span class="p">(</span>dates<span class="o">$</span>V1<span class="p">)</span></code></pre></figure>
-
-<figure class="highlight"><pre><code class="language-text" data-lang="text">## [1] &quot;2013-06-26&quot;</code></pre></figure>
-
-<figure class="highlight"><pre><code class="language-r" data-lang="r"><span class="kp">max</span><span class="p">(</span>dates<span class="o">$</span>V1<span class="p">)</span></code></pre></figure>
-
-<figure class="highlight"><pre><code class="language-text" data-lang="text">## [1] &quot;2014-01-16&quot;</code></pre></figure>
-
-<figure class="highlight"><pre><code class="language-r" data-lang="r"><span class="kp">length</span><span class="p">(</span>dates<span class="o">$</span>V1<span class="p">)</span></code></pre></figure>
-
-<figure class="highlight"><pre><code class="language-text" data-lang="text">## [1] 198</code></pre></figure>
-
-<p>So we&#39;ve got 198 days of data, first collected near end of June, and most recent yesterday. Now get actual visits data</p>
-
-<figure class="highlight"><pre><code class="language-r" data-lang="r">df <span class="o">&lt;-</span> ldply<span class="p">(</span>dat<span class="o">$</span>rows<span class="p">,</span> <span class="kr">function</span><span class="p">(</span>x<span class="p">)</span> <span class="p">{</span>
-    y <span class="o">&lt;-</span> <span class="kp">do.call</span><span class="p">(</span><span class="kp">rbind</span><span class="p">,</span> <span class="kp">lapply</span><span class="p">(</span>x<span class="o">$</span>doc<span class="o">$</span>recent_hours<span class="p">,</span> <span class="kt">data.frame</span><span class="p">))</span>
-    <span class="kt">data.frame</span><span class="p">(</span>date <span class="o">=</span> x<span class="o">$</span>doc<span class="o">$</span>coll_date<span class="p">,</span> y<span class="p">)</span>
-<span class="p">})</span>
-df<span class="o">$</span>date <span class="o">&lt;-</span> <span class="kp">as.Date</span><span class="p">(</span>df<span class="o">$</span><span class="kp">date</span><span class="p">)</span>
-df<span class="o">$</span>hour <span class="o">&lt;-</span> <span class="kp">as.numeric</span><span class="p">(</span>df<span class="o">$</span>hour<span class="p">)</span>
-
-<span class="kn">library</span><span class="p">(</span>reshape2<span class="p">)</span>
-df_melt <span class="o">&lt;-</span> melt<span class="p">(</span>df<span class="p">,</span> id.vars <span class="o">=</span> <span class="kt">c</span><span class="p">(</span><span class="s">&quot;date&quot;</span><span class="p">,</span> <span class="s">&quot;hour&quot;</span><span class="p">))</span>
-<span class="kp">head</span><span class="p">(</span>df_melt<span class="p">)</span></code></pre></figure>
-
-<figure class="highlight"><pre><code class="language-text" data-lang="text">##         date hour variable value
-## 1 2013-09-18    1    views     2
-## 2 2013-09-18    2    views     3
-## 3 2013-09-18    3    views     2
-## 4 2013-09-18    4    views     0
-## 5 2013-09-18    5    views     1
-## 6 2013-09-18    6    views    10</code></pre></figure>
-
-<p>We need to combine the date and hour in to one date time string:</p>
-
-<figure class="highlight"><pre><code class="language-r" data-lang="r">df_melt <span class="o">&lt;-</span> <span class="kp">transform</span><span class="p">(</span>df_melt<span class="p">,</span> datetime <span class="o">=</span> <span class="kp">as.POSIXct</span><span class="p">(</span><span class="kp">paste</span><span class="p">(</span><span class="kp">date</span><span class="p">,</span> <span class="kp">sprintf</span><span class="p">(</span><span class="s">&quot;%s:00:00&quot;</span><span class="p">,</span> 
-    hour<span class="p">))))</span>
-<span class="kp">head</span><span class="p">(</span>df_melt<span class="p">)</span></code></pre></figure>
-
-<figure class="highlight"><pre><code class="language-text" data-lang="text">##         date hour variable value            datetime
-## 1 2013-09-18    1    views     2 2013-09-18 01:00:00
-## 2 2013-09-18    2    views     3 2013-09-18 02:00:00
-## 3 2013-09-18    3    views     2 2013-09-18 03:00:00
-## 4 2013-09-18    4    views     0 2013-09-18 04:00:00
-## 5 2013-09-18    5    views     1 2013-09-18 05:00:00
-## 6 2013-09-18    6    views    10 2013-09-18 06:00:00</code></pre></figure>
-
-<p>Now plot all data</p>
-
-<figure class="highlight"><pre><code class="language-r" data-lang="r"><span class="kn">library</span><span class="p">(</span>ggplot2<span class="p">);</span> <span class="kn">library</span><span class="p">(</span>scales<span class="p">)</span>
-
-gauge_theme <span class="o">&lt;-</span> <span class="kr">function</span><span class="p">(){</span>
-  <span class="kt">list</span><span class="p">(</span>theme<span class="p">(</span>panel.grid.major <span class="o">=</span> element_blank<span class="p">(),</span>
-             panel.grid.minor <span class="o">=</span> element_blank<span class="p">(),</span>
-             legend.position <span class="o">=</span> <span class="kt">c</span><span class="p">(</span><span class="m">0.85</span><span class="p">,</span><span class="m">0.85</span><span class="p">),</span>
-             legend.key <span class="o">=</span> element_blank<span class="p">()))</span>
-<span class="p">}</span>
-
-ggplot<span class="p">(</span>df_melt<span class="p">,</span> aes<span class="p">(</span>datetime<span class="p">,</span> value<span class="p">,</span> group<span class="o">=</span>variable<span class="p">,</span> colour<span class="o">=</span>variable<span class="p">))</span> <span class="o">+</span>
-    theme_bw<span class="p">(</span>base_size<span class="o">=</span><span class="m">18</span><span class="p">)</span> <span class="o">+</span> 
-    geom_line<span class="p">(</span>size<span class="o">=</span><span class="m">2</span><span class="p">)</span> <span class="o">+</span>
-    scale_color_brewer<span class="p">(</span>name<span class="o">=</span><span class="s">&quot;&quot;</span><span class="p">,</span> palette<span class="o">=</span><span class="m">3</span><span class="p">)</span> <span class="o">+</span>
-    labs<span class="p">(</span>x<span class="o">=</span><span class="s">&quot;&quot;</span><span class="p">,</span> y<span class="o">=</span><span class="s">&quot;&quot;</span><span class="p">)</span> <span class="o">+</span>
-    gauge_theme<span class="p">()</span></code></pre></figure>
-
-<p><img src="/public/img/2014-01-17-rgauges-hourly/unnamed-chunk-8.png" alt="center"> </p>
-
-<p>And just one day</p>
-
-<figure class="highlight"><pre><code class="language-r" data-lang="r">oneday <span class="o">&lt;-</span> df_melt<span class="p">[</span> <span class="kp">as.character</span><span class="p">(</span>df_melt<span class="o">$</span><span class="kp">date</span><span class="p">)</span> <span class="o">%in%</span> <span class="s">&quot;2013-11-12&quot;</span><span class="p">,</span> <span class="p">]</span>
-ggplot<span class="p">(</span>oneday<span class="p">,</span> aes<span class="p">(</span>datetime<span class="p">,</span> value<span class="p">,</span> group<span class="o">=</span>variable<span class="p">,</span> colour<span class="o">=</span>variable<span class="p">))</span> <span class="o">+</span>
-    theme_bw<span class="p">(</span>base_size<span class="o">=</span><span class="m">18</span><span class="p">)</span> <span class="o">+</span> 
-    geom_line<span class="p">(</span>size<span class="o">=</span><span class="m">2</span><span class="p">)</span> <span class="o">+</span>
-    scale_color_brewer<span class="p">(</span>name<span class="o">=</span><span class="s">&quot;&quot;</span><span class="p">,</span> palette<span class="o">=</span><span class="m">3</span><span class="p">)</span> <span class="o">+</span>
-    labs<span class="p">(</span>x<span class="o">=</span><span class="s">&quot;&quot;</span><span class="p">,</span> y<span class="o">=</span><span class="s">&quot;&quot;</span><span class="p">)</span> <span class="o">+</span>
-    gauge_theme<span class="p">()</span></code></pre></figure>
-
-<p><img src="/public/img/2014-01-17-rgauges-hourly/unnamed-chunk-9.png" alt="center"> </p>
+Setting `--oa=false` simply concatenates your doi onto `http://dx.doi.org/`, which then attempts to resolve to likely the publishers page for the article.
 
   </div>
   
