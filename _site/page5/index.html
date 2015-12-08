@@ -61,6 +61,489 @@
   
   <div class="post">
     <h1>
+      <a href="/2015/05/mow-the-lawn/">
+        lawn - a new package to do geospatial analysis
+      </a>
+    </h1>
+
+    <span class="post-date">18 May 2015</span>
+
+    `lawn` is an R wrapper for the Javascript library [turf.js](http://turfjs.org/) for advanced geospatial analysis. In addition, we have a few functions to interface with the [geojson-random](https://github.com/mapbox/geojson-random) Javascript library.
+
+`lawn` includes traditional spatial operations, helper functions for creating GeoJSON data, and data classification and statistics tools.
+
+There is an additional helper function (see `view()`) in this package to help visualize data with interactive maps via the `leaflet` package ([https://github.com/rstudio/leaflet](https://github.com/rstudio/leaflet)). Note that `leaflet` is not required to install `lawn` - it's in Suggests, not Imports or Depends.
+
+Use cases for this package include (but not limited to, obs.) the following (all below assumes GeoJSON format):
+
+* Create random spatial data.
+* Convert among spatial data types (e.g. `Polygon` to `FeatureCollection`)
+* Transform objects, including merging many, simplifying, calculating hulls, etc.
+* Measuring objects
+* Performing interpolation of objects
+* Aggregating data (aka properties) associated with objects
+
+## Install
+
+Stable `lawn` version from CRAN - this should fetch `leaflet`, which is not on CRAN, but in a `drat` repo (let me know if it doesn't)
+
+
+```r
+install.packages("lawn")
+```
+
+Or, the development version from Github
+
+
+```r
+devtools::install_github("ropensci/lawn")
+```
+
+
+```r
+library("lawn")
+```
+
+## view
+
+`lawn` includes a tiny helper function for visualizing geojson. For examples below, we'll make liberal use of the `lawn::view()` function to visualize what it is the heck we're doing. mkay, lets roll...
+
+We've tried to make `view()` work with as many inputs as possible, from class `character` containing
+json to the class `json` from the `jsonlite` package, to the class `list` to all of the GeoJSON outputs
+from functions in `lawn`.
+
+
+```r
+view(lawn_data$points_average)
+```
+
+![map1](/public/img/2015-05-18-mow-the-lawn/map1.png)
+
+Here, we sample at random two points from the same dataset just viewed.
+
+
+```r
+lawn_sample(lawn_data$points_average, 2) %>% view()
+```
+
+![map2](/public/img/2015-05-18-mow-the-lawn/map2.png)
+
+## Make some geojson data
+
+Point
+
+
+```r
+lawn_point(c(-74.5, 40))
+#> $type
+#> [1] "Feature"
+#> 
+#> $geometry
+#> $geometry$type
+#> [1] "Point"
+#> 
+#> $geometry$coordinates
+#> [1] -74.5  40.0
+#> 
+#> 
+#> $properties
+#> named list()
+#> 
+#> attr(,"class")
+#> [1] "point"
+```
+
+
+```r
+lawn_point(c(-74.5, 40)) %>% view
+```
+
+![point](/public/img/2015-05-18-mow-the-lawn/point.png)
+
+Polygon
+
+
+```r
+rings <- list(list(
+  c(-2.275543, 53.464547),
+  c(-2.275543, 53.489271),
+  c(-2.215118, 53.489271),
+  c(-2.215118, 53.464547),
+  c(-2.275543, 53.464547)
+))
+lawn_polygon(rings)
+#> $type
+#> [1] "Feature"
+#> 
+#> $geometry
+#> $geometry$type
+#> [1] "Polygon"
+#> 
+#> $geometry$coordinates
+#> , , 1
+#> 
+#>           [,1]      [,2]      [,3]      [,4]      [,5]
+#> [1,] -2.275543 -2.275543 -2.215118 -2.215118 -2.275543
+#> 
+#> , , 2
+#> 
+#>          [,1]     [,2]     [,3]     [,4]     [,5]
+#> [1,] 53.46455 53.48927 53.48927 53.46455 53.46455
+#> 
+#> 
+#> 
+#> $properties
+#> named list()
+#> 
+#> attr(,"class")
+#> [1] "polygon"
+```
+
+
+```r
+lawn_polygon(rings) %>% view
+```
+
+![polygon](/public/img/2015-05-18-mow-the-lawn/polygon.png)
+
+Random set of points
+
+
+```r
+lawn_random(n = 2)
+#> $type
+#> [1] "FeatureCollection"
+#> 
+#> $features
+#>      type geometry.type  geometry.coordinates
+#> 1 Feature         Point -137.46327, -63.46154
+#> 2 Feature         Point  -110.68426, 83.10533
+#> 
+#> attr(,"class")
+#> [1] "featurecollection"
+```
+
+
+```r
+lawn_random(n = 5) %>% view
+```
+
+![rand1](/public/img/2015-05-18-mow-the-lawn/lawn_random.png)
+
+Or, use a different Javascript library ([geojson-random](https://github.com/mapbox/geojson-random)) to create random features.
+
+Positions
+
+
+```r
+gr_position()
+#> [1] -179.77996   45.99018
+```
+
+Points
+
+
+```r
+gr_point(2)
+#> $type
+#> [1] "FeatureCollection"
+#> 
+#> $features
+#>      type geometry.type geometry.coordinates
+#> 1 Feature         Point   5.83895, -27.77218
+#> 2 Feature         Point   78.50177, 14.95840
+#> 
+#> attr(,"class")
+#> [1] "featurecollection"
+```
+
+
+```r
+gr_point(2) %>% view
+```
+
+![rand2](/public/img/2015-05-18-mow-the-lawn/geojsonrandom_points.png)
+
+Polygons
+
+
+```r
+gr_polygon(n = 1, vertices = 5, max_radial_length = 5)
+#> $type
+#> [1] "FeatureCollection"
+#> 
+#> $features
+#>      type geometry.type
+#> 1 Feature       Polygon
+#>                                                                                                           geometry.coordinates
+#> 1 67.58827, 67.68551, 67.00091, 66.70156, 65.72578, 67.58827, -42.11340, -42.69850, -43.54866, -42.42758, -41.76731, -42.11340
+#> 
+#> attr(,"class")
+#> [1] "featurecollection"
+```
+
+
+```r
+gr_polygon(n = 1, vertices = 5, max_radial_length = 5) %>% view
+```
+
+![rand3](/public/img/2015-05-18-mow-the-lawn/geojsonrandom_polygons.png)
+
+## count
+
+Count number of points within polygons, appends a new field to properties (see the `count` field)
+
+
+```r
+lawn_count(polygons = lawn_data$polygons_count, points = lawn_data$points_count)
+#> $type
+#> [1] "FeatureCollection"
+#> 
+#> $features
+#>      type pt_count geometry.type
+#> 1 Feature        2       Polygon
+#> 2 Feature        0       Polygon
+#>                                                                                           geometry.coordinates
+#> 1 -112.07239, -112.07239, -112.02810, -112.02810, -112.07239, 46.58659, 46.61761, 46.61761, 46.58659, 46.58659
+#> 2 -112.02398, -112.02398, -111.96613, -111.96613, -112.02398, 46.57043, 46.61502, 46.61502, 46.57043, 46.57043
+#> 
+#> attr(,"class")
+#> [1] "featurecollection"
+```
+
+## distance
+
+Define two points
+
+
+```r
+from <- '{
+ "type": "Feature",
+ "properties": {},
+ "geometry": {
+   "type": "Point",
+   "coordinates": [-75.343, 39.984]
+ }
+}'
+to <- '{
+  "type": "Feature",
+  "properties": {},
+  "geometry": {
+    "type": "Point",
+    "coordinates": [-75.534, 39.123]
+  }
+}'
+```
+
+Calculate distance, default units is kilometers (default output: `km`)
+
+
+```r
+lawn_distance(from, to)
+#> [1] 97.15958
+```
+
+## sample from a FeatureCollection
+
+
+```r
+dat <- lawn_data$points_average
+cat(dat)
+#> {
+#>   "type": "FeatureCollection",
+#>   "features": [
+#>     {
+#>       "type": "Feature",
+#>       "properties": {
+#>         "population": 200
+#>       },
+#>       "geometry": {
+#>         "type": "Point",
+...
+```
+
+Sample 2 points at random
+
+
+```r
+lawn_sample(dat, 2)
+#> $type
+#> [1] "FeatureCollection"
+#> 
+#> $features
+#>      type population geometry.type geometry.coordinates
+#> 1 Feature        200         Point   10.80643, 59.90891
+#> 2 Feature        600         Point   10.71579, 59.90478
+#> 
+#> attr(,"class")
+#> [1] "featurecollection"
+```
+
+## extent
+
+Calculates the extent of all input features in a FeatureCollection, and returns a bounding box.
+
+
+```r
+lawn_extent(lawn_data$points_average)
+#> [1] 10.71579 59.90478 10.80643 59.93162
+```
+
+## buffer
+
+Calculates a buffer for input features for a given radius.
+
+
+```r
+dat <- '{
+ "type": "Feature",
+ "properties": {},
+ "geometry": {
+     "type": "Polygon",
+     "coordinates": [[
+       [-112.072391,46.586591],
+       [-112.072391,46.61761],
+       [-112.028102,46.61761],
+       [-112.028102,46.586591],
+       [-112.072391,46.586591]
+     ]]
+   }
+}'
+view(dat)
+```
+
+![buffer1](/public/img/2015-05-18-mow-the-lawn/buffer1.png)
+
+
+```r
+lawn_buffer(dat, 1, "miles") %>% view
+```
+
+![buffer2](/public/img/2015-05-18-mow-the-lawn/buffer2.png)
+
+## Union polygons together
+
+
+```r
+poly1 <- '{
+ "type": "Feature",
+ "properties": {
+   "fill": "#0f0"
+ },
+ "geometry": {
+   "type": "Polygon",
+   "coordinates": [[
+     [-122.801742, 45.48565],
+     [-122.801742, 45.60491],
+     [-122.584762, 45.60491],
+     [-122.584762, 45.48565],
+     [-122.801742, 45.48565]
+    ]]
+ }
+}'
+
+poly2 <- '{
+ "type": "Feature",
+ "properties": {
+   "fill": "#00f"
+ },
+ "geometry": {
+   "type": "Polygon",
+   "coordinates": [[
+     [-122.520217, 45.535693],
+     [-122.64038, 45.553967],
+     [-122.720031, 45.526554],
+     [-122.669906, 45.507309],
+     [-122.723464, 45.446643],
+     [-122.532577, 45.408574],
+     [-122.487258, 45.477466],
+     [-122.520217, 45.535693]
+     ]]
+ }
+}'
+view(poly1)
+```
+
+![union1](/public/img/2015-05-18-mow-the-lawn/union1.png)
+
+
+```r
+view(poly2)
+```
+
+![union2](/public/img/2015-05-18-mow-the-lawn/union2.png)
+
+Visualize union-ed polygons
+
+
+```r
+lawn_union(poly1, poly2) %>% view
+```
+
+![union3](/public/img/2015-05-18-mow-the-lawn/union3.png)
+
+See also `lawn_merge()` and `lawn_intersect()`.
+
+## lint input geojson
+
+For most functions, you can lint your input geojson data to make sure it is proper geojson. We use 
+the javascript library [geojsonhint](https://github.com/mapbox/geojsonhint). See the `lint` parameter.
+
+Good GeoJSON
+
+
+```r
+dat <- '{
+  "type": "FeatureCollection",
+  "features": [
+    {
+      "type": "Feature",
+      "properties": {
+        "population": 200
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [10.724029, 59.926807]
+      }
+    }
+  ]
+}'
+lawn_extent(dat)
+#> [1] 10.72403 59.92681 10.72403 59.92681
+```
+
+Bad GeoJSON
+
+
+```r
+dat <- '{
+  "type": "FeatureCollection",
+  "features": [
+    {
+      "type": "Feature",
+      "properties": {
+        "population": 200
+      },
+      "geometry": {
+        "type": "Point"
+      }
+    }
+  ]
+}'
+lawn_extent(dat, lint = TRUE)
+
+#> Error: Line 1 - "coordinates" property required
+```
+
+## To do
+
+* As Turf.js changes, we'll update `lawn`
+* Performance improvements. We realize that this package is slower than the C based `rgdal`/`rgeos` - we are looking into ways to increaes performance to get closer to the performance of those packages. 
+
+  </div>
+  
+  <div class="post">
+    <h1>
       <a href="/2015/04/geojson-io/">
         geojsonio - a new package to do geojson things
       </a>
@@ -68,260 +551,331 @@
 
     <span class="post-date">30 Apr 2015</span>
 
-    <p><code>geojsonio</code> converts geographic data to GeoJSON and TopoJSON formats - though the focus is mostly on GeoJSON </p>
+    `geojsonio` converts geographic data to GeoJSON and TopoJSON formats - though the focus is mostly on GeoJSON 
 
-<p>For those not familiar GeoJSON it is a format for encoding a variety of geographic data structures. GeoJSON supports the following geometry types: Point, LineString, Polygon, MultiPoint, MultiLineString, MultiPolygon, and GeometryCollection. These geometry types are also found in <a href="http://en.wikipedia.org/wiki/Well-known_text">well known text (WKT)</a>, and have equivalents in R&#39;s spatial classes. Read the <a href="http://geojson.org/geojson-spec.html">spec</a> for more detailed information. </p>
+For those not familiar GeoJSON it is a format for encoding a variety of geographic data structures. GeoJSON supports the following geometry types: Point, LineString, Polygon, MultiPoint, MultiLineString, MultiPolygon, and GeometryCollection. These geometry types are also found in [well known text (WKT)](http://en.wikipedia.org/wiki/Well-known_text), and have equivalents in R's spatial classes. Read the [spec](http://geojson.org/geojson-spec.html) for more detailed information. 
 
-<p>Other great geojson resources:</p>
+Other great geojson resources:
 
-<ul>
-<li>GeoJSON lint - lint your geojson - <a href="http://geojsonlint.com/">http://geojsonlint.com/</a></li>
-<li>GeoJSON.io - make maps with geojson input or draw maps and get geojson - <a href="http://geojson.io/">http://geojson.io/</a></li>
-</ul>
+* GeoJSON lint - lint your geojson - [http://geojsonlint.com/](http://geojsonlint.com/)
+* GeoJSON.io - make maps with geojson input or draw maps and get geojson - [http://geojson.io/](http://geojson.io/)
 
-<p>Functions in this package are organized first around what you&#39;re working with or want to get, geojson or topojson, then convert to or read from various formats:</p>
+Functions in this package are organized first around what you're working with or want to get, geojson or topojson, then convert to or read from various formats:
 
-<ul>
-<li><code>geojson_list()</code> - convert to GeoJSON as R list format</li>
-<li><code>geojson_json()</code> - convert to GeoJSON as json</li>
-<li><code>geojson_read()</code>/<code>topojson_read()</code> - read a GeoJSON/TopoJSON file from file path or URL</li>
-<li><code>geojson_write()</code> - write a GeoJSON file locally (no write TopoJSON yet)</li>
-</ul>
+* `geojson_list()` - convert to GeoJSON as R list format
+* `geojson_json()` - convert to GeoJSON as json
+* `geojson_read()`/`topojson_read()` - read a GeoJSON/TopoJSON file from file path or URL
+* `geojson_write()` - write a GeoJSON file locally (no write TopoJSON yet)
 
-<p>Each of the above functions have methods for various objects/classes, including <code>numeric</code>, <code>data.frame</code>, <code>list</code>, <code>SpatialPolygons</code>, <code>SpatialLines</code>, <code>SpatialPoints</code>, etc. (including the classes in <code>rgeos</code>)</p>
+Each of the above functions have methods for various objects/classes, including `numeric`, `data.frame`, `list`, `SpatialPolygons`, `SpatialLines`, `SpatialPoints`, etc. (including the classes in `rgeos`)
 
-<p>Use cases for this package include (but not limited to, obs.) the following:</p>
+Use cases for this package include (but not limited to, obs.) the following:
 
-<ul>
-<li>Get data in GeoJSON json format, and you want to get it into a list in R.</li>
-<li>Get data into GeoJSON format to use downstream to make a interactive map
+* Get data in GeoJSON json format, and you want to get it into a list in R.
+* Get data into GeoJSON format to use downstream to make a interactive map
+  * in R (e.g., with [leaflet](https://github.com/rstudio/leaflet))
+  * or in another context (e.g., using javascript with mapbox/leaflet)
+* Data is in a data.frame/matrix/list and you want to make GeoJSON format data.
+* Data is in one of the many spatial classes (e.g., `SpatialPoints`) and you want GeoJSON
+* You need to add styling to your data - can do with this package for certain data types.
+* You want to check that your GeoJSON data is valid - two ways to do it in geojsonio.
+* Combine objects together (e.g., a point and a line), either from two `geo_list` objects, or two `json` objects. See `?geojson-add`
 
-<ul>
-<li>in R (e.g., with <a href="https://github.com/rstudio/leaflet">leaflet</a>)</li>
-<li>or in another context (e.g., using javascript with mapbox/leaflet)</li>
-</ul></li>
-<li>Data is in a data.frame/matrix/list and you want to make GeoJSON format data.</li>
-<li>Data is in one of the many spatial classes (e.g., <code>SpatialPoints</code>) and you want GeoJSON</li>
-<li>You need to add styling to your data - can do with this package for certain data types.</li>
-<li>You want to check that your GeoJSON data is valid - two ways to do it in geojsonio.</li>
-<li>Combine objects together (e.g., a point and a line), either from two <code>geo_list</code> objects, or two <code>json</code> objects. See <code>?geojson-add</code></li>
-</ul>
+## Install
 
-<h2>Install</h2>
+See the github repo for notes about dependencies [https://github.com/ropensci/geojsonio#install](https://github.com/ropensci/geojsonio#install). 
 
-<p>See the github repo for notes about dependencies <a href="https://github.com/ropensci/geojsonio#install">https://github.com/ropensci/geojsonio#install</a>. </p>
+CRAN version or the dev version from GitHub
 
-<p>CRAN version or the dev version from GitHub</p>
-<div class="highlight"><pre><code class="language-r" data-lang="r">install.packages<span class="p">(</span><span class="s">&quot;geojsonio&quot;</span><span class="p">)</span>
-devtools<span class="o">::</span>install_github<span class="p">(</span><span class="s">&quot;sckott/geojsonio&quot;</span><span class="p">)</span>
-</code></pre></div><div class="highlight"><pre><code class="language-r" data-lang="r"><span class="kn">library</span><span class="p">(</span><span class="s">&quot;geojsonio&quot;</span><span class="p">)</span>
-</code></pre></div>
-<h2>GeoJSON</h2>
 
-<h3>Convert various formats to geojson</h3>
+```r
+install.packages("geojsonio")
+devtools::install_github("sckott/geojsonio")
+```
 
-<p>From a <code>numeric</code> vector of length 2</p>
 
-<p>as <em>json</em></p>
-<div class="highlight"><pre><code class="language-r" data-lang="r">geojson_json<span class="p">(</span><span class="kt">c</span><span class="p">(</span><span class="m">32.45</span><span class="p">,</span> <span class="m">-99.74</span><span class="p">))</span>
-<span class="c1">#&gt; {&quot;type&quot;:&quot;FeatureCollection&quot;,&quot;features&quot;:[{&quot;type&quot;:&quot;Feature&quot;,&quot;geometry&quot;:{&quot;type&quot;:&quot;Point&quot;,&quot;coordinates&quot;:[32.45,-99.74]},&quot;properties&quot;:{}}]}</span>
-</code></pre></div>
-<p>as a <strong>list</strong></p>
-<div class="highlight"><pre><code class="language-r" data-lang="r">geojson_list<span class="p">(</span><span class="kt">c</span><span class="p">(</span><span class="m">32.45</span><span class="p">,</span> <span class="m">-99.74</span><span class="p">))</span>
-<span class="c1">#&gt; $type</span>
-<span class="c1">#&gt; [1] &quot;FeatureCollection&quot;</span>
-<span class="c1">#&gt; </span>
-<span class="c1">#&gt; $features</span>
-<span class="c1">#&gt; $features[[1]]</span>
-<span class="c1">#&gt; $features[[1]]$type</span>
-<span class="c1">#&gt; [1] &quot;Feature&quot;</span>
-<span class="c1">#&gt; </span>
-<span class="c1">#&gt; $features[[1]]$geometry</span>
-<span class="c1">#&gt; $features[[1]]$geometry$type</span>
-<span class="kc">...</span>
-</code></pre></div>
-<p>From a <code>data.frame</code></p>
+```r
+library("geojsonio")
+```
 
-<p>as <strong>json</strong></p>
-<div class="highlight"><pre><code class="language-r" data-lang="r">geojson_json<span class="p">(</span>us_cities<span class="p">[</span><span class="m">1</span><span class="o">:</span><span class="m">2</span><span class="p">,</span> <span class="p">],</span> lat <span class="o">=</span> <span class="s">&#39;lat&#39;</span><span class="p">,</span> lon <span class="o">=</span> <span class="s">&#39;long&#39;</span><span class="p">)</span>
-<span class="c1">#&gt; {&quot;type&quot;:&quot;FeatureCollection&quot;,&quot;features&quot;:[{&quot;type&quot;:&quot;Feature&quot;,&quot;geometry&quot;:{&quot;type&quot;:&quot;Point&quot;,&quot;coordinates&quot;:[-99.74,32.45]},&quot;properties&quot;:{&quot;name&quot;:&quot;Abilene TX&quot;,&quot;country.etc&quot;:&quot;TX&quot;,&quot;pop&quot;:&quot;113888&quot;,&quot;capital&quot;:&quot;0&quot;}},{&quot;type&quot;:&quot;Feature&quot;,&quot;geometry&quot;:{&quot;type&quot;:&quot;Point&quot;,&quot;coordinates&quot;:[-81.52,41.08]},&quot;properties&quot;:{&quot;name&quot;:&quot;Akron OH&quot;,&quot;country.etc&quot;:&quot;OH&quot;,&quot;pop&quot;:&quot;206634&quot;,&quot;capital&quot;:&quot;0&quot;}}]}</span>
-</code></pre></div>
-<p>as a <strong>list</strong></p>
-<div class="highlight"><pre><code class="language-r" data-lang="r">geojson_list<span class="p">(</span>us_cities<span class="p">[</span><span class="m">1</span><span class="o">:</span><span class="m">2</span><span class="p">,</span> <span class="p">],</span> lat <span class="o">=</span> <span class="s">&#39;lat&#39;</span><span class="p">,</span> lon <span class="o">=</span> <span class="s">&#39;long&#39;</span><span class="p">)</span>
-<span class="c1">#&gt; $type</span>
-<span class="c1">#&gt; [1] &quot;FeatureCollection&quot;</span>
-<span class="c1">#&gt; </span>
-<span class="c1">#&gt; $features</span>
-<span class="c1">#&gt; $features[[1]]</span>
-<span class="c1">#&gt; $features[[1]]$type</span>
-<span class="c1">#&gt; [1] &quot;Feature&quot;</span>
-<span class="c1">#&gt; </span>
-<span class="c1">#&gt; $features[[1]]$geometry</span>
-<span class="c1">#&gt; $features[[1]]$geometry$type</span>
-<span class="kc">...</span>
-</code></pre></div>
-<p>From <code>SpatialPolygons</code> class</p>
-<div class="highlight"><pre><code class="language-r" data-lang="r"><span class="kn">library</span><span class="p">(</span><span class="s">&#39;sp&#39;</span><span class="p">)</span>
-poly1 <span class="o">&lt;-</span> Polygons<span class="p">(</span><span class="kt">list</span><span class="p">(</span>Polygon<span class="p">(</span><span class="kp">cbind</span><span class="p">(</span><span class="kt">c</span><span class="p">(</span><span class="m">-100</span><span class="p">,</span> <span class="m">-90</span><span class="p">,</span> <span class="m">-85</span><span class="p">,</span> <span class="m">-100</span><span class="p">),</span>
-  <span class="kt">c</span><span class="p">(</span><span class="m">40</span><span class="p">,</span> <span class="m">50</span><span class="p">,</span> <span class="m">45</span><span class="p">,</span> <span class="m">40</span><span class="p">)))),</span> <span class="s">&quot;1&quot;</span><span class="p">)</span>
-poly2 <span class="o">&lt;-</span> Polygons<span class="p">(</span><span class="kt">list</span><span class="p">(</span>Polygon<span class="p">(</span><span class="kp">cbind</span><span class="p">(</span><span class="kt">c</span><span class="p">(</span><span class="m">-90</span><span class="p">,</span> <span class="m">-80</span><span class="p">,</span> <span class="m">-75</span><span class="p">,</span> <span class="m">-90</span><span class="p">),</span>
-  <span class="kt">c</span><span class="p">(</span><span class="m">30</span><span class="p">,</span> <span class="m">40</span><span class="p">,</span> <span class="m">35</span><span class="p">,</span> <span class="m">30</span><span class="p">)))),</span> <span class="s">&quot;2&quot;</span><span class="p">)</span>
-<span class="p">(</span>sp_poly <span class="o">&lt;-</span> SpatialPolygons<span class="p">(</span><span class="kt">list</span><span class="p">(</span>poly1<span class="p">,</span> poly2<span class="p">),</span> <span class="m">1</span><span class="o">:</span><span class="m">2</span><span class="p">))</span>
-<span class="c1">#&gt; An object of class &quot;SpatialPolygons&quot;</span>
-<span class="c1">#&gt; Slot &quot;polygons&quot;:</span>
-<span class="c1">#&gt; [[1]]</span>
-<span class="c1">#&gt; An object of class &quot;Polygons&quot;</span>
-<span class="c1">#&gt; Slot &quot;Polygons&quot;:</span>
-<span class="c1">#&gt; [[1]]</span>
-<span class="c1">#&gt; An object of class &quot;Polygon&quot;</span>
-<span class="c1">#&gt; Slot &quot;labpt&quot;:</span>
-<span class="c1">#&gt; [1] -91.66667  45.00000</span>
-<span class="c1">#&gt; </span>
-<span class="kc">...</span>
-</code></pre></div>
-<p>to <strong>json</strong></p>
-<div class="highlight"><pre><code class="language-r" data-lang="r">geojson_json<span class="p">(</span>sp_poly<span class="p">)</span>
-<span class="c1">#&gt; {&quot;type&quot;:&quot;FeatureCollection&quot;,&quot;features&quot;:[{&quot;type&quot;:&quot;Feature&quot;,&quot;id&quot;:1,&quot;properties&quot;:{&quot;dummy&quot;:0},&quot;geometry&quot;:{&quot;type&quot;:&quot;Polygon&quot;,&quot;coordinates&quot;:[[[-100,40],[-90,50],[-85,45],[-100,40]]]}},{&quot;type&quot;:&quot;Feature&quot;,&quot;id&quot;:2,&quot;properties&quot;:{&quot;dummy&quot;:0},&quot;geometry&quot;:{&quot;type&quot;:&quot;Polygon&quot;,&quot;coordinates&quot;:[[[-90,30],[-80,40],[-75,35],[-90,30]]]}}]}</span>
-</code></pre></div>
-<p>to a <strong>list</strong></p>
-<div class="highlight"><pre><code class="language-r" data-lang="r">geojson_list<span class="p">(</span>sp_poly<span class="p">)</span>
-<span class="c1">#&gt; $type</span>
-<span class="c1">#&gt; [1] &quot;FeatureCollection&quot;</span>
-<span class="c1">#&gt; </span>
-<span class="c1">#&gt; $features</span>
-<span class="c1">#&gt; $features[[1]]</span>
-<span class="c1">#&gt; $features[[1]]$type</span>
-<span class="c1">#&gt; [1] &quot;Feature&quot;</span>
-<span class="c1">#&gt; </span>
-<span class="c1">#&gt; $features[[1]]$id</span>
-<span class="c1">#&gt; [1] 1</span>
-<span class="kc">...</span>
-</code></pre></div>
-<p>From <code>SpatialPoints</code> class</p>
-<div class="highlight"><pre><code class="language-r" data-lang="r">x <span class="o">&lt;-</span> <span class="kt">c</span><span class="p">(</span><span class="m">1</span><span class="p">,</span> <span class="m">2</span><span class="p">,</span> <span class="m">3</span><span class="p">,</span> <span class="m">4</span><span class="p">,</span> <span class="m">5</span><span class="p">)</span>
-y <span class="o">&lt;-</span> <span class="kt">c</span><span class="p">(</span><span class="m">3</span><span class="p">,</span> <span class="m">2</span><span class="p">,</span> <span class="m">5</span><span class="p">,</span> <span class="m">1</span><span class="p">,</span> <span class="m">4</span><span class="p">)</span>
-<span class="p">(</span>s <span class="o">&lt;-</span> SpatialPoints<span class="p">(</span><span class="kp">cbind</span><span class="p">(</span>x<span class="p">,</span> y<span class="p">)))</span>
-<span class="c1">#&gt; SpatialPoints:</span>
-<span class="c1">#&gt;      x y</span>
-<span class="c1">#&gt; [1,] 1 3</span>
-<span class="c1">#&gt; [2,] 2 2</span>
-<span class="c1">#&gt; [3,] 3 5</span>
-<span class="c1">#&gt; [4,] 4 1</span>
-<span class="c1">#&gt; [5,] 5 4</span>
-<span class="c1">#&gt; Coordinate Reference System (CRS) arguments: NA</span>
-</code></pre></div>
-<p>to <strong>json</strong></p>
-<div class="highlight"><pre><code class="language-r" data-lang="r">geojson_json<span class="p">(</span>s<span class="p">)</span>
-<span class="c1">#&gt; {&quot;type&quot;:&quot;FeatureCollection&quot;,&quot;features&quot;:[{&quot;type&quot;:&quot;Feature&quot;,&quot;id&quot;:1,&quot;properties&quot;:{&quot;dat&quot;:1},&quot;geometry&quot;:{&quot;type&quot;:&quot;Point&quot;,&quot;coordinates&quot;:[1,3]}},{&quot;type&quot;:&quot;Feature&quot;,&quot;id&quot;:2,&quot;properties&quot;:{&quot;dat&quot;:2},&quot;geometry&quot;:{&quot;type&quot;:&quot;Point&quot;,&quot;coordinates&quot;:[2,2]}},{&quot;type&quot;:&quot;Feature&quot;,&quot;id&quot;:3,&quot;properties&quot;:{&quot;dat&quot;:3},&quot;geometry&quot;:{&quot;type&quot;:&quot;Point&quot;,&quot;coordinates&quot;:[3,5]}},{&quot;type&quot;:&quot;Feature&quot;,&quot;id&quot;:4,&quot;properties&quot;:{&quot;dat&quot;:4},&quot;geometry&quot;:{&quot;type&quot;:&quot;Point&quot;,&quot;coordinates&quot;:[4,1]}},{&quot;type&quot;:&quot;Feature&quot;,&quot;id&quot;:5,&quot;properties&quot;:{&quot;dat&quot;:5},&quot;geometry&quot;:{&quot;type&quot;:&quot;Point&quot;,&quot;coordinates&quot;:[5,4]}}]}</span>
-</code></pre></div>
-<p>to a <strong>list</strong></p>
-<div class="highlight"><pre><code class="language-r" data-lang="r">geojson_list<span class="p">(</span>s<span class="p">)</span>
-<span class="c1">#&gt; $type</span>
-<span class="c1">#&gt; [1] &quot;FeatureCollection&quot;</span>
-<span class="c1">#&gt; </span>
-<span class="c1">#&gt; $features</span>
-<span class="c1">#&gt; $features[[1]]</span>
-<span class="c1">#&gt; $features[[1]]$type</span>
-<span class="c1">#&gt; [1] &quot;Feature&quot;</span>
-<span class="c1">#&gt; </span>
-<span class="c1">#&gt; $features[[1]]$id</span>
-<span class="c1">#&gt; [1] 1</span>
-<span class="kc">...</span>
-</code></pre></div>
-<h3>Combine objects</h3>
+## GeoJSON
 
-<p><code>geo_list</code> + <code>geo_list</code></p>
+### Convert various formats to geojson
 
-<blockquote>
-<p>Note: <code>geo_list</code> is the output type from <code>geojson_list()</code>, it&#39;s just a list with a class attached so we know it&#39;s geojson :)</p>
-</blockquote>
-<div class="highlight"><pre><code class="language-r" data-lang="r">vec <span class="o">&lt;-</span> <span class="kt">c</span><span class="p">(</span><span class="m">-99.74</span><span class="p">,</span> <span class="m">32.45</span><span class="p">)</span>
-a <span class="o">&lt;-</span> geojson_list<span class="p">(</span>vec<span class="p">)</span>
-vecs <span class="o">&lt;-</span> <span class="kt">list</span><span class="p">(</span><span class="kt">c</span><span class="p">(</span><span class="m">100.0</span><span class="p">,</span> <span class="m">0.0</span><span class="p">),</span> <span class="kt">c</span><span class="p">(</span><span class="m">101.0</span><span class="p">,</span> <span class="m">0.0</span><span class="p">),</span> <span class="kt">c</span><span class="p">(</span><span class="m">100.0</span><span class="p">,</span> <span class="m">0.0</span><span class="p">))</span>
-b <span class="o">&lt;-</span> geojson_list<span class="p">(</span>vecs<span class="p">,</span> geometry <span class="o">=</span> <span class="s">&quot;polygon&quot;</span><span class="p">)</span>
-a <span class="o">+</span> b
-<span class="c1">#&gt; $type</span>
-<span class="c1">#&gt; [1] &quot;FeatureCollection&quot;</span>
-<span class="c1">#&gt; </span>
-<span class="c1">#&gt; $features</span>
-<span class="c1">#&gt; $features[[1]]</span>
-<span class="c1">#&gt; $features[[1]]$type</span>
-<span class="c1">#&gt; [1] &quot;Feature&quot;</span>
-<span class="c1">#&gt; </span>
-<span class="c1">#&gt; $features[[1]]$geometry</span>
-<span class="c1">#&gt; $features[[1]]$geometry$type</span>
-<span class="kc">...</span>
-</code></pre></div>
-<p><code>json</code> + <code>json</code></p>
-<div class="highlight"><pre><code class="language-r" data-lang="r"><span class="kt">c</span> <span class="o">&lt;-</span> geojson_json<span class="p">(</span><span class="kt">c</span><span class="p">(</span><span class="m">-99.74</span><span class="p">,</span> <span class="m">32.45</span><span class="p">))</span>
-vecs <span class="o">&lt;-</span> <span class="kt">list</span><span class="p">(</span><span class="kt">c</span><span class="p">(</span><span class="m">100.0</span><span class="p">,</span> <span class="m">0.0</span><span class="p">),</span> <span class="kt">c</span><span class="p">(</span><span class="m">101.0</span><span class="p">,</span> <span class="m">0.0</span><span class="p">),</span> <span class="kt">c</span><span class="p">(</span><span class="m">101.0</span><span class="p">,</span> <span class="m">1.0</span><span class="p">),</span> <span class="kt">c</span><span class="p">(</span><span class="m">100.0</span><span class="p">,</span> <span class="m">1.0</span><span class="p">),</span> <span class="kt">c</span><span class="p">(</span><span class="m">100.0</span><span class="p">,</span> <span class="m">0.0</span><span class="p">))</span>
-d <span class="o">&lt;-</span> geojson_json<span class="p">(</span>vecs<span class="p">,</span> geometry <span class="o">=</span> <span class="s">&quot;polygon&quot;</span><span class="p">)</span>
-<span class="kt">c</span> <span class="o">+</span> d
-<span class="c1">#&gt; {&quot;type&quot;:&quot;FeatureCollection&quot;,&quot;features&quot;:[{&quot;type&quot;:&quot;Feature&quot;,&quot;geometry&quot;:{&quot;type&quot;:&quot;Point&quot;,&quot;coordinates&quot;:[-99.74,32.45]},&quot;properties&quot;:{}},{&quot;type&quot;:&quot;Feature&quot;,&quot;geometry&quot;:{&quot;type&quot;:&quot;Polygon&quot;,&quot;coordinates&quot;:[[[100,0],[101,0],[101,1],[100,1],[100,0]]]},&quot;properties&quot;:[]}]}</span>
-</code></pre></div>
-<h3>Write geojson</h3>
-<div class="highlight"><pre><code class="language-r" data-lang="r">geojson_write<span class="p">(</span>us_cities<span class="p">[</span><span class="m">1</span><span class="o">:</span><span class="m">2</span><span class="p">,</span> <span class="p">],</span> lat <span class="o">=</span> <span class="s">&#39;lat&#39;</span><span class="p">,</span> lon <span class="o">=</span> <span class="s">&#39;long&#39;</span><span class="p">)</span>
-<span class="c1">#&gt; &lt;geojson&gt;</span>
-<span class="c1">#&gt;   Path:       myfile.geojson</span>
-<span class="c1">#&gt;   From class: data.frame</span>
-</code></pre></div>
-<h2>Topojson</h2>
+From a `numeric` vector of length 2
 
-<p>In the current version of this package you can read topojson. Writing topojson was in this package, but is gone for now - will come back later as in interface to <a href="https://github.com/mbostock/topojson">topojson</a> via <a href="https://github.com/jeroenooms/V8">V8</a>.</p>
+as _json_
 
-<p>Read from a file</p>
-<div class="highlight"><pre><code class="language-r" data-lang="r">file <span class="o">&lt;-</span> <span class="kp">system.file</span><span class="p">(</span><span class="s">&quot;examples&quot;</span><span class="p">,</span> <span class="s">&quot;us_states.topojson&quot;</span><span class="p">,</span> package <span class="o">=</span> <span class="s">&quot;geojsonio&quot;</span><span class="p">)</span>
-out <span class="o">&lt;-</span> topojson_read<span class="p">(</span><span class="kp">file</span><span class="p">)</span>
-</code></pre></div>
-<p>Read from a URL</p>
-<div class="highlight"><pre><code class="language-r" data-lang="r">url <span class="o">&lt;-</span> <span class="s">&quot;https://raw.githubusercontent.com/shawnbot/d3-cartogram/master/data/us-states.topojson&quot;</span>
-out <span class="o">&lt;-</span> topojson_read<span class="p">(</span><span class="kp">url</span><span class="p">)</span>
-</code></pre></div>
-<h2>Lint geojson</h2>
 
-<p>There are two ways to do this in this package. </p>
+```r
+geojson_json(c(32.45, -99.74))
+#> {"type":"FeatureCollection","features":[{"type":"Feature","geometry":{"type":"Point","coordinates":[32.45,-99.74]},"properties":{}}]}
+```
 
-<h3>lint, locally</h3>
+as a __list__
 
-<p>Uses the javascript library <a href="https://github.com/mapbox/geojsonhint">geojsonhint</a> from Mapbox. We&#39;re running this locally via the <a href="http://cran.rstudio.com/web/packages/V8/">V8</a> package.</p>
 
-<p>Good</p>
-<div class="highlight"><pre><code class="language-r" data-lang="r">lint<span class="p">(</span><span class="s">&#39;{&quot;type&quot;: &quot;Point&quot;, &quot;coordinates&quot;: [-100, 80]}&#39;</span><span class="p">)</span>
-<span class="c1">#&gt; [1] &quot;valid&quot;</span>
-</code></pre></div>
-<p>Bad</p>
-<div class="highlight"><pre><code class="language-r" data-lang="r">lint<span class="p">(</span><span class="s">&#39;{&quot;type&quot;: &quot;Rhombus&quot;, &quot;coordinates&quot;: [[1, 2], [3, 4], [5, 6]]}&#39;</span><span class="p">)</span>
-<span class="c1">#&gt; $message</span>
-<span class="c1">#&gt; [1] &quot;The type Rhombus is unknown&quot;</span>
-<span class="c1">#&gt; </span>
-<span class="c1">#&gt; $line</span>
-<span class="c1">#&gt; [1] 1</span>
-</code></pre></div>
-<h3>validate, with a web service</h3>
+```r
+geojson_list(c(32.45, -99.74))
+#> $type
+#> [1] "FeatureCollection"
+#> 
+#> $features
+#> $features[[1]]
+#> $features[[1]]$type
+#> [1] "Feature"
+#> 
+#> $features[[1]]$geometry
+#> $features[[1]]$geometry$type
+...
+```
 
-<p>Uses the web service at <a href="http://geojsonlint.com/">http://geojsonlint.com/</a></p>
+From a `data.frame`
 
-<p>Good</p>
-<div class="highlight"><pre><code class="language-r" data-lang="r">validate<span class="p">(</span><span class="s">&#39;{&quot;type&quot;: &quot;Point&quot;, &quot;coordinates&quot;: [-100, 80]}&#39;</span><span class="p">)</span>
-<span class="c1">#&gt; $status</span>
-<span class="c1">#&gt; [1] &quot;ok&quot;</span>
-</code></pre></div>
-<p>Bad</p>
-<div class="highlight"><pre><code class="language-r" data-lang="r">validate<span class="p">(</span><span class="s">&#39;{&quot;type&quot;: &quot;Rhombus&quot;, &quot;coordinates&quot;: [[1, 2], [3, 4], [5, 6]]}&#39;</span><span class="p">)</span>
-<span class="c1">#&gt; $message</span>
-<span class="c1">#&gt; [1] &quot;\&quot;Rhombus\&quot; is not a valid GeoJSON type.&quot;</span>
-<span class="c1">#&gt; </span>
-<span class="c1">#&gt; $status</span>
-<span class="c1">#&gt; [1] &quot;error&quot;</span>
-</code></pre></div>
-<h2>To do</h2>
+as __json__
 
-<ul>
-<li>I&#39;d like to replace <code>rgdal</code> with javascript libraries to read from various file types (kml, shp, etc.) and convert to geojson. This is <a href="https://github.com/ropensci/geojsonio/tree/js">in development</a>, and will come in the next version of this package most likely. This should make installation a bit easier as we won&#39;t have to depend on <code>rgdal</code> and <code>GDAL</code></li>
-<li>Performance improvements. Some operations already use the gdal or geos C libraries, so are quite fast, though the round trip to disk and back does take significant time. I&#39;d like to speed this up. </li>
-<li>More input types. We already have operations (json, list, etc.) for lots of input types (data.frame, list, sp classes), but likely there will be more added. </li>
-<li>Most likely add functions <code>topojson_list()</code>, <code>topojson_json()</code></li>
-</ul>
+
+```r
+geojson_json(us_cities[1:2, ], lat = 'lat', lon = 'long')
+#> {"type":"FeatureCollection","features":[{"type":"Feature","geometry":{"type":"Point","coordinates":[-99.74,32.45]},"properties":{"name":"Abilene TX","country.etc":"TX","pop":"113888","capital":"0"}},{"type":"Feature","geometry":{"type":"Point","coordinates":[-81.52,41.08]},"properties":{"name":"Akron OH","country.etc":"OH","pop":"206634","capital":"0"}}]}
+```
+
+as a __list__
+
+
+```r
+geojson_list(us_cities[1:2, ], lat = 'lat', lon = 'long')
+#> $type
+#> [1] "FeatureCollection"
+#> 
+#> $features
+#> $features[[1]]
+#> $features[[1]]$type
+#> [1] "Feature"
+#> 
+#> $features[[1]]$geometry
+#> $features[[1]]$geometry$type
+...
+```
+
+From `SpatialPolygons` class
+
+
+```r
+library('sp')
+poly1 <- Polygons(list(Polygon(cbind(c(-100, -90, -85, -100),
+  c(40, 50, 45, 40)))), "1")
+poly2 <- Polygons(list(Polygon(cbind(c(-90, -80, -75, -90),
+  c(30, 40, 35, 30)))), "2")
+(sp_poly <- SpatialPolygons(list(poly1, poly2), 1:2))
+#> An object of class "SpatialPolygons"
+#> Slot "polygons":
+#> [[1]]
+#> An object of class "Polygons"
+#> Slot "Polygons":
+#> [[1]]
+#> An object of class "Polygon"
+#> Slot "labpt":
+#> [1] -91.66667  45.00000
+#> 
+...
+```
+
+to __json__
+
+
+```r
+geojson_json(sp_poly)
+#> {"type":"FeatureCollection","features":[{"type":"Feature","id":1,"properties":{"dummy":0},"geometry":{"type":"Polygon","coordinates":[[[-100,40],[-90,50],[-85,45],[-100,40]]]}},{"type":"Feature","id":2,"properties":{"dummy":0},"geometry":{"type":"Polygon","coordinates":[[[-90,30],[-80,40],[-75,35],[-90,30]]]}}]}
+```
+
+to a __list__
+
+
+```r
+geojson_list(sp_poly)
+#> $type
+#> [1] "FeatureCollection"
+#> 
+#> $features
+#> $features[[1]]
+#> $features[[1]]$type
+#> [1] "Feature"
+#> 
+#> $features[[1]]$id
+#> [1] 1
+...
+```
+
+From `SpatialPoints` class
+
+
+```r
+x <- c(1, 2, 3, 4, 5)
+y <- c(3, 2, 5, 1, 4)
+(s <- SpatialPoints(cbind(x, y)))
+#> SpatialPoints:
+#>      x y
+#> [1,] 1 3
+#> [2,] 2 2
+#> [3,] 3 5
+#> [4,] 4 1
+#> [5,] 5 4
+#> Coordinate Reference System (CRS) arguments: NA
+```
+
+to __json__
+
+
+```r
+geojson_json(s)
+#> {"type":"FeatureCollection","features":[{"type":"Feature","id":1,"properties":{"dat":1},"geometry":{"type":"Point","coordinates":[1,3]}},{"type":"Feature","id":2,"properties":{"dat":2},"geometry":{"type":"Point","coordinates":[2,2]}},{"type":"Feature","id":3,"properties":{"dat":3},"geometry":{"type":"Point","coordinates":[3,5]}},{"type":"Feature","id":4,"properties":{"dat":4},"geometry":{"type":"Point","coordinates":[4,1]}},{"type":"Feature","id":5,"properties":{"dat":5},"geometry":{"type":"Point","coordinates":[5,4]}}]}
+```
+
+to a __list__
+
+
+```r
+geojson_list(s)
+#> $type
+#> [1] "FeatureCollection"
+#> 
+#> $features
+#> $features[[1]]
+#> $features[[1]]$type
+#> [1] "Feature"
+#> 
+#> $features[[1]]$id
+#> [1] 1
+...
+```
+
+### Combine objects
+
+`geo_list` + `geo_list`
+
+> Note: `geo_list` is the output type from `geojson_list()`, it's just a list with a class attached so we know it's geojson :)
+
+
+```r
+vec <- c(-99.74, 32.45)
+a <- geojson_list(vec)
+vecs <- list(c(100.0, 0.0), c(101.0, 0.0), c(100.0, 0.0))
+b <- geojson_list(vecs, geometry = "polygon")
+a + b
+#> $type
+#> [1] "FeatureCollection"
+#> 
+#> $features
+#> $features[[1]]
+#> $features[[1]]$type
+#> [1] "Feature"
+#> 
+#> $features[[1]]$geometry
+#> $features[[1]]$geometry$type
+...
+```
+
+`json` + `json`
+
+
+```r
+c <- geojson_json(c(-99.74, 32.45))
+vecs <- list(c(100.0, 0.0), c(101.0, 0.0), c(101.0, 1.0), c(100.0, 1.0), c(100.0, 0.0))
+d <- geojson_json(vecs, geometry = "polygon")
+c + d
+#> {"type":"FeatureCollection","features":[{"type":"Feature","geometry":{"type":"Point","coordinates":[-99.74,32.45]},"properties":{}},{"type":"Feature","geometry":{"type":"Polygon","coordinates":[[[100,0],[101,0],[101,1],[100,1],[100,0]]]},"properties":[]}]}
+```
+
+### Write geojson
+
+
+```r
+geojson_write(us_cities[1:2, ], lat = 'lat', lon = 'long')
+#> <geojson>
+#>   Path:       myfile.geojson
+#>   From class: data.frame
+```
+
+## Topojson
+
+In the current version of this package you can read topojson. Writing topojson was in this package, but is gone for now - will come back later as in interface to [topojson](https://github.com/mbostock/topojson) via [V8](https://github.com/jeroenooms/V8).
+
+Read from a file
+
+
+```r
+file <- system.file("examples", "us_states.topojson", package = "geojsonio")
+out <- topojson_read(file)
+```
+
+Read from a URL
+
+
+```r
+url <- "https://raw.githubusercontent.com/shawnbot/d3-cartogram/master/data/us-states.topojson"
+out <- topojson_read(url)
+```
+
+## Lint geojson
+
+There are two ways to do this in this package. 
+
+### lint, locally
+
+Uses the javascript library [geojsonhint](https://github.com/mapbox/geojsonhint) from Mapbox. We're running this locally via the [V8](http://cran.rstudio.com/web/packages/V8/) package.
+
+Good
+
+
+```r
+lint('{"type": "Point", "coordinates": [-100, 80]}')
+#> [1] "valid"
+```
+
+Bad
+
+
+```r
+lint('{"type": "Rhombus", "coordinates": [[1, 2], [3, 4], [5, 6]]}')
+#> $message
+#> [1] "The type Rhombus is unknown"
+#> 
+#> $line
+#> [1] 1
+```
+
+### validate, with a web service
+
+Uses the web service at [http://geojsonlint.com/](http://geojsonlint.com/)
+
+Good
+
+
+```r
+validate('{"type": "Point", "coordinates": [-100, 80]}')
+#> $status
+#> [1] "ok"
+```
+
+Bad
+
+
+```r
+validate('{"type": "Rhombus", "coordinates": [[1, 2], [3, 4], [5, 6]]}')
+#> $message
+#> [1] "\"Rhombus\" is not a valid GeoJSON type."
+#> 
+#> $status
+#> [1] "error"
+```
+
+## To do
+
+* I'd like to replace `rgdal` with javascript libraries to read from various file types (kml, shp, etc.) and convert to geojson. This is [in development](https://github.com/ropensci/geojsonio/tree/js), and will come in the next version of this package most likely. This should make installation a bit easier as we won't have to depend on `rgdal` and `GDAL`
+* Performance improvements. Some operations already use the gdal or geos C libraries, so are quite fast, though the round trip to disk and back does take significant time. I'd like to speed this up. 
+* More input types. We already have operations (json, list, etc.) for lots of input types (data.frame, list, sp classes), but likely there will be more added. 
+* Most likely add functions `topojson_list()`, `topojson_json()`
 
   </div>
   
@@ -334,323 +888,233 @@ out <span class="o">&lt;-</span> topojson_read<span class="p">(</span><span clas
 
     <span class="post-date">29 Apr 2015</span>
 
-    <p>Inspired by <code>httpie</code>, a Python command line client as a sort of drop in replacement for <code>curl</code>, I am playing around with something similar-ish in R, at least in spirit. I started a little R pkg called <code>httsnap</code> with the following ideas:</p>
+    Inspired by `httpie`, a Python command line client as a sort of drop in replacement for `curl`, I am playing around with something similar-ish in R, at least in spirit. I started a little R pkg called `httsnap` with the following ideas:
 
-<ul>
-<li>The web is increasingly a JSON world, so set <code>content-type</code> and <code>accept</code> headers to <code>applications/json</code> by default </li>
-<li>The workflow follows logically, or at least should, from, <em>hey, I got this url</em>, to <em>i need to add some options</em>, to <em>execute request</em></li>
-<li>Whenever possible, transform output to data.frame&#39;s - facilitating downstream manipulation via <code>dplyr</code>, etc.</li>
-<li>Do <code>GET</code> requests by default. Specify a different type if you don&#39;t want <code>GET</code>. Some functionality does GET by default, though in some cases you need to specify GET</li>
-<li>You can use non-standard evaluation to easily pass in query parameters without worrying about <code>&amp;</code>&#39;s, URL escaping, etc. (see <code>Query()</code>)</li>
-<li>Same for body params (see <code>Body()</code>)</li>
-</ul>
+* The web is increasingly a JSON world, so set `content-type` and `accept` headers to `applications/json` by default 
+* The workflow follows logically, or at least should, from, _hey, I got this url_, to _i need to add some options_, to _execute request_
+* Whenever possible, transform output to data.frame's - facilitating downstream manipulation via `dplyr`, etc.
+* Do `GET` requests by default. Specify a different type if you don't want `GET`. Some functionality does GET by default, though in some cases you need to specify GET
+* You can use non-standard evaluation to easily pass in query parameters without worrying about `&`'s, URL escaping, etc. (see `Query()`)
+* Same for body params (see `Body()`)
 
-<h2>Install</h2>
+## Install
 
-<p>Install and load <code>httsnap</code></p>
-<div class="highlight"><pre><code class="language-r" data-lang="r">devtools<span class="o">::</span>install_github<span class="p">(</span><span class="s">&quot;sckott/httsnap&quot;</span><span class="p">)</span>
-</code></pre></div><div class="highlight"><pre><code class="language-r" data-lang="r"><span class="kn">library</span><span class="p">(</span><span class="s">&quot;httsnap&quot;</span><span class="p">)</span>
-<span class="kn">library</span><span class="p">(</span><span class="s">&quot;dplyr&quot;</span><span class="p">)</span>
-</code></pre></div>
-<h2>Functions so far</h2>
+Install and load `httsnap`
 
-<ul>
-<li><code>Get</code> - GET request</li>
-<li><code>Query</code> - add query parameters</li>
-<li><code>Authenticate</code> - add authentication details</li>
-<li><code>Progress</code> - add progress bar</li>
-<li><code>Timeout</code> - add a timeout</li>
-<li><code>User_agent</code> - add a user agent</li>
-<li><code>Verbose</code> - give verbose output</li>
-<li><code>Body</code> - add a body</li>
-<li><code>h</code> - add headers by key-value pair</li>
-</ul>
 
-<p>These are named to avoid conflict with <code>httr</code></p>
+```r
+devtools::install_github("sckott/httsnap")
+```
 
-<h2>Intro</h2>
 
-<p>A simple <code>GET</code> request</p>
-<div class="highlight"><pre><code class="language-r" data-lang="r"><span class="s">&quot;http://httpbin.org/get&quot;</span> <span class="o">%&gt;%</span>
-  Get<span class="p">()</span>
-<span class="c1">#&gt; $args</span>
-<span class="c1">#&gt; named list()</span>
-<span class="c1">#&gt; </span>
-<span class="c1">#&gt; $headers</span>
-<span class="c1">#&gt; $headers$Accept</span>
-<span class="c1">#&gt; [1] &quot;application/json, text/xml, application/xml, */*&quot;</span>
-<span class="c1">#&gt; </span>
-<span class="c1">#&gt; $headers$`Accept-Encoding`</span>
-<span class="c1">#&gt; [1] &quot;gzip&quot;</span>
-<span class="c1">#&gt; </span>
-<span class="c1">#&gt; $headers$Host</span>
-<span class="c1">#&gt; [1] &quot;httpbin.org&quot;</span>
-<span class="c1">#&gt; </span>
-<span class="c1">#&gt; $headers$`User-Agent`</span>
-<span class="c1">#&gt; [1] &quot;curl/7.37.1 Rcurl/1.95.4.1 httr/0.6.1 httsnap/0.0.2.99&quot;</span>
-<span class="c1">#&gt; </span>
-<span class="c1">#&gt; </span>
-<span class="c1">#&gt; $origin</span>
-<span class="c1">#&gt; [1] &quot;24.21.209.71&quot;</span>
-<span class="c1">#&gt; </span>
-<span class="c1">#&gt; $url</span>
-<span class="c1">#&gt; [1] &quot;http://httpbin.org/get&quot;</span>
-</code></pre></div>
-<p>You&#39;ll notice that <code>Get()</code> doesn&#39;t just get the response, but also checks for whether it was a good response (the HTTP status code), and extracts the data. </p>
+```r
+library("httsnap")
+library("dplyr")
+```
 
-<p>Or you can just pass the URL into the function itself</p>
-<div class="highlight"><pre><code class="language-r" data-lang="r">Get<span class="p">(</span><span class="s">&quot;http://httpbin.org/get&quot;</span><span class="p">)</span>
-<span class="c1">#&gt; $args</span>
-<span class="c1">#&gt; named list()</span>
-<span class="c1">#&gt; </span>
-<span class="c1">#&gt; $headers</span>
-<span class="c1">#&gt; $headers$Accept</span>
-<span class="c1">#&gt; [1] &quot;application/json, text/xml, application/xml, */*&quot;</span>
-<span class="c1">#&gt; </span>
-<span class="c1">#&gt; $headers$`Accept-Encoding`</span>
-<span class="c1">#&gt; [1] &quot;gzip&quot;</span>
-<span class="c1">#&gt; </span>
-<span class="c1">#&gt; $headers$Host</span>
-<span class="c1">#&gt; [1] &quot;httpbin.org&quot;</span>
-<span class="c1">#&gt; </span>
-<span class="c1">#&gt; $headers$`User-Agent`</span>
-<span class="c1">#&gt; [1] &quot;curl/7.37.1 Rcurl/1.95.4.1 httr/0.6.1 httsnap/0.0.2.99&quot;</span>
-<span class="c1">#&gt; </span>
-<span class="c1">#&gt; </span>
-<span class="c1">#&gt; $origin</span>
-<span class="c1">#&gt; [1] &quot;24.21.209.71&quot;</span>
-<span class="c1">#&gt; </span>
-<span class="c1">#&gt; $url</span>
-<span class="c1">#&gt; [1] &quot;http://httpbin.org/get&quot;</span>
-</code></pre></div>
-<p>You can buid up options by calling functions via pipes, and see what the options look like</p>
-<div class="highlight"><pre><code class="language-r" data-lang="r"><span class="s">&quot;http://httpbin.org/get&quot;</span> <span class="o">%&gt;%</span>
-  Progress<span class="p">()</span> <span class="o">%&gt;%</span>
-  Verbose<span class="p">()</span>
-<span class="c1">#&gt; &lt;http request&gt; </span>
-<span class="c1">#&gt;   url: http://httpbin.org/get</span>
-<span class="c1">#&gt;   config: </span>
-<span class="c1">#&gt; Config: </span>
-<span class="c1">#&gt; List of 4</span>
-<span class="c1">#&gt;  $ noprogress      :FALSE</span>
-<span class="c1">#&gt;  $ progressfunction:function (...)  </span>
-<span class="c1">#&gt;  $ debugfunction   :function (...)  </span>
-<span class="c1">#&gt;  $ verbose         :TRUE</span>
-</code></pre></div>
-<p>Then execute the GET request when you&#39;re ready</p>
-<div class="highlight"><pre><code class="language-r" data-lang="r"><span class="s">&quot;http://httpbin.org/get&quot;</span> <span class="o">%&gt;%</span>
-  Progress<span class="p">()</span> <span class="o">%&gt;%</span>
-  Verbose<span class="p">()</span> <span class="o">%&gt;%</span>
-  Get<span class="p">()</span>
-<span class="c1">#&gt; $args</span>
-<span class="c1">#&gt; named list()</span>
-<span class="c1">#&gt; </span>
-<span class="c1">#&gt; $headers</span>
-<span class="c1">#&gt; $headers$Accept</span>
-<span class="c1">#&gt; [1] &quot;application/json, text/xml, application/xml, */*&quot;</span>
-<span class="c1">#&gt; </span>
-<span class="c1">#&gt; $headers$`Accept-Encoding`</span>
-<span class="c1">#&gt; [1] &quot;gzip&quot;</span>
-<span class="c1">#&gt; </span>
-<span class="c1">#&gt; $headers$Host</span>
-<span class="c1">#&gt; [1] &quot;httpbin.org&quot;</span>
-<span class="c1">#&gt; </span>
-<span class="c1">#&gt; $headers$`User-Agent`</span>
-<span class="c1">#&gt; [1] &quot;curl/7.37.1 Rcurl/1.95.4.1 httr/0.6.1 httsnap/0.0.2.99&quot;</span>
-<span class="c1">#&gt; </span>
-<span class="c1">#&gt; </span>
-<span class="c1">#&gt; $origin</span>
-<span class="c1">#&gt; [1] &quot;24.21.209.71&quot;</span>
-<span class="c1">#&gt; </span>
-<span class="c1">#&gt; $url</span>
-<span class="c1">#&gt; [1] &quot;http://httpbin.org/get&quot;</span>
-</code></pre></div>
-<h2>Example 1</h2>
+## Functions so far
 
-<p>Get scholarly article metadata from the Crossref API</p>
-<div class="highlight"><pre><code class="language-r" data-lang="r"><span class="s">&quot;http://api.crossref.org/works&quot;</span> <span class="o">%&gt;%</span>
-  Query<span class="p">(</span>query <span class="o">=</span> <span class="s">&quot;ecology&quot;</span><span class="p">)</span> <span class="o">%&gt;%</span> 
-  <span class="m">.</span><span class="o">$</span>message <span class="o">%&gt;%</span> 
-  <span class="m">.</span><span class="o">$</span>items <span class="o">%&gt;%</span> 
-  select<span class="p">(</span>DOI<span class="p">,</span> title<span class="p">,</span> publisher<span class="p">)</span>
-<span class="c1">#&gt;                            DOI                title</span>
-<span class="c1">#&gt; 1          10.4996/fireecology         Fire Ecology</span>
-<span class="c1">#&gt; 2              10.5402/ecology         ISRN Ecology</span>
-<span class="c1">#&gt; 3                 10.1155/8641         ISRN Ecology</span>
-<span class="c1">#&gt; 4      10.1111/(issn)1526-100x  Restoration Ecology</span>
-<span class="c1">#&gt; 5        10.1007/248.1432-184x    Microbial Ecology</span>
-<span class="c1">#&gt; 6      10.1007/10144.1438-390x   Population Ecology</span>
-<span class="c1">#&gt; 7      10.1007/10452.1573-5125      Aquatic Ecology</span>
-<span class="c1">#&gt; 8      10.1007/10682.1573-8477 Evolutionary Ecology</span>
-<span class="c1">#&gt; 9      10.1007/10745.1572-9915        Human Ecology</span>
-<span class="c1">#&gt; 10     10.1007/10980.1572-9761    Landscape Ecology</span>
-<span class="c1">#&gt; 11     10.1007/11258.1573-5052        Plant Ecology</span>
-<span class="c1">#&gt; 12     10.1007/12080.1874-1746  Theoretical Ecology</span>
-<span class="c1">#&gt; 13     10.1111/(issn)1442-9993      Austral Ecology</span>
-<span class="c1">#&gt; 14     10.1111/(issn)1439-0485       Marine Ecology</span>
-<span class="c1">#&gt; 15     10.1111/(issn)1365-2435   Functional Ecology</span>
-<span class="c1">#&gt; 16     10.1111/(issn)1365-294x    Molecular Ecology</span>
-<span class="c1">#&gt; 17     10.1111/(issn)1461-0248      Ecology Letters</span>
-<span class="c1">#&gt; 18   10.1002/9780470979365.ch7  Behavioural Ecology</span>
-<span class="c1">#&gt; 19 10.1111/fec.2007.21.issue-5                     </span>
-<span class="c1">#&gt; 20     10.1111/rec.0.0.issue-0                     </span>
-<span class="c1">#&gt;                            publisher</span>
-<span class="c1">#&gt; 1       Association for Fire Ecology</span>
-<span class="c1">#&gt; 2     Hindawi Publishing Corporation</span>
-<span class="c1">#&gt; 3     Hindawi Publishing Corporation</span>
-<span class="c1">#&gt; 4                    Wiley-Blackwell</span>
-<span class="c1">#&gt; 5  Springer Science + Business Media</span>
-<span class="c1">#&gt; 6  Springer Science + Business Media</span>
-<span class="c1">#&gt; 7  Springer Science + Business Media</span>
-<span class="c1">#&gt; 8  Springer Science + Business Media</span>
-<span class="c1">#&gt; 9  Springer Science + Business Media</span>
-<span class="c1">#&gt; 10 Springer Science + Business Media</span>
-<span class="c1">#&gt; 11 Springer Science + Business Media</span>
-<span class="c1">#&gt; 12 Springer Science + Business Media</span>
-<span class="c1">#&gt; 13                   Wiley-Blackwell</span>
-<span class="c1">#&gt; 14                   Wiley-Blackwell</span>
-<span class="c1">#&gt; 15                   Wiley-Blackwell</span>
-<span class="c1">#&gt; 16                   Wiley-Blackwell</span>
-<span class="c1">#&gt; 17                   Wiley-Blackwell</span>
-<span class="c1">#&gt; 18                   Wiley-Blackwell</span>
-<span class="c1">#&gt; 19                   Wiley-Blackwell</span>
-<span class="c1">#&gt; 20                   Wiley-Blackwell</span>
-</code></pre></div>
-<h2>Example 2</h2>
+* `Get` - GET request
+* `Query` - add query parameters
+* `Authenticate` - add authentication details
+* `Progress` - add progress bar
+* `Timeout` - add a timeout
+* `User_agent` - add a user agent
+* `Verbose` - give verbose output
+* `Body` - add a body
+* `h` - add headers by key-value pair
 
-<p>Get Public Library of Science article metadata via their API, make a histogram of number of tweets for each article</p>
-<div class="highlight"><pre><code class="language-r" data-lang="r"><span class="s">&quot;http://api.plos.org/search&quot;</span> <span class="o">%&gt;%</span>
-  Query<span class="p">(</span>q <span class="o">=</span> <span class="s">&quot;*:*&quot;</span><span class="p">,</span> wt <span class="o">=</span> <span class="s">&quot;json&quot;</span><span class="p">,</span> rows <span class="o">=</span> <span class="m">100</span><span class="p">,</span> 
-        fl <span class="o">=</span> <span class="s">&quot;id,journal,alm_twitterCount&quot;</span><span class="p">,</span>  
-        fq <span class="o">=</span> <span class="s">&#39;alm_twitterCount:[100 TO 10000]&#39;</span><span class="p">)</span> <span class="o">%&gt;%</span> 
-  <span class="m">.</span><span class="o">$</span>response <span class="o">%&gt;%</span> 
-  <span class="m">.</span><span class="o">$</span>docs <span class="o">%&gt;%</span> 
-  <span class="m">.</span><span class="o">$</span>alm_twitterCount <span class="o">%&gt;%</span> 
-  hist<span class="p">()</span>
-</code></pre></div>
-<p><img src="/public/img/2015-04-29-the-new-way/unnamed-chunk-9-1.png" alt="image"></p>
+These are named to avoid conflict with `httr`
 
-<h2>Notes</h2>
+## Intro
 
-<p>Okay, so this isn&#39;t drastically different from what <code>httr</code> already does, but its early days. </p>
+A simple `GET` request
 
-  </div>
-  
-  <div class="post">
-    <h1>
-      <a href="/2015/03/faster-solr/">
-        Faster solr with csv
-      </a>
-    </h1>
 
-    <span class="post-date">20 Mar 2015</span>
+```r
+"http://httpbin.org/get" %>%
+  Get()
+#> $args
+#> named list()
+#> 
+#> $headers
+#> $headers$Accept
+#> [1] "application/json, text/xml, application/xml, */*"
+#> 
+#> $headers$`Accept-Encoding`
+#> [1] "gzip"
+#> 
+#> $headers$Host
+#> [1] "httpbin.org"
+#> 
+#> $headers$`User-Agent`
+#> [1] "curl/7.37.1 Rcurl/1.95.4.1 httr/0.6.1 httsnap/0.0.2.99"
+#> 
+#> 
+#> $origin
+#> [1] "24.21.209.71"
+#> 
+#> $url
+#> [1] "http://httpbin.org/get"
+```
 
-    <p>With the <a href="https://github.com/ropensci/solr/issues/47">help of user input</a>, I&#39;ve tweaked <code>solr</code> just a bit to make things faster using default setings. I imagine the main interface for people using the <code>solr</code> R client is via <code>solr_search()</code>, which used to have <code>wt=json</code> by default. Changing this to <code>wt=csv</code> gives better performance. And it sorta makes sense to use csv, as the point of using an R client is probably do get data eventually into a data.frame, so it makes sense to go csv format (Already in tabular format) if it&#39;s faster too.</p>
+You'll notice that `Get()` doesn't just get the response, but also checks for whether it was a good response (the HTTP status code), and extracts the data. 
 
-<h2>Install</h2>
+Or you can just pass the URL into the function itself
 
-<p>Install and load <code>solr</code></p>
-<div class="highlight"><pre><code class="language-r" data-lang="r">devtools<span class="o">::</span>install_github<span class="p">(</span><span class="s">&quot;ropensci/solr&quot;</span><span class="p">)</span>
-</code></pre></div><div class="highlight"><pre><code class="language-r" data-lang="r"><span class="kn">library</span><span class="p">(</span><span class="s">&quot;solr&quot;</span><span class="p">)</span>
-<span class="kn">library</span><span class="p">(</span><span class="s">&quot;microbenchmark&quot;</span><span class="p">)</span>
-</code></pre></div>
-<h2>Setup</h2>
 
-<p>Define base url and fields to return</p>
-<div class="highlight"><pre><code class="language-r" data-lang="r">url <span class="o">&lt;-</span> <span class="s">&#39;http://api.plos.org/search&#39;</span>
-fields <span class="o">&lt;-</span> <span class="kt">c</span><span class="p">(</span><span class="s">&#39;id&#39;</span><span class="p">,</span><span class="s">&#39;cross_published_journal_name&#39;</span><span class="p">,</span><span class="s">&#39;cross_published_journal_key&#39;</span><span class="p">,</span>
-            <span class="s">&#39;cross_published_journal_eissn&#39;</span><span class="p">,</span><span class="s">&#39;pmid&#39;</span><span class="p">,</span><span class="s">&#39;pmcid&#39;</span><span class="p">,</span><span class="s">&#39;publisher&#39;</span><span class="p">,</span><span class="s">&#39;journal&#39;</span><span class="p">,</span>
-            <span class="s">&#39;publication_date&#39;</span><span class="p">,</span><span class="s">&#39;article_type&#39;</span><span class="p">,</span><span class="s">&#39;article_type_facet&#39;</span><span class="p">,</span><span class="s">&#39;author&#39;</span><span class="p">,</span>
-            <span class="s">&#39;author_facet&#39;</span><span class="p">,</span><span class="s">&#39;volume&#39;</span><span class="p">,</span><span class="s">&#39;issue&#39;</span><span class="p">,</span><span class="s">&#39;elocation_id&#39;</span><span class="p">,</span><span class="s">&#39;author_display&#39;</span><span class="p">,</span>
-            <span class="s">&#39;competing_interest&#39;</span><span class="p">,</span><span class="s">&#39;copyright&#39;</span><span class="p">)</span>
-</code></pre></div>
-<h2>json</h2>
+```r
+Get("http://httpbin.org/get")
+#> $args
+#> named list()
+#> 
+#> $headers
+#> $headers$Accept
+#> [1] "application/json, text/xml, application/xml, */*"
+#> 
+#> $headers$`Accept-Encoding`
+#> [1] "gzip"
+#> 
+#> $headers$Host
+#> [1] "httpbin.org"
+#> 
+#> $headers$`User-Agent`
+#> [1] "curl/7.37.1 Rcurl/1.95.4.1 httr/0.6.1 httsnap/0.0.2.99"
+#> 
+#> 
+#> $origin
+#> [1] "24.21.209.71"
+#> 
+#> $url
+#> [1] "http://httpbin.org/get"
+```
 
-<p>The previous default for <code>solr_search()</code> used <code>json</code></p>
-<div class="highlight"><pre><code class="language-r" data-lang="r">solr_search<span class="p">(</span>q<span class="o">=</span><span class="s">&#39;*:*&#39;</span><span class="p">,</span> rows<span class="o">=</span><span class="m">10</span><span class="p">,</span> fl<span class="o">=</span>fields<span class="p">,</span> base<span class="o">=</span><span class="kp">url</span><span class="p">,</span> wt <span class="o">=</span> <span class="s">&quot;json&quot;</span><span class="p">)</span>
-<span class="c1">#&gt; Source: local data frame [10 x 19]</span>
-<span class="c1">#&gt; </span>
-<span class="c1">#&gt;                                                                    id</span>
-<span class="c1">#&gt; 1             10.1371/annotation/856f0890-9d85-4719-8e54-c27530ac94f4</span>
-<span class="c1">#&gt; 2       10.1371/annotation/856f0890-9d85-4719-8e54-c27530ac94f4/title</span>
-<span class="c1">#&gt; 3    10.1371/annotation/856f0890-9d85-4719-8e54-c27530ac94f4/abstract</span>
-<span class="c1">#&gt; 4  10.1371/annotation/856f0890-9d85-4719-8e54-c27530ac94f4/references</span>
-<span class="c1">#&gt; 5        10.1371/annotation/856f0890-9d85-4719-8e54-c27530ac94f4/body</span>
-<span class="c1">#&gt; 6             10.1371/annotation/8551e3d5-fdd5-413b-a253-170ba13b7525</span>
-<span class="c1">#&gt; 7       10.1371/annotation/8551e3d5-fdd5-413b-a253-170ba13b7525/title</span>
-<span class="c1">#&gt; 8    10.1371/annotation/8551e3d5-fdd5-413b-a253-170ba13b7525/abstract</span>
-<span class="c1">#&gt; 9  10.1371/annotation/8551e3d5-fdd5-413b-a253-170ba13b7525/references</span>
-<span class="c1">#&gt; 10       10.1371/annotation/8551e3d5-fdd5-413b-a253-170ba13b7525/body</span>
-<span class="c1">#&gt; Variables not shown: cross_published_journal_name (chr),</span>
-<span class="c1">#&gt;   cross_published_journal_key (chr), cross_published_journal_eissn (chr),</span>
-<span class="c1">#&gt;   pmid (chr), pmcid (chr), publisher (chr), journal (chr),</span>
-<span class="c1">#&gt;   publication_date (chr), article_type (chr), article_type_facet (chr),</span>
-<span class="c1">#&gt;   author (chr), author_facet (chr), volume (int), issue (int),</span>
-<span class="c1">#&gt;   elocation_id (chr), author_display (chr), competing_interest (chr),</span>
-<span class="c1">#&gt;   copyright (chr)</span>
-</code></pre></div>
-<h2>csv</h2>
+You can buid up options by calling functions via pipes, and see what the options look like
 
-<p>The default <code>wt</code> setting is now <code>csv</code></p>
-<div class="highlight"><pre><code class="language-r" data-lang="r">solr_search<span class="p">(</span>q<span class="o">=</span><span class="s">&#39;*:*&#39;</span><span class="p">,</span> rows<span class="o">=</span><span class="m">10</span><span class="p">,</span> fl<span class="o">=</span>fields<span class="p">,</span> base<span class="o">=</span><span class="kp">url</span><span class="p">,</span> wt <span class="o">=</span> <span class="s">&quot;json&quot;</span><span class="p">)</span>
-<span class="c1">#&gt; Source: local data frame [10 x 19]</span>
-<span class="c1">#&gt; </span>
-<span class="c1">#&gt;                                                                    id</span>
-<span class="c1">#&gt; 1             10.1371/annotation/856f0890-9d85-4719-8e54-c27530ac94f4</span>
-<span class="c1">#&gt; 2       10.1371/annotation/856f0890-9d85-4719-8e54-c27530ac94f4/title</span>
-<span class="c1">#&gt; 3    10.1371/annotation/856f0890-9d85-4719-8e54-c27530ac94f4/abstract</span>
-<span class="c1">#&gt; 4  10.1371/annotation/856f0890-9d85-4719-8e54-c27530ac94f4/references</span>
-<span class="c1">#&gt; 5        10.1371/annotation/856f0890-9d85-4719-8e54-c27530ac94f4/body</span>
-<span class="c1">#&gt; 6             10.1371/annotation/8551e3d5-fdd5-413b-a253-170ba13b7525</span>
-<span class="c1">#&gt; 7       10.1371/annotation/8551e3d5-fdd5-413b-a253-170ba13b7525/title</span>
-<span class="c1">#&gt; 8    10.1371/annotation/8551e3d5-fdd5-413b-a253-170ba13b7525/abstract</span>
-<span class="c1">#&gt; 9  10.1371/annotation/8551e3d5-fdd5-413b-a253-170ba13b7525/references</span>
-<span class="c1">#&gt; 10       10.1371/annotation/8551e3d5-fdd5-413b-a253-170ba13b7525/body</span>
-<span class="c1">#&gt; Variables not shown: cross_published_journal_name (chr),</span>
-<span class="c1">#&gt;   cross_published_journal_key (chr), cross_published_journal_eissn (chr),</span>
-<span class="c1">#&gt;   pmid (chr), pmcid (chr), publisher (chr), journal (chr),</span>
-<span class="c1">#&gt;   publication_date (chr), article_type (chr), article_type_facet (chr),</span>
-<span class="c1">#&gt;   author (chr), author_facet (chr), volume (int), issue (int),</span>
-<span class="c1">#&gt;   elocation_id (chr), author_display (chr), competing_interest (chr),</span>
-<span class="c1">#&gt;   copyright (chr)</span>
-</code></pre></div>
-<h2>Compare times</h2>
 
-<p>When parsing to a data.frame (which <code>solr_search()</code> does by default), csv is quite a bit faster.</p>
-<div class="highlight"><pre><code class="language-r" data-lang="r">microbenchmark<span class="p">(</span>
-  json <span class="o">=</span> solr_search<span class="p">(</span>q<span class="o">=</span><span class="s">&#39;*:*&#39;</span><span class="p">,</span> rows<span class="o">=</span><span class="m">500</span><span class="p">,</span> fl<span class="o">=</span>fields<span class="p">,</span> base<span class="o">=</span><span class="kp">url</span><span class="p">,</span> wt <span class="o">=</span> <span class="s">&quot;json&quot;</span><span class="p">,</span> verbose <span class="o">=</span> <span class="kc">FALSE</span><span class="p">),</span>
-  csv <span class="o">=</span> solr_search<span class="p">(</span>q<span class="o">=</span><span class="s">&#39;*:*&#39;</span><span class="p">,</span> rows<span class="o">=</span><span class="m">500</span><span class="p">,</span> fl<span class="o">=</span>fields<span class="p">,</span> base<span class="o">=</span><span class="kp">url</span><span class="p">,</span> wt <span class="o">=</span> <span class="s">&quot;csv&quot;</span><span class="p">,</span> verbose <span class="o">=</span> <span class="kc">FALSE</span><span class="p">),</span> 
-  times <span class="o">=</span> <span class="m">20</span>
-<span class="p">)</span>
-<span class="c1">#&gt; Unit: milliseconds</span>
-<span class="c1">#&gt;  expr      min       lq      mean    median        uq       max neval cld</span>
-<span class="c1">#&gt;  json 965.7043 1013.014 1124.1229 1086.3225 1227.9054 1441.8332    20   b</span>
-<span class="c1">#&gt;   csv 509.6573  520.089  541.5784  532.4546  548.0303  723.7575    20  a</span>
-</code></pre></div>
-<h2>json vs xml vs csv</h2>
+```r
+"http://httpbin.org/get" %>%
+  Progress() %>%
+  Verbose()
+#> <http request> 
+#>   url: http://httpbin.org/get
+#>   config: 
+#> Config: 
+#> List of 4
+#>  $ noprogress      :FALSE
+#>  $ progressfunction:function (...)  
+#>  $ debugfunction   :function (...)  
+#>  $ verbose         :TRUE
+```
 
-<p>When getting raw data, csv is best, json next, then xml pulling up the rear.</p>
-<div class="highlight"><pre><code class="language-r" data-lang="r">microbenchmark<span class="p">(</span>
-  json <span class="o">=</span> solr_search<span class="p">(</span>q<span class="o">=</span><span class="s">&#39;*:*&#39;</span><span class="p">,</span> rows<span class="o">=</span><span class="m">1000</span><span class="p">,</span> fl<span class="o">=</span>fields<span class="p">,</span> base<span class="o">=</span><span class="kp">url</span><span class="p">,</span> wt <span class="o">=</span> <span class="s">&quot;json&quot;</span><span class="p">,</span> verbose <span class="o">=</span> <span class="kc">FALSE</span><span class="p">,</span> raw <span class="o">=</span> <span class="kc">TRUE</span><span class="p">),</span>
-  csv <span class="o">=</span> solr_search<span class="p">(</span>q<span class="o">=</span><span class="s">&#39;*:*&#39;</span><span class="p">,</span> rows<span class="o">=</span><span class="m">1000</span><span class="p">,</span> fl<span class="o">=</span>fields<span class="p">,</span> base<span class="o">=</span><span class="kp">url</span><span class="p">,</span> wt <span class="o">=</span> <span class="s">&quot;csv&quot;</span><span class="p">,</span> verbose <span class="o">=</span> <span class="kc">FALSE</span><span class="p">,</span> raw <span class="o">=</span> <span class="kc">TRUE</span><span class="p">),</span>
-  xml <span class="o">=</span> solr_search<span class="p">(</span>q<span class="o">=</span><span class="s">&#39;*:*&#39;</span><span class="p">,</span> rows<span class="o">=</span><span class="m">1000</span><span class="p">,</span> fl<span class="o">=</span>fields<span class="p">,</span> base<span class="o">=</span><span class="kp">url</span><span class="p">,</span> wt <span class="o">=</span> <span class="s">&quot;xml&quot;</span><span class="p">,</span> verbose <span class="o">=</span> <span class="kc">FALSE</span><span class="p">,</span> raw <span class="o">=</span> <span class="kc">TRUE</span><span class="p">),</span>
-  times <span class="o">=</span> <span class="m">10</span>
-<span class="p">)</span>
-<span class="c1">#&gt; Unit: milliseconds</span>
-<span class="c1">#&gt;  expr       min       lq      mean    median        uq       max neval cld</span>
-<span class="c1">#&gt;  json 1110.9515 1142.478 1198.9981 1169.0808 1195.5709 1518.7412    10  b </span>
-<span class="c1">#&gt;   csv  801.6871  802.516  826.0655  819.1532  835.0512  873.4266    10 a  </span>
-<span class="c1">#&gt;   xml 1507.1111 1554.002 1618.5963 1617.5208 1671.0026 1740.4448    10   c</span>
-</code></pre></div>
-<h2>Notes</h2>
+Then execute the GET request when you're ready
 
-<p>Note that <code>wt=csv</code> is only available in <code>solr_search()</code> and <code>solr_all()</code> because csv writer 
-only returns the docs element in csv, dropping other elements, including facets, mlt, groups, 
-stats, etc. </p>
 
-<p>Also, note the http client used in <code>solr</code> is <code>httr</code>, which passes in a gzip compression header by default, so as long as the server serving up the Solr data has compression turned on, that&#39;s all set.</p>
+```r
+"http://httpbin.org/get" %>%
+  Progress() %>%
+  Verbose() %>%
+  Get()
+#> $args
+#> named list()
+#> 
+#> $headers
+#> $headers$Accept
+#> [1] "application/json, text/xml, application/xml, */*"
+#> 
+#> $headers$`Accept-Encoding`
+#> [1] "gzip"
+#> 
+#> $headers$Host
+#> [1] "httpbin.org"
+#> 
+#> $headers$`User-Agent`
+#> [1] "curl/7.37.1 Rcurl/1.95.4.1 httr/0.6.1 httsnap/0.0.2.99"
+#> 
+#> 
+#> $origin
+#> [1] "24.21.209.71"
+#> 
+#> $url
+#> [1] "http://httpbin.org/get"
+```
 
-<p>Another way I&#39;ve sped things up is if you use <code>wt=json</code> then parse to a data.frame, it uses <code>dplyr</code> which sped things up considerably.</p>
+## Example 1
+
+Get scholarly article metadata from the Crossref API
+
+
+```r
+"http://api.crossref.org/works" %>%
+  Query(query = "ecology") %>% 
+  .$message %>% 
+  .$items %>% 
+  select(DOI, title, publisher)
+#>                            DOI                title
+#> 1          10.4996/fireecology         Fire Ecology
+#> 2              10.5402/ecology         ISRN Ecology
+#> 3                 10.1155/8641         ISRN Ecology
+#> 4      10.1111/(issn)1526-100x  Restoration Ecology
+#> 5        10.1007/248.1432-184x    Microbial Ecology
+#> 6      10.1007/10144.1438-390x   Population Ecology
+#> 7      10.1007/10452.1573-5125      Aquatic Ecology
+#> 8      10.1007/10682.1573-8477 Evolutionary Ecology
+#> 9      10.1007/10745.1572-9915        Human Ecology
+#> 10     10.1007/10980.1572-9761    Landscape Ecology
+#> 11     10.1007/11258.1573-5052        Plant Ecology
+#> 12     10.1007/12080.1874-1746  Theoretical Ecology
+#> 13     10.1111/(issn)1442-9993      Austral Ecology
+#> 14     10.1111/(issn)1439-0485       Marine Ecology
+#> 15     10.1111/(issn)1365-2435   Functional Ecology
+#> 16     10.1111/(issn)1365-294x    Molecular Ecology
+#> 17     10.1111/(issn)1461-0248      Ecology Letters
+#> 18   10.1002/9780470979365.ch7  Behavioural Ecology
+#> 19 10.1111/fec.2007.21.issue-5                     
+#> 20     10.1111/rec.0.0.issue-0                     
+#>                            publisher
+#> 1       Association for Fire Ecology
+#> 2     Hindawi Publishing Corporation
+#> 3     Hindawi Publishing Corporation
+#> 4                    Wiley-Blackwell
+#> 5  Springer Science + Business Media
+#> 6  Springer Science + Business Media
+#> 7  Springer Science + Business Media
+#> 8  Springer Science + Business Media
+#> 9  Springer Science + Business Media
+#> 10 Springer Science + Business Media
+#> 11 Springer Science + Business Media
+#> 12 Springer Science + Business Media
+#> 13                   Wiley-Blackwell
+#> 14                   Wiley-Blackwell
+#> 15                   Wiley-Blackwell
+#> 16                   Wiley-Blackwell
+#> 17                   Wiley-Blackwell
+#> 18                   Wiley-Blackwell
+#> 19                   Wiley-Blackwell
+#> 20                   Wiley-Blackwell
+```
+
+## Example 2
+
+Get Public Library of Science article metadata via their API, make a histogram of number of tweets for each article
+
+
+```r
+"http://api.plos.org/search" %>%
+  Query(q = "*:*", wt = "json", rows = 100, 
+        fl = "id,journal,alm_twitterCount",  
+        fq = 'alm_twitterCount:[100 TO 10000]') %>% 
+  .$response %>% 
+  .$docs %>% 
+  .$alm_twitterCount %>% 
+  hist()
+```
+ 
+![image](/public/img/2015-04-29-the-new-way/unnamed-chunk-9-1.png)
+
+## Notes
+
+Okay, so this isn't drastically different from what `httr` already does, but its early days. 
 
   </div>
   

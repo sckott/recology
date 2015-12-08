@@ -61,6 +61,256 @@
   
   <div class="post">
     <h1>
+      <a href="/2015/01/httping/">
+        httping - ping and time http requests
+      </a>
+    </h1>
+
+    <span class="post-date">30 Jan 2015</span>
+
+    I've been working on a little thing called `httping` - a small R package that started as a pkg to Ping urls and time requests. It's a port of the Ruby gem [httping](https://github.com/jpignata/httping). The `httr` package is in `Depends` in this package, so its functions can be called directly, without having to load `httr` explicitly yourself.
+
+In addition to timing requests, I've been tinkering with how to make http requests, with curl options accepting and returning the same object so they can be chained together, and then that object passed to a http verb like `GET`. Maybe this is a bad idea, but maybe not.
+
+## Installation
+
+Install:
+
+One non-CRAN dep (`httpcode`) needs to be installed first.
+
+
+```r
+install.packages("devtools")
+devtools::install_github("sckott/httpcode")
+devtools::install_github("sckott/httping")
+```
+
+Then load package
+
+
+```r
+library("httping")
+```
+
+## Time requests
+
+The idea with `time()` is to provide easy to use and understand information on how long http requests take to run. You should be able to pass in any `httr` verbs (`GET()`, `POST()`, etc.) to `time()`. `time()` repeats whatever http request you pass to it by default 10 times, but you can set the number of times to repeat in the `count` parameter. In addition, the `flood` parameter controls whether there is a delay between requests or not, and `delay` controls length of the delay. 
+
+A `GET` request
+
+
+```r
+GET("http://google.com") %>% time(count=3)
+#> 29.392 kb - http://www.google.com/ code:200 time(ms):92.444
+#> 29.392 kb - http://www.google.com/ code:200 time(ms):82.127
+#> 29.392 kb - http://www.google.com/ code:200 time(ms):85.587
+#> <http time>
+#>   Avg. min (ms):  82.127
+#>   Avg. max (ms):  92.444
+#>   Avg. mean (ms): 86.71933
+```
+
+A `POST` request
+
+
+```r
+POST("http://httpbin.org/post", body = "A simple text string") %>% time(count=3)
+#> 10.144 kb - http://httpbin.org/post code:200 time(ms):267.574
+#> 10.144 kb - http://httpbin.org/post code:200 time(ms):113.309
+#> 10.144 kb - http://httpbin.org/post code:200 time(ms):99.938
+#> <http time>
+#>   Avg. min (ms):  99.938
+#>   Avg. max (ms):  267.574
+#>   Avg. mean (ms): 160.2737
+```
+
+The return object is a list with slots for all the `httr` response objects, the times for each request, and the average times. The number of requests, and the delay between requests are included as attributes.
+
+
+```r
+res <- GET("http://google.com") %>% time(count=3)
+#> 29.392 kb - http://www.google.com/ code:200 time(ms):82.086
+#> 29.392 kb - http://www.google.com/ code:200 time(ms):78.15
+#> 29.392 kb - http://www.google.com/ code:200 time(ms):79.763
+```
+
+
+```r
+attributes(res)
+#> $names
+#> [1] "times"    "averages" "request" 
+#> 
+#> $count
+#> [1] 3
+#> 
+#> $delay
+#> [1] 0.5
+#> 
+#> $class
+#> [1] "http_time"
+```
+
+Or print a summary of a response, gives more detail
+
+
+```r
+res %>% summary()
+#> <http time, averages (min max mean)>
+#>   Total (s):           78.15 82.086 79.99967
+#>   Tedirect (s):        26.695 34.319 29.80633
+#>   Namelookup time (s): 0.025 0.03 0.028
+#>   Connect (s):         0.028 0.034 0.032
+#>   Pretransfer (s):     0.069 0.081 0.07633333
+#>   Starttransfer (s):   45.44 49.326 47.95867
+```
+
+Messages are printed using `cat`, so you can suppress those using `verbose=FALSE`, like
+
+
+```r
+GET("http://google.com") %>% time(count=3, verbose = FALSE)
+#> <http time>
+#>   Avg. min (ms):  86.12
+#>   Avg. max (ms):  94.035
+#>   Avg. mean (ms): 89.12467
+```
+
+
+## Ping an endpoint
+
+The idea with `ping()` is to simply return the http status code along with a message describing what that code means. That's it.
+
+This function is a bit different, accepts a url as first parameter, but can accept any args passed on to `httr` verb functions, like `GET`, `POST`,  etc.
+
+
+```r
+"http://google.com" %>% ping()
+#> <http ping> 200
+#>   Message: OK
+#>   Description: Request fulfilled, document follows
+```
+
+Or pass in additional arguments to modify request
+
+
+```r
+"http://google.com" %>% ping(config=verbose())
+#> -> GET / HTTP/1.1
+#> -> User-Agent: curl/7.37.1 Rcurl/1.95.4.5 httr/0.6.1
+#> -> Host: google.com
+#> -> Accept-Encoding: gzip
+...cutoff
+```
+
+## Even simpler verbs
+
+`httr` is already easy, but `Get()`:
+
+* Allows use of an intuitive chaining workflow
+* Parses data for you using `httr` built in format guesser, which should work in most cases
+
+A simple GET request
+
+
+```r
+"http://httpbin.org/get" %>%
+  Get()
+#> $args
+#> named list()
+#> 
+#> $headers
+#> $headers$Accept
+#> [1] "application/json, text/xml, application/xml, */*"
+#> 
+#> $headers$`Accept-Encoding`
+#> [1] "gzip"
+#> 
+#> $headers$Host
+#> [1] "httpbin.org"
+#> 
+#> $headers$`User-Agent`
+#> [1] "curl/7.37.1 Rcurl/1.95.4.5 httr/0.6.1"
+#> 
+#> 
+#> $origin
+#> [1] "24.21.209.71"
+#> 
+#> $url
+#> [1] "http://httpbin.org/get"
+```
+
+You can buid up options by calling functions
+
+
+```r
+"http://httpbin.org/get" %>%
+  Progress() %>%
+  Verbose()
+#> <http request> 
+#>   url: http://httpbin.org/get
+#>   config: 
+#> Config: 
+#> List of 4
+#>  $ noprogress      :FALSE
+#>  $ progressfunction:function (...)  
+#>  $ debugfunction   :function (...)  
+#>  $ verbose         :TRUE
+```
+
+Then eventually execute the GET request
+
+
+```r
+"http://httpbin.org/get" %>%
+  Verbose() %>%
+  Progress() %>%
+  Get()
+#> -> GET /get HTTP/1.1
+#> -> User-Agent: curl/7.37.1 Rcurl/1.95.4.5 httr/0.6.1
+#> -> Host: httpbin.org
+#> -> Accept-Encoding: gzip
+#> -> Accept: application/json, text/xml, application/xml, */*
+#> -> 
+#> <- HTTP/1.1 200 OK
+#> <- Server: nginx
+#> <- Date: Fri, 30 Jan 2015 17:38:58 GMT
+#> <- Content-Type: application/json
+#> <- Content-Length: 288
+#> <- Connection: keep-alive
+#> <- Access-Control-Allow-Origin: *
+#> <- Access-Control-Allow-Credentials: true
+#> <- 
+#>   |=======================================| 100%
+#> 
+#> $args
+#> named list()
+#> 
+#> $headers
+#> $headers$Accept
+#> [1] "application/json, text/xml, application/xml, */*"
+#> 
+#> $headers$`Accept-Encoding`
+#> [1] "gzip"
+#> 
+#> $headers$Host
+#> [1] "httpbin.org"
+#> 
+#> $headers$`User-Agent`
+#> [1] "curl/7.37.1 Rcurl/1.95.4.5 httr/0.6.1"
+#> 
+#> 
+#> $origin
+#> [1] "24.21.209.71"
+#> 
+#> $url
+#> [1] "http://httpbin.org/get"
+#> 
+```
+
+  </div>
+  
+  <div class="post">
+    <h1>
       <a href="/2015/01/elasticsearch/">
         elastic - Elasticsearch from R
       </a>
@@ -68,660 +318,819 @@
 
     <span class="post-date">29 Jan 2015</span>
 
-    <p>We&#39;ve (ropensci) been working on an R client for interacting with <a href="http://www.elasticsearch.org/">Elasticsearch</a> for a while now, first commit was November 2013.</p>
+    We've (ropensci) been working on an R client for interacting with [Elasticsearch](http://www.elasticsearch.org/) for a while now, first commit was November 2013.
 
-<p>Elasticsearch is a document database built on the JVM. <code>elastic</code> interacts with the Elasticsearch HTTP API, and includes functions for setting connection details to Elasticsearch instances, loading bulk data, searching for documents with both HTTP query variables and JSON based body requests. In addition, <code>elastic</code> provides functions for interacting with APIs for indices, documents, nodes, clusters, an interface to the cat API, and more.</p>
+Elasticsearch is a document database built on the JVM. `elastic` interacts with the Elasticsearch HTTP API, and includes functions for setting connection details to Elasticsearch instances, loading bulk data, searching for documents with both HTTP query variables and JSON based body requests. In addition, `elastic` provides functions for interacting with APIs for indices, documents, nodes, clusters, an interface to the cat API, and more.
 
-<p>Here&#39;s a few examples of what you can do.</p>
+Here's a few examples of what you can do.
 
-<p>Note: <code>elastic</code> was just pushed to CRAN. It just got accepted, so binaries may not be available, try again soon, or install from Github, or install from source from CRAN like <code>install.packages(&quot;http://cran.r-project.org/src/contrib/elastic_0.3.0.tar.gz&quot;, repos=NULL, type=&quot;source&quot;)</code>.</p>
+Note: `elastic` was just pushed to CRAN. It just got accepted, so binaries may not be available, try again soon, or install from Github, or install from source from CRAN like `install.packages("http://cran.r-project.org/src/contrib/elastic_0.3.0.tar.gz", repos=NULL, type="source")`.
 
-<h2>Installation</h2>
-<div class="highlight"><pre><code class="language-r" data-lang="r">install.packages<span class="p">(</span><span class="s">&quot;elastic&quot;</span><span class="p">)</span>
-</code></pre></div>
-<p>Or install development version:</p>
-<div class="highlight"><pre><code class="language-r" data-lang="r">install.packages<span class="p">(</span><span class="s">&quot;devtools&quot;</span><span class="p">)</span>
-devtools<span class="o">::</span>install_github<span class="p">(</span><span class="s">&quot;ropensci/elastic&quot;</span><span class="p">)</span>
-</code></pre></div>
-<p>Then load package</p>
-<div class="highlight"><pre><code class="language-r" data-lang="r"><span class="kn">library</span><span class="p">(</span><span class="s">&quot;elastic&quot;</span><span class="p">)</span>
-</code></pre></div>
-<h2>Install Elasticsearch</h2>
+## Installation
 
-<ul>
-<li><a href="http://www.elasticsearch.org/guide/en/elasticsearch/reference/current/_installation.html">Elasticsearch installation help</a></li>
-</ul>
 
-<p><strong>Unix (linux/osx)</strong></p>
+```r
+install.packages("elastic")
+```
 
-<p>Replace <code>1.4.1</code> with the version you are working with.</p>
+Or install development version:
 
-<ul>
-<li>Download zip or tar file from Elasticsearch <a href="http://www.elasticsearch.org/overview/elkdownloads/">see here for download</a>, e.g., <code>curl -L -O https://download.elasticsearch.org/elasticsearch/elasticsearch/elasticsearch-1.4.1.tar.gz</code></li>
-<li>Uncompress it: <code>tar -xvf elasticsearch-1.4.1.tar.gz</code></li>
-<li>Move it: <code>sudo mv /path/to/elasticsearch-1.4.1 /usr/local</code></li>
-<li>Navigate to /usr/local: <code>cd /usr/local</code></li>
-<li>Add shortcut: <code>sudo ln -s elasticsearch-1.4.1 elasticsearch</code></li>
-</ul>
 
-<p>On OSX, you can install via Homebrew: <code>brew install elasticsearch</code></p>
+```r
+install.packages("devtools")
+devtools::install_github("ropensci/elastic")
+```
 
-<p><strong>Windows</strong></p>
+Then load package
 
-<p>Windows users can follow the above, but unzip the zip file instead of uncompressing the tar file.</p>
 
-<h2>Start Elasticsearch</h2>
+```r
+library("elastic")
+```
 
-<ul>
-<li>Navigate to elasticsearch: <code>cd /usr/local/elasticsearch</code></li>
-<li>Start elasticsearch: <code>bin/elasticsearch</code></li>
-</ul>
 
-<p>I create a little bash shortcut called <code>es</code> that does both of the above commands in one step (<code>cd /usr/local/elasticsearch &amp;&amp; bin/elasticsearch</code>).</p>
+## Install Elasticsearch
 
-<p><strong>Note:</strong> Windows users should run the <code>elasticsearch.bat</code> file</p>
+* [Elasticsearch installation help](http://www.elasticsearch.org/guide/en/elasticsearch/reference/current/_installation.html)
 
-<h2>Initialize connection</h2>
+__Unix (linux/osx)__
 
-<p>The function <code>connect()</code> is used before doing anything else to set the connection details to your remote or local elasticsearch store. The details created by <code>connect()</code> are written to your options for the current session, and are used by <code>elastic</code> functions.</p>
-<div class="highlight"><pre><code class="language-r" data-lang="r">connect<span class="p">()</span>
-</code></pre></div>
-<p>On package load, your base url and port are set to <code>http://127.0.0.1</code> and <code>9200</code>, respectively. You can of course override these settings per session or for all sessions.</p>
+Replace `1.4.1` with the version you are working with.
 
-<h2>Get data</h2>
++ Download zip or tar file from Elasticsearch [see here for download](http://www.elasticsearch.org/overview/elkdownloads/), e.g., `curl -L -O https://download.elasticsearch.org/elasticsearch/elasticsearch/elasticsearch-1.4.1.tar.gz`
++ Uncompress it: `tar -xvf elasticsearch-1.4.1.tar.gz`
++ Move it: `sudo mv /path/to/elasticsearch-1.4.1 /usr/local`
++ Navigate to /usr/local: `cd /usr/local`
++ Add shortcut: `sudo ln -s elasticsearch-1.4.1 elasticsearch`
 
-<p>Elasticsearch has a bulk load API to load data in fast. The format is pretty weird though. It&#39;s sort of JSON, but would pass no JSON linter. I include a few data sets in <code>elastic</code> so it&#39;s easy to get up and running, and so when you run examples in this package they&#39;ll actually run the same way (hopefully).</p>
+On OSX, you can install via Homebrew: `brew install elasticsearch`
 
-<h3>Shakespeare data</h3>
+__Windows__
 
-<p>Elasticsearch provides some data on Shakespeare plays. I&#39;ve provided a subset of this data in this package. Get the path for the file specific to your machine:</p>
-<div class="highlight"><pre><code class="language-r" data-lang="r">shakespeare <span class="o">&lt;-</span> <span class="kp">system.file</span><span class="p">(</span><span class="s">&quot;examples&quot;</span><span class="p">,</span> <span class="s">&quot;shakespeare_data.json&quot;</span><span class="p">,</span> package <span class="o">=</span> <span class="s">&quot;elastic&quot;</span><span class="p">)</span>
-</code></pre></div>
-<p>Then load the data into Elasticsearch:</p>
-<div class="highlight"><pre><code class="language-r" data-lang="r">docs_bulk<span class="p">(</span>shakespeare<span class="p">)</span>
-</code></pre></div>
-<h3>Public Library of Science (PLOS) data</h3>
+Windows users can follow the above, but unzip the zip file instead of uncompressing the tar file.
 
-<p>A dataset inluded in the <code>elastic</code> package is metadata for PLOS scholarly articles.</p>
-<div class="highlight"><pre><code class="language-r" data-lang="r">plosdat <span class="o">&lt;-</span> <span class="kp">system.file</span><span class="p">(</span><span class="s">&quot;examples&quot;</span><span class="p">,</span> <span class="s">&quot;plos_data.json&quot;</span><span class="p">,</span> package <span class="o">=</span> <span class="s">&quot;elastic&quot;</span><span class="p">)</span>
-docs_bulk<span class="p">(</span>plosdat<span class="p">)</span>
-</code></pre></div>
-<h3>Global Biodiversity Information Facility (GBIF) data</h3>
+## Start Elasticsearch
 
-<p>A dataset inluded in the <code>elastic</code> package is data for GBIF species occurrence records. Get the file path, then load:</p>
-<div class="highlight"><pre><code class="language-r" data-lang="r">gbifdat <span class="o">&lt;-</span> <span class="kp">system.file</span><span class="p">(</span><span class="s">&quot;examples&quot;</span><span class="p">,</span> <span class="s">&quot;gbif_data.json&quot;</span><span class="p">,</span> package <span class="o">=</span> <span class="s">&quot;elastic&quot;</span><span class="p">)</span>
-docs_bulk<span class="p">(</span>gbifdat<span class="p">)</span>
-</code></pre></div>
-<p>GBIF geo data with a coordinates element to allow <code>geo_shape</code> queries</p>
-<div class="highlight"><pre><code class="language-r" data-lang="r">gbifgeo <span class="o">&lt;-</span> <span class="kp">system.file</span><span class="p">(</span><span class="s">&quot;examples&quot;</span><span class="p">,</span> <span class="s">&quot;gbif_geo.json&quot;</span><span class="p">,</span> package <span class="o">=</span> <span class="s">&quot;elastic&quot;</span><span class="p">)</span>
-docs_bulk<span class="p">(</span>gbifgeo<span class="p">)</span>
-</code></pre></div>
-<h2>The Search function</h2>
+* Navigate to elasticsearch: `cd /usr/local/elasticsearch`
+* Start elasticsearch: `bin/elasticsearch`
 
-<p>The main interface to searching documents in your Elasticsearch store is the function <code>Search()</code>. I nearly always develop R software using all lowercase, but R has a function called <code>search()</code>, and I wanted to avoid collision with that function.</p>
+I create a little bash shortcut called `es` that does both of the above commands in one step (`cd /usr/local/elasticsearch && bin/elasticsearch`).
 
-<p><code>Search()</code> is an interface to both the HTTP search API (in which queries are passed in the URI of the request, meaning queries have to be relatively simple), as well as the POST API, or the Query DSL, in which queries are passed in the body of the request (so can be much more complex).</p>
+__Note:__ Windows users should run the `elasticsearch.bat` file
 
-<p>There are a huge amount of ways you can search Elasticsearch documents - this tutorial covers some of them, and highlights the ways in which you interact with the R outputs.</p>
+## Initialize connection
 
-<h3>Search an index</h3>
-<div class="highlight"><pre><code class="language-r" data-lang="r">out <span class="o">&lt;-</span> Search<span class="p">(</span>index<span class="o">=</span><span class="s">&quot;shakespeare&quot;</span><span class="p">)</span>
-out<span class="o">$</span>hits<span class="o">$</span>total
-<span class="c1">#&gt; [1] 5000</span>
-</code></pre></div><div class="highlight"><pre><code class="language-r" data-lang="r">out<span class="o">$</span>hits<span class="o">$</span>hits<span class="p">[[</span><span class="m">1</span><span class="p">]]</span>
-<span class="c1">#&gt; $`_index`</span>
-<span class="c1">#&gt; [1] &quot;shakespeare&quot;</span>
-<span class="c1">#&gt; </span>
-<span class="c1">#&gt; $`_type`</span>
-<span class="c1">#&gt; [1] &quot;line&quot;</span>
-<span class="c1">#&gt; </span>
-<span class="c1">#&gt; $`_id`</span>
-<span class="c1">#&gt; [1] &quot;4&quot;</span>
-<span class="c1">#&gt; </span>
-<span class="c1">#&gt; $`_version`</span>
-<span class="c1">#&gt; [1] 1</span>
-<span class="c1">#&gt; </span>
-<span class="c1">#&gt; $`_score`</span>
-<span class="c1">#&gt; [1] 1</span>
-<span class="c1">#&gt; </span>
-<span class="c1">#&gt; $`_source`</span>
-<span class="c1">#&gt; $`_source`$line_id</span>
-<span class="c1">#&gt; [1] 5</span>
-<span class="c1">#&gt; </span>
-<span class="c1">#&gt; $`_source`$play_name</span>
-<span class="c1">#&gt; [1] &quot;Henry IV&quot;</span>
-<span class="c1">#&gt; </span>
-<span class="c1">#&gt; $`_source`$speech_number</span>
-<span class="c1">#&gt; [1] 1</span>
-<span class="c1">#&gt; </span>
-<span class="c1">#&gt; $`_source`$line_number</span>
-<span class="c1">#&gt; [1] &quot;1.1.2&quot;</span>
-<span class="c1">#&gt; </span>
-<span class="c1">#&gt; $`_source`$speaker</span>
-<span class="c1">#&gt; [1] &quot;KING HENRY IV&quot;</span>
-<span class="c1">#&gt; </span>
-<span class="c1">#&gt; $`_source`$text_entry</span>
-<span class="c1">#&gt; [1] &quot;Find we a time for frighted peace to pant,&quot;</span>
-</code></pre></div>
-<h3>Search an index by type</h3>
-<div class="highlight"><pre><code class="language-r" data-lang="r">Search<span class="p">(</span>index<span class="o">=</span><span class="s">&quot;shakespeare&quot;</span><span class="p">,</span> type<span class="o">=</span><span class="s">&quot;act&quot;</span><span class="p">)</span><span class="o">$</span>hits<span class="o">$</span>hits<span class="p">[[</span><span class="m">1</span><span class="p">]]</span>
-<span class="c1">#&gt; $`_index`</span>
-<span class="c1">#&gt; [1] &quot;shakespeare&quot;</span>
-<span class="c1">#&gt; </span>
-<span class="c1">#&gt; $`_type`</span>
-<span class="c1">#&gt; [1] &quot;act&quot;</span>
-<span class="c1">#&gt; </span>
-<span class="c1">#&gt; $`_id`</span>
-<span class="c1">#&gt; [1] &quot;2227&quot;</span>
-<span class="c1">#&gt; </span>
-<span class="c1">#&gt; $`_version`</span>
-<span class="c1">#&gt; [1] 1</span>
-<span class="c1">#&gt; </span>
-<span class="c1">#&gt; $`_score`</span>
-<span class="c1">#&gt; [1] 1</span>
-<span class="c1">#&gt; </span>
-<span class="c1">#&gt; $`_source`</span>
-<span class="c1">#&gt; $`_source`$line_id</span>
-<span class="c1">#&gt; [1] 2228</span>
-<span class="c1">#&gt; </span>
-<span class="c1">#&gt; $`_source`$play_name</span>
-<span class="c1">#&gt; [1] &quot;Henry IV&quot;</span>
-<span class="c1">#&gt; </span>
-<span class="c1">#&gt; $`_source`$speech_number</span>
-<span class="c1">#&gt; [1] 81</span>
-<span class="c1">#&gt; </span>
-<span class="c1">#&gt; $`_source`$line_number</span>
-<span class="c1">#&gt; [1] &quot;&quot;</span>
-<span class="c1">#&gt; </span>
-<span class="c1">#&gt; $`_source`$speaker</span>
-<span class="c1">#&gt; [1] &quot;FALSTAFF&quot;</span>
-<span class="c1">#&gt; </span>
-<span class="c1">#&gt; $`_source`$text_entry</span>
-<span class="c1">#&gt; [1] &quot;ACT IV&quot;</span>
-</code></pre></div>
-<h3>Return certain fields</h3>
-<div class="highlight"><pre><code class="language-r" data-lang="r">Search<span class="p">(</span>index<span class="o">=</span><span class="s">&quot;shakespeare&quot;</span><span class="p">,</span> fields<span class="o">=</span><span class="kt">c</span><span class="p">(</span><span class="s">&#39;play_name&#39;</span><span class="p">,</span><span class="s">&#39;speaker&#39;</span><span class="p">))</span><span class="o">$</span>hits<span class="o">$</span>hits<span class="p">[[</span><span class="m">1</span><span class="p">]]</span>
-<span class="c1">#&gt; $`_index`</span>
-<span class="c1">#&gt; [1] &quot;shakespeare&quot;</span>
-<span class="c1">#&gt; </span>
-<span class="c1">#&gt; $`_type`</span>
-<span class="c1">#&gt; [1] &quot;line&quot;</span>
-<span class="c1">#&gt; </span>
-<span class="c1">#&gt; $`_id`</span>
-<span class="c1">#&gt; [1] &quot;4&quot;</span>
-<span class="c1">#&gt; </span>
-<span class="c1">#&gt; $`_version`</span>
-<span class="c1">#&gt; [1] 1</span>
-<span class="c1">#&gt; </span>
-<span class="c1">#&gt; $`_score`</span>
-<span class="c1">#&gt; [1] 1</span>
-<span class="c1">#&gt; </span>
-<span class="c1">#&gt; $fields</span>
-<span class="c1">#&gt; $fields$speaker</span>
-<span class="c1">#&gt; $fields$speaker[[1]]</span>
-<span class="c1">#&gt; [1] &quot;KING HENRY IV&quot;</span>
-<span class="c1">#&gt; </span>
-<span class="c1">#&gt; </span>
-<span class="c1">#&gt; $fields$play_name</span>
-<span class="c1">#&gt; $fields$play_name[[1]]</span>
-<span class="c1">#&gt; [1] &quot;Henry IV&quot;</span>
-</code></pre></div>
-<h3>Sorting</h3>
-<div class="highlight"><pre><code class="language-r" data-lang="r">Search<span class="p">(</span>index<span class="o">=</span><span class="s">&quot;shakespeare&quot;</span><span class="p">,</span> type<span class="o">=</span><span class="s">&quot;act&quot;</span><span class="p">,</span> sort<span class="o">=</span><span class="s">&quot;text_entry&quot;</span><span class="p">)</span><span class="o">$</span>hits<span class="o">$</span>hits<span class="p">[</span><span class="m">1</span><span class="o">:</span><span class="m">2</span><span class="p">]</span>
-<span class="c1">#&gt; [[1]]</span>
-<span class="c1">#&gt; [[1]]$`_index`</span>
-<span class="c1">#&gt; [1] &quot;shakespeare&quot;</span>
-<span class="c1">#&gt; </span>
-<span class="c1">#&gt; [[1]]$`_type`</span>
-<span class="c1">#&gt; [1] &quot;act&quot;</span>
-<span class="c1">#&gt; </span>
-<span class="c1">#&gt; [[1]]$`_id`</span>
-<span class="c1">#&gt; [1] &quot;2227&quot;</span>
-<span class="c1">#&gt; </span>
-<span class="c1">#&gt; [[1]]$`_version`</span>
-<span class="c1">#&gt; [1] 1</span>
-<span class="c1">#&gt; </span>
-<span class="c1">#&gt; [[1]]$`_score`</span>
-<span class="c1">#&gt; NULL</span>
-<span class="c1">#&gt; </span>
-<span class="c1">#&gt; [[1]]$`_source`</span>
-<span class="c1">#&gt; [[1]]$`_source`$line_id</span>
-<span class="c1">#&gt; [1] 2228</span>
-<span class="c1">#&gt; </span>
-<span class="c1">#&gt; [[1]]$`_source`$play_name</span>
-<span class="c1">#&gt; [1] &quot;Henry IV&quot;</span>
-<span class="c1">#&gt; </span>
-<span class="c1">#&gt; [[1]]$`_source`$speech_number</span>
-<span class="c1">#&gt; [1] 81</span>
-<span class="c1">#&gt; </span>
-<span class="c1">#&gt; [[1]]$`_source`$line_number</span>
-<span class="c1">#&gt; [1] &quot;&quot;</span>
-<span class="c1">#&gt; </span>
-<span class="c1">#&gt; [[1]]$`_source`$speaker</span>
-<span class="c1">#&gt; [1] &quot;FALSTAFF&quot;</span>
-<span class="c1">#&gt; </span>
-<span class="c1">#&gt; [[1]]$`_source`$text_entry</span>
-<span class="c1">#&gt; [1] &quot;ACT IV&quot;</span>
-<span class="c1">#&gt; </span>
-<span class="c1">#&gt; </span>
-<span class="c1">#&gt; [[1]]$sort</span>
-<span class="c1">#&gt; [[1]]$sort[[1]]</span>
-<span class="c1">#&gt; [1] &quot;act&quot;</span>
-<span class="c1">#&gt; </span>
-<span class="c1">#&gt; </span>
-<span class="c1">#&gt; </span>
-<span class="c1">#&gt; [[2]]</span>
-<span class="c1">#&gt; [[2]]$`_index`</span>
-<span class="c1">#&gt; [1] &quot;shakespeare&quot;</span>
-<span class="c1">#&gt; </span>
-<span class="c1">#&gt; [[2]]$`_type`</span>
-<span class="c1">#&gt; [1] &quot;act&quot;</span>
-<span class="c1">#&gt; </span>
-<span class="c1">#&gt; [[2]]$`_id`</span>
-<span class="c1">#&gt; [1] &quot;2633&quot;</span>
-<span class="c1">#&gt; </span>
-<span class="c1">#&gt; [[2]]$`_version`</span>
-<span class="c1">#&gt; [1] 1</span>
-<span class="c1">#&gt; </span>
-<span class="c1">#&gt; [[2]]$`_score`</span>
-<span class="c1">#&gt; NULL</span>
-<span class="c1">#&gt; </span>
-<span class="c1">#&gt; [[2]]$`_source`</span>
-<span class="c1">#&gt; [[2]]$`_source`$line_id</span>
-<span class="c1">#&gt; [1] 2634</span>
-<span class="c1">#&gt; </span>
-<span class="c1">#&gt; [[2]]$`_source`$play_name</span>
-<span class="c1">#&gt; [1] &quot;Henry IV&quot;</span>
-<span class="c1">#&gt; </span>
-<span class="c1">#&gt; [[2]]$`_source`$speech_number</span>
-<span class="c1">#&gt; [1] 9</span>
-<span class="c1">#&gt; </span>
-<span class="c1">#&gt; [[2]]$`_source`$line_number</span>
-<span class="c1">#&gt; [1] &quot;&quot;</span>
-<span class="c1">#&gt; </span>
-<span class="c1">#&gt; [[2]]$`_source`$speaker</span>
-<span class="c1">#&gt; [1] &quot;ARCHBISHOP OF YORK&quot;</span>
-<span class="c1">#&gt; </span>
-<span class="c1">#&gt; [[2]]$`_source`$text_entry</span>
-<span class="c1">#&gt; [1] &quot;ACT V&quot;</span>
-<span class="c1">#&gt; </span>
-<span class="c1">#&gt; </span>
-<span class="c1">#&gt; [[2]]$sort</span>
-<span class="c1">#&gt; [[2]]$sort[[1]]</span>
-<span class="c1">#&gt; [1] &quot;act&quot;</span>
-</code></pre></div>
-<h3>Paging</h3>
-<div class="highlight"><pre><code class="language-r" data-lang="r">Search<span class="p">(</span>index<span class="o">=</span><span class="s">&quot;shakespeare&quot;</span><span class="p">,</span> size<span class="o">=</span><span class="m">1</span><span class="p">,</span> from<span class="o">=</span><span class="m">1</span><span class="p">,</span> fields<span class="o">=</span><span class="s">&#39;text_entry&#39;</span><span class="p">)</span><span class="o">$</span>hits
-<span class="c1">#&gt; $total</span>
-<span class="c1">#&gt; [1] 5000</span>
-<span class="c1">#&gt; </span>
-<span class="c1">#&gt; $max_score</span>
-<span class="c1">#&gt; [1] 1</span>
-<span class="c1">#&gt; </span>
-<span class="c1">#&gt; $hits</span>
-<span class="c1">#&gt; $hits[[1]]</span>
-<span class="c1">#&gt; $hits[[1]]$`_index`</span>
-<span class="c1">#&gt; [1] &quot;shakespeare&quot;</span>
-<span class="c1">#&gt; </span>
-<span class="c1">#&gt; $hits[[1]]$`_type`</span>
-<span class="c1">#&gt; [1] &quot;line&quot;</span>
-<span class="c1">#&gt; </span>
-<span class="c1">#&gt; $hits[[1]]$`_id`</span>
-<span class="c1">#&gt; [1] &quot;9&quot;</span>
-<span class="c1">#&gt; </span>
-<span class="c1">#&gt; $hits[[1]]$`_version`</span>
-<span class="c1">#&gt; [1] 1</span>
-<span class="c1">#&gt; </span>
-<span class="c1">#&gt; $hits[[1]]$`_score`</span>
-<span class="c1">#&gt; [1] 1</span>
-<span class="c1">#&gt; </span>
-<span class="c1">#&gt; $hits[[1]]$fields</span>
-<span class="c1">#&gt; $hits[[1]]$fields$text_entry</span>
-<span class="c1">#&gt; $hits[[1]]$fields$text_entry[[1]]</span>
-<span class="c1">#&gt; [1] &quot;Nor more shall trenching war channel her fields,&quot;</span>
-</code></pre></div>
-<h3>Queries</h3>
+The function `connect()` is used before doing anything else to set the connection details to your remote or local elasticsearch store. The details created by `connect()` are written to your options for the current session, and are used by `elastic` functions.
 
-<p>Using the <code>q</code> parameter you can pass in a query, which gets passed in the URI of the query. This type of query is less powerful than the below query passed in the body of the request, using the <code>body</code> parameter.</p>
-<div class="highlight"><pre><code class="language-r" data-lang="r">Search<span class="p">(</span>index<span class="o">=</span><span class="s">&quot;shakespeare&quot;</span><span class="p">,</span> type<span class="o">=</span><span class="s">&quot;act&quot;</span><span class="p">,</span> q<span class="o">=</span><span class="s">&quot;speaker:KING HENRY IV&quot;</span><span class="p">)</span><span class="o">$</span>hits<span class="o">$</span>total
-<span class="c1">#&gt; [1] 9</span>
-</code></pre></div>
-<h3>Query DSL searches - queries sent in the body of the request</h3>
 
-<p>Pass in as an R list</p>
-<div class="highlight"><pre><code class="language-r" data-lang="r">aggs <span class="o">&lt;-</span> <span class="kt">list</span><span class="p">(</span>aggs <span class="o">=</span> <span class="kt">list</span><span class="p">(</span>stats <span class="o">=</span> <span class="kt">list</span><span class="p">(</span>terms <span class="o">=</span> <span class="kt">list</span><span class="p">(</span>field <span class="o">=</span> <span class="s">&quot;text_entry&quot;</span><span class="p">))))</span>
-Search<span class="p">(</span>index<span class="o">=</span><span class="s">&quot;shakespeare&quot;</span><span class="p">,</span> body<span class="o">=</span>aggs<span class="p">)</span><span class="o">$</span>hits<span class="o">$</span>hits<span class="p">[[</span><span class="m">1</span><span class="p">]]</span>
-<span class="c1">#&gt; $`_index`</span>
-<span class="c1">#&gt; [1] &quot;shakespeare&quot;</span>
-<span class="c1">#&gt; </span>
-<span class="c1">#&gt; $`_type`</span>
-<span class="c1">#&gt; [1] &quot;line&quot;</span>
-<span class="c1">#&gt; </span>
-<span class="c1">#&gt; $`_id`</span>
-<span class="c1">#&gt; [1] &quot;4&quot;</span>
-<span class="c1">#&gt; </span>
-<span class="c1">#&gt; $`_version`</span>
-<span class="c1">#&gt; [1] 1</span>
-<span class="c1">#&gt; </span>
-<span class="c1">#&gt; $`_score`</span>
-<span class="c1">#&gt; [1] 1</span>
-<span class="c1">#&gt; </span>
-<span class="c1">#&gt; $`_source`</span>
-<span class="c1">#&gt; $`_source`$line_id</span>
-<span class="c1">#&gt; [1] 5</span>
-<span class="c1">#&gt; </span>
-<span class="c1">#&gt; $`_source`$play_name</span>
-<span class="c1">#&gt; [1] &quot;Henry IV&quot;</span>
-<span class="c1">#&gt; </span>
-<span class="c1">#&gt; $`_source`$speech_number</span>
-<span class="c1">#&gt; [1] 1</span>
-<span class="c1">#&gt; </span>
-<span class="c1">#&gt; $`_source`$line_number</span>
-<span class="c1">#&gt; [1] &quot;1.1.2&quot;</span>
-<span class="c1">#&gt; </span>
-<span class="c1">#&gt; $`_source`$speaker</span>
-<span class="c1">#&gt; [1] &quot;KING HENRY IV&quot;</span>
-<span class="c1">#&gt; </span>
-<span class="c1">#&gt; $`_source`$text_entry</span>
-<span class="c1">#&gt; [1] &quot;Find we a time for frighted peace to pant,&quot;</span>
-</code></pre></div>
-<p>Or pass in as json query with newlines, easy to read</p>
-<div class="highlight"><pre><code class="language-r" data-lang="r">aggs <span class="o">&lt;-</span> <span class="s">&#39;{</span>
-<span class="s">    &quot;aggs&quot;: {</span>
-<span class="s">        &quot;stats&quot; : {</span>
-<span class="s">            &quot;terms&quot; : {</span>
-<span class="s">                &quot;field&quot; : &quot;text_entry&quot;</span>
-<span class="s">            }</span>
-<span class="s">        }</span>
-<span class="s">    }</span>
-<span class="s">}&#39;</span>
-Search<span class="p">(</span>index<span class="o">=</span><span class="s">&quot;shakespeare&quot;</span><span class="p">,</span> body<span class="o">=</span>aggs<span class="p">)</span><span class="o">$</span>hits<span class="o">$</span>hits<span class="p">[[</span><span class="m">1</span><span class="p">]]</span>
-<span class="c1">#&gt; $`_index`</span>
-<span class="c1">#&gt; [1] &quot;shakespeare&quot;</span>
-<span class="c1">#&gt; </span>
-<span class="c1">#&gt; $`_type`</span>
-<span class="c1">#&gt; [1] &quot;line&quot;</span>
-<span class="c1">#&gt; </span>
-<span class="c1">#&gt; $`_id`</span>
-<span class="c1">#&gt; [1] &quot;4&quot;</span>
-<span class="c1">#&gt; </span>
-<span class="c1">#&gt; $`_version`</span>
-<span class="c1">#&gt; [1] 1</span>
-<span class="c1">#&gt; </span>
-<span class="c1">#&gt; $`_score`</span>
-<span class="c1">#&gt; [1] 1</span>
-<span class="c1">#&gt; </span>
-<span class="c1">#&gt; $`_source`</span>
-<span class="c1">#&gt; $`_source`$line_id</span>
-<span class="c1">#&gt; [1] 5</span>
-<span class="c1">#&gt; </span>
-<span class="c1">#&gt; $`_source`$play_name</span>
-<span class="c1">#&gt; [1] &quot;Henry IV&quot;</span>
-<span class="c1">#&gt; </span>
-<span class="c1">#&gt; $`_source`$speech_number</span>
-<span class="c1">#&gt; [1] 1</span>
-<span class="c1">#&gt; </span>
-<span class="c1">#&gt; $`_source`$line_number</span>
-<span class="c1">#&gt; [1] &quot;1.1.2&quot;</span>
-<span class="c1">#&gt; </span>
-<span class="c1">#&gt; $`_source`$speaker</span>
-<span class="c1">#&gt; [1] &quot;KING HENRY IV&quot;</span>
-<span class="c1">#&gt; </span>
-<span class="c1">#&gt; $`_source`$text_entry</span>
-<span class="c1">#&gt; [1] &quot;Find we a time for frighted peace to pant,&quot;</span>
-</code></pre></div>
-<p>Or pass in collapsed json string</p>
-<div class="highlight"><pre><code class="language-r" data-lang="r">aggs <span class="o">&lt;-</span> <span class="s">&#39;{&quot;aggs&quot;:{&quot;stats&quot;:{&quot;terms&quot;:{&quot;field&quot;:&quot;text_entry&quot;}}}}&#39;</span>
-Search<span class="p">(</span>index<span class="o">=</span><span class="s">&quot;shakespeare&quot;</span><span class="p">,</span> body<span class="o">=</span>aggs<span class="p">)</span><span class="o">$</span>hits<span class="o">$</span>hits<span class="p">[[</span><span class="m">1</span><span class="p">]]</span>
-<span class="c1">#&gt; $`_index`</span>
-<span class="c1">#&gt; [1] &quot;shakespeare&quot;</span>
-<span class="c1">#&gt; </span>
-<span class="c1">#&gt; $`_type`</span>
-<span class="c1">#&gt; [1] &quot;line&quot;</span>
-<span class="c1">#&gt; </span>
-<span class="c1">#&gt; $`_id`</span>
-<span class="c1">#&gt; [1] &quot;4&quot;</span>
-<span class="c1">#&gt; </span>
-<span class="c1">#&gt; $`_version`</span>
-<span class="c1">#&gt; [1] 1</span>
-<span class="c1">#&gt; </span>
-<span class="c1">#&gt; $`_score`</span>
-<span class="c1">#&gt; [1] 1</span>
-<span class="c1">#&gt; </span>
-<span class="c1">#&gt; $`_source`</span>
-<span class="c1">#&gt; $`_source`$line_id</span>
-<span class="c1">#&gt; [1] 5</span>
-<span class="c1">#&gt; </span>
-<span class="c1">#&gt; $`_source`$play_name</span>
-<span class="c1">#&gt; [1] &quot;Henry IV&quot;</span>
-<span class="c1">#&gt; </span>
-<span class="c1">#&gt; $`_source`$speech_number</span>
-<span class="c1">#&gt; [1] 1</span>
-<span class="c1">#&gt; </span>
-<span class="c1">#&gt; $`_source`$line_number</span>
-<span class="c1">#&gt; [1] &quot;1.1.2&quot;</span>
-<span class="c1">#&gt; </span>
-<span class="c1">#&gt; $`_source`$speaker</span>
-<span class="c1">#&gt; [1] &quot;KING HENRY IV&quot;</span>
-<span class="c1">#&gt; </span>
-<span class="c1">#&gt; $`_source`$text_entry</span>
-<span class="c1">#&gt; [1] &quot;Find we a time for frighted peace to pant,&quot;</span>
-</code></pre></div>
-<h3>Fuzzy query</h3>
+```r
+connect()
+```
 
-<p>Fuzzy query on numerics</p>
-<div class="highlight"><pre><code class="language-r" data-lang="r">fuzzy <span class="o">&lt;-</span> <span class="kt">list</span><span class="p">(</span>query <span class="o">=</span> <span class="kt">list</span><span class="p">(</span>fuzzy <span class="o">=</span> <span class="kt">list</span><span class="p">(</span>speech_number <span class="o">=</span> <span class="m">7</span><span class="p">)))</span>
-Search<span class="p">(</span>index<span class="o">=</span><span class="s">&quot;shakespeare&quot;</span><span class="p">,</span> body<span class="o">=</span>fuzzy<span class="p">)</span><span class="o">$</span>hits<span class="o">$</span>total
-<span class="c1">#&gt; [1] 523</span>
-</code></pre></div><div class="highlight"><pre><code class="language-r" data-lang="r">fuzzy <span class="o">&lt;-</span> <span class="kt">list</span><span class="p">(</span>query <span class="o">=</span> <span class="kt">list</span><span class="p">(</span>fuzzy <span class="o">=</span> <span class="kt">list</span><span class="p">(</span>speech_number <span class="o">=</span> <span class="kt">list</span><span class="p">(</span>value <span class="o">=</span> <span class="m">7</span><span class="p">,</span> fuzziness <span class="o">=</span> <span class="m">4</span><span class="p">))))</span>
-Search<span class="p">(</span>index<span class="o">=</span><span class="s">&quot;shakespeare&quot;</span><span class="p">,</span> body<span class="o">=</span>fuzzy<span class="p">)</span><span class="o">$</span>hits<span class="o">$</span>total
-<span class="c1">#&gt; [1] 1499</span>
-</code></pre></div>
-<h3>Range query</h3>
+On package load, your base url and port are set to `http://127.0.0.1` and `9200`, respectively. You can of course override these settings per session or for all sessions.
 
-<p>With numeric</p>
-<div class="highlight"><pre><code class="language-r" data-lang="r">body <span class="o">&lt;-</span> <span class="kt">list</span><span class="p">(</span>query<span class="o">=</span><span class="kt">list</span><span class="p">(</span>range<span class="o">=</span><span class="kt">list</span><span class="p">(</span>decimalLongitude<span class="o">=</span><span class="kt">list</span><span class="p">(</span>gte<span class="o">=</span><span class="m">1</span><span class="p">,</span> lte<span class="o">=</span><span class="m">3</span><span class="p">))))</span>
-Search<span class="p">(</span><span class="s">&#39;gbif&#39;</span><span class="p">,</span> body<span class="o">=</span><span class="kp">body</span><span class="p">)</span><span class="o">$</span>hits<span class="o">$</span>total
-<span class="c1">#&gt; [1] 24</span>
-</code></pre></div><div class="highlight"><pre><code class="language-r" data-lang="r">body <span class="o">&lt;-</span> <span class="kt">list</span><span class="p">(</span>query<span class="o">=</span><span class="kt">list</span><span class="p">(</span>range<span class="o">=</span><span class="kt">list</span><span class="p">(</span>decimalLongitude<span class="o">=</span><span class="kt">list</span><span class="p">(</span>gte<span class="o">=</span><span class="m">2.9</span><span class="p">,</span> lte<span class="o">=</span><span class="m">10</span><span class="p">))))</span>
-Search<span class="p">(</span><span class="s">&#39;gbif&#39;</span><span class="p">,</span> body<span class="o">=</span><span class="kp">body</span><span class="p">)</span><span class="o">$</span>hits<span class="o">$</span>total
-<span class="c1">#&gt; [1] 166</span>
-</code></pre></div>
-<p>With dates</p>
-<div class="highlight"><pre><code class="language-r" data-lang="r">body <span class="o">&lt;-</span> <span class="kt">list</span><span class="p">(</span>query<span class="o">=</span><span class="kt">list</span><span class="p">(</span>range<span class="o">=</span><span class="kt">list</span><span class="p">(</span>eventDate<span class="o">=</span><span class="kt">list</span><span class="p">(</span>gte<span class="o">=</span><span class="s">&quot;2012-01-01&quot;</span><span class="p">,</span> lte<span class="o">=</span><span class="s">&quot;now&quot;</span><span class="p">))))</span>
-Search<span class="p">(</span><span class="s">&#39;gbif&#39;</span><span class="p">,</span> body<span class="o">=</span><span class="kp">body</span><span class="p">)</span><span class="o">$</span>hits<span class="o">$</span>total
-<span class="c1">#&gt; [1] 899</span>
-</code></pre></div><div class="highlight"><pre><code class="language-r" data-lang="r">body <span class="o">&lt;-</span> <span class="kt">list</span><span class="p">(</span>query<span class="o">=</span><span class="kt">list</span><span class="p">(</span>range<span class="o">=</span><span class="kt">list</span><span class="p">(</span>eventDate<span class="o">=</span><span class="kt">list</span><span class="p">(</span>gte<span class="o">=</span><span class="s">&quot;2014-01-01&quot;</span><span class="p">,</span> lte<span class="o">=</span><span class="s">&quot;now&quot;</span><span class="p">))))</span>
-Search<span class="p">(</span><span class="s">&#39;gbif&#39;</span><span class="p">,</span> body<span class="o">=</span><span class="kp">body</span><span class="p">)</span><span class="o">$</span>hits<span class="o">$</span>total
-<span class="c1">#&gt; [1] 685</span>
-</code></pre></div>
-<h3>Highlighting</h3>
-<div class="highlight"><pre><code class="language-r" data-lang="r">body <span class="o">&lt;-</span> <span class="s">&#39;{</span>
-<span class="s"> &quot;query&quot;: {</span>
-<span class="s">   &quot;query_string&quot;: {</span>
-<span class="s">     &quot;query&quot; : &quot;cell&quot;</span>
-<span class="s">   }</span>
-<span class="s"> },</span>
-<span class="s"> &quot;highlight&quot;: {</span>
-<span class="s">   &quot;fields&quot;: {</span>
-<span class="s">     &quot;title&quot;: {&quot;number_of_fragments&quot;: 2}</span>
-<span class="s">   }</span>
-<span class="s"> }</span>
-<span class="s">}&#39;</span>
-out <span class="o">&lt;-</span> Search<span class="p">(</span><span class="s">&#39;plos&#39;</span><span class="p">,</span> <span class="s">&#39;article&#39;</span><span class="p">,</span> body<span class="o">=</span><span class="kp">body</span><span class="p">)</span>
-out<span class="o">$</span>hits<span class="o">$</span>total
-<span class="c1">#&gt; [1] 57</span>
-</code></pre></div><div class="highlight"><pre><code class="language-r" data-lang="r"><span class="kp">sapply</span><span class="p">(</span>out<span class="o">$</span>hits<span class="o">$</span>hits<span class="p">,</span> <span class="kr">function</span><span class="p">(</span>x<span class="p">)</span> x<span class="o">$</span>highlight<span class="o">$</span>title<span class="p">[[</span><span class="m">1</span><span class="p">]])[</span><span class="m">8</span><span class="o">:</span><span class="m">10</span><span class="p">]</span>
-<span class="c1">#&gt; [1] &quot;c-FLIP Protects Eosinophils from TNF-α-Mediated &lt;em&gt;Cell&lt;/em&gt; Death In Vivo&quot;                          </span>
-<span class="c1">#&gt; [2] &quot;DUSP1 Is a Novel Target for Enhancing Pancreatic Cancer &lt;em&gt;Cell&lt;/em&gt; Sensitivity to Gemcitabine&quot;     </span>
-<span class="c1">#&gt; [3] &quot;Carbon Ion Radiation Inhibits Glioma and Endothelial &lt;em&gt;Cell&lt;/em&gt; Migration Induced by Secreted VEGF&quot;</span>
-</code></pre></div>
-<h3>Scrolling search - instead of paging</h3>
-<div class="highlight"><pre><code class="language-r" data-lang="r">Search<span class="p">(</span><span class="s">&#39;shakespeare&#39;</span><span class="p">,</span> q<span class="o">=</span><span class="s">&quot;a*&quot;</span><span class="p">)</span><span class="o">$</span>hits<span class="o">$</span>total
-<span class="c1">#&gt; [1] 2747</span>
-res <span class="o">&lt;-</span> Search<span class="p">(</span>index <span class="o">=</span> <span class="s">&#39;shakespeare&#39;</span><span class="p">,</span> q<span class="o">=</span><span class="s">&quot;a*&quot;</span><span class="p">,</span> scroll<span class="o">=</span><span class="s">&quot;1m&quot;</span><span class="p">)</span>
-res <span class="o">&lt;-</span> Search<span class="p">(</span>index <span class="o">=</span> <span class="s">&#39;shakespeare&#39;</span><span class="p">,</span> q<span class="o">=</span><span class="s">&quot;a*&quot;</span><span class="p">,</span> scroll<span class="o">=</span><span class="s">&quot;1m&quot;</span><span class="p">,</span> search_type <span class="o">=</span> <span class="s">&quot;scan&quot;</span><span class="p">)</span>
-<span class="kp">length</span><span class="p">(</span>scroll<span class="p">(</span>scroll_id <span class="o">=</span> res<span class="o">$</span><span class="sb">`_scroll_id`</span><span class="p">)</span><span class="o">$</span>hits<span class="o">$</span>hits<span class="p">)</span>
-<span class="c1">#&gt; [1] 50</span>
-</code></pre></div><div class="highlight"><pre><code class="language-r" data-lang="r">res <span class="o">&lt;-</span> Search<span class="p">(</span>index <span class="o">=</span> <span class="s">&#39;shakespeare&#39;</span><span class="p">,</span> q<span class="o">=</span><span class="s">&quot;a*&quot;</span><span class="p">,</span> scroll<span class="o">=</span><span class="s">&quot;5m&quot;</span><span class="p">,</span> search_type <span class="o">=</span> <span class="s">&quot;scan&quot;</span><span class="p">)</span>
-out <span class="o">&lt;-</span> <span class="kt">list</span><span class="p">()</span>
-hits <span class="o">&lt;-</span> <span class="m">1</span>
-<span class="kr">while</span><span class="p">(</span>hits <span class="o">!=</span> <span class="m">0</span><span class="p">){</span>
-  res <span class="o">&lt;-</span> scroll<span class="p">(</span>scroll_id <span class="o">=</span> res<span class="o">$</span><span class="sb">`_scroll_id`</span><span class="p">)</span>
-  hits <span class="o">&lt;-</span> <span class="kp">length</span><span class="p">(</span>res<span class="o">$</span>hits<span class="o">$</span>hits<span class="p">)</span>
-  <span class="kr">if</span><span class="p">(</span>hits <span class="o">&gt;</span> <span class="m">0</span><span class="p">)</span>
-    out <span class="o">&lt;-</span> <span class="kt">c</span><span class="p">(</span>out<span class="p">,</span> res<span class="o">$</span>hits<span class="o">$</span>hits<span class="p">)</span>
-<span class="p">}</span>
-<span class="kp">length</span><span class="p">(</span>out<span class="p">)</span>
-<span class="c1">#&gt; [1] 2747</span>
-</code></pre></div>
-<p>Woohoo! Collected all 2747 documents in very little time.</p>
+## Get data
 
-<h2>The cat API</h2>
+Elasticsearch has a bulk load API to load data in fast. The format is pretty weird though. It's sort of JSON, but would pass no JSON linter. I include a few data sets in `elastic` so it's easy to get up and running, and so when you run examples in this package they'll actually run the same way (hopefully).
 
-<p>List cat methods</p>
-<div class="highlight"><pre><code class="language-r" data-lang="r">cat_<span class="p">()</span>
-<span class="c1">#&gt; =^.^=</span>
-<span class="c1">#&gt; /_cat/allocation</span>
-<span class="c1">#&gt; /_cat/shards</span>
-<span class="c1">#&gt; /_cat/shards/{index}</span>
-<span class="c1">#&gt; /_cat/master</span>
-<span class="c1">#&gt; /_cat/nodes</span>
-<span class="c1">#&gt; /_cat/indices</span>
-<span class="c1">#&gt; /_cat/indices/{index}</span>
-<span class="c1">#&gt; /_cat/segments</span>
-<span class="c1">#&gt; /_cat/segments/{index}</span>
-<span class="c1">#&gt; /_cat/count</span>
-<span class="c1">#&gt; /_cat/count/{index}</span>
-<span class="c1">#&gt; /_cat/recovery</span>
-<span class="c1">#&gt; /_cat/recovery/{index}</span>
-<span class="c1">#&gt; /_cat/health</span>
-<span class="c1">#&gt; /_cat/pending_tasks</span>
-<span class="c1">#&gt; /_cat/aliases</span>
-<span class="c1">#&gt; /_cat/aliases/{alias}</span>
-<span class="c1">#&gt; /_cat/thread_pool</span>
-<span class="c1">#&gt; /_cat/plugins</span>
-<span class="c1">#&gt; /_cat/fielddata</span>
-<span class="c1">#&gt; /_cat/fielddata/{fields}</span>
-</code></pre></div>
-<p>Get aliases</p>
-<div class="highlight"><pre><code class="language-r" data-lang="r">cat_aliases<span class="p">()</span>
-<span class="c1">#&gt; things plos - - - </span>
-<span class="c1">#&gt; stuff  plos - - -</span>
-</code></pre></div>
-<p>Get indices</p>
-<div class="highlight"><pre><code class="language-r" data-lang="r">cat_indices<span class="p">()</span>
-<span class="c1">#&gt; yellow open plosmore     5 1  1000  0   3.5mb   3.5mb </span>
-<span class="c1">#&gt; yellow open leotheadfadf 5 1     0  0    575b    575b </span>
-<span class="c1">#&gt; red    open alsothat     3 2                          </span>
-<span class="c1">#&gt; yellow open gbif         5 1   899  0     1mb     1mb </span>
-<span class="c1">#&gt; yellow open gbifgeopoint 5 1     0  0    575b    575b </span>
-<span class="c1">#&gt; yellow open gbifnewgeo   5 1     2  0   5.8kb   5.8kb </span>
-<span class="c1">#&gt; yellow open plos         5 1  1202 39  14.2mb  14.2mb </span>
-<span class="c1">#&gt; yellow open leothedog    5 1     0  0    575b    575b </span>
-<span class="c1">#&gt; yellow open shakespeare  5 1  5000  0     1mb     1mb </span>
-<span class="c1">#&gt; yellow open gbifgeo      5 1   600  0 861.9kb 861.9kb </span>
-<span class="c1">#&gt; yellow open plosbigdata  5 1 20000  0  53.6mb  53.6mb </span>
-<span class="c1">#&gt; yellow open mapuris      5 1    31  0  34.4kb  34.4kb </span>
-<span class="c1">#&gt; yellow open leothelion   5 1     0  0    575b    575b</span>
-</code></pre></div>
-<p>Get nodes</p>
-<div class="highlight"><pre><code class="language-r" data-lang="r">cat_nodes<span class="p">()</span>
-<span class="c1">#&gt; Scotts-MacBook-Pro.local 192.168.1.104 6 79 3.44 d * Hellfire</span>
-</code></pre></div>
-<h2>Work with indices</h2>
-<div class="highlight"><pre><code class="language-r" data-lang="r">out <span class="o">&lt;-</span> index_get<span class="p">(</span>index<span class="o">=</span><span class="s">&#39;shakespeare&#39;</span><span class="p">)</span>
-<span class="kp">names</span><span class="p">(</span>out<span class="o">$</span>shakespeare<span class="o">$</span>mappings<span class="p">)</span>
-<span class="c1">#&gt; [1] &quot;line&quot;  &quot;scene&quot; &quot;act&quot;</span>
-</code></pre></div>
-<p>Check for index existence</p>
-<div class="highlight"><pre><code class="language-r" data-lang="r">index_exists<span class="p">(</span>index<span class="o">=</span><span class="s">&#39;shakespeare&#39;</span><span class="p">)</span>
-<span class="c1">#&gt; [1] TRUE</span>
-</code></pre></div>
-<p>Delete an index</p>
-<div class="highlight"><pre><code class="language-r" data-lang="r">index_delete<span class="p">(</span>index<span class="o">=</span><span class="s">&#39;plos&#39;</span><span class="p">)</span>
-<span class="c1">#&gt; $acknowledged</span>
-<span class="c1">#&gt; [1] TRUE</span>
-</code></pre></div>
-<p>Create an index</p>
-<div class="highlight"><pre><code class="language-r" data-lang="r">index_create<span class="p">(</span>index<span class="o">=</span><span class="s">&#39;twitter&#39;</span><span class="p">)</span>
-<span class="c1">#&gt; $acknowledged</span>
-<span class="c1">#&gt; [1] TRUE</span>
-</code></pre></div>
-<h2>Work with documents</h2>
+### Shakespeare data
 
-<p>Get a document</p>
-<div class="highlight"><pre><code class="language-r" data-lang="r">docs_get<span class="p">(</span>index<span class="o">=</span><span class="s">&#39;shakespeare&#39;</span><span class="p">,</span> type<span class="o">=</span><span class="s">&#39;line&#39;</span><span class="p">,</span> id<span class="o">=</span><span class="m">10</span><span class="p">)</span>
-<span class="c1">#&gt; $`_index`</span>
-<span class="c1">#&gt; [1] &quot;shakespeare&quot;</span>
-<span class="c1">#&gt; </span>
-<span class="c1">#&gt; $`_type`</span>
-<span class="c1">#&gt; [1] &quot;line&quot;</span>
-<span class="c1">#&gt; </span>
-<span class="c1">#&gt; $`_id`</span>
-<span class="c1">#&gt; [1] &quot;10&quot;</span>
-<span class="c1">#&gt; </span>
-<span class="c1">#&gt; $`_version`</span>
-<span class="c1">#&gt; [1] 1</span>
-<span class="c1">#&gt; </span>
-<span class="c1">#&gt; $found</span>
-<span class="c1">#&gt; [1] TRUE</span>
-<span class="c1">#&gt; </span>
-<span class="c1">#&gt; $`_source`</span>
-<span class="c1">#&gt; $`_source`$line_id</span>
-<span class="c1">#&gt; [1] 11</span>
-<span class="c1">#&gt; </span>
-<span class="c1">#&gt; $`_source`$play_name</span>
-<span class="c1">#&gt; [1] &quot;Henry IV&quot;</span>
-<span class="c1">#&gt; </span>
-<span class="c1">#&gt; $`_source`$speech_number</span>
-<span class="c1">#&gt; [1] 1</span>
-<span class="c1">#&gt; </span>
-<span class="c1">#&gt; $`_source`$line_number</span>
-<span class="c1">#&gt; [1] &quot;1.1.8&quot;</span>
-<span class="c1">#&gt; </span>
-<span class="c1">#&gt; $`_source`$speaker</span>
-<span class="c1">#&gt; [1] &quot;KING HENRY IV&quot;</span>
-<span class="c1">#&gt; </span>
-<span class="c1">#&gt; $`_source`$text_entry</span>
-<span class="c1">#&gt; [1] &quot;Nor bruise her flowerets with the armed hoofs&quot;</span>
-</code></pre></div>
-<p>Get certain fields</p>
-<div class="highlight"><pre><code class="language-r" data-lang="r">docs_get<span class="p">(</span>index<span class="o">=</span><span class="s">&#39;shakespeare&#39;</span><span class="p">,</span> type<span class="o">=</span><span class="s">&#39;line&#39;</span><span class="p">,</span> id<span class="o">=</span><span class="m">10</span><span class="p">,</span> fields<span class="o">=</span><span class="kt">c</span><span class="p">(</span><span class="s">&#39;play_name&#39;</span><span class="p">,</span><span class="s">&#39;speaker&#39;</span><span class="p">))</span>
-<span class="c1">#&gt; $`_index`</span>
-<span class="c1">#&gt; [1] &quot;shakespeare&quot;</span>
-<span class="c1">#&gt; </span>
-<span class="c1">#&gt; $`_type`</span>
-<span class="c1">#&gt; [1] &quot;line&quot;</span>
-<span class="c1">#&gt; </span>
-<span class="c1">#&gt; $`_id`</span>
-<span class="c1">#&gt; [1] &quot;10&quot;</span>
-<span class="c1">#&gt; </span>
-<span class="c1">#&gt; $`_version`</span>
-<span class="c1">#&gt; [1] 1</span>
-<span class="c1">#&gt; </span>
-<span class="c1">#&gt; $found</span>
-<span class="c1">#&gt; [1] TRUE</span>
-<span class="c1">#&gt; </span>
-<span class="c1">#&gt; $fields</span>
-<span class="c1">#&gt; $fields$play_name</span>
-<span class="c1">#&gt; $fields$play_name[[1]]</span>
-<span class="c1">#&gt; [1] &quot;Henry IV&quot;</span>
-<span class="c1">#&gt; </span>
-<span class="c1">#&gt; </span>
-<span class="c1">#&gt; $fields$speaker</span>
-<span class="c1">#&gt; $fields$speaker[[1]]</span>
-<span class="c1">#&gt; [1] &quot;KING HENRY IV&quot;</span>
-</code></pre></div>
-<p>Test for existence of the document</p>
-<div class="highlight"><pre><code class="language-r" data-lang="r">docs_get<span class="p">(</span>index<span class="o">=</span><span class="s">&#39;plos&#39;</span><span class="p">,</span> type<span class="o">=</span><span class="s">&#39;article&#39;</span><span class="p">,</span> id<span class="o">=</span><span class="m">1</span><span class="p">,</span> exists<span class="o">=</span><span class="kc">TRUE</span><span class="p">)</span>
-<span class="c1">#&gt; [1] FALSE</span>
-</code></pre></div><div class="highlight"><pre><code class="language-r" data-lang="r">docs_get<span class="p">(</span>index<span class="o">=</span><span class="s">&#39;plos&#39;</span><span class="p">,</span> type<span class="o">=</span><span class="s">&#39;article&#39;</span><span class="p">,</span> id<span class="o">=</span><span class="m">123456</span><span class="p">,</span> exists<span class="o">=</span><span class="kc">TRUE</span><span class="p">)</span>
-<span class="c1">#&gt; [1] FALSE</span>
-</code></pre></div>
-<h2>Thats it</h2>
+Elasticsearch provides some data on Shakespeare plays. I've provided a subset of this data in this package. Get the path for the file specific to your machine:
 
-<p>Let us know if you have any feedback!</p>
+
+```r
+shakespeare <- system.file("examples", "shakespeare_data.json", package = "elastic")
+```
+
+Then load the data into Elasticsearch:
+
+
+```r
+docs_bulk(shakespeare)
+```
+
+### Public Library of Science (PLOS) data
+
+A dataset inluded in the `elastic` package is metadata for PLOS scholarly articles.
+
+
+```r
+plosdat <- system.file("examples", "plos_data.json", package = "elastic")
+docs_bulk(plosdat)
+```
+
+### Global Biodiversity Information Facility (GBIF) data
+
+A dataset inluded in the `elastic` package is data for GBIF species occurrence records. Get the file path, then load:
+
+
+```r
+gbifdat <- system.file("examples", "gbif_data.json", package = "elastic")
+docs_bulk(gbifdat)
+```
+
+GBIF geo data with a coordinates element to allow `geo_shape` queries
+
+
+```r
+gbifgeo <- system.file("examples", "gbif_geo.json", package = "elastic")
+docs_bulk(gbifgeo)
+```
+
+## The Search function
+
+The main interface to searching documents in your Elasticsearch store is the function `Search()`. I nearly always develop R software using all lowercase, but R has a function called `search()`, and I wanted to avoid collision with that function.
+
+`Search()` is an interface to both the HTTP search API (in which queries are passed in the URI of the request, meaning queries have to be relatively simple), as well as the POST API, or the Query DSL, in which queries are passed in the body of the request (so can be much more complex).
+
+There are a huge amount of ways you can search Elasticsearch documents - this tutorial covers some of them, and highlights the ways in which you interact with the R outputs.
+
+### Search an index
+
+
+```r
+out <- Search(index="shakespeare")
+out$hits$total
+#> [1] 5000
+```
+
+
+```r
+out$hits$hits[[1]]
+#> $`_index`
+#> [1] "shakespeare"
+#> 
+#> $`_type`
+#> [1] "line"
+#> 
+#> $`_id`
+#> [1] "4"
+#> 
+#> $`_version`
+#> [1] 1
+#> 
+#> $`_score`
+#> [1] 1
+#> 
+#> $`_source`
+#> $`_source`$line_id
+#> [1] 5
+#> 
+#> $`_source`$play_name
+#> [1] "Henry IV"
+#> 
+#> $`_source`$speech_number
+#> [1] 1
+#> 
+#> $`_source`$line_number
+#> [1] "1.1.2"
+#> 
+#> $`_source`$speaker
+#> [1] "KING HENRY IV"
+#> 
+#> $`_source`$text_entry
+#> [1] "Find we a time for frighted peace to pant,"
+```
+
+### Search an index by type
+
+
+```r
+Search(index="shakespeare", type="act")$hits$hits[[1]]
+#> $`_index`
+#> [1] "shakespeare"
+#> 
+#> $`_type`
+#> [1] "act"
+#> 
+#> $`_id`
+#> [1] "2227"
+#> 
+#> $`_version`
+#> [1] 1
+#> 
+#> $`_score`
+#> [1] 1
+#> 
+#> $`_source`
+#> $`_source`$line_id
+#> [1] 2228
+#> 
+#> $`_source`$play_name
+#> [1] "Henry IV"
+#> 
+#> $`_source`$speech_number
+#> [1] 81
+#> 
+#> $`_source`$line_number
+#> [1] ""
+#> 
+#> $`_source`$speaker
+#> [1] "FALSTAFF"
+#> 
+#> $`_source`$text_entry
+#> [1] "ACT IV"
+```
+
+### Return certain fields
+
+
+```r
+Search(index="shakespeare", fields=c('play_name','speaker'))$hits$hits[[1]]
+#> $`_index`
+#> [1] "shakespeare"
+#> 
+#> $`_type`
+#> [1] "line"
+#> 
+#> $`_id`
+#> [1] "4"
+#> 
+#> $`_version`
+#> [1] 1
+#> 
+#> $`_score`
+#> [1] 1
+#> 
+#> $fields
+#> $fields$speaker
+#> $fields$speaker[[1]]
+#> [1] "KING HENRY IV"
+#> 
+#> 
+#> $fields$play_name
+#> $fields$play_name[[1]]
+#> [1] "Henry IV"
+```
+
+### Sorting
+
+
+```r
+Search(index="shakespeare", type="act", sort="text_entry")$hits$hits[1:2]
+#> [[1]]
+#> [[1]]$`_index`
+#> [1] "shakespeare"
+#> 
+#> [[1]]$`_type`
+#> [1] "act"
+#> 
+#> [[1]]$`_id`
+#> [1] "2227"
+#> 
+#> [[1]]$`_version`
+#> [1] 1
+#> 
+#> [[1]]$`_score`
+#> NULL
+#> 
+#> [[1]]$`_source`
+#> [[1]]$`_source`$line_id
+#> [1] 2228
+#> 
+#> [[1]]$`_source`$play_name
+#> [1] "Henry IV"
+#> 
+#> [[1]]$`_source`$speech_number
+#> [1] 81
+#> 
+#> [[1]]$`_source`$line_number
+#> [1] ""
+#> 
+#> [[1]]$`_source`$speaker
+#> [1] "FALSTAFF"
+#> 
+#> [[1]]$`_source`$text_entry
+#> [1] "ACT IV"
+#> 
+#> 
+#> [[1]]$sort
+#> [[1]]$sort[[1]]
+#> [1] "act"
+#> 
+#> 
+#> 
+#> [[2]]
+#> [[2]]$`_index`
+#> [1] "shakespeare"
+#> 
+#> [[2]]$`_type`
+#> [1] "act"
+#> 
+#> [[2]]$`_id`
+#> [1] "2633"
+#> 
+#> [[2]]$`_version`
+#> [1] 1
+#> 
+#> [[2]]$`_score`
+#> NULL
+#> 
+#> [[2]]$`_source`
+#> [[2]]$`_source`$line_id
+#> [1] 2634
+#> 
+#> [[2]]$`_source`$play_name
+#> [1] "Henry IV"
+#> 
+#> [[2]]$`_source`$speech_number
+#> [1] 9
+#> 
+#> [[2]]$`_source`$line_number
+#> [1] ""
+#> 
+#> [[2]]$`_source`$speaker
+#> [1] "ARCHBISHOP OF YORK"
+#> 
+#> [[2]]$`_source`$text_entry
+#> [1] "ACT V"
+#> 
+#> 
+#> [[2]]$sort
+#> [[2]]$sort[[1]]
+#> [1] "act"
+```
+
+### Paging
+
+
+```r
+Search(index="shakespeare", size=1, from=1, fields='text_entry')$hits
+#> $total
+#> [1] 5000
+#> 
+#> $max_score
+#> [1] 1
+#> 
+#> $hits
+#> $hits[[1]]
+#> $hits[[1]]$`_index`
+#> [1] "shakespeare"
+#> 
+#> $hits[[1]]$`_type`
+#> [1] "line"
+#> 
+#> $hits[[1]]$`_id`
+#> [1] "9"
+#> 
+#> $hits[[1]]$`_version`
+#> [1] 1
+#> 
+#> $hits[[1]]$`_score`
+#> [1] 1
+#> 
+#> $hits[[1]]$fields
+#> $hits[[1]]$fields$text_entry
+#> $hits[[1]]$fields$text_entry[[1]]
+#> [1] "Nor more shall trenching war channel her fields,"
+```
+
+### Queries
+
+Using the `q` parameter you can pass in a query, which gets passed in the URI of the query. This type of query is less powerful than the below query passed in the body of the request, using the `body` parameter.
+
+
+```r
+Search(index="shakespeare", type="act", q="speaker:KING HENRY IV")$hits$total
+#> [1] 9
+```
+
+### Query DSL searches - queries sent in the body of the request
+
+Pass in as an R list
+
+
+```r
+aggs <- list(aggs = list(stats = list(terms = list(field = "text_entry"))))
+Search(index="shakespeare", body=aggs)$hits$hits[[1]]
+#> $`_index`
+#> [1] "shakespeare"
+#> 
+#> $`_type`
+#> [1] "line"
+#> 
+#> $`_id`
+#> [1] "4"
+#> 
+#> $`_version`
+#> [1] 1
+#> 
+#> $`_score`
+#> [1] 1
+#> 
+#> $`_source`
+#> $`_source`$line_id
+#> [1] 5
+#> 
+#> $`_source`$play_name
+#> [1] "Henry IV"
+#> 
+#> $`_source`$speech_number
+#> [1] 1
+#> 
+#> $`_source`$line_number
+#> [1] "1.1.2"
+#> 
+#> $`_source`$speaker
+#> [1] "KING HENRY IV"
+#> 
+#> $`_source`$text_entry
+#> [1] "Find we a time for frighted peace to pant,"
+```
+
+Or pass in as json query with newlines, easy to read
+
+
+```r
+aggs <- '{
+    "aggs": {
+        "stats" : {
+            "terms" : {
+                "field" : "text_entry"
+            }
+        }
+    }
+}'
+Search(index="shakespeare", body=aggs)$hits$hits[[1]]
+#> $`_index`
+#> [1] "shakespeare"
+#> 
+#> $`_type`
+#> [1] "line"
+#> 
+#> $`_id`
+#> [1] "4"
+#> 
+#> $`_version`
+#> [1] 1
+#> 
+#> $`_score`
+#> [1] 1
+#> 
+#> $`_source`
+#> $`_source`$line_id
+#> [1] 5
+#> 
+#> $`_source`$play_name
+#> [1] "Henry IV"
+#> 
+#> $`_source`$speech_number
+#> [1] 1
+#> 
+#> $`_source`$line_number
+#> [1] "1.1.2"
+#> 
+#> $`_source`$speaker
+#> [1] "KING HENRY IV"
+#> 
+#> $`_source`$text_entry
+#> [1] "Find we a time for frighted peace to pant,"
+```
+
+Or pass in collapsed json string
+
+
+```r
+aggs <- '{"aggs":{"stats":{"terms":{"field":"text_entry"}}}}'
+Search(index="shakespeare", body=aggs)$hits$hits[[1]]
+#> $`_index`
+#> [1] "shakespeare"
+#> 
+#> $`_type`
+#> [1] "line"
+#> 
+#> $`_id`
+#> [1] "4"
+#> 
+#> $`_version`
+#> [1] 1
+#> 
+#> $`_score`
+#> [1] 1
+#> 
+#> $`_source`
+#> $`_source`$line_id
+#> [1] 5
+#> 
+#> $`_source`$play_name
+#> [1] "Henry IV"
+#> 
+#> $`_source`$speech_number
+#> [1] 1
+#> 
+#> $`_source`$line_number
+#> [1] "1.1.2"
+#> 
+#> $`_source`$speaker
+#> [1] "KING HENRY IV"
+#> 
+#> $`_source`$text_entry
+#> [1] "Find we a time for frighted peace to pant,"
+```
+
+### Fuzzy query
+
+Fuzzy query on numerics
+
+
+```r
+fuzzy <- list(query = list(fuzzy = list(speech_number = 7)))
+Search(index="shakespeare", body=fuzzy)$hits$total
+#> [1] 523
+```
+
+
+```r
+fuzzy <- list(query = list(fuzzy = list(speech_number = list(value = 7, fuzziness = 4))))
+Search(index="shakespeare", body=fuzzy)$hits$total
+#> [1] 1499
+```
+
+### Range query
+
+With numeric
+
+
+```r
+body <- list(query=list(range=list(decimalLongitude=list(gte=1, lte=3))))
+Search('gbif', body=body)$hits$total
+#> [1] 24
+```
+
+
+```r
+body <- list(query=list(range=list(decimalLongitude=list(gte=2.9, lte=10))))
+Search('gbif', body=body)$hits$total
+#> [1] 166
+```
+
+With dates
+
+
+```r
+body <- list(query=list(range=list(eventDate=list(gte="2012-01-01", lte="now"))))
+Search('gbif', body=body)$hits$total
+#> [1] 899
+```
+
+
+```r
+body <- list(query=list(range=list(eventDate=list(gte="2014-01-01", lte="now"))))
+Search('gbif', body=body)$hits$total
+#> [1] 685
+```
+
+### Highlighting
+
+
+```r
+body <- '{
+ "query": {
+   "query_string": {
+     "query" : "cell"
+   }
+ },
+ "highlight": {
+   "fields": {
+     "title": {"number_of_fragments": 2}
+   }
+ }
+}'
+out <- Search('plos', 'article', body=body)
+out$hits$total
+#> [1] 57
+```
+
+
+```r
+sapply(out$hits$hits, function(x) x$highlight$title[[1]])[8:10]
+#> [1] "c-FLIP Protects Eosinophils from TNF-α-Mediated <em>Cell</em> Death In Vivo"                          
+#> [2] "DUSP1 Is a Novel Target for Enhancing Pancreatic Cancer <em>Cell</em> Sensitivity to Gemcitabine"     
+#> [3] "Carbon Ion Radiation Inhibits Glioma and Endothelial <em>Cell</em> Migration Induced by Secreted VEGF"
+```
+
+### Scrolling search - instead of paging
+
+
+```r
+Search('shakespeare', q="a*")$hits$total
+#> [1] 2747
+res <- Search(index = 'shakespeare', q="a*", scroll="1m")
+res <- Search(index = 'shakespeare', q="a*", scroll="1m", search_type = "scan")
+length(scroll(scroll_id = res$`_scroll_id`)$hits$hits)
+#> [1] 50
+```
+
+
+```r
+res <- Search(index = 'shakespeare', q="a*", scroll="5m", search_type = "scan")
+out <- list()
+hits <- 1
+while(hits != 0){
+  res <- scroll(scroll_id = res$`_scroll_id`)
+  hits <- length(res$hits$hits)
+  if(hits > 0)
+    out <- c(out, res$hits$hits)
+}
+length(out)
+#> [1] 2747
+```
+
+Woohoo! Collected all 2747 documents in very little time.
+
+## The cat API
+
+List cat methods
+
+
+```r
+cat_()
+#> =^.^=
+#> /_cat/allocation
+#> /_cat/shards
+#> /_cat/shards/{index}
+#> /_cat/master
+#> /_cat/nodes
+#> /_cat/indices
+#> /_cat/indices/{index}
+#> /_cat/segments
+#> /_cat/segments/{index}
+#> /_cat/count
+#> /_cat/count/{index}
+#> /_cat/recovery
+#> /_cat/recovery/{index}
+#> /_cat/health
+#> /_cat/pending_tasks
+#> /_cat/aliases
+#> /_cat/aliases/{alias}
+#> /_cat/thread_pool
+#> /_cat/plugins
+#> /_cat/fielddata
+#> /_cat/fielddata/{fields}
+```
+
+Get aliases
+
+
+```r
+cat_aliases()
+#> things plos - - - 
+#> stuff  plos - - -
+```
+
+Get indices
+
+
+```r
+cat_indices()
+#> yellow open plosmore     5 1  1000  0   3.5mb   3.5mb 
+#> yellow open leotheadfadf 5 1     0  0    575b    575b 
+#> red    open alsothat     3 2                          
+#> yellow open gbif         5 1   899  0     1mb     1mb 
+#> yellow open gbifgeopoint 5 1     0  0    575b    575b 
+#> yellow open gbifnewgeo   5 1     2  0   5.8kb   5.8kb 
+#> yellow open plos         5 1  1202 39  14.2mb  14.2mb 
+#> yellow open leothedog    5 1     0  0    575b    575b 
+#> yellow open shakespeare  5 1  5000  0     1mb     1mb 
+#> yellow open gbifgeo      5 1   600  0 861.9kb 861.9kb 
+#> yellow open plosbigdata  5 1 20000  0  53.6mb  53.6mb 
+#> yellow open mapuris      5 1    31  0  34.4kb  34.4kb 
+#> yellow open leothelion   5 1     0  0    575b    575b
+```
+
+Get nodes
+
+
+```r
+cat_nodes()
+#> Scotts-MacBook-Pro.local 192.168.1.104 6 79 3.44 d * Hellfire
+```
+
+## Work with indices
+
+
+```r
+out <- index_get(index='shakespeare')
+names(out$shakespeare$mappings)
+#> [1] "line"  "scene" "act"
+```
+
+Check for index existence
+
+
+```r
+index_exists(index='shakespeare')
+#> [1] TRUE
+```
+
+Delete an index
+
+
+```r
+index_delete(index='plos')
+#> $acknowledged
+#> [1] TRUE
+```
+
+Create an index
+
+
+```r
+index_create(index='twitter')
+#> $acknowledged
+#> [1] TRUE
+```
+
+## Work with documents
+
+Get a document
+
+
+```r
+docs_get(index='shakespeare', type='line', id=10)
+#> $`_index`
+#> [1] "shakespeare"
+#> 
+#> $`_type`
+#> [1] "line"
+#> 
+#> $`_id`
+#> [1] "10"
+#> 
+#> $`_version`
+#> [1] 1
+#> 
+#> $found
+#> [1] TRUE
+#> 
+#> $`_source`
+#> $`_source`$line_id
+#> [1] 11
+#> 
+#> $`_source`$play_name
+#> [1] "Henry IV"
+#> 
+#> $`_source`$speech_number
+#> [1] 1
+#> 
+#> $`_source`$line_number
+#> [1] "1.1.8"
+#> 
+#> $`_source`$speaker
+#> [1] "KING HENRY IV"
+#> 
+#> $`_source`$text_entry
+#> [1] "Nor bruise her flowerets with the armed hoofs"
+```
+
+Get certain fields
+
+
+```r
+docs_get(index='shakespeare', type='line', id=10, fields=c('play_name','speaker'))
+#> $`_index`
+#> [1] "shakespeare"
+#> 
+#> $`_type`
+#> [1] "line"
+#> 
+#> $`_id`
+#> [1] "10"
+#> 
+#> $`_version`
+#> [1] 1
+#> 
+#> $found
+#> [1] TRUE
+#> 
+#> $fields
+#> $fields$play_name
+#> $fields$play_name[[1]]
+#> [1] "Henry IV"
+#> 
+#> 
+#> $fields$speaker
+#> $fields$speaker[[1]]
+#> [1] "KING HENRY IV"
+```
+
+Test for existence of the document
+
+
+```r
+docs_get(index='plos', type='article', id=1, exists=TRUE)
+#> [1] FALSE
+```
+
+
+```r
+docs_get(index='plos', type='article', id=123456, exists=TRUE)
+#> [1] FALSE
+```
+
+## Thats it
+
+Let us know if you have any feedback!
 
   </div>
   
@@ -734,307 +1143,203 @@ hits <span class="o">&lt;-</span> <span class="m">1</span>
 
     <span class="post-date">19 Jan 2015</span>
 
-    <p>I maintain, along with other <a href="https://github.com/ropensci/taxize/graphs/contributors">awesome people</a>, the <a href="https://github.com/ropensci/taxize">taxize</a> R package - a taxonomic toolbelt for R, for interacting with taxonomic data sources on the web. </p>
+    I maintain, along with other [awesome people](https://github.com/ropensci/taxize/graphs/contributors), the [taxize](https://github.com/ropensci/taxize) R package - a taxonomic toolbelt for R, for interacting with taxonomic data sources on the web. 
 
-<p>Taxonomy data is not standardized, but there are a lot of common elements, and there is a finite list of taxonomic ranks, and finite number of major taxonomic data sets. Thus, I&#39;ve been interested in attempting to define a pseudo standard for expressing taxonomic data in R. The conversation <a href="https://github.com/ropensci/taxize/issues/261">started a while back</a> in a GitHub issue, and hasn&#39;t moved very far. </p>
+Taxonomy data is not standardized, but there are a lot of common elements, and there is a finite list of taxonomic ranks, and finite number of major taxonomic data sets. Thus, I've been interested in attempting to define a pseudo standard for expressing taxonomic data in R. The conversation [started a while back](https://github.com/ropensci/taxize/issues/261) in a GitHub issue, and hasn't moved very far. 
 
-<p>I decided to start playing with this more, which is easier to do in a separate pacakge. Thus: <code>binomen</code>. It&#39;s an attempt to define a set of taxonomic classes/objects in R, along with a suite of functions to help construct and parse these objects.</p>
+I decided to start playing with this more, which is easier to do in a separate pacakge. Thus: `binomen`. It's an attempt to define a set of taxonomic classes/objects in R, along with a suite of functions to help construct and parse these objects.
 
-<p>Would love any/all feedback. </p>
+Would love any/all feedback. 
 
-<p>Here&#39;s some examples:</p>
+Here's some examples:
 
-<h2>Install</h2>
+## Install
 
-<p>Install <code>binomen</code> </p>
-<div class="highlight"><pre><code class="language-r" data-lang="r">install.packages<span class="p">(</span><span class="s">&quot;devtools&quot;</span><span class="p">)</span>
-devtools<span class="o">::</span>install_github<span class="p">(</span><span class="s">&quot;ropensci/binomen&quot;</span><span class="p">)</span>
-</code></pre></div><div class="highlight"><pre><code class="language-r" data-lang="r"><span class="kn">library</span><span class="p">(</span><span class="s">&quot;binomen&quot;</span><span class="p">)</span>
-</code></pre></div>
-<h2>Make a taxon</h2>
+Install `binomen` 
 
-<p>Make a taxon object</p>
-<div class="highlight"><pre><code class="language-r" data-lang="r"><span class="p">(</span>obj <span class="o">&lt;-</span> make_taxon<span class="p">(</span>genus<span class="o">=</span><span class="s">&quot;Poa&quot;</span><span class="p">,</span> epithet<span class="o">=</span><span class="s">&quot;annua&quot;</span><span class="p">,</span> authority<span class="o">=</span><span class="s">&quot;L.&quot;</span><span class="p">,</span>
-                   family<span class="o">=</span><span class="s">&#39;Poaceae&#39;</span><span class="p">,</span> clazz<span class="o">=</span><span class="s">&#39;Poales&#39;</span><span class="p">,</span> 
-                   kingdom<span class="o">=</span><span class="s">&#39;Plantae&#39;</span><span class="p">,</span> variety<span class="o">=</span><span class="s">&#39;annua&#39;</span><span class="p">))</span>
-<span class="c1">#&gt; &lt;taxon&gt;</span>
-<span class="c1">#&gt;   binomial: Poa annua</span>
-<span class="c1">#&gt;   classification: </span>
-<span class="c1">#&gt;     kingdom: Plantae</span>
-<span class="c1">#&gt;     clazz: Poales</span>
-<span class="c1">#&gt;     family: Poaceae</span>
-<span class="c1">#&gt;     genus: Poa</span>
-<span class="c1">#&gt;     species: Poa annua</span>
-<span class="c1">#&gt;     variety: annua</span>
-</code></pre></div>
-<p>Index to various parts of the object</p>
 
-<p>The binomial</p>
-<div class="highlight"><pre><code class="language-r" data-lang="r">obj<span class="o">$</span>binomial
-<span class="c1">#&gt; &lt;binomial&gt;</span>
-<span class="c1">#&gt;   genus: Poa</span>
-<span class="c1">#&gt;   epithet: annua</span>
-<span class="c1">#&gt;   canonical: Poa annua</span>
-<span class="c1">#&gt;   species: Poa annua L.</span>
-<span class="c1">#&gt;   authority: L.</span>
-</code></pre></div>
-<p>The authority</p>
-<div class="highlight"><pre><code class="language-r" data-lang="r">obj<span class="o">$</span>binomial<span class="o">$</span>authority
-<span class="c1">#&gt; [1] &quot;L.&quot;</span>
-</code></pre></div>
-<p>The classification</p>
-<div class="highlight"><pre><code class="language-r" data-lang="r">obj<span class="o">$</span>classification
-<span class="c1">#&gt; &lt;classification&gt;</span>
-<span class="c1">#&gt;     kingdom: Plantae</span>
-<span class="c1">#&gt;     clazz: Poales</span>
-<span class="c1">#&gt;     family: Poaceae</span>
-<span class="c1">#&gt;     genus: Poa</span>
-<span class="c1">#&gt;     species: Poa annua</span>
-<span class="c1">#&gt;     variety: annua</span>
-</code></pre></div>
-<p>The family</p>
-<div class="highlight"><pre><code class="language-r" data-lang="r">obj<span class="o">$</span>classification<span class="o">$</span>family
-<span class="c1">#&gt; &lt;taxonref&gt;</span>
-<span class="c1">#&gt;   rank: family</span>
-<span class="c1">#&gt;   name: Poaceae</span>
-<span class="c1">#&gt;   id: none</span>
-<span class="c1">#&gt;   uri: none</span>
-</code></pre></div>
-<h2>Subset taxon objects</h2>
+```r
+install.packages("devtools")
+devtools::install_github("ropensci/binomen")
+```
 
-<p>Get a single rank</p>
-<div class="highlight"><pre><code class="language-r" data-lang="r">obj <span class="o">%&gt;%</span> select<span class="p">(</span>family<span class="p">)</span>
-<span class="c1">#&gt; &lt;taxonref&gt;</span>
-<span class="c1">#&gt;   rank: family</span>
-<span class="c1">#&gt;   name: Poaceae</span>
-<span class="c1">#&gt;   id: none</span>
-<span class="c1">#&gt;   uri: none</span>
-</code></pre></div>
-<p>Get a range of ranks</p>
-<div class="highlight"><pre><code class="language-r" data-lang="r">obj <span class="o">%&gt;%</span> <span class="kp">range</span><span class="p">(</span>kingdom<span class="p">,</span> family<span class="p">)</span>
-<span class="c1">#&gt; $kingdom</span>
-<span class="c1">#&gt; &lt;taxonref&gt;</span>
-<span class="c1">#&gt;   rank: kingdom</span>
-<span class="c1">#&gt;   name: Plantae</span>
-<span class="c1">#&gt;   id: none</span>
-<span class="c1">#&gt;   uri: none</span>
-<span class="c1">#&gt; </span>
-<span class="c1">#&gt; $clazz</span>
-<span class="c1">#&gt; &lt;taxonref&gt;</span>
-<span class="c1">#&gt;   rank: clazz</span>
-<span class="c1">#&gt;   name: Poales</span>
-<span class="c1">#&gt;   id: none</span>
-<span class="c1">#&gt;   uri: none</span>
-<span class="c1">#&gt; </span>
-<span class="c1">#&gt; $family</span>
-<span class="c1">#&gt; &lt;taxonref&gt;</span>
-<span class="c1">#&gt;   rank: family</span>
-<span class="c1">#&gt;   name: Poaceae</span>
-<span class="c1">#&gt;   id: none</span>
-<span class="c1">#&gt;   uri: none</span>
-</code></pre></div>
-<p>Extract classification as a <code>data.frame</code></p>
-<div class="highlight"><pre><code class="language-r" data-lang="r">gethier<span class="p">(</span>obj<span class="p">)</span>
-<span class="c1">#&gt;      rank      name</span>
-<span class="c1">#&gt; 1 kingdom   Plantae</span>
-<span class="c1">#&gt; 2   clazz    Poales</span>
-<span class="c1">#&gt; 3  family   Poaceae</span>
-<span class="c1">#&gt; 4   genus       Poa</span>
-<span class="c1">#&gt; 5 species Poa annua</span>
-<span class="c1">#&gt; 6 variety     annua</span>
-</code></pre></div>
-<h2>Taxonomic data.frame&#39;s</h2>
 
-<p>Make one</p>
-<div class="highlight"><pre><code class="language-r" data-lang="r">df <span class="o">&lt;-</span> <span class="kt">data.frame</span><span class="p">(</span>
-  order<span class="o">=</span><span class="kt">c</span><span class="p">(</span><span class="s">&#39;Asterales&#39;</span><span class="p">,</span><span class="s">&#39;Asterales&#39;</span><span class="p">,</span><span class="s">&#39;Fagales&#39;</span><span class="p">,</span><span class="s">&#39;Poales&#39;</span><span class="p">,</span><span class="s">&#39;Poales&#39;</span><span class="p">,</span><span class="s">&#39;Poales&#39;</span><span class="p">),</span>
-  family<span class="o">=</span><span class="kt">c</span><span class="p">(</span><span class="s">&#39;Asteraceae&#39;</span><span class="p">,</span><span class="s">&#39;Asteraceae&#39;</span><span class="p">,</span><span class="s">&#39;Fagaceae&#39;</span><span class="p">,</span><span class="s">&#39;Poaceae&#39;</span><span class="p">,</span><span class="s">&#39;Poaceae&#39;</span><span class="p">,</span><span class="s">&#39;Poaceae&#39;</span><span class="p">),</span>
-  genus<span class="o">=</span><span class="kt">c</span><span class="p">(</span><span class="s">&#39;Helianthus&#39;</span><span class="p">,</span><span class="s">&#39;Helianthus&#39;</span><span class="p">,</span><span class="s">&#39;Quercus&#39;</span><span class="p">,</span><span class="s">&#39;Poa&#39;</span><span class="p">,</span><span class="s">&#39;Festuca&#39;</span><span class="p">,</span><span class="s">&#39;Holodiscus&#39;</span><span class="p">),</span>
-  stringsAsFactors <span class="o">=</span> <span class="kc">FALSE</span><span class="p">)</span>
-<span class="p">(</span>df2 <span class="o">&lt;-</span> taxon_df<span class="p">(</span>df<span class="p">))</span>
-<span class="c1">#&gt;       order     family      genus</span>
-<span class="c1">#&gt; 1 Asterales Asteraceae Helianthus</span>
-<span class="c1">#&gt; 2 Asterales Asteraceae Helianthus</span>
-<span class="c1">#&gt; 3   Fagales   Fagaceae    Quercus</span>
-<span class="c1">#&gt; 4    Poales    Poaceae        Poa</span>
-<span class="c1">#&gt; 5    Poales    Poaceae    Festuca</span>
-<span class="c1">#&gt; 6    Poales    Poaceae Holodiscus</span>
-</code></pre></div>
-<p>Parse - get rank order matching <em>Fagales</em></p>
-<div class="highlight"><pre><code class="language-r" data-lang="r">df2 <span class="o">%&gt;%</span> select<span class="p">(</span><span class="kp">order</span><span class="p">,</span> Fagales<span class="p">)</span>
-<span class="c1">#&gt;     order   family   genus</span>
-<span class="c1">#&gt; 3 Fagales Fagaceae Quercus</span>
-</code></pre></div>
-<p>get rank family matching <em>Asteraceae</em></p>
-<div class="highlight"><pre><code class="language-r" data-lang="r">df2 <span class="o">%&gt;%</span> select<span class="p">(</span>family<span class="p">,</span> Asteraceae<span class="p">)</span>
-<span class="c1">#&gt;       order     family      genus</span>
-<span class="c1">#&gt; 1 Asterales Asteraceae Helianthus</span>
-<span class="c1">#&gt; 2 Asterales Asteraceae Helianthus</span>
-</code></pre></div>
-<p>get rank genus matching <em>Poa</em></p>
-<div class="highlight"><pre><code class="language-r" data-lang="r">df2 <span class="o">%&gt;%</span> select<span class="p">(</span>genus<span class="p">,</span> Poa<span class="p">)</span>
-<span class="c1">#&gt;    order  family genus</span>
-<span class="c1">#&gt; 4 Poales Poaceae   Poa</span>
-</code></pre></div>
-  </div>
-  
-  <div class="post">
-    <h1>
-      <a href="/2015/01/discourse-in-r/">
-        discgolf - Dicourse from R
-      </a>
-    </h1>
+```r
+library("binomen")
+```
 
-    <span class="post-date">15 Jan 2015</span>
+## Make a taxon
 
-    <p><a href="http://www.discourse.org/">Discourse</a> is a great discussion forum application. It&#39;s another thing from <a href="https://en.wikipedia.org/wiki/Jeff_Atwood">Jeff Atwood</a>, the co-founder of <a href="http://stackoverflow.com/">Stackoverflow/Stackexchange</a>. The installation is epecially easy with their dockerized installation setup on DigitalOcean ([instructions here][https://www.digitalocean.com/community/tutorials/how-to-install-discourse-on-ubuntu-14-04]). </p>
+Make a taxon object
 
-<p>In <a href="http://ropensci.org/">rOpenSci</a>, we&#39;ve been using a Google Groups mailing list, which is sufficient I guess, but doesn&#39;t support Markdown, and we all know <a href="http://www.slate.com/articles/technology/technology/2013/03/google_reader_why_did_everyone_s_favorite_rss_program_die_what_free_web.html">Google can kill products any day</a>, so it makes sense to use something with which we have more control. We&#39;ve set up our own Discourse installation to have rOpenSci discussions - find it at <a href="https://meta.discourse.org/">discuss.ropensci.org</a>. Check it out if you want to discuss anything rOpenSci related, or general open science, open source software, etc. You can login with email, Mozilla Persona, Twitter, or GitHub. </p>
 
-<p>Discourse does have a RESTful API, which I found through the <a href="https://github.com/discourse/discourse_api/">Ruby gem</a>. Why not interact with the API via R?</p>
+```r
+(obj <- make_taxon(genus="Poa", epithet="annua", authority="L.",
+                   family='Poaceae', clazz='Poales', 
+                   kingdom='Plantae', variety='annua'))
+#> <taxon>
+#>   binomial: Poa annua
+#>   classification: 
+#>     kingdom: Plantae
+#>     clazz: Poales
+#>     family: Poaceae
+#>     genus: Poa
+#>     species: Poa annua
+#>     variety: annua
+```
 
-<h2>Install</h2>
+Index to various parts of the object
 
-<p>Install <code>discgolf</code> </p>
-<div class="highlight"><pre><code class="language-r" data-lang="r">install.packages<span class="p">(</span><span class="s">&quot;devtools&quot;</span><span class="p">)</span>
-devtools<span class="o">::</span>install_github<span class="p">(</span><span class="s">&quot;sckott/discgolf&quot;</span><span class="p">)</span>
-</code></pre></div><div class="highlight"><pre><code class="language-r" data-lang="r"><span class="kn">library</span><span class="p">(</span><span class="s">&quot;discgolf&quot;</span><span class="p">)</span>
-</code></pre></div>
-<h2>Authentication</h2>
+The binomial
 
-<p>The Discourse API is based on using a specific installation of Discourse (as far as I know), which requires your username and an API key for that installation. Get those (I found mine in the admin panel), and you can pass them in to each function call, or set as option variables in <code>.Rprofile</code> (use <code>discourse_api_key</code> and <code>discourse_username</code>) or environment variables in <code>.Renviron</code> (use <code>DISCOURSE_API_KEY</code> and <code>DISCOURSE_USERNAME</code>).</p>
 
-<h2>Examples</h2>
+```r
+obj$binomial
+#> <binomial>
+#>   genus: Poa
+#>   epithet: annua
+#>   canonical: Poa annua
+#>   species: Poa annua L.
+#>   authority: L.
+```
 
-<p>Get the latest topics (abbreviated content for blog post brevity)</p>
-<div class="highlight"><pre><code class="language-r" data-lang="r">latest_topics<span class="p">()</span>
-</code></pre></div><div class="highlight"><pre><code class="language-text" data-lang="text">#&gt;    id                             title                       fancy_title
-#&gt; 1   8       Welcome to rOpenSci Discuss       Welcome to rOpenSci Discuss
-#&gt; 2  92    Feedback on geojsonio package?    Feedback on geojsonio package?
-#&gt; 3 102                Astronomy research                Astronomy research
-#&gt; 4  99           Rgbif argument question           Rgbif argument question
-#&gt; 5  93 Feedback on rnoaa ghcnd functions Feedback on rnoaa ghcnd functions
-#&gt;                                slug
-#&gt; 1       welcome-to-ropensci-discuss
-#&gt; 2     feedback-on-geojsonio-package
-#&gt; 3                astronomy-research
-#&gt; 4           rgbif-argument-question
-#&gt; 5 feedback-on-rnoaa-ghcnd-functions
-</code></pre></div>
-<p>Get new topics</p>
-<div class="highlight"><pre><code class="language-r" data-lang="r">new_topics<span class="p">()</span>
-<span class="c1">#&gt; $topic_list</span>
-<span class="c1">#&gt; $topic_list$can_create_topic</span>
-<span class="c1">#&gt; [1] TRUE</span>
-<span class="c1">#&gt; </span>
-<span class="c1">#&gt; $topic_list$draft</span>
-<span class="c1">#&gt; NULL</span>
-<span class="c1">#&gt; </span>
-<span class="c1">#&gt; $topic_list$draft_key</span>
-<span class="c1">#&gt; [1] &quot;new_topic&quot;</span>
-<span class="c1">#&gt; </span>
-<span class="c1">#&gt; $topic_list$draft_sequence</span>
-<span class="c1">#&gt; [1] 15</span>
-<span class="c1">#&gt; </span>
-<span class="c1">#&gt; $topic_list$per_page</span>
-<span class="c1">#&gt; [1] 30</span>
-<span class="c1">#&gt; </span>
-<span class="c1">#&gt; $topic_list$topics</span>
-<span class="c1">#&gt; list()</span>
-</code></pre></div>
-<p>Get topics by a specific user</p>
-<div class="highlight"><pre><code class="language-r" data-lang="r">topics_by<span class="p">(</span><span class="s">&quot;cboettig&quot;</span><span class="p">)</span>
-<span class="c1">#&gt; $users</span>
-<span class="c1">#&gt;   id username uploaded_avatar_id</span>
-<span class="c1">#&gt; 1  3 cboettig                  4</span>
-<span class="c1">#&gt; 2  1   sckott                  2</span>
-<span class="c1">#&gt; 3 35 noamross                 57</span>
-<span class="c1">#&gt; 4  2  karthik                  3</span>
-<span class="c1">#&gt;                                            avatar_template</span>
-<span class="c1">#&gt; 1  /user_avatar/discuss.ropensci.org/cboettig/{size}/4.png</span>
-<span class="c1">#&gt; 2    /user_avatar/discuss.ropensci.org/sckott/{size}/2.png</span>
-<span class="c1">#&gt; 3 /user_avatar/discuss.ropensci.org/noamross/{size}/57.png</span>
-<span class="c1">#&gt; 4   /user_avatar/discuss.ropensci.org/karthik/{size}/3.png</span>
-<span class="c1">#&gt; </span>
-<span class="c1">#&gt; $topic_list</span>
-<span class="c1">#&gt; $topic_list$can_create_topic</span>
-<span class="c1">#&gt; [1] TRUE</span>
-<span class="c1">#&gt; </span>
-<span class="c1">#&gt; $topic_list$draft</span>
-<span class="c1">#&gt; NULL</span>
-<span class="c1">#&gt; </span>
-<span class="c1">#&gt; $topic_list$draft_key</span>
-<span class="c1">#&gt; [1] &quot;new_topic&quot;</span>
-<span class="c1">#&gt; </span>
-<span class="c1">#&gt; $topic_list$draft_sequence</span>
-<span class="c1">#&gt; [1] 15</span>
-<span class="c1">#&gt; </span>
-<span class="c1">#&gt; $topic_list$per_page</span>
-<span class="c1">#&gt; [1] 30</span>
-<span class="c1">#&gt; </span>
-<span class="c1">#&gt; $topic_list$topics</span>
-<span class="c1">#&gt;   id                                      title</span>
-<span class="c1">#&gt; 1 15 Using Discourse for blog comments as well?</span>
-<span class="c1">#&gt; 2 16                            Reply by email?</span>
-<span class="c1">#&gt;                                  fancy_title</span>
-<span class="c1">#&gt; 1 Using Discourse for blog comments as well?</span>
-<span class="c1">#&gt; 2                            Reply by email?</span>
-<span class="c1">#&gt;                                        slug posts_count reply_count</span>
-<span class="c1">#&gt; 1 using-discourse-for-blog-comments-as-well           8           4</span>
-<span class="c1">#&gt; 2                            reply-by-email           6           2</span>
-<span class="c1">#&gt;   highest_post_number image_url               created_at</span>
-<span class="c1">#&gt; 1                   8        NA 2014-12-15T19:33:11.879Z</span>
-<span class="c1">#&gt; 2                   6        NA 2014-12-15T20:10:36.414Z</span>
-<span class="c1">#&gt;             last_posted_at bumped                bumped_at unseen</span>
-<span class="c1">#&gt; 1 2015-01-02T19:47:42.403Z   TRUE 2015-01-02T19:47:42.403Z  FALSE</span>
-<span class="c1">#&gt; 2 2014-12-17T00:18:31.427Z   TRUE 2014-12-17T00:18:31.427Z  FALSE</span>
-<span class="c1">#&gt;   last_read_post_number unread new_posts pinned unpinned visible closed</span>
-<span class="c1">#&gt; 1                     8      0         0  FALSE       NA    TRUE  FALSE</span>
-<span class="c1">#&gt; 2                     6      0         0  FALSE       NA    TRUE  FALSE</span>
-<span class="c1">#&gt;   archived notification_level bookmarked liked views like_count</span>
-<span class="c1">#&gt; 1    FALSE                  2       TRUE FALSE    71          0</span>
-<span class="c1">#&gt; 2    FALSE                  3       TRUE FALSE    54          0</span>
-<span class="c1">#&gt;   has_summary archetype last_poster_username category_id pinned_globally</span>
-<span class="c1">#&gt; 1       FALSE   regular             cboettig           3           FALSE</span>
-<span class="c1">#&gt; 2       FALSE   regular               sckott           1           FALSE</span>
-<span class="c1">#&gt;   bookmarked_post_numbers</span>
-<span class="c1">#&gt; 1                       1</span>
-<span class="c1">#&gt; 2                       1</span>
-<span class="c1">#&gt;                                                                                                                   posters</span>
-<span class="c1">#&gt; 1 latest, NA, NA, NA, Original Poster, Most Recent Poster, Frequent Poster, Frequent Poster, Frequent Poster, 3, 1, 35, 2</span>
-<span class="c1">#&gt; 2                                                                   NA, latest, Original Poster, Most Recent Poster, 3, 1</span>
-</code></pre></div>
-<p>Get a single topic by id number</p>
-<div class="highlight"><pre><code class="language-r" data-lang="r">topic<span class="p">(</span><span class="m">8</span><span class="p">)</span>
-</code></pre></div><div class="highlight"><pre><code class="language-text" data-lang="text">#&gt;   id              name username
-#&gt; 1 11            system   system
-#&gt; 2 14 Scott Chamberlain   sckott
-#&gt; 3 51 Scott Chamberlain   sckott
-#&gt;                                         avatar_template uploaded_avatar_id
-#&gt; 1 /user_avatar/discuss.ropensci.org/system/{size}/1.png                  1
-#&gt; 2 /user_avatar/discuss.ropensci.org/sckott/{size}/2.png                  2
-#&gt; 3 /user_avatar/discuss.ropensci.org/sckott/{size}/2.png                  2
-</code></pre></div>
-<p>Create topic</p>
-<div class="highlight"><pre><code class="language-r" data-lang="r">text <span class="o">&lt;-</span> <span class="s">&#39;</span>
-<span class="s">print(&quot;hello world&quot;)</span>
-<span class="s">#&gt; [1] &quot;hello world&quot;</span>
+The authority
 
-<span class="s">head(mtcars)</span>
-<span class="s">#&gt;                    mpg cyl disp  hp drat    wt  qsec vs am gear carb</span>
-<span class="s">#&gt; Mazda RX4         21.0   6  160 110 3.90 2.620 16.46  0  1    4    4</span>
-<span class="s">#&gt; Mazda RX4 Wag     21.0   6  160 110 3.90 2.875 17.02  0  1    4    4</span>
-<span class="s">#&gt; Datsun 710        22.8   4  108  93 3.85 2.320 18.61  1  1    4    1</span>
-<span class="s">#&gt; Hornet 4 Drive    21.4   6  258 110 3.08 3.215 19.44  1  0    3    1</span>
-<span class="s">#&gt; Hornet Sportabout 18.7   8  360 175 3.15 3.440 17.02  0  0    3    2</span>
-<span class="s">#&gt; Valiant           18.1   6  225 105 2.76 3.460 20.22  1  0    3    1</span>
-<span class="s">&#39;</span>
 
-create_topic<span class="p">(</span>title<span class="o">=</span><span class="s">&quot;testing from discgolf - 2&quot;</span><span class="p">,</span> text<span class="o">=</span>text<span class="p">)</span>
-</code></pre></div>
-<h2>Wrapup</h2>
+```r
+obj$binomial$authority
+#> [1] "L."
+```
 
-<p>There are more functions I didn&#39;t highlight, and there are many methods that haven&#39;t been implemented yet... in good time it will be done. </p>
+The classification
+
+
+```r
+obj$classification
+#> <classification>
+#>     kingdom: Plantae
+#>     clazz: Poales
+#>     family: Poaceae
+#>     genus: Poa
+#>     species: Poa annua
+#>     variety: annua
+```
+
+The family
+
+
+```r
+obj$classification$family
+#> <taxonref>
+#>   rank: family
+#>   name: Poaceae
+#>   id: none
+#>   uri: none
+```
+
+## Subset taxon objects
+
+Get a single rank
+
+
+```r
+obj %>% select(family)
+#> <taxonref>
+#>   rank: family
+#>   name: Poaceae
+#>   id: none
+#>   uri: none
+```
+
+Get a range of ranks
+
+
+```r
+obj %>% range(kingdom, family)
+#> $kingdom
+#> <taxonref>
+#>   rank: kingdom
+#>   name: Plantae
+#>   id: none
+#>   uri: none
+#> 
+#> $clazz
+#> <taxonref>
+#>   rank: clazz
+#>   name: Poales
+#>   id: none
+#>   uri: none
+#> 
+#> $family
+#> <taxonref>
+#>   rank: family
+#>   name: Poaceae
+#>   id: none
+#>   uri: none
+```
+
+Extract classification as a `data.frame`
+
+
+```r
+gethier(obj)
+#>      rank      name
+#> 1 kingdom   Plantae
+#> 2   clazz    Poales
+#> 3  family   Poaceae
+#> 4   genus       Poa
+#> 5 species Poa annua
+#> 6 variety     annua
+```
+
+## Taxonomic data.frame's
+
+Make one
+
+
+```r
+df <- data.frame(
+  order=c('Asterales','Asterales','Fagales','Poales','Poales','Poales'),
+  family=c('Asteraceae','Asteraceae','Fagaceae','Poaceae','Poaceae','Poaceae'),
+  genus=c('Helianthus','Helianthus','Quercus','Poa','Festuca','Holodiscus'),
+  stringsAsFactors = FALSE)
+(df2 <- taxon_df(df))
+#>       order     family      genus
+#> 1 Asterales Asteraceae Helianthus
+#> 2 Asterales Asteraceae Helianthus
+#> 3   Fagales   Fagaceae    Quercus
+#> 4    Poales    Poaceae        Poa
+#> 5    Poales    Poaceae    Festuca
+#> 6    Poales    Poaceae Holodiscus
+```
+
+Parse - get rank order matching _Fagales_
+
+
+```r
+df2 %>% select(order, Fagales)
+#>     order   family   genus
+#> 3 Fagales Fagaceae Quercus
+```
+
+get rank family matching _Asteraceae_
+
+
+```r
+df2 %>% select(family, Asteraceae)
+#>       order     family      genus
+#> 1 Asterales Asteraceae Helianthus
+#> 2 Asterales Asteraceae Helianthus
+```
+
+get rank genus matching _Poa_
+
+
+```r
+df2 %>% select(genus, Poa)
+#>    order  family genus
+#> 4 Poales Poaceae   Poa
+```
 
   </div>
   
