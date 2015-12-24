@@ -1,0 +1,181 @@
+---
+name: marine-regions
+layout: post
+title: Marine Regions data in R
+date: 2015-12-28
+author: Scott Chamberlain
+sourceslug: _drafts/2015-12-28-marine-regions.Rmd
+tags:
+- R
+- shp
+- spatial
+- geospatial
+- marine
+---
+
+```{r echo=FALSE}
+knitr::opts_chunk$set(
+  comment = "#>",
+  collapse = TRUE,
+  warning = FALSE,
+  message = FALSE
+)
+```
+
+I was at a hackathon focused on OBIS data a few weeks back in Belgium. One project idea was to make it easier to get at data based on one or more marine regions. I was told that Marineregions.org is most often used for shape files to get different regions to then do other work with.
+
+I hacked together a package `mregions`, at [sckott/mregions][mregions]. Here I'll show how to get different marine regions, then pass those outputs directly to another package(s) to query for OBIS species occurrence data, then make maps.
+
+We'll use WKT (Well-Known Text) in this post. If you don't know what it is, Wikipedia to the rescue: [https://en.wikipedia.org/wiki/Well-known_text](https://en.wikipedia.org/wiki/Well-known_text)
+
+## Install
+
+```{r eval=FALSE}
+devtools::install_github("sckott/mregions")
+devtools::install_github("iobis/robis")
+install.packages("leaflet")
+```
+
+```{r}
+library("mregions")
+```
+
+## Get list of place types
+
+```{r}
+res <- place_types()
+head(res$type)
+```
+
+## Get Marineregions records by place type
+
+```{r}
+res <- records_by_type(type = "EEZ")
+head(res)
+```
+
+## Get and search region names
+
+```{r}
+res <- region_names()
+region_names_search(query = "IHO")
+```
+
+## Get a region - geojson
+
+```{r}
+res <- region_geojson(name = "Turkmen Exclusive Economic Zone")
+class(res)
+names(res)
+```
+
+## Get a region - shp
+
+```{r}
+res <- region_shp(name = "Belgian Exclusive Economic Zone")
+class(res)
+```
+
+## Get OBIS EEZ ID
+
+```{r}
+res <- region_names()
+obis_eez_id(res[[1]]$title)
+```
+
+## Convert to WKT
+
+From geojson or shp. Here, geojson
+
+```{r eval=FALSE}
+res <- region_geojson(key = "MarineRegions:eez_33176")
+as_wkt(res, fmt = 5)
+#> [1] "MULTIPOLYGON (((41.573732 -1.659444, 45.891882 ... cutoff
+```
+
+## Get regions, then OBIS data
+
+### Using Well-Known Text
+
+Both shp and geojson data returned from `region_shp()` and `region_geojson()`, respectively, can be passed to `as_wkt()` to get WKT.
+
+```{r}
+library('robis')
+shp <- region_shp(name = "Belgian Exclusive Economic Zone")
+wkt <- as_wkt(shp)
+xx <- occurrence("Abra alba", geometry = wkt)
+xx <- xx[,c('scientificName','decimalLongitude', 'decimalLatitude')]
+names(xx) <- c('scientificName','longitude', 'latitude')
+```
+
+Plot
+
+```{r}
+library('leaflet')
+leaflet() %>% 
+  addTiles() %>%
+  addCircleMarkers(data = xx) %>% 
+  addPolygons(data = shp)
+```
+
+### Using EEZ ID
+
+EEZ is a Exclusive Economic Zone
+
+```{r}
+library('robis')
+res <- region_names()
+(eez <- obis_eez_id("Belgian Exclusive Economic Zone"))
+```
+
+You currently can't search for OBIS occurrences by EEZ ID, but hopefully soon...
+
+## Bonus: big WKT
+
+What if you're WKT string is super long?  It's often a problem because some online species occurrence databases that accept WKT to search by geometry bork if your WKT string is too long (about 8000 characters, including remainder of URL). We've got a thing in dev for that, called `geoaxe`.
+
+```{r eval=FALSE}
+devtools::install_github("ropenscilabs/geoaxe")
+```
+
+Using a similar example as above, but using a EEZ with a large WKT string. The idea is that `geoaxe` will chop up your WKT string, and give back a bunch of WKT strings. We can then make a single request with each of those strings, and put them back together.
+
+```{r}
+library("geoaxe")
+shp <- region_shp(name = "Venezuelan Exclusive Economic Zone")
+wkt <- as_wkt(shp)
+```
+
+### GBIF data
+
+GBIF only allows GET requests for searching for occurrences, so the request below fails because our WKT string is too long.
+
+```{r eval=}
+library("rgbif")
+out <- occ_search(geometry = wkt)
+```
+
+We can chop up the WKT string, query GBIF, then get back results:
+
+```{r}
+wktc <- to_wkt(chop(wkt, size = 3))
+sapply(wktc, nchar)
+```
+
+```{r}
+res <- lapply(wktc, function(z) {
+  occ_search(geometry = z, limit = 10)
+})
+res[[1]]
+```
+
+### OBIS data
+
+OBIS fortunately allows `POST` http requests, so long WKT strings are no problem!
+
+```{r}
+xx <- occurrence(geometry = wkt)
+head(xx)
+```
+
+[mregions]: https://github.com/sckott/mregions
