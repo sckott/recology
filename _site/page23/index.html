@@ -68,130 +68,115 @@
 
     <span class="post-date">08 Mar 2013</span>
 
-    We ([rOpenSci](http://ropensci.org/)) have been writing code for R packages for a couple years, so it is time to take a look back at the data. What data you ask? The commits data from GitHub ~ data that records who did what and when. 
+    <p>We (<a href="http://ropensci.org/">rOpenSci</a>) have been writing code for R packages for a couple years, so it is time to take a look back at the data. What data you ask? The commits data from GitHub ~ data that records who did what and when. </p>
 
-Using the [Github commits API](http://developer.github.com/v3/repos/commits/) we can gather data on who commited code to a Github repository, and when they did it. Then we can visualize this hitorical record. 
+<p>Using the <a href="http://developer.github.com/v3/repos/commits/">Github commits API</a> we can gather data on who commited code to a Github repository, and when they did it. Then we can visualize this hitorical record. </p>
 
-***************
+<hr>
 
-### Install some functions for interacting with the Github API via R
+<h3>Install some functions for interacting with the Github API via R</h3>
 
-{% highlight r %}
+<figure class="highlight"><pre><code class="language-r" data-lang="r">install_github<span class="p">(</span><span class="s">&#39;sandbox&#39;</span><span class="p">,</span> <span class="s">&#39;ropensci&#39;</span><span class="p">)</span> 
 
-install_github('sandbox', 'ropensci') 
+<span class="kn">library</span><span class="p">(</span>sandbox<span class="p">)</span>
+<span class="kn">library</span><span class="p">(</span>httr<span class="p">)</span>
+<span class="kn">library</span><span class="p">(</span>ggplot2<span class="p">)</span>
+<span class="kn">library</span><span class="p">(</span>scales<span class="p">)</span>
+<span class="kn">library</span><span class="p">(</span>reshape2<span class="p">)</span>
+<span class="kn">library</span><span class="p">(</span>bipartite<span class="p">)</span>
+<span class="kn">library</span><span class="p">(</span>doMC<span class="p">)</span>
+<span class="kn">library</span><span class="p">(</span>plyr<span class="p">)</span>
+<span class="kn">library</span><span class="p">(</span>ggthemes<span class="p">)</span>
+<span class="kn">library</span><span class="p">(</span>picante<span class="p">)</span>
 
-library(sandbox)
-library(httr)
-library(ggplot2)
-library(scales)
-library(reshape2)
-library(bipartite)
-library(doMC)
-library(plyr)
-library(ggthemes)
-library(picante)
+<span class="c1"># And authenticate - pops open a page in your default browser, then tells </span>
+<span class="c1"># you authentication was successful</span>
+github_auth<span class="p">()</span></code></pre></figure>
 
-# And authenticate - pops open a page in your default browser, then tells 
-# you authentication was successful
-github_auth()
-{% endhighlight %}
+<hr>
 
+<h3>Get all repos for an organization, here ropensci of course</h3>
 
-***************
+<figure class="highlight"><pre><code class="language-r" data-lang="r">ropensci_repos <span class="o">&lt;-</span> github_allrepos<span class="p">(</span>userorg <span class="o">=</span> <span class="s">&quot;ropensci&quot;</span><span class="p">)</span></code></pre></figure>
 
-### Get all repos for an organization, here ropensci of course
+<hr>
 
-{% highlight r %}
-ropensci_repos <- github_allrepos(userorg = "ropensci")
-{% endhighlight %}
+<h3>Get commits broken down in to additions and deletions, though below we just collapse them to all commits</h3>
 
+<figure class="highlight"><pre><code class="language-r" data-lang="r">registerDoMC<span class="p">(</span>cores <span class="o">=</span> <span class="m">4</span><span class="p">)</span>
+github_commits_safe <span class="o">&lt;-</span> plyr<span class="o">::</span>failwith<span class="p">(</span><span class="kc">NULL</span><span class="p">,</span> github_commits<span class="p">)</span>
+out <span class="o">&lt;-</span> llply<span class="p">(</span>ropensci_repos<span class="p">,</span> <span class="kr">function</span><span class="p">(</span>x<span class="p">)</span> github_commits_safe<span class="p">(</span><span class="s">&quot;ropensci&quot;</span><span class="p">,</span> x<span class="p">,</span> 
+    since <span class="o">=</span> <span class="s">&quot;2009-01-01T&quot;</span><span class="p">,</span> limit <span class="o">=</span> <span class="m">500</span><span class="p">),</span> <span class="m">.</span>parallel <span class="o">=</span> <span class="kc">TRUE</span><span class="p">)</span>
+<span class="kp">names</span><span class="p">(</span>out<span class="p">)</span> <span class="o">&lt;-</span> ropensci_repos
+out2 <span class="o">&lt;-</span> compact<span class="p">(</span>out<span class="p">)</span>
+outdf <span class="o">&lt;-</span> ldply<span class="p">(</span>out2<span class="p">)</span></code></pre></figure>
 
-***************
+<hr>
 
-### Get commits broken down in to additions and deletions, though below we just collapse them to all commits
+<h3>Plot commits by date and repo</h3>
 
-{% highlight r %}
-registerDoMC(cores = 4)
-github_commits_safe <- plyr::failwith(NULL, github_commits)
-out <- llply(ropensci_repos, function(x) github_commits_safe("ropensci", x, 
-    since = "2009-01-01T", limit = 500), .parallel = TRUE)
-names(out) <- ropensci_repos
-out2 <- compact(out)
-outdf <- ldply(out2)
-{% endhighlight %}
+<figure class="highlight"><pre><code class="language-r" data-lang="r">outdf_subset <span class="o">&lt;-</span> outdf<span class="p">[</span><span class="o">!</span>outdf<span class="o">$</span><span class="m">.i</span>d <span class="o">%in%</span> <span class="kt">c</span><span class="p">(</span><span class="s">&quot;citeulike&quot;</span><span class="p">,</span> <span class="s">&quot;challenge&quot;</span><span class="p">,</span> <span class="s">&quot;docs&quot;</span><span class="p">,</span> <span class="s">&quot;ropensci-book&quot;</span><span class="p">,</span> 
+    <span class="s">&quot;usecases&quot;</span><span class="p">,</span> <span class="s">&quot;textmine&quot;</span><span class="p">,</span> <span class="s">&quot;usgs&quot;</span><span class="p">,</span> <span class="s">&quot;ropenscitoolkit&quot;</span><span class="p">,</span> <span class="s">&quot;neotoma&quot;</span><span class="p">,</span> <span class="s">&quot;rEWDB&quot;</span><span class="p">,</span> <span class="s">&quot;rgauges&quot;</span><span class="p">,</span> 
+    <span class="s">&quot;rodash&quot;</span><span class="p">,</span> <span class="s">&quot;ropensci.github.com&quot;</span><span class="p">,</span> <span class="s">&quot;ROAuth&quot;</span><span class="p">),</span> <span class="p">]</span>
+outdf_subset<span class="o">$</span><span class="m">.i</span>d <span class="o">&lt;-</span> <span class="kp">tolower</span><span class="p">(</span>outdf_subset<span class="o">$</span><span class="m">.i</span>d<span class="p">)</span>
+outdf_subset <span class="o">&lt;-</span> ddply<span class="p">(</span>outdf_subset<span class="p">,</span> <span class="m">.</span><span class="p">(</span><span class="m">.i</span>d<span class="p">,</span> <span class="kp">date</span><span class="p">),</span> summarise<span class="p">,</span> value <span class="o">=</span> <span class="kp">sum</span><span class="p">(</span>value<span class="p">))</span>
 
+mindates <span class="o">&lt;-</span> llply<span class="p">(</span><span class="kp">unique</span><span class="p">(</span>outdf_subset<span class="o">$</span><span class="m">.i</span>d<span class="p">),</span> <span class="kr">function</span><span class="p">(</span>x<span class="p">)</span> <span class="kp">min</span><span class="p">(</span>outdf_subset<span class="p">[</span>outdf_subset<span class="o">$</span><span class="m">.i</span>d <span class="o">==</span> 
+    x<span class="p">,</span> <span class="s">&quot;date&quot;</span><span class="p">]))</span>
+<span class="kp">names</span><span class="p">(</span>mindates<span class="p">)</span> <span class="o">&lt;-</span> <span class="kp">unique</span><span class="p">(</span>outdf_subset<span class="o">$</span><span class="m">.i</span>d<span class="p">)</span>
+mindates <span class="o">&lt;-</span> <span class="kp">sort</span><span class="p">(</span><span class="kp">do.call</span><span class="p">(</span><span class="kt">c</span><span class="p">,</span> mindates<span class="p">))</span>
+outdf_subset<span class="o">$</span><span class="m">.i</span>d <span class="o">&lt;-</span> <span class="kp">factor</span><span class="p">(</span>outdf_subset<span class="o">$</span><span class="m">.i</span>d<span class="p">,</span> levels <span class="o">=</span> <span class="kp">names</span><span class="p">(</span>mindates<span class="p">))</span>
 
-***************
+ggplot<span class="p">(</span>outdf_subset<span class="p">,</span> aes<span class="p">(</span><span class="kp">date</span><span class="p">,</span> value<span class="p">,</span> fill <span class="o">=</span> <span class="m">.i</span>d<span class="p">))</span> <span class="o">+</span> 
+    geom_bar<span class="p">(</span>stat <span class="o">=</span> <span class="s">&quot;identity&quot;</span><span class="p">,</span> width <span class="o">=</span> <span class="m">0.5</span><span class="p">)</span> <span class="o">+</span> 
+    geom_rangeframe<span class="p">(</span>sides <span class="o">=</span> <span class="s">&quot;b&quot;</span><span class="p">,</span> colour <span class="o">=</span> <span class="s">&quot;grey&quot;</span><span class="p">)</span> <span class="o">+</span> 
+    theme_bw<span class="p">(</span>base_size <span class="o">=</span> <span class="m">9</span><span class="p">)</span> <span class="o">+</span> 
+    scale_x_date<span class="p">(</span>labels <span class="o">=</span> date_format<span class="p">(</span><span class="s">&quot;%Y&quot;</span><span class="p">),</span> breaks <span class="o">=</span> date_breaks<span class="p">(</span><span class="s">&quot;year&quot;</span><span class="p">))</span> <span class="o">+</span> 
+    scale_y_log10<span class="p">()</span> <span class="o">+</span> 
+    facet_grid<span class="p">(</span><span class="m">.i</span>d <span class="o">~</span> <span class="m">.</span><span class="p">)</span> <span class="o">+</span> 
+    labs<span class="p">(</span>x <span class="o">=</span> <span class="s">&quot;&quot;</span><span class="p">,</span> y <span class="o">=</span> <span class="s">&quot;&quot;</span><span class="p">)</span> <span class="o">+</span> 
+    theme<span class="p">(</span>axis.text.y <span class="o">=</span> element_blank<span class="p">(),</span> 
+        axis.text.x <span class="o">=</span> element_text<span class="p">(</span>colour <span class="o">=</span> <span class="s">&quot;black&quot;</span><span class="p">),</span> 
+        axis.ticks.y <span class="o">=</span> element_blank<span class="p">(),</span> 
+        strip.text.y <span class="o">=</span> element_text<span class="p">(</span>angle <span class="o">=</span> <span class="m">0</span><span class="p">,</span> size <span class="o">=</span> <span class="m">8</span><span class="p">,</span> <span class="p">),</span> 
+        strip.background <span class="o">=</span> element_rect<span class="p">(</span>size <span class="o">=</span> <span class="m">0</span><span class="p">),</span> 
+        panel.grid.major <span class="o">=</span> element_blank<span class="p">(),</span> 
+        panel.grid.minor <span class="o">=</span> element_blank<span class="p">(),</span> 
+        legend.text <span class="o">=</span> element_text<span class="p">(</span>size <span class="o">=</span> <span class="m">8</span><span class="p">),</span> 
+        legend.position <span class="o">=</span> <span class="s">&quot;none&quot;</span><span class="p">,</span> 
+        panel.border <span class="o">=</span> element_blank<span class="p">())</span></code></pre></figure>
 
-### Plot commits by date and repo
+<p><img src="/public/img/commitsbydate.png" alt="center"> </p>
 
-{% highlight r %}
-outdf_subset <- outdf[!outdf$.id %in% c("citeulike", "challenge", "docs", "ropensci-book", 
-    "usecases", "textmine", "usgs", "ropenscitoolkit", "neotoma", "rEWDB", "rgauges", 
-    "rodash", "ropensci.github.com", "ROAuth"), ]
-outdf_subset$.id <- tolower(outdf_subset$.id)
-outdf_subset <- ddply(outdf_subset, .(.id, date), summarise, value = sum(value))
+<p>The plot above plots the sum of additions+deletions, and is sorted by the first commit date of reach repo, with the first being <a href="https://github.com/ropensci/treeBASE">treebase</a>, which wraps the <a href="http://treebase.org/treebase-web/urlAPI.html">Treebase API</a>, and the most recent being <a href="https://github.com/ropensci/rWBclimate">rwbclimate</a>, which wraps the <a href="http://data.worldbank.org/developers/climate-data-api">World Blank climate data API</a>. </p>
 
-mindates <- llply(unique(outdf_subset$.id), function(x) min(outdf_subset[outdf_subset$.id == 
-    x, "date"]))
-names(mindates) <- unique(outdf_subset$.id)
-mindates <- sort(do.call(c, mindates))
-outdf_subset$.id <- factor(outdf_subset$.id, levels = names(mindates))
+<p>You can see that some repos have recieved commits more or less consistently over their life time, while others have seen a little development here and there. </p>
 
-ggplot(outdf_subset, aes(date, value, fill = .id)) + 
-    geom_bar(stat = "identity", width = 0.5) + 
-    geom_rangeframe(sides = "b", colour = "grey") + 
-    theme_bw(base_size = 9) + 
-    scale_x_date(labels = date_format("%Y"), breaks = date_breaks("year")) + 
-    scale_y_log10() + 
-    facet_grid(.id ~ .) + 
-    labs(x = "", y = "") + 
-    theme(axis.text.y = element_blank(), 
-        axis.text.x = element_text(colour = "black"), 
-        axis.ticks.y = element_blank(), 
-        strip.text.y = element_text(angle = 0, size = 8, ), 
-        strip.background = element_rect(size = 0), 
-        panel.grid.major = element_blank(), 
-        panel.grid.minor = element_blank(), 
-        legend.text = element_text(size = 8), 
-        legend.position = "none", 
-        panel.border = element_blank())
-{% endhighlight %}
+<hr>
 
+<p>w</p>
 
-![center](/public/img/commitsbydate.png) 
+<h3>In addition, there are quite a few people that have committed code now to rOpenSci repos, calling for a network vizualization of course.</h3>
 
+<figure class="highlight"><pre><code class="language-r" data-lang="r">outdf_network <span class="o">&lt;-</span> <span class="kp">droplevels</span><span class="p">(</span>outdf<span class="p">[</span><span class="o">!</span>outdf<span class="o">$</span><span class="m">.i</span>d <span class="o">%in%</span> <span class="kt">c</span><span class="p">(</span><span class="s">&quot;citeulike&quot;</span><span class="p">,</span> <span class="s">&quot;challenge&quot;</span><span class="p">,</span> 
+    <span class="s">&quot;docs&quot;</span><span class="p">,</span> <span class="s">&quot;ropensci-book&quot;</span><span class="p">,</span> <span class="s">&quot;usecases&quot;</span><span class="p">,</span> <span class="s">&quot;textmine&quot;</span><span class="p">,</span> <span class="s">&quot;usgs&quot;</span><span class="p">,</span> <span class="s">&quot;ropenscitoolkit&quot;</span><span class="p">,</span> 
+    <span class="s">&quot;retriever&quot;</span><span class="p">,</span> <span class="s">&quot;rodash&quot;</span><span class="p">,</span> <span class="s">&quot;ropensci.github.com&quot;</span><span class="p">,</span> <span class="s">&quot;ROAuth&quot;</span><span class="p">,</span> <span class="s">&quot;rgauges&quot;</span><span class="p">,</span> <span class="s">&quot;sandbox&quot;</span><span class="p">,</span> 
+    <span class="s">&quot;rfna&quot;</span><span class="p">,</span> <span class="s">&quot;rmetadata&quot;</span><span class="p">,</span> <span class="s">&quot;rhindawi&quot;</span><span class="p">,</span> <span class="s">&quot;rpmc&quot;</span><span class="p">,</span> <span class="s">&quot;rpensoft&quot;</span><span class="p">,</span> <span class="s">&quot;ritis&quot;</span><span class="p">),</span> <span class="p">])</span>
+casted <span class="o">&lt;-</span> dcast<span class="p">(</span>outdf_network<span class="p">,</span> <span class="m">.i</span>d <span class="o">+</span> date <span class="o">+</span> name <span class="o">~</span> variable<span class="p">,</span> fun.aggregate <span class="o">=</span> <span class="kp">length</span><span class="p">,</span> 
+    value.var <span class="o">=</span> <span class="s">&quot;value&quot;</span><span class="p">)</span>
+<span class="kp">names</span><span class="p">(</span>casted<span class="p">)[</span><span class="m">1</span><span class="p">]</span> <span class="o">&lt;-</span> <span class="s">&quot;repo&quot;</span>
+casted2 <span class="o">&lt;-</span> ddply<span class="p">(</span>casted<span class="p">,</span> <span class="m">.</span><span class="p">(</span>repo<span class="p">,</span> name<span class="p">),</span> summarise<span class="p">,</span> commits <span class="o">=</span> <span class="kp">sum</span><span class="p">(</span>additions<span class="p">))</span>
+casted2 <span class="o">&lt;-</span> <span class="kt">data.frame</span><span class="p">(</span>repo <span class="o">=</span> casted2<span class="o">$</span>repo<span class="p">,</span> weight <span class="o">=</span> casted2<span class="o">$</span>commits<span class="p">,</span> name <span class="o">=</span> casted2<span class="o">$</span>name<span class="p">)</span>
+mat <span class="o">&lt;-</span> sample2matrix<span class="p">(</span>casted2<span class="p">)</span>
+plotweb<span class="p">(</span>sortweb<span class="p">(</span>mat<span class="p">,</span> sort.order <span class="o">=</span> <span class="s">&quot;dec&quot;</span><span class="p">),</span> method <span class="o">=</span> <span class="s">&quot;normal&quot;</span><span class="p">,</span> text.rot <span class="o">=</span> <span class="m">90</span><span class="p">,</span> 
+    adj.high <span class="o">=</span> <span class="kt">c</span><span class="p">(</span><span class="m">-0.3</span><span class="p">,</span> <span class="m">0</span><span class="p">),</span> adj.low <span class="o">=</span> <span class="kt">c</span><span class="p">(</span><span class="m">1</span><span class="p">,</span> <span class="m">-0.3</span><span class="p">),</span> y.width.low <span class="o">=</span> <span class="m">0.05</span><span class="p">,</span> y.width.high <span class="o">=</span> <span class="m">0.05</span><span class="p">,</span> 
+    ybig <span class="o">=</span> <span class="m">0.09</span><span class="p">,</span> labsize <span class="o">=</span> <span class="m">0.7</span><span class="p">)</span></code></pre></figure>
 
-The plot above plots the sum of additions+deletions, and is sorted by the first commit date of reach repo, with the first being [treebase](https://github.com/ropensci/treeBASE), which wraps the [Treebase API](http://treebase.org/treebase-web/urlAPI.html), and the most recent being [rwbclimate](https://github.com/ropensci/rWBclimate), which wraps the [World Blank climate data API](http://data.worldbank.org/developers/climate-data-api). 
+<p><img src="/public/img/collabnetwork.png" alt="center"> </p>
 
-You can see that some repos have recieved commits more or less consistently over their life time, while others have seen a little development here and there. 
+<p>The plot above shows repos on one side and contributors on the other. Some folks (the core rOpenSci team: cboettig, karthikram, emhart, and schamberlain) have committed quite a lot to many packages. We also have amny awesome contributors to our packages (some contributors and repos have been removed for clarity). </p>
 
-***************
-w
-### In addition, there are quite a few people that have committed code now to rOpenSci repos, calling for a network vizualization of course.
-
-{% highlight r %}
-outdf_network <- droplevels(outdf[!outdf$.id %in% c("citeulike", "challenge", 
-    "docs", "ropensci-book", "usecases", "textmine", "usgs", "ropenscitoolkit", 
-    "retriever", "rodash", "ropensci.github.com", "ROAuth", "rgauges", "sandbox", 
-    "rfna", "rmetadata", "rhindawi", "rpmc", "rpensoft", "ritis"), ])
-casted <- dcast(outdf_network, .id + date + name ~ variable, fun.aggregate = length, 
-    value.var = "value")
-names(casted)[1] <- "repo"
-casted2 <- ddply(casted, .(repo, name), summarise, commits = sum(additions))
-casted2 <- data.frame(repo = casted2$repo, weight = casted2$commits, name = casted2$name)
-mat <- sample2matrix(casted2)
-plotweb(sortweb(mat, sort.order = "dec"), method = "normal", text.rot = 90, 
-    adj.high = c(-0.3, 0), adj.low = c(1, -0.3), y.width.low = 0.05, y.width.high = 0.05, 
-    ybig = 0.09, labsize = 0.7)
-{% endhighlight %}
-
-![center](/public/img/collabnetwork.png) 
-
-
-The plot above shows repos on one side and contributors on the other. Some folks (the core rOpenSci team: cboettig, karthikram, emhart, and schamberlain) have committed quite a lot to many packages. We also have amny awesome contributors to our packages (some contributors and repos have been removed for clarity). 
-
-rOpenSci is truly a collaborative effort to develop tools for open science, so thanks to all our contributors - keep on forking, pull requesting, and commiting. 
+<p>rOpenSci is truly a collaborative effort to develop tools for open science, so thanks to all our contributors - keep on forking, pull requesting, and commiting. </p>
 
   </div>
   
@@ -204,48 +189,48 @@ rOpenSci is truly a collaborative effort to develop tools for open science, so t
 
     <span class="post-date">22 Feb 2013</span>
 
-    ## Reboot
+    <h2>Reboot</h2>
 
-We need to reboot academia, at least for graduate training. I am speaking from the point of view of ecology/evolution (EEB). Why you ask? Because of the following line of reasoning:
+<p>We need to reboot academia, at least for graduate training. I am speaking from the point of view of ecology/evolution (EEB). Why you ask? Because of the following line of reasoning:</p>
 
-+ First, the most important factor for me comes down to supply and demand. We have too much supply (=graduate students) and not enough demand (=faculty positions, etc.) - see [this comic at PhDComics](http://www.phdcomics.com/comics/archive.php?comicid=911) for proof. This seems especially apparent when you hear from your fellow postdoc friends that there were hundreds of other people with Ph.D.'s applying for the same position. 
+<ul>
+<li><p>First, the most important factor for me comes down to supply and demand. We have too much supply (=graduate students) and not enough demand (=faculty positions, etc.) - see <a href="http://www.phdcomics.com/comics/archive.php?comicid=911">this comic at PhDComics</a> for proof. This seems especially apparent when you hear from your fellow postdoc friends that there were hundreds of other people with Ph.D.&#39;s applying for the same position. </p></li>
+<li><p>Second, funding is getting thin. I have never received funding from a competitive grant, despite having 12 published papers to my name. Recent cuts to the NSF, NIH, and other federal agencies mean that getting a grant will be harder and harder. Furthermore, the mean age of a first time NIH grant recipient in 2008 was 51 according to a recent study in PLoS One (Matthews <em>et. al.</em> 2011). </p></li>
+<li><p>Third, we don&#39;t learn the skills we really need. This is many fold. First, we don&#39;t learn the appropriate mathematical and statistical techniques in undergraduate and grad school - a forthcoming paper found that in a survey of nearly 1000 ecology and evolution graduate students, most thought they were unprepared wrt to math and stats (interview with author in Soundcloud widget below). Second, we don&#39;t learn enough computational skills. Digital data (not on your physical clipboard, but your digital one) is more and more important, requiring knowing how to leverage and keep track of data. Yet, we aren&#39;t taught these skills, at least in my experience. The need for training in computation/coding is evident from the sold out <a href="http://software-carpentry.org/">Software Carpentry workshops</a>. Third, reproducibility is not something we are taught. Well, we are taught to check over everything in detail (read: proof your data), but there is often no way to reproduce analyses when we use 10 different expensive software programs to do an analysis (read: MS Word, JMP, SAS, SigmaPlot, etc.). And isn&#39;t reproduciblity important?</p></li>
+</ul>
 
-+ Second, funding is getting thin. I have never received funding from a competitive grant, despite having 12 published papers to my name. Recent cuts to the NSF, NIH, and other federal agencies mean that getting a grant will be harder and harder. Furthermore, the mean age of a first time NIH grant recipient in 2008 was 51 according to a recent study in PLoS One (Matthews _et. al._ 2011). 
-
-+ Third, we don't learn the skills we really need. This is many fold. First, we don't learn the appropriate mathematical and statistical techniques in undergraduate and grad school - a forthcoming paper found that in a survey of nearly 1000 ecology and evolution graduate students, most thought they were unprepared wrt to math and stats (interview with author in Soundcloud widget below). Second, we don't learn enough computational skills. Digital data (not on your physical clipboard, but your digital one) is more and more important, requiring knowing how to leverage and keep track of data. Yet, we aren't taught these skills, at least in my experience. The need for training in computation/coding is evident from the sold out [Software Carpentry workshops](http://software-carpentry.org/). Third, reproducibility is not something we are taught. Well, we are taught to check over everything in detail (read: proof your data), but there is often no way to reproduce analyses when we use 10 different expensive software programs to do an analysis (read: MS Word, JMP, SAS, SigmaPlot, etc.). And isn't reproduciblity important?
-
-***************
+<hr>
 
 <iframe width="30%" height="140" scrolling="no" frameborder="no" src="https://w.soundcloud.com/player/?url=http%3A%2F%2Fapi.soundcloud.com%2Ftracks%2F78215101&amp;color=ff6600&amp;auto_play=false&amp;show_artwork=false"></iframe>
 
-***************
+<hr>
 
-## What do we do?
+<h2>What do we do?</h2>
 
-To address the supply/demand issue, I think we need fewer graduate students, period. I think this will work for a few reasons. If there are fewer graduate students, those that get in will be of higher quality because profs can be more selective, they may get payed more (hopefully) since there are few students, and they should in theory get more attention from their advisers (if they want it). In addition, there would be less competition for the very few grants out there for grad students.  This would then lead to fewer postdocs, and less competition for faculty positions. I think the supply/demand issue in EEB is particularly problematic. That is, in EEB there doesn't seem to be the large quantity of private sector jobs as there is for Ph.D. graduates in engineering, physics, etc. 
+<p>To address the supply/demand issue, I think we need fewer graduate students, period. I think this will work for a few reasons. If there are fewer graduate students, those that get in will be of higher quality because profs can be more selective, they may get payed more (hopefully) since there are few students, and they should in theory get more attention from their advisers (if they want it). In addition, there would be less competition for the very few grants out there for grad students.  This would then lead to fewer postdocs, and less competition for faculty positions. I think the supply/demand issue in EEB is particularly problematic. That is, in EEB there doesn&#39;t seem to be the large quantity of private sector jobs as there is for Ph.D. graduates in engineering, physics, etc. </p>
 
-The funding situation is beyond me, but definitely makes me want to leave academia. Crowdfunding, especially [#SciFund](http://scifundchallenge.org/), is an option for scientists, but mostly only on a small financial scale. Any thoughts?
+<p>The funding situation is beyond me, but definitely makes me want to leave academia. Crowdfunding, especially <a href="http://scifundchallenge.org/">#SciFund</a>, is an option for scientists, but mostly only on a small financial scale. Any thoughts?</p>
 
-The skills issue will likely be addressed in time, and vary among schools for sure. Some schools will focus on natural history, which is good (that's where I did my undergrad and it was great), and some schools will incorporate more of these science 2.0 skills (advanced stats, better math training, and computer science).
+<p>The skills issue will likely be addressed in time, and vary among schools for sure. Some schools will focus on natural history, which is good (that&#39;s where I did my undergrad and it was great), and some schools will incorporate more of these science 2.0 skills (advanced stats, better math training, and computer science).</p>
 
-***************
+<hr>
 
-## _Thoughts?_
+<h2><em>Thoughts?</em></h2>
 
-***************
+<hr>
 
-#### Get the .Rmd file used to create this post [at my github account](https://github.com/sckott/sckott.github.com/tree/master/_drafts/2013-02-22-academia-reboot.Rmd) - or [.md file](https://github.com/sckott/sckott.github.com/tree/master/_posts/2013-02-22-academia-reboot.md).
+<h4>Get the .Rmd file used to create this post <a href="https://github.com/sckott/sckott.github.com/tree/master/_drafts/2013-02-22-academia-reboot.Rmd">at my github account</a> - or <a href="https://github.com/sckott/sckott.github.com/tree/master/_posts/2013-02-22-academia-reboot.md">.md file</a>.</h4>
 
-#### Written in [Markdown](http://daringfireball.net/projects/markdown/), with help from [knitr](http://yihui.name/knitr/), and [knitcitations](https://github.com/cboettig/knitcitations).
+<h4>Written in <a href="http://daringfireball.net/projects/markdown/">Markdown</a>, with help from <a href="http://yihui.name/knitr/">knitr</a>, and <a href="https://github.com/cboettig/knitcitations">knitcitations</a>.</h4>
 
-***************
+<hr>
 
-#### References
-<p>Matthews KRW, Calhoun KM, lo N, ho V and Germano G (2011).
+<h4>References</h4>
+
+<p><p>Matthews KRW, Calhoun KM, lo N, ho V and Germano G (2011).
 &ldquo;The Aging of Biomedical Research in The United States.&rdquo;
 <EM>Plos One</EM>, <B>6</B>.
-<a href="http://dx.doi.org/10.1371/journal.pone.0029738">http://dx.doi.org/10.1371/journal.pone.0029738</a>.
-
+<a href="http://dx.doi.org/10.1371/journal.pone.0029738">http://dx.doi.org/10.1371/journal.pone.0029738</a>.</p>
 
   </div>
   
@@ -258,68 +243,70 @@ The skills issue will likely be addressed in time, and vary among schools for su
 
     <span class="post-date">14 Feb 2013</span>
 
-    I was just at the [Phylotastic hackathon](http://www.evoio.org/wiki/Phylotastic) in Tucson, AZ at the [iPlant](http://www.iplantcollaborative.org/) facilities at the UofA.
+    <p>I was just at the <a href="http://www.evoio.org/wiki/Phylotastic">Phylotastic hackathon</a> in Tucson, AZ at the <a href="http://www.iplantcollaborative.org/">iPlant</a> facilities at the UofA.</p>
 
-A problem that needs to be solved is getting the incrasingly vast phylogenetic information to folks not comfortable building their own phylogenies. [Phylomatic](http://phylodiversity.net/phylomatic/) has made this super easy for people that want plant phylogenies (at least 250 or so papers have used and cited Phylomatic in their papers) - however, there are few options for those that want phylogenies for other taxonomic groups. 
+<p>A problem that needs to be solved is getting the incrasingly vast phylogenetic information to folks not comfortable building their own phylogenies. <a href="http://phylodiversity.net/phylomatic/">Phylomatic</a> has made this super easy for people that want plant phylogenies (at least 250 or so papers have used and cited Phylomatic in their papers) - however, there are few options for those that want phylogenies for other taxonomic groups. </p>
 
-One cool tool that was brought up was the [Common Tree](http://www.ncbi.nlm.nih.gov/Taxonomy/CommonTree/wwwcmt.cgi) service provided by NCBI. [Here's](http://www.ncbi.nlm.nih.gov/Taxonomy/CommonTree/cmthelp.html) some help on the service. Unlike Phylomatic, Common Tree is purely based off of taxonomic relationships (A and B are both in the C family, so are sisters), not an actual phylogeny as Phylomatic is based on. 
+<p>One cool tool that was brought up was the <a href="http://www.ncbi.nlm.nih.gov/Taxonomy/CommonTree/wwwcmt.cgi">Common Tree</a> service provided by NCBI. <a href="http://www.ncbi.nlm.nih.gov/Taxonomy/CommonTree/cmthelp.html">Here&#39;s</a> some help on the service. Unlike Phylomatic, Common Tree is purely based off of taxonomic relationships (A and B are both in the C family, so are sisters), not an actual phylogeny as Phylomatic is based on. </p>
 
-But how do you use Common Tree?
+<p>But how do you use Common Tree?</p>
 
-***************
+<hr>
 
-### Get a species list
-Grab the taxon list from my github account [here](https://raw.github.com/sckott/sckott.github.com/master/public/img/species.txt) 
+<h3>Get a species list</h3>
 
-### Go to the site
-Go to the Common Tree site [here](http://www.ncbi.nlm.nih.gov/Taxonomy/CommonTree/wwwcmt.cgi)
+<p>Grab the taxon list from my github account <a href="https://raw.github.com/sckott/sckott.github.com/master/public/img/species.txt">here</a> </p>
 
-### Choose file
-Hit the "choose file" button, then select the `species.txt` file you downloaded in the first step. 
+<h3>Go to the site</h3>
 
-### Add the species list to make the tree
-Then hit "add from file", and you got a "tree"
+<p>Go to the Common Tree site <a href="http://www.ncbi.nlm.nih.gov/Taxonomy/CommonTree/wwwcmt.cgi">here</a></p>
 
-![image](https://raw.github.com/sckott/sckott.github.com/master/public/img/ncbi.png)
+<h3>Choose file</h3>
 
-## Download
-You can download the tree in a variety of formats, including a .phy file
+<p>Hit the &quot;choose file&quot; button, then select the <code>species.txt</code> file you downloaded in the first step. </p>
 
-![image](https://raw.github.com/sckott/sckott.github.com/master/public/img/ncbi2.png)
+<h3>Add the species list to make the tree</h3>
 
-## Plot the tree on your machine
-Make a tree, in R for me
+<p>Then hit &quot;add from file&quot;, and you got a &quot;tree&quot;</p>
 
+<p><img src="https://raw.github.com/sckott/sckott.github.com/master/public/img/ncbi.png" alt="image"></p>
 
-{% highlight r %}
-# install.packages('ape') # install if you don't have ape
-library(ape)
+<h2>Download</h2>
 
-# Read the tree in. YOu get the tree back with alot of newlines (\n) -
-# can easily take these out with a good text editor.
-tree <- read.tree(text = "(Lampetra:4,((((((Umbra:4,((Lota:4,Microgadus:4)Gadiformes:4,((Culaea:4,Apeltes:4,Pungitius:4,Gasterosteus:4)Gasterosteidae:4,(Morone:4,(Ambloplites:4,Micropterus:4,Lepomis:4)Centrarchidae:4,(Sander:4,Perca:4)Percidae:4)Percoidei:4,Cottus:4)Percomorpha:4)Holacanthopterygii:4)Neognathi:4,(((Prosopium:4,Coregonus:4)Coregoninae:4,(Salvelinus:4,Salmo:4,Oncorhynchus:4)Salmoninae:4)Salmonidae:4,Osmerus:4)Protacanthopterygii:4)Euteleostei:4,(Alosa:4,(Ameiurus:4,(Catostomus:4,(Semotilus:4,Rhinichthys:4,Margariscus:4,Couesius:4,Pimephales:4,Luxilus:4,Notemigonus:4,Notropis:4,Carassius:4)Cyprinidae:4)Cypriniformes:4)Otophysi:4)Otocephala:4)Clupeocephala:4,Anguilla:4)Elopocephala:4,Acipenser:4)Actinopteri:4,Scyliorhinus:4)Gnathostomata:4)Vertebrata:4;")
+<p>You can download the tree in a variety of formats, including a .phy file</p>
 
-# stretch the branches so tips line up
-tree2 <- compute.brlen(tree, method = "Grafen")
+<p><img src="https://raw.github.com/sckott/sckott.github.com/master/public/img/ncbi2.png" alt="image"></p>
 
-# Plot the tree
-plot(tree2, no.margin = TRUE, cex = 0.7)
-{% endhighlight %}
+<h2>Plot the tree on your machine</h2>
 
+<p>Make a tree, in R for me</p>
 
-### w00p, there it is...
+<figure class="highlight"><pre><code class="language-r" data-lang="r"><span class="c1"># install.packages(&#39;ape&#39;) # install if you don&#39;t have ape</span>
+<span class="kn">library</span><span class="p">(</span>ape<span class="p">)</span>
 
-![image4](https://raw.github.com/sckott/sckott.github.com/master/public/img/ncbi_tree.png)
+<span class="c1"># Read the tree in. YOu get the tree back with alot of newlines (\n) -</span>
+<span class="c1"># can easily take these out with a good text editor.</span>
+tree <span class="o">&lt;-</span> read.tree<span class="p">(</span>text <span class="o">=</span> <span class="s">&quot;(Lampetra:4,((((((Umbra:4,((Lota:4,Microgadus:4)Gadiformes:4,((Culaea:4,Apeltes:4,Pungitius:4,Gasterosteus:4)Gasterosteidae:4,(Morone:4,(Ambloplites:4,Micropterus:4,Lepomis:4)Centrarchidae:4,(Sander:4,Perca:4)Percidae:4)Percoidei:4,Cottus:4)Percomorpha:4)Holacanthopterygii:4)Neognathi:4,(((Prosopium:4,Coregonus:4)Coregoninae:4,(Salvelinus:4,Salmo:4,Oncorhynchus:4)Salmoninae:4)Salmonidae:4,Osmerus:4)Protacanthopterygii:4)Euteleostei:4,(Alosa:4,(Ameiurus:4,(Catostomus:4,(Semotilus:4,Rhinichthys:4,Margariscus:4,Couesius:4,Pimephales:4,Luxilus:4,Notemigonus:4,Notropis:4,Carassius:4)Cyprinidae:4)Cypriniformes:4)Otophysi:4)Otocephala:4)Clupeocephala:4,Anguilla:4)Elopocephala:4,Acipenser:4)Actinopteri:4,Scyliorhinus:4)Gnathostomata:4)Vertebrata:4;&quot;</span><span class="p">)</span>
 
-***************
+<span class="c1"># stretch the branches so tips line up</span>
+tree2 <span class="o">&lt;-</span> compute.brlen<span class="p">(</span>tree<span class="p">,</span> method <span class="o">=</span> <span class="s">&quot;Grafen&quot;</span><span class="p">)</span>
 
-### And the answer is _NO_ to the question: Is there an API for Common Tree?
+<span class="c1"># Plot the tree</span>
+plot<span class="p">(</span>tree2<span class="p">,</span> no.margin <span class="o">=</span> <span class="kc">TRUE</span><span class="p">,</span> cex <span class="o">=</span> <span class="m">0.7</span><span class="p">)</span></code></pre></figure>
 
-***************
+<h3>w00p, there it is...</h3>
 
-#### Get the .Rmd file used to create this post [at my github account](https://github.com/sckott/sckott.github.com/tree/master/_drafts/2013-02-14-common-tree.Rmd) - or [.md file](https://github.com/sckott/sckott.github.com/tree/master/_posts/2013-02-14-common-tree.md).
+<p><img src="https://raw.github.com/sckott/sckott.github.com/master/public/img/ncbi_tree.png" alt="image4"></p>
 
-#### Written in [Markdown](http://daringfireball.net/projects/markdown/), with help from [knitr](http://yihui.name/knitr/).
+<hr>
+
+<h3>And the answer is <em>NO</em> to the question: Is there an API for Common Tree?</h3>
+
+<hr>
+
+<h4>Get the .Rmd file used to create this post <a href="https://github.com/sckott/sckott.github.com/tree/master/_drafts/2013-02-14-common-tree.Rmd">at my github account</a> - or <a href="https://github.com/sckott/sckott.github.com/tree/master/_posts/2013-02-14-common-tree.md">.md file</a>.</h4>
+
+<h4>Written in <a href="http://daringfireball.net/projects/markdown/">Markdown</a>, with help from <a href="http://yihui.name/knitr/">knitr</a>.</h4>
 
   </div>
   

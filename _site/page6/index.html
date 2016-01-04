@@ -68,140 +68,112 @@
 
     <span class="post-date">20 Mar 2015</span>
 
-    With the [help of user input](https://github.com/ropensci/solr/issues/47), I've tweaked `solr` just a bit to make things faster using default setings. I imagine the main interface for people using the `solr` R client is via `solr_search()`, which used to have `wt=json` by default. Changing this to `wt=csv` gives better performance. And it sorta makes sense to use csv, as the point of using an R client is probably do get data eventually into a data.frame, so it makes sense to go csv format (Already in tabular format) if it's faster too.
+    <p>With the <a href="https://github.com/ropensci/solr/issues/47">help of user input</a>, I&#39;ve tweaked <code>solr</code> just a bit to make things faster using default setings. I imagine the main interface for people using the <code>solr</code> R client is via <code>solr_search()</code>, which used to have <code>wt=json</code> by default. Changing this to <code>wt=csv</code> gives better performance. And it sorta makes sense to use csv, as the point of using an R client is probably do get data eventually into a data.frame, so it makes sense to go csv format (Already in tabular format) if it&#39;s faster too.</p>
 
-## Install
+<h2>Install</h2>
 
-Install and load `solr`
+<p>Install and load <code>solr</code></p>
+<div class="highlight"><pre><code class="language-r" data-lang="r">devtools<span class="o">::</span>install_github<span class="p">(</span><span class="s">&quot;ropensci/solr&quot;</span><span class="p">)</span>
+</code></pre></div><div class="highlight"><pre><code class="language-r" data-lang="r"><span class="kn">library</span><span class="p">(</span><span class="s">&quot;solr&quot;</span><span class="p">)</span>
+<span class="kn">library</span><span class="p">(</span><span class="s">&quot;microbenchmark&quot;</span><span class="p">)</span>
+</code></pre></div>
+<h2>Setup</h2>
 
+<p>Define base url and fields to return</p>
+<div class="highlight"><pre><code class="language-r" data-lang="r">url <span class="o">&lt;-</span> <span class="s">&#39;http://api.plos.org/search&#39;</span>
+fields <span class="o">&lt;-</span> <span class="kt">c</span><span class="p">(</span><span class="s">&#39;id&#39;</span><span class="p">,</span><span class="s">&#39;cross_published_journal_name&#39;</span><span class="p">,</span><span class="s">&#39;cross_published_journal_key&#39;</span><span class="p">,</span>
+            <span class="s">&#39;cross_published_journal_eissn&#39;</span><span class="p">,</span><span class="s">&#39;pmid&#39;</span><span class="p">,</span><span class="s">&#39;pmcid&#39;</span><span class="p">,</span><span class="s">&#39;publisher&#39;</span><span class="p">,</span><span class="s">&#39;journal&#39;</span><span class="p">,</span>
+            <span class="s">&#39;publication_date&#39;</span><span class="p">,</span><span class="s">&#39;article_type&#39;</span><span class="p">,</span><span class="s">&#39;article_type_facet&#39;</span><span class="p">,</span><span class="s">&#39;author&#39;</span><span class="p">,</span>
+            <span class="s">&#39;author_facet&#39;</span><span class="p">,</span><span class="s">&#39;volume&#39;</span><span class="p">,</span><span class="s">&#39;issue&#39;</span><span class="p">,</span><span class="s">&#39;elocation_id&#39;</span><span class="p">,</span><span class="s">&#39;author_display&#39;</span><span class="p">,</span>
+            <span class="s">&#39;competing_interest&#39;</span><span class="p">,</span><span class="s">&#39;copyright&#39;</span><span class="p">)</span>
+</code></pre></div>
+<h2>json</h2>
 
-```r
-devtools::install_github("ropensci/solr")
-```
+<p>The previous default for <code>solr_search()</code> used <code>json</code></p>
+<div class="highlight"><pre><code class="language-r" data-lang="r">solr_search<span class="p">(</span>q<span class="o">=</span><span class="s">&#39;*:*&#39;</span><span class="p">,</span> rows<span class="o">=</span><span class="m">10</span><span class="p">,</span> fl<span class="o">=</span>fields<span class="p">,</span> base<span class="o">=</span><span class="kp">url</span><span class="p">,</span> wt <span class="o">=</span> <span class="s">&quot;json&quot;</span><span class="p">)</span>
+<span class="c1">#&gt; Source: local data frame [10 x 19]</span>
+<span class="c1">#&gt; </span>
+<span class="c1">#&gt;                                                                    id</span>
+<span class="c1">#&gt; 1             10.1371/annotation/856f0890-9d85-4719-8e54-c27530ac94f4</span>
+<span class="c1">#&gt; 2       10.1371/annotation/856f0890-9d85-4719-8e54-c27530ac94f4/title</span>
+<span class="c1">#&gt; 3    10.1371/annotation/856f0890-9d85-4719-8e54-c27530ac94f4/abstract</span>
+<span class="c1">#&gt; 4  10.1371/annotation/856f0890-9d85-4719-8e54-c27530ac94f4/references</span>
+<span class="c1">#&gt; 5        10.1371/annotation/856f0890-9d85-4719-8e54-c27530ac94f4/body</span>
+<span class="c1">#&gt; 6             10.1371/annotation/8551e3d5-fdd5-413b-a253-170ba13b7525</span>
+<span class="c1">#&gt; 7       10.1371/annotation/8551e3d5-fdd5-413b-a253-170ba13b7525/title</span>
+<span class="c1">#&gt; 8    10.1371/annotation/8551e3d5-fdd5-413b-a253-170ba13b7525/abstract</span>
+<span class="c1">#&gt; 9  10.1371/annotation/8551e3d5-fdd5-413b-a253-170ba13b7525/references</span>
+<span class="c1">#&gt; 10       10.1371/annotation/8551e3d5-fdd5-413b-a253-170ba13b7525/body</span>
+<span class="c1">#&gt; Variables not shown: cross_published_journal_name (chr),</span>
+<span class="c1">#&gt;   cross_published_journal_key (chr), cross_published_journal_eissn (chr),</span>
+<span class="c1">#&gt;   pmid (chr), pmcid (chr), publisher (chr), journal (chr),</span>
+<span class="c1">#&gt;   publication_date (chr), article_type (chr), article_type_facet (chr),</span>
+<span class="c1">#&gt;   author (chr), author_facet (chr), volume (int), issue (int),</span>
+<span class="c1">#&gt;   elocation_id (chr), author_display (chr), competing_interest (chr),</span>
+<span class="c1">#&gt;   copyright (chr)</span>
+</code></pre></div>
+<h2>csv</h2>
 
+<p>The default <code>wt</code> setting is now <code>csv</code></p>
+<div class="highlight"><pre><code class="language-r" data-lang="r">solr_search<span class="p">(</span>q<span class="o">=</span><span class="s">&#39;*:*&#39;</span><span class="p">,</span> rows<span class="o">=</span><span class="m">10</span><span class="p">,</span> fl<span class="o">=</span>fields<span class="p">,</span> base<span class="o">=</span><span class="kp">url</span><span class="p">,</span> wt <span class="o">=</span> <span class="s">&quot;json&quot;</span><span class="p">)</span>
+<span class="c1">#&gt; Source: local data frame [10 x 19]</span>
+<span class="c1">#&gt; </span>
+<span class="c1">#&gt;                                                                    id</span>
+<span class="c1">#&gt; 1             10.1371/annotation/856f0890-9d85-4719-8e54-c27530ac94f4</span>
+<span class="c1">#&gt; 2       10.1371/annotation/856f0890-9d85-4719-8e54-c27530ac94f4/title</span>
+<span class="c1">#&gt; 3    10.1371/annotation/856f0890-9d85-4719-8e54-c27530ac94f4/abstract</span>
+<span class="c1">#&gt; 4  10.1371/annotation/856f0890-9d85-4719-8e54-c27530ac94f4/references</span>
+<span class="c1">#&gt; 5        10.1371/annotation/856f0890-9d85-4719-8e54-c27530ac94f4/body</span>
+<span class="c1">#&gt; 6             10.1371/annotation/8551e3d5-fdd5-413b-a253-170ba13b7525</span>
+<span class="c1">#&gt; 7       10.1371/annotation/8551e3d5-fdd5-413b-a253-170ba13b7525/title</span>
+<span class="c1">#&gt; 8    10.1371/annotation/8551e3d5-fdd5-413b-a253-170ba13b7525/abstract</span>
+<span class="c1">#&gt; 9  10.1371/annotation/8551e3d5-fdd5-413b-a253-170ba13b7525/references</span>
+<span class="c1">#&gt; 10       10.1371/annotation/8551e3d5-fdd5-413b-a253-170ba13b7525/body</span>
+<span class="c1">#&gt; Variables not shown: cross_published_journal_name (chr),</span>
+<span class="c1">#&gt;   cross_published_journal_key (chr), cross_published_journal_eissn (chr),</span>
+<span class="c1">#&gt;   pmid (chr), pmcid (chr), publisher (chr), journal (chr),</span>
+<span class="c1">#&gt;   publication_date (chr), article_type (chr), article_type_facet (chr),</span>
+<span class="c1">#&gt;   author (chr), author_facet (chr), volume (int), issue (int),</span>
+<span class="c1">#&gt;   elocation_id (chr), author_display (chr), competing_interest (chr),</span>
+<span class="c1">#&gt;   copyright (chr)</span>
+</code></pre></div>
+<h2>Compare times</h2>
 
-```r
-library("solr")
-library("microbenchmark")
-```
+<p>When parsing to a data.frame (which <code>solr_search()</code> does by default), csv is quite a bit faster.</p>
+<div class="highlight"><pre><code class="language-r" data-lang="r">microbenchmark<span class="p">(</span>
+  json <span class="o">=</span> solr_search<span class="p">(</span>q<span class="o">=</span><span class="s">&#39;*:*&#39;</span><span class="p">,</span> rows<span class="o">=</span><span class="m">500</span><span class="p">,</span> fl<span class="o">=</span>fields<span class="p">,</span> base<span class="o">=</span><span class="kp">url</span><span class="p">,</span> wt <span class="o">=</span> <span class="s">&quot;json&quot;</span><span class="p">,</span> verbose <span class="o">=</span> <span class="kc">FALSE</span><span class="p">),</span>
+  csv <span class="o">=</span> solr_search<span class="p">(</span>q<span class="o">=</span><span class="s">&#39;*:*&#39;</span><span class="p">,</span> rows<span class="o">=</span><span class="m">500</span><span class="p">,</span> fl<span class="o">=</span>fields<span class="p">,</span> base<span class="o">=</span><span class="kp">url</span><span class="p">,</span> wt <span class="o">=</span> <span class="s">&quot;csv&quot;</span><span class="p">,</span> verbose <span class="o">=</span> <span class="kc">FALSE</span><span class="p">),</span> 
+  times <span class="o">=</span> <span class="m">20</span>
+<span class="p">)</span>
+<span class="c1">#&gt; Unit: milliseconds</span>
+<span class="c1">#&gt;  expr      min       lq      mean    median        uq       max neval cld</span>
+<span class="c1">#&gt;  json 965.7043 1013.014 1124.1229 1086.3225 1227.9054 1441.8332    20   b</span>
+<span class="c1">#&gt;   csv 509.6573  520.089  541.5784  532.4546  548.0303  723.7575    20  a</span>
+</code></pre></div>
+<h2>json vs xml vs csv</h2>
 
-## Setup
+<p>When getting raw data, csv is best, json next, then xml pulling up the rear.</p>
+<div class="highlight"><pre><code class="language-r" data-lang="r">microbenchmark<span class="p">(</span>
+  json <span class="o">=</span> solr_search<span class="p">(</span>q<span class="o">=</span><span class="s">&#39;*:*&#39;</span><span class="p">,</span> rows<span class="o">=</span><span class="m">1000</span><span class="p">,</span> fl<span class="o">=</span>fields<span class="p">,</span> base<span class="o">=</span><span class="kp">url</span><span class="p">,</span> wt <span class="o">=</span> <span class="s">&quot;json&quot;</span><span class="p">,</span> verbose <span class="o">=</span> <span class="kc">FALSE</span><span class="p">,</span> raw <span class="o">=</span> <span class="kc">TRUE</span><span class="p">),</span>
+  csv <span class="o">=</span> solr_search<span class="p">(</span>q<span class="o">=</span><span class="s">&#39;*:*&#39;</span><span class="p">,</span> rows<span class="o">=</span><span class="m">1000</span><span class="p">,</span> fl<span class="o">=</span>fields<span class="p">,</span> base<span class="o">=</span><span class="kp">url</span><span class="p">,</span> wt <span class="o">=</span> <span class="s">&quot;csv&quot;</span><span class="p">,</span> verbose <span class="o">=</span> <span class="kc">FALSE</span><span class="p">,</span> raw <span class="o">=</span> <span class="kc">TRUE</span><span class="p">),</span>
+  xml <span class="o">=</span> solr_search<span class="p">(</span>q<span class="o">=</span><span class="s">&#39;*:*&#39;</span><span class="p">,</span> rows<span class="o">=</span><span class="m">1000</span><span class="p">,</span> fl<span class="o">=</span>fields<span class="p">,</span> base<span class="o">=</span><span class="kp">url</span><span class="p">,</span> wt <span class="o">=</span> <span class="s">&quot;xml&quot;</span><span class="p">,</span> verbose <span class="o">=</span> <span class="kc">FALSE</span><span class="p">,</span> raw <span class="o">=</span> <span class="kc">TRUE</span><span class="p">),</span>
+  times <span class="o">=</span> <span class="m">10</span>
+<span class="p">)</span>
+<span class="c1">#&gt; Unit: milliseconds</span>
+<span class="c1">#&gt;  expr       min       lq      mean    median        uq       max neval cld</span>
+<span class="c1">#&gt;  json 1110.9515 1142.478 1198.9981 1169.0808 1195.5709 1518.7412    10  b </span>
+<span class="c1">#&gt;   csv  801.6871  802.516  826.0655  819.1532  835.0512  873.4266    10 a  </span>
+<span class="c1">#&gt;   xml 1507.1111 1554.002 1618.5963 1617.5208 1671.0026 1740.4448    10   c</span>
+</code></pre></div>
+<h2>Notes</h2>
 
-Define base url and fields to return
-
-
-```r
-url <- 'http://api.plos.org/search'
-fields <- c('id','cross_published_journal_name','cross_published_journal_key',
-            'cross_published_journal_eissn','pmid','pmcid','publisher','journal',
-            'publication_date','article_type','article_type_facet','author',
-            'author_facet','volume','issue','elocation_id','author_display',
-            'competing_interest','copyright')
-```
-
-## json
-
-The previous default for `solr_search()` used `json`
-
-
-```r
-solr_search(q='*:*', rows=10, fl=fields, base=url, wt = "json")
-#> Source: local data frame [10 x 19]
-#> 
-#>                                                                    id
-#> 1             10.1371/annotation/856f0890-9d85-4719-8e54-c27530ac94f4
-#> 2       10.1371/annotation/856f0890-9d85-4719-8e54-c27530ac94f4/title
-#> 3    10.1371/annotation/856f0890-9d85-4719-8e54-c27530ac94f4/abstract
-#> 4  10.1371/annotation/856f0890-9d85-4719-8e54-c27530ac94f4/references
-#> 5        10.1371/annotation/856f0890-9d85-4719-8e54-c27530ac94f4/body
-#> 6             10.1371/annotation/8551e3d5-fdd5-413b-a253-170ba13b7525
-#> 7       10.1371/annotation/8551e3d5-fdd5-413b-a253-170ba13b7525/title
-#> 8    10.1371/annotation/8551e3d5-fdd5-413b-a253-170ba13b7525/abstract
-#> 9  10.1371/annotation/8551e3d5-fdd5-413b-a253-170ba13b7525/references
-#> 10       10.1371/annotation/8551e3d5-fdd5-413b-a253-170ba13b7525/body
-#> Variables not shown: cross_published_journal_name (chr),
-#>   cross_published_journal_key (chr), cross_published_journal_eissn (chr),
-#>   pmid (chr), pmcid (chr), publisher (chr), journal (chr),
-#>   publication_date (chr), article_type (chr), article_type_facet (chr),
-#>   author (chr), author_facet (chr), volume (int), issue (int),
-#>   elocation_id (chr), author_display (chr), competing_interest (chr),
-#>   copyright (chr)
-```
-
-## csv
-
-The default `wt` setting is now `csv`
-
-
-```r
-solr_search(q='*:*', rows=10, fl=fields, base=url, wt = "json")
-#> Source: local data frame [10 x 19]
-#> 
-#>                                                                    id
-#> 1             10.1371/annotation/856f0890-9d85-4719-8e54-c27530ac94f4
-#> 2       10.1371/annotation/856f0890-9d85-4719-8e54-c27530ac94f4/title
-#> 3    10.1371/annotation/856f0890-9d85-4719-8e54-c27530ac94f4/abstract
-#> 4  10.1371/annotation/856f0890-9d85-4719-8e54-c27530ac94f4/references
-#> 5        10.1371/annotation/856f0890-9d85-4719-8e54-c27530ac94f4/body
-#> 6             10.1371/annotation/8551e3d5-fdd5-413b-a253-170ba13b7525
-#> 7       10.1371/annotation/8551e3d5-fdd5-413b-a253-170ba13b7525/title
-#> 8    10.1371/annotation/8551e3d5-fdd5-413b-a253-170ba13b7525/abstract
-#> 9  10.1371/annotation/8551e3d5-fdd5-413b-a253-170ba13b7525/references
-#> 10       10.1371/annotation/8551e3d5-fdd5-413b-a253-170ba13b7525/body
-#> Variables not shown: cross_published_journal_name (chr),
-#>   cross_published_journal_key (chr), cross_published_journal_eissn (chr),
-#>   pmid (chr), pmcid (chr), publisher (chr), journal (chr),
-#>   publication_date (chr), article_type (chr), article_type_facet (chr),
-#>   author (chr), author_facet (chr), volume (int), issue (int),
-#>   elocation_id (chr), author_display (chr), competing_interest (chr),
-#>   copyright (chr)
-```
-
-## Compare times
-
-When parsing to a data.frame (which `solr_search()` does by default), csv is quite a bit faster.
-
-
-```r
-microbenchmark(
-  json = solr_search(q='*:*', rows=500, fl=fields, base=url, wt = "json", verbose = FALSE),
-  csv = solr_search(q='*:*', rows=500, fl=fields, base=url, wt = "csv", verbose = FALSE), 
-  times = 20
-)
-#> Unit: milliseconds
-#>  expr      min       lq      mean    median        uq       max neval cld
-#>  json 965.7043 1013.014 1124.1229 1086.3225 1227.9054 1441.8332    20   b
-#>   csv 509.6573  520.089  541.5784  532.4546  548.0303  723.7575    20  a
-```
-
-## json vs xml vs csv
-
-When getting raw data, csv is best, json next, then xml pulling up the rear.
-
-
-```r
-microbenchmark(
-  json = solr_search(q='*:*', rows=1000, fl=fields, base=url, wt = "json", verbose = FALSE, raw = TRUE),
-  csv = solr_search(q='*:*', rows=1000, fl=fields, base=url, wt = "csv", verbose = FALSE, raw = TRUE),
-  xml = solr_search(q='*:*', rows=1000, fl=fields, base=url, wt = "xml", verbose = FALSE, raw = TRUE),
-  times = 10
-)
-#> Unit: milliseconds
-#>  expr       min       lq      mean    median        uq       max neval cld
-#>  json 1110.9515 1142.478 1198.9981 1169.0808 1195.5709 1518.7412    10  b 
-#>   csv  801.6871  802.516  826.0655  819.1532  835.0512  873.4266    10 a  
-#>   xml 1507.1111 1554.002 1618.5963 1617.5208 1671.0026 1740.4448    10   c
-```
-
-## Notes
-
-Note that `wt=csv` is only available in `solr_search()` and `solr_all()` because csv writer 
+<p>Note that <code>wt=csv</code> is only available in <code>solr_search()</code> and <code>solr_all()</code> because csv writer 
 only returns the docs element in csv, dropping other elements, including facets, mlt, groups, 
-stats, etc. 
+stats, etc. </p>
 
-Also, note the http client used in `solr` is `httr`, which passes in a gzip compression header by default, so as long as the server serving up the Solr data has compression turned on, that's all set.
+<p>Also, note the http client used in <code>solr</code> is <code>httr</code>, which passes in a gzip compression header by default, so as long as the server serving up the Solr data has compression turned on, that&#39;s all set.</p>
 
-Another way I've sped things up is if you use `wt=json` then parse to a data.frame, it uses `dplyr` which sped things up considerably.
+<p>Another way I&#39;ve sped things up is if you use <code>wt=json</code> then parse to a data.frame, it uses <code>dplyr</code> which sped things up considerably.</p>
 
   </div>
   
@@ -214,240 +186,180 @@ Another way I've sped things up is if you use `wt=json` then parse to a data.fra
 
     <span class="post-date">12 Mar 2015</span>
 
-    It would be nice to easily push each row or column of a data.frame into CouchDB instead of having to prepare them yourself into JSON, then push in to couch. I recently added ability to push data.frame's into couch using the normal `PUT /{db}` method, and added support for the couch bulk API.
+    <p>It would be nice to easily push each row or column of a data.frame into CouchDB instead of having to prepare them yourself into JSON, then push in to couch. I recently added ability to push data.frame&#39;s into couch using the normal <code>PUT /{db}</code> method, and added support for the couch bulk API.</p>
 
-## Install
+<h2>Install</h2>
+<div class="highlight"><pre><code class="language-r" data-lang="r">install.packages<span class="p">(</span><span class="s">&quot;devtools&quot;</span><span class="p">)</span>
+devtools<span class="o">::</span>install_github<span class="p">(</span><span class="s">&quot;sckott/sofa&quot;</span><span class="p">)</span>
+</code></pre></div><div class="highlight"><pre><code class="language-r" data-lang="r"><span class="kn">library</span><span class="p">(</span><span class="s">&quot;sofa&quot;</span><span class="p">)</span>
+</code></pre></div>
+<h2>PUT /db</h2>
 
+<p>You can write directly from a data.frame, either by rows or columns. First, rows:</p>
+<div class="highlight"><pre><code class="language-text" data-lang="text">#&gt; $ok
+#&gt; [1] TRUE
+</code></pre></div>
+<p>Create a database</p>
+<div class="highlight"><pre><code class="language-r" data-lang="r">db_create<span class="p">(</span>dbname<span class="o">=</span><span class="s">&quot;mtcarsdb&quot;</span><span class="p">)</span>
+<span class="c1">#&gt; $ok</span>
+<span class="c1">#&gt; [1] TRUE</span>
+</code></pre></div><div class="highlight"><pre><code class="language-r" data-lang="r">out <span class="o">&lt;-</span> doc_create<span class="p">(</span>mtcars<span class="p">,</span> dbname<span class="o">=</span><span class="s">&quot;mtcarsdb&quot;</span><span class="p">,</span> how<span class="o">=</span><span class="s">&quot;rows&quot;</span><span class="p">)</span>
+out<span class="p">[</span><span class="m">1</span><span class="o">:</span><span class="m">2</span><span class="p">]</span>
+<span class="c1">#&gt; $`Mazda RX4`</span>
+<span class="c1">#&gt; $`Mazda RX4`$ok</span>
+<span class="c1">#&gt; [1] TRUE</span>
+<span class="c1">#&gt; </span>
+<span class="c1">#&gt; $`Mazda RX4`$id</span>
+<span class="c1">#&gt; [1] &quot;0063109bfb1c15765854cbc9525c3a7a&quot;</span>
+<span class="c1">#&gt; </span>
+<span class="c1">#&gt; $`Mazda RX4`$rev</span>
+<span class="c1">#&gt; [1] &quot;1-3946941c894a874697554e3e6d9bc176&quot;</span>
+<span class="c1">#&gt; </span>
+<span class="c1">#&gt; </span>
+<span class="c1">#&gt; $`Mazda RX4 Wag`</span>
+<span class="c1">#&gt; $`Mazda RX4 Wag`$ok</span>
+<span class="c1">#&gt; [1] TRUE</span>
+<span class="c1">#&gt; </span>
+<span class="c1">#&gt; $`Mazda RX4 Wag`$id</span>
+<span class="c1">#&gt; [1] &quot;0063109bfb1c15765854cbc9525c461d&quot;</span>
+<span class="c1">#&gt; </span>
+<span class="c1">#&gt; $`Mazda RX4 Wag`$rev</span>
+<span class="c1">#&gt; [1] &quot;1-273ff17a938cb956cba21051ab428b95&quot;</span>
+</code></pre></div>
+<p>Then by columns</p>
+<div class="highlight"><pre><code class="language-r" data-lang="r">out <span class="o">&lt;-</span> doc_create<span class="p">(</span>mtcars<span class="p">,</span> dbname<span class="o">=</span><span class="s">&quot;mtcarsdb&quot;</span><span class="p">,</span> how<span class="o">=</span><span class="s">&quot;columns&quot;</span><span class="p">)</span>
+out<span class="p">[</span><span class="m">1</span><span class="o">:</span><span class="m">2</span><span class="p">]</span>
+<span class="c1">#&gt; $mpg</span>
+<span class="c1">#&gt; $mpg$ok</span>
+<span class="c1">#&gt; [1] TRUE</span>
+<span class="c1">#&gt; </span>
+<span class="c1">#&gt; $mpg$id</span>
+<span class="c1">#&gt; [1] &quot;0063109bfb1c15765854cbc9525d4f1f&quot;</span>
+<span class="c1">#&gt; </span>
+<span class="c1">#&gt; $mpg$rev</span>
+<span class="c1">#&gt; [1] &quot;1-4b83d0ef53a28849a872d47ad03fef9a&quot;</span>
+<span class="c1">#&gt; </span>
+<span class="c1">#&gt; </span>
+<span class="c1">#&gt; $cyl</span>
+<span class="c1">#&gt; $cyl$ok</span>
+<span class="c1">#&gt; [1] TRUE</span>
+<span class="c1">#&gt; </span>
+<span class="c1">#&gt; $cyl$id</span>
+<span class="c1">#&gt; [1] &quot;0063109bfb1c15765854cbc9525d57d3&quot;</span>
+<span class="c1">#&gt; </span>
+<span class="c1">#&gt; $cyl$rev</span>
+<span class="c1">#&gt; [1] &quot;1-c21bfa5425c67743f0826fd4b44b0dbf&quot;</span>
+</code></pre></div>
+<h2>Bulk API</h2>
 
-```r
-install.packages("devtools")
-devtools::install_github("sckott/sofa")
-```
+<p>The bulk API will/should be faster for larger data.frames</p>
+<div class="highlight"><pre><code class="language-text" data-lang="text">#&gt; $ok
+#&gt; [1] TRUE
+</code></pre></div>
+<p>We&#39;ll use part of the diamonds dataset</p>
+<div class="highlight"><pre><code class="language-r" data-lang="r"><span class="kn">library</span><span class="p">(</span><span class="s">&quot;ggplot2&quot;</span><span class="p">)</span>
+dat <span class="o">&lt;-</span> diamonds<span class="p">[</span><span class="m">1</span><span class="o">:</span><span class="m">20000</span><span class="p">,]</span>
+</code></pre></div>
+<p>Create a database</p>
+<div class="highlight"><pre><code class="language-r" data-lang="r">db_create<span class="p">(</span>dbname<span class="o">=</span><span class="s">&quot;bulktest&quot;</span><span class="p">)</span>
+<span class="c1">#&gt; $ok</span>
+<span class="c1">#&gt; [1] TRUE</span>
+</code></pre></div>
+<p>Load by row (could instead do each column, see <code>how</code> parameter), printing the time it takes</p>
+<div class="highlight"><pre><code class="language-r" data-lang="r"><span class="kp">system.time</span><span class="p">(</span>out <span class="o">&lt;-</span> bulk_create<span class="p">(</span>dat<span class="p">,</span> dbname<span class="o">=</span><span class="s">&quot;bulktest&quot;</span><span class="p">))</span>
+<span class="c1">#&gt;    user  system elapsed </span>
+<span class="c1">#&gt;  16.832   6.039  24.432</span>
+</code></pre></div>
+<p>The returned data is the same as with <code>doc_create()</code></p>
+<div class="highlight"><pre><code class="language-r" data-lang="r">out<span class="p">[</span><span class="m">1</span><span class="o">:</span><span class="m">2</span><span class="p">]</span>
+<span class="c1">#&gt; [[1]]</span>
+<span class="c1">#&gt; [[1]]$ok</span>
+<span class="c1">#&gt; [1] TRUE</span>
+<span class="c1">#&gt; </span>
+<span class="c1">#&gt; [[1]]$id</span>
+<span class="c1">#&gt; [1] &quot;0063109bfb1c15765854cbc9525d8b8d&quot;</span>
+<span class="c1">#&gt; </span>
+<span class="c1">#&gt; [[1]]$rev</span>
+<span class="c1">#&gt; [1] &quot;1-f407fe4935af7fd17c101f13d3c81679&quot;</span>
+<span class="c1">#&gt; </span>
+<span class="c1">#&gt; </span>
+<span class="c1">#&gt; [[2]]</span>
+<span class="c1">#&gt; [[2]]$ok</span>
+<span class="c1">#&gt; [1] TRUE</span>
+<span class="c1">#&gt; </span>
+<span class="c1">#&gt; [[2]]$id</span>
+<span class="c1">#&gt; [1] &quot;0063109bfb1c15765854cbc9525d998b&quot;</span>
+<span class="c1">#&gt; </span>
+<span class="c1">#&gt; [[2]]$rev</span>
+<span class="c1">#&gt; [1] &quot;1-cf8b9a9dcdc026052a663d6fef8a36fe&quot;</span>
+</code></pre></div>
+<p>So that&#39;s 20,000 rows in not that much time, not bad.</p>
 
+<h3>not dataframes</h3>
 
-```r
-library("sofa")
-```
+<p>You can also pass in lists or vectors of json as character strings, e.g., </p>
 
-## PUT /db
-
-You can write directly from a data.frame, either by rows or columns. First, rows:
-
-
-```
-#> $ok
-#> [1] TRUE
-```
-
-Create a database
-
-
-```r
-db_create(dbname="mtcarsdb")
-#> $ok
-#> [1] TRUE
-```
-
-
-```r
-out <- doc_create(mtcars, dbname="mtcarsdb", how="rows")
-out[1:2]
-#> $`Mazda RX4`
-#> $`Mazda RX4`$ok
-#> [1] TRUE
-#> 
-#> $`Mazda RX4`$id
-#> [1] "0063109bfb1c15765854cbc9525c3a7a"
-#> 
-#> $`Mazda RX4`$rev
-#> [1] "1-3946941c894a874697554e3e6d9bc176"
-#> 
-#> 
-#> $`Mazda RX4 Wag`
-#> $`Mazda RX4 Wag`$ok
-#> [1] TRUE
-#> 
-#> $`Mazda RX4 Wag`$id
-#> [1] "0063109bfb1c15765854cbc9525c461d"
-#> 
-#> $`Mazda RX4 Wag`$rev
-#> [1] "1-273ff17a938cb956cba21051ab428b95"
-```
-
-Then by columns
-
-
-```r
-out <- doc_create(mtcars, dbname="mtcarsdb", how="columns")
-out[1:2]
-#> $mpg
-#> $mpg$ok
-#> [1] TRUE
-#> 
-#> $mpg$id
-#> [1] "0063109bfb1c15765854cbc9525d4f1f"
-#> 
-#> $mpg$rev
-#> [1] "1-4b83d0ef53a28849a872d47ad03fef9a"
-#> 
-#> 
-#> $cyl
-#> $cyl$ok
-#> [1] TRUE
-#> 
-#> $cyl$id
-#> [1] "0063109bfb1c15765854cbc9525d57d3"
-#> 
-#> $cyl$rev
-#> [1] "1-c21bfa5425c67743f0826fd4b44b0dbf"
-```
-
-## Bulk API
-
-The bulk API will/should be faster for larger data.frames
-
-
-```
-#> $ok
-#> [1] TRUE
-```
-
-We'll use part of the diamonds dataset
-
-
-```r
-library("ggplot2")
-dat <- diamonds[1:20000,]
-```
-
-Create a database
-
-
-```r
-db_create(dbname="bulktest")
-#> $ok
-#> [1] TRUE
-```
-
-Load by row (could instead do each column, see `how` parameter), printing the time it takes
-
-
-```r
-system.time(out <- bulk_create(dat, dbname="bulktest"))
-#>    user  system elapsed 
-#>  16.832   6.039  24.432
-```
-
-The returned data is the same as with `doc_create()`
-
-
-```r
-out[1:2]
-#> [[1]]
-#> [[1]]$ok
-#> [1] TRUE
-#> 
-#> [[1]]$id
-#> [1] "0063109bfb1c15765854cbc9525d8b8d"
-#> 
-#> [[1]]$rev
-#> [1] "1-f407fe4935af7fd17c101f13d3c81679"
-#> 
-#> 
-#> [[2]]
-#> [[2]]$ok
-#> [1] TRUE
-#> 
-#> [[2]]$id
-#> [1] "0063109bfb1c15765854cbc9525d998b"
-#> 
-#> [[2]]$rev
-#> [1] "1-cf8b9a9dcdc026052a663d6fef8a36fe"
-```
-
-So that's 20,000 rows in not that much time, not bad.
-
-### not dataframes
-
-You can also pass in lists or vectors of json as character strings, e.g., 
-
-_lists_
-
-
-```
-#> $ok
-#> [1] TRUE
-```
-
-
-```r
-row.names(mtcars) <- NULL # get rid of row.names
-lst <- parse_df(mtcars, tojson=FALSE)
-db_create(dbname="bulkfromlist")
-#> $ok
-#> [1] TRUE
-out <- bulk_create(lst, dbname="bulkfromlist")
-out[1:2]
-#> [[1]]
-#> [[1]]$ok
-#> [1] TRUE
-#> 
-#> [[1]]$id
-#> [1] "ba70c46d73707662b1e204a90fcd9bb8"
-#> 
-#> [[1]]$rev
-#> [1] "1-3946941c894a874697554e3e6d9bc176"
-#> 
-#> 
-#> [[2]]
-#> [[2]]$ok
-#> [1] TRUE
-#> 
-#> [[2]]$id
-#> [1] "ba70c46d73707662b1e204a90fcda9f6"
-#> 
-#> [[2]]$rev
-#> [1] "1-273ff17a938cb956cba21051ab428b95"
-```
-
-_json_
-
-
-```
-#> $ok
-#> [1] TRUE
-```
-
-
-```r
-strs <- as.character(parse_df(mtcars, "columns"))
-db_create(dbname="bulkfromchr")
-#> $ok
-#> [1] TRUE
-out <- bulk_create(strs, dbname="bulkfromchr")
-out[1:2]
-#> [[1]]
-#> [[1]]$ok
-#> [1] TRUE
-#> 
-#> [[1]]$id
-#> [1] "ba70c46d73707662b1e204a90fce8c20"
-#> 
-#> [[1]]$rev
-#> [1] "1-4b83d0ef53a28849a872d47ad03fef9a"
-#> 
-#> 
-#> [[2]]
-#> [[2]]$ok
-#> [1] TRUE
-#> 
-#> [[2]]$id
-#> [1] "ba70c46d73707662b1e204a90fce9bc1"
-#> 
-#> [[2]]$rev
-#> [1] "1-c21bfa5425c67743f0826fd4b44b0dbf"
-```
-
+<p><em>lists</em></p>
+<div class="highlight"><pre><code class="language-text" data-lang="text">#&gt; $ok
+#&gt; [1] TRUE
+</code></pre></div><div class="highlight"><pre><code class="language-r" data-lang="r"><span class="kp">row.names</span><span class="p">(</span>mtcars<span class="p">)</span> <span class="o">&lt;-</span> <span class="kc">NULL</span> <span class="c1"># get rid of row.names</span>
+lst <span class="o">&lt;-</span> parse_df<span class="p">(</span>mtcars<span class="p">,</span> tojson<span class="o">=</span><span class="kc">FALSE</span><span class="p">)</span>
+db_create<span class="p">(</span>dbname<span class="o">=</span><span class="s">&quot;bulkfromlist&quot;</span><span class="p">)</span>
+<span class="c1">#&gt; $ok</span>
+<span class="c1">#&gt; [1] TRUE</span>
+out <span class="o">&lt;-</span> bulk_create<span class="p">(</span>lst<span class="p">,</span> dbname<span class="o">=</span><span class="s">&quot;bulkfromlist&quot;</span><span class="p">)</span>
+out<span class="p">[</span><span class="m">1</span><span class="o">:</span><span class="m">2</span><span class="p">]</span>
+<span class="c1">#&gt; [[1]]</span>
+<span class="c1">#&gt; [[1]]$ok</span>
+<span class="c1">#&gt; [1] TRUE</span>
+<span class="c1">#&gt; </span>
+<span class="c1">#&gt; [[1]]$id</span>
+<span class="c1">#&gt; [1] &quot;ba70c46d73707662b1e204a90fcd9bb8&quot;</span>
+<span class="c1">#&gt; </span>
+<span class="c1">#&gt; [[1]]$rev</span>
+<span class="c1">#&gt; [1] &quot;1-3946941c894a874697554e3e6d9bc176&quot;</span>
+<span class="c1">#&gt; </span>
+<span class="c1">#&gt; </span>
+<span class="c1">#&gt; [[2]]</span>
+<span class="c1">#&gt; [[2]]$ok</span>
+<span class="c1">#&gt; [1] TRUE</span>
+<span class="c1">#&gt; </span>
+<span class="c1">#&gt; [[2]]$id</span>
+<span class="c1">#&gt; [1] &quot;ba70c46d73707662b1e204a90fcda9f6&quot;</span>
+<span class="c1">#&gt; </span>
+<span class="c1">#&gt; [[2]]$rev</span>
+<span class="c1">#&gt; [1] &quot;1-273ff17a938cb956cba21051ab428b95&quot;</span>
+</code></pre></div>
+<p><em>json</em></p>
+<div class="highlight"><pre><code class="language-text" data-lang="text">#&gt; $ok
+#&gt; [1] TRUE
+</code></pre></div><div class="highlight"><pre><code class="language-r" data-lang="r">strs <span class="o">&lt;-</span> <span class="kp">as.character</span><span class="p">(</span>parse_df<span class="p">(</span>mtcars<span class="p">,</span> <span class="s">&quot;columns&quot;</span><span class="p">))</span>
+db_create<span class="p">(</span>dbname<span class="o">=</span><span class="s">&quot;bulkfromchr&quot;</span><span class="p">)</span>
+<span class="c1">#&gt; $ok</span>
+<span class="c1">#&gt; [1] TRUE</span>
+out <span class="o">&lt;-</span> bulk_create<span class="p">(</span>strs<span class="p">,</span> dbname<span class="o">=</span><span class="s">&quot;bulkfromchr&quot;</span><span class="p">)</span>
+out<span class="p">[</span><span class="m">1</span><span class="o">:</span><span class="m">2</span><span class="p">]</span>
+<span class="c1">#&gt; [[1]]</span>
+<span class="c1">#&gt; [[1]]$ok</span>
+<span class="c1">#&gt; [1] TRUE</span>
+<span class="c1">#&gt; </span>
+<span class="c1">#&gt; [[1]]$id</span>
+<span class="c1">#&gt; [1] &quot;ba70c46d73707662b1e204a90fce8c20&quot;</span>
+<span class="c1">#&gt; </span>
+<span class="c1">#&gt; [[1]]$rev</span>
+<span class="c1">#&gt; [1] &quot;1-4b83d0ef53a28849a872d47ad03fef9a&quot;</span>
+<span class="c1">#&gt; </span>
+<span class="c1">#&gt; </span>
+<span class="c1">#&gt; [[2]]</span>
+<span class="c1">#&gt; [[2]]$ok</span>
+<span class="c1">#&gt; [1] TRUE</span>
+<span class="c1">#&gt; </span>
+<span class="c1">#&gt; [[2]]$id</span>
+<span class="c1">#&gt; [1] &quot;ba70c46d73707662b1e204a90fce9bc1&quot;</span>
+<span class="c1">#&gt; </span>
+<span class="c1">#&gt; [[2]]$rev</span>
+<span class="c1">#&gt; [1] &quot;1-c21bfa5425c67743f0826fd4b44b0dbf&quot;</span>
+</code></pre></div>
   </div>
   
   <div class="post">
@@ -459,197 +371,132 @@ out[1:2]
 
     <span class="post-date">11 Mar 2015</span>
 
-    CSL (Citation Style Language) is used quite widely now to specify citations in a standard fashion. `csl` is an R client for exploring CSL styles, and is inspired by the Ruby gem [csl](https://github.com/inukshuk/csl-ruby). For example, csl is given back in the PLOS Lagotto article level metric API (follow [http://alm.plos.org/api/v5/articles?ids=10.1371%252Fjournal.pone.0025110&info=detail&source_id=crossref](http://alm.plos.org/api/v5/articles?ids=10.1371%252Fjournal.pone.0025110&info=detail&source_id=crossref)).
+    <p>CSL (Citation Style Language) is used quite widely now to specify citations in a standard fashion. <code>csl</code> is an R client for exploring CSL styles, and is inspired by the Ruby gem <a href="https://github.com/inukshuk/csl-ruby">csl</a>. For example, csl is given back in the PLOS Lagotto article level metric API (follow <a href="http://alm.plos.org/api/v5/articles?ids=10.1371%252Fjournal.pone.0025110&amp;info=detail&amp;source_id=crossref">http://alm.plos.org/api/v5/articles?ids=10.1371%252Fjournal.pone.0025110&amp;info=detail&amp;source_id=crossref</a>).</p>
 
-Let me know if you have any feedback at the repo [https://github.com/ropensci/csl](https://github.com/ropensci/csl)
+<p>Let me know if you have any feedback at the repo <a href="https://github.com/ropensci/csl">https://github.com/ropensci/csl</a></p>
 
-## Install
+<h2>Install</h2>
+<div class="highlight"><pre><code class="language-r" data-lang="r">install.packages<span class="p">(</span><span class="s">&quot;devtools&quot;</span><span class="p">)</span>
+devtools<span class="o">::</span>install_github<span class="p">(</span><span class="s">&quot;ropensci/csl&quot;</span><span class="p">)</span>
+</code></pre></div><div class="highlight"><pre><code class="language-r" data-lang="r"><span class="kn">library</span><span class="p">(</span><span class="s">&quot;csl&quot;</span><span class="p">)</span>
+</code></pre></div>
+<h2>Load CSL style from a URL</h2>
 
+<p>You can load CSL styles from either a URL or a local file on your machine. Firt, from a URL. In this case from the Zotero style repository, for the American Journal or Political Science.</p>
+<div class="highlight"><pre><code class="language-r" data-lang="r">jps <span class="o">&lt;-</span> style_load<span class="p">(</span><span class="s">&#39;http://www.zotero.org/styles/american-journal-of-political-science&#39;</span><span class="p">)</span>
+</code></pre></div>
+<p>A list is returned, which you can index to various parts of the style specification.</p>
+<div class="highlight"><pre><code class="language-r" data-lang="r">jps<span class="o">$</span>info
+<span class="c1">#&gt; $title</span>
+<span class="c1">#&gt; [1] &quot;American Journal of Political Science&quot;</span>
+<span class="c1">#&gt; </span>
+<span class="c1">#&gt; $title_short</span>
+<span class="c1">#&gt; [1] &quot;AJPS&quot;</span>
+<span class="c1">#&gt; </span>
+<span class="c1">#&gt; $id</span>
+<span class="c1">#&gt; [1] &quot;http://www.zotero.org/styles/american-journal-of-political-science&quot;</span>
+<span class="c1">#&gt; </span>
+<span class="c1">#&gt; $author</span>
+<span class="kc">...</span>
+</code></pre></div><div class="highlight"><pre><code class="language-r" data-lang="r">jps<span class="o">$</span>title
+<span class="c1">#&gt; [1] &quot;American Journal of Political Science&quot;</span>
+</code></pre></div><div class="highlight"><pre><code class="language-r" data-lang="r">jps<span class="o">$</span>citation_format
+<span class="c1">#&gt; [1] &quot;author-date&quot;</span>
+</code></pre></div><div class="highlight"><pre><code class="language-r" data-lang="r">jps<span class="o">$</span>links_template
+<span class="c1">#&gt; [1] &quot;http://www.zotero.org/styles/american-political-science-association&quot;</span>
+</code></pre></div><div class="highlight"><pre><code class="language-r" data-lang="r">jps<span class="o">$</span>editor
+<span class="c1">#&gt; $editor</span>
+<span class="c1">#&gt; $editor$variable</span>
+<span class="c1">#&gt; [1] &quot;editor&quot;</span>
+<span class="c1">#&gt; </span>
+<span class="c1">#&gt; $editor$delimiter</span>
+<span class="c1">#&gt; [1] &quot;, &quot;</span>
+<span class="c1">#&gt; </span>
+<span class="c1">#&gt; </span>
+<span class="c1">#&gt; $label</span>
+<span class="c1">#&gt; $label$form</span>
+<span class="kc">...</span>
+</code></pre></div><div class="highlight"><pre><code class="language-r" data-lang="r">jps<span class="o">$</span>author
+<span class="c1">#&gt; $author</span>
+<span class="c1">#&gt; $author$variable</span>
+<span class="c1">#&gt; [1] &quot;author&quot;</span>
+<span class="c1">#&gt; </span>
+<span class="c1">#&gt; </span>
+<span class="c1">#&gt; $label</span>
+<span class="c1">#&gt; $label$form</span>
+<span class="c1">#&gt; [1] &quot;short&quot;</span>
+<span class="c1">#&gt; </span>
+<span class="c1">#&gt; $label$prefix</span>
+<span class="kc">...</span>
+</code></pre></div>
+<h2>Get raw XML</h2>
 
-```r
-install.packages("devtools")
-devtools::install_github("ropensci/csl")
-```
+<p>You can also get raw XML if you&#39;d rather deal with that format.</p>
+<div class="highlight"><pre><code class="language-r" data-lang="r">style_xml<span class="p">(</span><span class="s">&#39;http://www.zotero.org/styles/american-journal-of-political-science&#39;</span><span class="p">)</span>
+<span class="c1">#&gt; &lt;?xml version=&quot;1.0&quot; encoding=&quot;utf-8&quot;?&gt;</span>
+<span class="c1">#&gt; &lt;style xmlns=&quot;http://purl.org/net/xbiblio/csl&quot; class=&quot;in-text&quot; version=&quot;1.0&quot; demote-non-dropping-particle=&quot;sort-only&quot; default-locale=&quot;en-US&quot;&gt;</span>
+<span class="c1">#&gt;   &lt;info&gt;</span>
+<span class="c1">#&gt;     &lt;title&gt;American Journal of Political Science&lt;/title&gt;</span>
+<span class="c1">#&gt;     &lt;title-short&gt;AJPS&lt;/title-short&gt;</span>
+<span class="c1">#&gt;     &lt;id&gt;http://www.zotero.org/styles/american-journal-of-political-science&lt;/id&gt;</span>
+<span class="c1">#&gt;     &lt;link href=&quot;http://www.zotero.org/styles/american-journal-of-political-science&quot; rel=&quot;self&quot;/&gt;</span>
+<span class="c1">#&gt;     &lt;link href=&quot;http://www.zotero.org/styles/american-political-science-association&quot; rel=&quot;template&quot;/&gt;</span>
+<span class="c1">#&gt;     &lt;link href=&quot;http://www.ajps.org/AJPS%20Style%20Guide.pdf&quot; rel=&quot;documentation&quot;/&gt;</span>
+<span class="c1">#&gt;     &lt;author&gt;</span>
+<span class="kc">...</span>
+</code></pre></div>
+<h2>Get styles</h2>
 
+<p>There is a GitHub repository of CSL styles at  <a href="https://github.com/citation-style-language/styles-distribution">https://github.com/citation-style-language/styles-distribution</a>. These don&#39;t come with the <code>csl</code> package, so you have to run <code>get_styles()</code> to get them on your machine. The default path is <code>Sys.getenv(&quot;HOME&quot;)/styles</code>, which for me is <code>/Users/sacmac/styles</code>. You can change where files are saved by using the <code>path</code> parameter.</p>
+<div class="highlight"><pre><code class="language-r" data-lang="r">get_styles<span class="p">()</span>
+<span class="c1">#&gt; </span>
+<span class="c1">#&gt; Done! Files put in /Users/sacmac/styles</span>
+</code></pre></div>
+<p>After getting styles locally you can load them just as we did with <code>style_load()</code>, but from your machine. However, since the file is local, we can make this easier by allowing just the name of the style, like</p>
+<div class="highlight"><pre><code class="language-r" data-lang="r">style_load<span class="p">(</span><span class="s">&quot;apa&quot;</span><span class="p">)</span>
+<span class="c1">#&gt; $info</span>
+<span class="c1">#&gt; $info$title</span>
+<span class="c1">#&gt; [1] &quot;American Psychological Association 6th edition&quot;</span>
+<span class="c1">#&gt; </span>
+<span class="c1">#&gt; $info$title_short</span>
+<span class="c1">#&gt; [1] &quot;APA&quot;</span>
+<span class="c1">#&gt; </span>
+<span class="c1">#&gt; $info$id</span>
+<span class="c1">#&gt; [1] &quot;http://www.zotero.org/styles/apa&quot;</span>
+<span class="c1">#&gt; </span>
+<span class="kc">...</span>
+</code></pre></div>
+<p>If you are unsure if a style exists, you can use <code>style_exists()</code></p>
+<div class="highlight"><pre><code class="language-r" data-lang="r">style_exists<span class="p">(</span><span class="s">&quot;helloworld&quot;</span><span class="p">)</span>
+<span class="c1">#&gt; [1] FALSE</span>
+style_exists<span class="p">(</span><span class="s">&quot;acs-nano&quot;</span><span class="p">)</span>
+<span class="c1">#&gt; [1] TRUE</span>
+</code></pre></div>
+<p>In addition, you can list the path for a single style, more than 1, or all styles with <code>styles()</code></p>
+<div class="highlight"><pre><code class="language-r" data-lang="r">styles<span class="p">(</span><span class="s">&quot;apa&quot;</span><span class="p">)</span>
+<span class="c1">#&gt; [1] &quot;/Users/sacmac/styles/apa.csl&quot;</span>
+</code></pre></div>
+<p>All of them, truncated for blog brevity</p>
+<div class="highlight"><pre><code class="language-r" data-lang="r">styles<span class="p">()</span>
+<span class="c1">#&gt; $independent</span>
+<span class="c1">#&gt;    [1] &quot;academy-of-management-review&quot;                                                         </span>
+<span class="c1">#&gt;    [2] &quot;acm-sig-proceedings-long-author-list&quot;                                                 </span>
+<span class="c1">#&gt;    [3] &quot;acm-sig-proceedings&quot;                                                                  </span>
+<span class="c1">#&gt;    [4] &quot;acm-sigchi-proceedings-extended-abstract-format&quot;                                      </span>
+<span class="c1">#&gt;    [5] &quot;acm-sigchi-proceedings&quot;                                                               </span>
+<span class="c1">#&gt;    [6] &quot;acm-siggraph&quot;                                                                         </span>
+<span class="c1">#&gt;    [7] &quot;acs-nano&quot;                                                                             </span>
+<span class="c1">#&gt;    [8] &quot;acta-anaesthesiologica-scandinavica&quot;                                                  </span>
+<span class="c1">#&gt;    [9] &quot;acta-anaesthesiologica-taiwanica&quot;                                                     </span>
+<span class="kc">...</span>
+</code></pre></div>
+<h2>Get locales</h2>
 
-```r
-library("csl")
-```
-
-## Load CSL style from a URL
-
-You can load CSL styles from either a URL or a local file on your machine. Firt, from a URL. In this case from the Zotero style repository, for the American Journal or Political Science.
-
-
-```r
-jps <- style_load('http://www.zotero.org/styles/american-journal-of-political-science')
-```
-
-A list is returned, which you can index to various parts of the style specification.
-
-
-```r
-jps$info
-#> $title
-#> [1] "American Journal of Political Science"
-#> 
-#> $title_short
-#> [1] "AJPS"
-#> 
-#> $id
-#> [1] "http://www.zotero.org/styles/american-journal-of-political-science"
-#> 
-#> $author
-...
-```
-
-
-```r
-jps$title
-#> [1] "American Journal of Political Science"
-```
-
-
-```r
-jps$citation_format
-#> [1] "author-date"
-```
-
-
-```r
-jps$links_template
-#> [1] "http://www.zotero.org/styles/american-political-science-association"
-```
-
-
-```r
-jps$editor
-#> $editor
-#> $editor$variable
-#> [1] "editor"
-#> 
-#> $editor$delimiter
-#> [1] ", "
-#> 
-#> 
-#> $label
-#> $label$form
-...
-```
-
-
-```r
-jps$author
-#> $author
-#> $author$variable
-#> [1] "author"
-#> 
-#> 
-#> $label
-#> $label$form
-#> [1] "short"
-#> 
-#> $label$prefix
-...
-```
-
-## Get raw XML
-
-You can also get raw XML if you'd rather deal with that format.
-
-
-```r
-style_xml('http://www.zotero.org/styles/american-journal-of-political-science')
-#> <?xml version="1.0" encoding="utf-8"?>
-#> <style xmlns="http://purl.org/net/xbiblio/csl" class="in-text" version="1.0" demote-non-dropping-particle="sort-only" default-locale="en-US">
-#>   <info>
-#>     <title>American Journal of Political Science</title>
-#>     <title-short>AJPS</title-short>
-#>     <id>http://www.zotero.org/styles/american-journal-of-political-science</id>
-#>     <link href="http://www.zotero.org/styles/american-journal-of-political-science" rel="self"/>
-#>     <link href="http://www.zotero.org/styles/american-political-science-association" rel="template"/>
-#>     <link href="http://www.ajps.org/AJPS%20Style%20Guide.pdf" rel="documentation"/>
-#>     <author>
-...
-```
-
-## Get styles
-
-There is a GitHub repository of CSL styles at  [https://github.com/citation-style-language/styles-distribution](https://github.com/citation-style-language/styles-distribution). These don't come with the `csl` package, so you have to run `get_styles()` to get them on your machine. The default path is `Sys.getenv("HOME")/styles`, which for me is `/Users/sacmac/styles`. You can change where files are saved by using the `path` parameter.
-
-
-```r
-get_styles()
-#> 
-#> Done! Files put in /Users/sacmac/styles
-```
-
-After getting styles locally you can load them just as we did with `style_load()`, but from your machine. However, since the file is local, we can make this easier by allowing just the name of the style, like
-
-
-```r
-style_load("apa")
-#> $info
-#> $info$title
-#> [1] "American Psychological Association 6th edition"
-#> 
-#> $info$title_short
-#> [1] "APA"
-#> 
-#> $info$id
-#> [1] "http://www.zotero.org/styles/apa"
-#> 
-...
-```
-
-If you are unsure if a style exists, you can use `style_exists()`
-
-
-```r
-style_exists("helloworld")
-#> [1] FALSE
-style_exists("acs-nano")
-#> [1] TRUE
-```
-
-In addition, you can list the path for a single style, more than 1, or all styles with `styles()`
-
-
-```r
-styles("apa")
-#> [1] "/Users/sacmac/styles/apa.csl"
-```
-
-All of them, truncated for blog brevity
-
-
-```r
-styles()
-#> $independent
-#>    [1] "academy-of-management-review"                                                         
-#>    [2] "acm-sig-proceedings-long-author-list"                                                 
-#>    [3] "acm-sig-proceedings"                                                                  
-#>    [4] "acm-sigchi-proceedings-extended-abstract-format"                                      
-#>    [5] "acm-sigchi-proceedings"                                                               
-#>    [6] "acm-siggraph"                                                                         
-#>    [7] "acs-nano"                                                                             
-#>    [8] "acta-anaesthesiologica-scandinavica"                                                  
-#>    [9] "acta-anaesthesiologica-taiwanica"                                                     
-...
-```
-
-## Get locales
-
-In addition to styles, there is a GitHub repo for locales at  [https://github.com/citation-style-language/locales](https://github.com/citation-style-language/locales). These also don't come with the `csl` package, so you have to run `get_locales()` to get them on your machine. Same goes here for paths as above for styles.
-
-
-```r
-get_locales()
-#> 
-#> Done! Files put in /Users/sacmac/locales
-```
-
-
+<p>In addition to styles, there is a GitHub repo for locales at  <a href="https://github.com/citation-style-language/locales">https://github.com/citation-style-language/locales</a>. These also don&#39;t come with the <code>csl</code> package, so you have to run <code>get_locales()</code> to get them on your machine. Same goes here for paths as above for styles.</p>
+<div class="highlight"><pre><code class="language-r" data-lang="r">get_locales<span class="p">()</span>
+<span class="c1">#&gt; </span>
+<span class="c1">#&gt; Done! Files put in /Users/sacmac/locales</span>
+</code></pre></div>
   </div>
   
 </div>
