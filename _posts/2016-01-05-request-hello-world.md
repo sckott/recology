@@ -2,9 +2,9 @@
 name: request-hello-world
 layout: post
 title: request - a high level HTTP client for R
-date: 2016-01-04
+date: 2016-01-05
 author: Scott Chamberlain
-sourceslug: _drafts/2016-01-04-request-hello-world.Rmd
+sourceslug: _drafts/2016-01-05-request-hello-world.Rmd
 tags:
 - R
 - api
@@ -270,9 +270,3 @@ There's a number of interesting features that should be coming soon to `request`
 * Retry - a retry helper will make it easy to retry http requests on any failure, and execute a user defined function on failure [sckott/request#6](https://github.com/sckott/request/issues/6)
 * Rate limit - a rate limit helper will add info to a set of many requests - still in early design stages [sckott/request#5](https://github.com/sckott/request/issues/5)
 * Caching - a caching helper - may use in the background the in development [vcr R client](https://github.com/ropensci/vcr) when on CRAN or perhaps [storr](https://github.com/richfitz/storr)  [sckott/request#4](https://github.com/sckott/request/issues/4)
-
-## I can haz feedback?
-
-Would love feedback at this stage. Wanted to get on CRAN to get to wider audience - now hoping for feedback to make it lots better. 
-
-See [the issues](https://github.com/sckott/request/issues) for discussion of these

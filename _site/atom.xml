@@ -4,13 +4,225 @@
  <title>Recology</title>
  <link href="http://recology.info//atom.xml" rel="self"/>
  <link href="http://recology.info//"/>
- <updated>2016-01-03T16:29:02-08:00</updated>
+ <updated>2016-01-05T09:54:00-08:00</updated>
  <id>http://recology.info/</id>
  <author>
    <name>Scott Chamberlain</name>
    <email>myrmecocystus@gmail.com</email>
  </author>
 
+ 
+ <entry>
+   <title>request - a high level HTTP client for R</title>
+   <link href="http://recology.info//2016/01/request-hello-world/"/>
+   <updated>2016-01-05T00:00:00-08:00</updated>
+   <id>http://recology.info//2016/01/request-hello-world</id>
+   <content type="html">&lt;p&gt;&lt;code&gt;request&lt;/code&gt; is DSL for http requests for R, and is inspired by the CLI tool &lt;a href=&quot;https://github.com/jakubroztocil/httpie&quot;&gt;httpie&lt;/a&gt;. It&amp;#39;s built on &lt;code&gt;httr&lt;/code&gt;.&lt;/p&gt;
+
+&lt;p&gt;The following were driving principles for this package:&lt;/p&gt;
+
+&lt;ul&gt;
+&lt;li&gt;The web is increasingly a JSON world, so we assume &lt;code&gt;applications/json&lt;/code&gt; by default, but give back other types if not&lt;/li&gt;
+&lt;li&gt;The workflow follows logically, or at least should, from, &lt;em&gt;hey, I got this url&lt;/em&gt;, to &lt;em&gt;i need to add some options&lt;/em&gt;, to &lt;em&gt;execute request&lt;/em&gt; - and functions support piping so that you can execute functions in this order&lt;/li&gt;
+&lt;li&gt;Whenever possible, we transform output to data.frame&amp;#39;s - facilitating downstream manipulation via &lt;code&gt;dplyr&lt;/code&gt;, etc.&lt;/li&gt;
+&lt;li&gt;We do &lt;code&gt;GET&lt;/code&gt; requests by default. Specify a different type if you don&amp;#39;t want &lt;code&gt;GET&lt;/code&gt;. Given &lt;code&gt;GET&lt;/code&gt; by default, this client is optimized for consumption of data, rather than creating new things on servers&lt;/li&gt;
+&lt;li&gt;You can use non-standard evaluation to easily pass in query parameters without worrying about &lt;code&gt;&amp;amp;&lt;/code&gt;&amp;#39;s, URL escaping, etc. (see &lt;code&gt;api_query()&lt;/code&gt;)&lt;/li&gt;
+&lt;li&gt;Same for body params (see &lt;code&gt;api_body()&lt;/code&gt;)&lt;/li&gt;
+&lt;/ul&gt;
+
+&lt;p&gt;The following is a brief demo of some of the package functionality:&lt;/p&gt;
+
+&lt;h2&gt;Install&lt;/h2&gt;
+
+&lt;p&gt;From CRAN&lt;/p&gt;
+&lt;div class=&quot;highlight&quot;&gt;&lt;pre&gt;&lt;code class=&quot;language-r&quot; data-lang=&quot;r&quot;&gt;install.packages&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;s&quot;&gt;&amp;quot;request&amp;quot;&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt;
+&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;
+&lt;p&gt;Or from GitHub&lt;/p&gt;
+&lt;div class=&quot;highlight&quot;&gt;&lt;pre&gt;&lt;code class=&quot;language-r&quot; data-lang=&quot;r&quot;&gt;devtools&lt;span class=&quot;o&quot;&gt;::&lt;/span&gt;install_github&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;s&quot;&gt;&amp;quot;sckott/request&amp;quot;&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt;
+&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;&lt;div class=&quot;highlight&quot;&gt;&lt;pre&gt;&lt;code class=&quot;language-r&quot; data-lang=&quot;r&quot;&gt;&lt;span class=&quot;kn&quot;&gt;library&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;s&quot;&gt;&amp;quot;request&amp;quot;&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt;
+&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;
+&lt;h2&gt;Execute on last pipe&lt;/h2&gt;
+
+&lt;p&gt;When using pipes (&lt;code&gt;%&amp;gt;%&lt;/code&gt;) in &lt;code&gt;request&lt;/code&gt;, we autodetect last piped command, and execute &lt;code&gt;http()&lt;/code&gt; if it&amp;#39;s the last. If not the last, the output gets passed to the next command, and so on. This feature (and &lt;code&gt;magrittr&lt;/code&gt;) were done by Stefan Milton Bache.&lt;/p&gt;
+
+&lt;p&gt;This feature is really nice because a) it&amp;#39;s one less thing you need to do, and b) you only need to care about the request itself.&lt;/p&gt;
+
+&lt;p&gt;You can escape auto-execution if you use the function &lt;code&gt;peep()&lt;/code&gt;, which prints out a summary of the request you&amp;#39;ve created, but does not execute an HTTP request.&lt;/p&gt;
+
+&lt;h2&gt;HTTP Requests&lt;/h2&gt;
+
+&lt;p&gt;A high level function &lt;code&gt;http()&lt;/code&gt; wraps a lower level &lt;code&gt;R6&lt;/code&gt; object &lt;code&gt;RequestIterator&lt;/code&gt;, which holds a series of variables and functions to execute &lt;code&gt;GET&lt;/code&gt; and &lt;code&gt;POST&lt;/code&gt; requests, and will hold other HTTP verbs as well. In addition, it can hold state, which will allow us to do paging internally for you (see below). You have direct access to the &lt;code&gt;R6&lt;/code&gt; object if you call &lt;code&gt;http_client()&lt;/code&gt; instead of &lt;code&gt;http()&lt;/code&gt;.&lt;/p&gt;
+
+&lt;h2&gt;NSE and SE&lt;/h2&gt;
+
+&lt;p&gt;Most if not all functions in &lt;code&gt;request&lt;/code&gt; support non-standard evaluation (NSE) as well as standard evaluation (SE). If a function supports both, there&amp;#39;s a version without an underscore for NSE, while a version with an underscore is for SE. For example, here, we make a HTTP request by passing a base URL, then a series of paths that get combined together. First the NSE version&lt;/p&gt;
+&lt;div class=&quot;highlight&quot;&gt;&lt;pre&gt;&lt;code class=&quot;language-r&quot; data-lang=&quot;r&quot;&gt;api&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;s&quot;&gt;&amp;#39;https://api.github.com/&amp;#39;&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;%&amp;gt;%&lt;/span&gt;
+  api_path&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;repos&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt; ropensci&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt; rgbif&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt; issues&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt;
+&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;
+&lt;p&gt;Then the SE version&lt;/p&gt;
+&lt;div class=&quot;highlight&quot;&gt;&lt;pre&gt;&lt;code class=&quot;language-r&quot; data-lang=&quot;r&quot;&gt;api&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;s&quot;&gt;&amp;#39;https://api.github.com/&amp;#39;&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;%&amp;gt;%&lt;/span&gt;
+  api_path_&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;s&quot;&gt;&amp;#39;repos&amp;#39;&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt; &lt;span class=&quot;s&quot;&gt;&amp;#39;ropensci&amp;#39;&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt; &lt;span class=&quot;s&quot;&gt;&amp;#39;rgbif&amp;#39;&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt; &lt;span class=&quot;s&quot;&gt;&amp;#39;issues&amp;#39;&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt;
+&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;
+&lt;h2&gt;Building API routes&lt;/h2&gt;
+
+&lt;p&gt;The first thing you&amp;#39;ll want to do is lay out the base URL for your request. The function &lt;code&gt;api()&lt;/code&gt; is your friend.&lt;/p&gt;
+
+&lt;p&gt;&lt;code&gt;api()&lt;/code&gt; works with full or partial URLs:&lt;/p&gt;
+&lt;div class=&quot;highlight&quot;&gt;&lt;pre&gt;&lt;code class=&quot;language-r&quot; data-lang=&quot;r&quot;&gt;api&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;s&quot;&gt;&amp;#39;https://api.github.com/&amp;#39;&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt;
+&lt;span class=&quot;c1&quot;&gt;#&amp;gt; URL: https://api.github.com/&lt;/span&gt;
+api&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;s&quot;&gt;&amp;#39;http://api.gbif.org/v1&amp;#39;&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt;
+&lt;span class=&quot;c1&quot;&gt;#&amp;gt; URL: http://api.gbif.org/v1&lt;/span&gt;
+api&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;s&quot;&gt;&amp;#39;api.gbif.org/v1&amp;#39;&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt;
+&lt;span class=&quot;c1&quot;&gt;#&amp;gt; URL: api.gbif.org/v1&lt;/span&gt;
+&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;
+&lt;p&gt;And works with ports, full or partial&lt;/p&gt;
+&lt;div class=&quot;highlight&quot;&gt;&lt;pre&gt;&lt;code class=&quot;language-r&quot; data-lang=&quot;r&quot;&gt;api&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;s&quot;&gt;&amp;#39;http://localhost:9200&amp;#39;&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt;
+&lt;span class=&quot;c1&quot;&gt;#&amp;gt; URL: http://localhost:9200&lt;/span&gt;
+api&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;s&quot;&gt;&amp;#39;localhost:9200&amp;#39;&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt;
+&lt;span class=&quot;c1&quot;&gt;#&amp;gt; URL: http://localhost:9200&lt;/span&gt;
+api&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;s&quot;&gt;&amp;#39;:9200&amp;#39;&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt;
+&lt;span class=&quot;c1&quot;&gt;#&amp;gt; URL: http://localhost:9200&lt;/span&gt;
+api&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;s&quot;&gt;&amp;#39;9200&amp;#39;&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt;
+&lt;span class=&quot;c1&quot;&gt;#&amp;gt; URL: http://localhost:9200&lt;/span&gt;
+api&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;s&quot;&gt;&amp;#39;9200/stuff&amp;#39;&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt;
+&lt;span class=&quot;c1&quot;&gt;#&amp;gt; URL: http://localhost:9200/stuff&lt;/span&gt;
+&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;
+&lt;h2&gt;Make HTTP requests&lt;/h2&gt;
+
+&lt;p&gt;The above examples with &lt;code&gt;api()&lt;/code&gt; are not passed through a pipe, so only define a URL, but don&amp;#39;t do an HTTP request. To make an HTTP request, you can either pipe a url or partial url to e.g., &lt;code&gt;api()&lt;/code&gt;, or call &lt;code&gt;http()&lt;/code&gt; at the end of a string of function calls:&lt;/p&gt;
+&lt;div class=&quot;highlight&quot;&gt;&lt;pre&gt;&lt;code class=&quot;language-r&quot; data-lang=&quot;r&quot;&gt;&lt;span class=&quot;s&quot;&gt;&amp;#39;https://api.github.com/&amp;#39;&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;%&amp;gt;%&lt;/span&gt; api&lt;span class=&quot;p&quot;&gt;()&lt;/span&gt;
+&lt;span class=&quot;c1&quot;&gt;#&amp;gt; $current_user_url&lt;/span&gt;
+&lt;span class=&quot;c1&quot;&gt;#&amp;gt; [1] &amp;quot;https://api.github.com/user&amp;quot;&lt;/span&gt;
+&lt;span class=&quot;c1&quot;&gt;#&amp;gt; &lt;/span&gt;
+&lt;span class=&quot;c1&quot;&gt;#&amp;gt; $current_user_authorizations_html_url&lt;/span&gt;
+&lt;span class=&quot;c1&quot;&gt;#&amp;gt; [1] &amp;quot;https://github.com/settings/connections/applications{/client_id}&amp;quot;&lt;/span&gt;
+&lt;span class=&quot;c1&quot;&gt;#&amp;gt; &lt;/span&gt;
+&lt;span class=&quot;c1&quot;&gt;#&amp;gt; $authorizations_url&lt;/span&gt;
+&lt;span class=&quot;c1&quot;&gt;#&amp;gt; [1] &amp;quot;https://api.github.com/authorizations&amp;quot;&lt;/span&gt;
+&lt;span class=&quot;c1&quot;&gt;#&amp;gt; &lt;/span&gt;
+&lt;span class=&quot;c1&quot;&gt;#&amp;gt; $code_search_url&lt;/span&gt;
+&lt;span class=&quot;kc&quot;&gt;...&lt;/span&gt;
+&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;
+&lt;p&gt;Or&lt;/p&gt;
+&lt;div class=&quot;highlight&quot;&gt;&lt;pre&gt;&lt;code class=&quot;language-r&quot; data-lang=&quot;r&quot;&gt;api&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;s&quot;&gt;&amp;#39;https://api.github.com/&amp;#39;&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;%&amp;gt;%&lt;/span&gt; http&lt;span class=&quot;p&quot;&gt;()&lt;/span&gt;
+&lt;span class=&quot;c1&quot;&gt;#&amp;gt; $current_user_url&lt;/span&gt;
+&lt;span class=&quot;c1&quot;&gt;#&amp;gt; [1] &amp;quot;https://api.github.com/user&amp;quot;&lt;/span&gt;
+&lt;span class=&quot;c1&quot;&gt;#&amp;gt; &lt;/span&gt;
+&lt;span class=&quot;c1&quot;&gt;#&amp;gt; $current_user_authorizations_html_url&lt;/span&gt;
+&lt;span class=&quot;c1&quot;&gt;#&amp;gt; [1] &amp;quot;https://github.com/settings/connections/applications{/client_id}&amp;quot;&lt;/span&gt;
+&lt;span class=&quot;c1&quot;&gt;#&amp;gt; &lt;/span&gt;
+&lt;span class=&quot;c1&quot;&gt;#&amp;gt; $authorizations_url&lt;/span&gt;
+&lt;span class=&quot;c1&quot;&gt;#&amp;gt; [1] &amp;quot;https://api.github.com/authorizations&amp;quot;&lt;/span&gt;
+&lt;span class=&quot;c1&quot;&gt;#&amp;gt; &lt;/span&gt;
+&lt;span class=&quot;c1&quot;&gt;#&amp;gt; $code_search_url&lt;/span&gt;
+&lt;span class=&quot;kc&quot;&gt;...&lt;/span&gt;
+&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;
+&lt;p&gt;&lt;code&gt;http()&lt;/code&gt; is called at the end of a chain of piped commands, so no need to invoke it. However, you can if you like.&lt;/p&gt;
+
+&lt;h2&gt;Templating&lt;/h2&gt;
+&lt;div class=&quot;highlight&quot;&gt;&lt;pre&gt;&lt;code class=&quot;language-r&quot; data-lang=&quot;r&quot;&gt;repo_info &lt;span class=&quot;o&quot;&gt;&amp;lt;-&lt;/span&gt; &lt;span class=&quot;kt&quot;&gt;list&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;username &lt;span class=&quot;o&quot;&gt;=&lt;/span&gt; &lt;span class=&quot;s&quot;&gt;&amp;#39;craigcitro&amp;#39;&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt; repo &lt;span class=&quot;o&quot;&gt;=&lt;/span&gt; &lt;span class=&quot;s&quot;&gt;&amp;#39;r-travis&amp;#39;&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt;
+api&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;s&quot;&gt;&amp;#39;https://api.github.com/&amp;#39;&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;%&amp;gt;%&lt;/span&gt;
+  api_template&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;template &lt;span class=&quot;o&quot;&gt;=&lt;/span&gt; &lt;span class=&quot;s&quot;&gt;&amp;#39;repos///issues&amp;#39;&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt; data &lt;span class=&quot;o&quot;&gt;=&lt;/span&gt; repo_info&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt;
+&lt;span class=&quot;c1&quot;&gt;#&amp;gt; [[1]]&lt;/span&gt;
+&lt;span class=&quot;c1&quot;&gt;#&amp;gt; [[1]]$url&lt;/span&gt;
+&lt;span class=&quot;c1&quot;&gt;#&amp;gt; [1] &amp;quot;https://api.github.com/repos/craigcitro/r-travis/issues/164&amp;quot;&lt;/span&gt;
+&lt;span class=&quot;c1&quot;&gt;#&amp;gt; &lt;/span&gt;
+&lt;span class=&quot;c1&quot;&gt;#&amp;gt; [[1]]$labels_url&lt;/span&gt;
+&lt;span class=&quot;c1&quot;&gt;#&amp;gt; [1] &amp;quot;https://api.github.com/repos/craigcitro/r-travis/issues/164/labels{/name}&amp;quot;&lt;/span&gt;
+&lt;span class=&quot;c1&quot;&gt;#&amp;gt; &lt;/span&gt;
+&lt;span class=&quot;c1&quot;&gt;#&amp;gt; [[1]]$comments_url&lt;/span&gt;
+&lt;span class=&quot;c1&quot;&gt;#&amp;gt; [1] &amp;quot;https://api.github.com/repos/craigcitro/r-travis/issues/164/comments&amp;quot;&lt;/span&gt;
+&lt;span class=&quot;c1&quot;&gt;#&amp;gt; ...&lt;/span&gt;
+&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;
+&lt;h2&gt;Set paths&lt;/h2&gt;
+
+&lt;p&gt;&lt;code&gt;api_path()&lt;/code&gt; adds paths to the base URL&lt;/p&gt;
+&lt;div class=&quot;highlight&quot;&gt;&lt;pre&gt;&lt;code class=&quot;language-r&quot; data-lang=&quot;r&quot;&gt;api&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;s&quot;&gt;&amp;#39;https://api.github.com/&amp;#39;&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;%&amp;gt;%&lt;/span&gt;
+  api_path&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;repos&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt; ropensci&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt; rgbif&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt; issues&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;%&amp;gt;%&lt;/span&gt;
+  peep
+&lt;span class=&quot;c1&quot;&gt;#&amp;gt; &amp;lt;http request&amp;gt; &lt;/span&gt;
+&lt;span class=&quot;c1&quot;&gt;#&amp;gt;   url: https://api.github.com/&lt;/span&gt;
+&lt;span class=&quot;c1&quot;&gt;#&amp;gt;   paths: repos/ropensci/rgbif/issues&lt;/span&gt;
+&lt;span class=&quot;c1&quot;&gt;#&amp;gt;   query: &lt;/span&gt;
+&lt;span class=&quot;c1&quot;&gt;#&amp;gt;   body: &lt;/span&gt;
+&lt;span class=&quot;c1&quot;&gt;#&amp;gt;   paging: &lt;/span&gt;
+&lt;span class=&quot;c1&quot;&gt;#&amp;gt;   headers: &lt;/span&gt;
+&lt;span class=&quot;c1&quot;&gt;#&amp;gt;   rate limit: &lt;/span&gt;
+&lt;span class=&quot;c1&quot;&gt;#&amp;gt;   retry (n/delay (s)): /&lt;/span&gt;
+&lt;span class=&quot;c1&quot;&gt;#&amp;gt;   error handler: &lt;/span&gt;
+&lt;span class=&quot;c1&quot;&gt;#&amp;gt;   config:&lt;/span&gt;
+&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;
+&lt;h2&gt;Query&lt;/h2&gt;
+&lt;div class=&quot;highlight&quot;&gt;&lt;pre&gt;&lt;code class=&quot;language-r&quot; data-lang=&quot;r&quot;&gt;api&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;s&quot;&gt;&amp;quot;http://api.plos.org/search&amp;quot;&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;%&amp;gt;%&lt;/span&gt;
+  api_query&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;q &lt;span class=&quot;o&quot;&gt;=&lt;/span&gt; ecology&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt; wt &lt;span class=&quot;o&quot;&gt;=&lt;/span&gt; json&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt; fl &lt;span class=&quot;o&quot;&gt;=&lt;/span&gt; journal&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;%&amp;gt;%&lt;/span&gt;
+  peep
+&lt;span class=&quot;c1&quot;&gt;#&amp;gt; &amp;lt;http request&amp;gt; &lt;/span&gt;
+&lt;span class=&quot;c1&quot;&gt;#&amp;gt;   url: http://api.plos.org/search&lt;/span&gt;
+&lt;span class=&quot;c1&quot;&gt;#&amp;gt;   paths: &lt;/span&gt;
+&lt;span class=&quot;c1&quot;&gt;#&amp;gt;   query: q=ecology, wt=json, fl=journal&lt;/span&gt;
+&lt;span class=&quot;c1&quot;&gt;#&amp;gt;   body: &lt;/span&gt;
+&lt;span class=&quot;c1&quot;&gt;#&amp;gt;   paging: &lt;/span&gt;
+&lt;span class=&quot;c1&quot;&gt;#&amp;gt;   headers: &lt;/span&gt;
+&lt;span class=&quot;c1&quot;&gt;#&amp;gt;   rate limit: &lt;/span&gt;
+&lt;span class=&quot;c1&quot;&gt;#&amp;gt;   retry (n/delay (s)): /&lt;/span&gt;
+&lt;span class=&quot;c1&quot;&gt;#&amp;gt;   error handler: &lt;/span&gt;
+&lt;span class=&quot;c1&quot;&gt;#&amp;gt;   config:&lt;/span&gt;
+&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;
+&lt;h2&gt;Headers&lt;/h2&gt;
+&lt;div class=&quot;highlight&quot;&gt;&lt;pre&gt;&lt;code class=&quot;language-r&quot; data-lang=&quot;r&quot;&gt;api&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;s&quot;&gt;&amp;#39;http://httpbin.org/headers&amp;#39;&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;%&amp;gt;%&lt;/span&gt;
+  api_headers&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;sb&quot;&gt;`X-FARGO-SEASON`&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;=&lt;/span&gt; &lt;span class=&quot;m&quot;&gt;3&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt; &lt;span class=&quot;sb&quot;&gt;`X-NARCOS-SEASON`&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;=&lt;/span&gt; &lt;span class=&quot;m&quot;&gt;5&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;%&amp;gt;%&lt;/span&gt;
+  peep
+&lt;span class=&quot;c1&quot;&gt;#&amp;gt; &amp;lt;http request&amp;gt; &lt;/span&gt;
+&lt;span class=&quot;c1&quot;&gt;#&amp;gt;   url: http://httpbin.org/headers&lt;/span&gt;
+&lt;span class=&quot;c1&quot;&gt;#&amp;gt;   paths: &lt;/span&gt;
+&lt;span class=&quot;c1&quot;&gt;#&amp;gt;   query: &lt;/span&gt;
+&lt;span class=&quot;c1&quot;&gt;#&amp;gt;   body: &lt;/span&gt;
+&lt;span class=&quot;c1&quot;&gt;#&amp;gt;   paging: &lt;/span&gt;
+&lt;span class=&quot;c1&quot;&gt;#&amp;gt;   headers: &lt;/span&gt;
+&lt;span class=&quot;c1&quot;&gt;#&amp;gt;     X-FARGO-SEASON: 3&lt;/span&gt;
+&lt;span class=&quot;c1&quot;&gt;#&amp;gt;     X-NARCOS-SEASON: 5&lt;/span&gt;
+&lt;span class=&quot;c1&quot;&gt;#&amp;gt;   rate limit: &lt;/span&gt;
+&lt;span class=&quot;c1&quot;&gt;#&amp;gt;   retry (n/delay (s)): /&lt;/span&gt;
+&lt;span class=&quot;c1&quot;&gt;#&amp;gt;   error handler: &lt;/span&gt;
+&lt;span class=&quot;c1&quot;&gt;#&amp;gt;   config:&lt;/span&gt;
+&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;
+&lt;h2&gt;curl configuration&lt;/h2&gt;
+
+&lt;p&gt;&lt;code&gt;httr&lt;/code&gt; is exported in &lt;code&gt;request&lt;/code&gt;, so you can use &lt;code&gt;httr&lt;/code&gt; functions like &lt;code&gt;verbose()&lt;/code&gt; to get verbose curl output&lt;/p&gt;
+&lt;div class=&quot;highlight&quot;&gt;&lt;pre&gt;&lt;code class=&quot;language-r&quot; data-lang=&quot;r&quot;&gt;api&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;s&quot;&gt;&amp;#39;http://httpbin.org/headers&amp;#39;&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;%&amp;gt;%&lt;/span&gt;
+  api_config&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;verbose&lt;span class=&quot;p&quot;&gt;())&lt;/span&gt;
+&lt;span class=&quot;c1&quot;&gt;#&amp;gt; -&amp;gt; GET /headers HTTP/1.1&lt;/span&gt;
+&lt;span class=&quot;c1&quot;&gt;#&amp;gt; -&amp;gt; Host: httpbin.org&lt;/span&gt;
+&lt;span class=&quot;c1&quot;&gt;#&amp;gt; -&amp;gt; User-Agent: curl/7.43.0 curl/0.9.4 httr/1.0.0 request/0.1.0&lt;/span&gt;
+&lt;span class=&quot;c1&quot;&gt;#&amp;gt; -&amp;gt; Accept-Encoding: gzip, deflate&lt;/span&gt;
+&lt;span class=&quot;c1&quot;&gt;#&amp;gt; -&amp;gt; Accept: application/json, text/xml, application/xml, */*&lt;/span&gt;
+&lt;span class=&quot;c1&quot;&gt;#&amp;gt; -&amp;gt;&lt;/span&gt;
+&lt;span class=&quot;c1&quot;&gt;#&amp;gt; &amp;lt;- HTTP/1.1 200 OK&lt;/span&gt;
+&lt;span class=&quot;c1&quot;&gt;#&amp;gt; &amp;lt;- Server: nginx&lt;/span&gt;
+&lt;span class=&quot;c1&quot;&gt;#&amp;gt; &amp;lt;- Date: Sun, 03 Jan 2016 16:56:29 GMT&lt;/span&gt;
+&lt;span class=&quot;c1&quot;&gt;#&amp;gt; &amp;lt;- Content-Type: application/json&lt;/span&gt;
+&lt;span class=&quot;c1&quot;&gt;#&amp;gt; &amp;lt;- Content-Length: 227&lt;/span&gt;
+&lt;span class=&quot;c1&quot;&gt;#&amp;gt; &amp;lt;- Connection: keep-alive&lt;/span&gt;
+&lt;span class=&quot;c1&quot;&gt;#&amp;gt; &amp;lt;- Access-Control-Allow-Origin: *&lt;/span&gt;
+&lt;span class=&quot;c1&quot;&gt;#&amp;gt; &amp;lt;- Access-Control-Allow-Credentials: true&lt;/span&gt;
+&lt;span class=&quot;c1&quot;&gt;#&amp;gt; &amp;lt;-&lt;/span&gt;
+&lt;span class=&quot;c1&quot;&gt;#&amp;gt; $headers&lt;/span&gt;
+&lt;span class=&quot;c1&quot;&gt;#&amp;gt; $headers$Accept&lt;/span&gt;
+&lt;span class=&quot;c1&quot;&gt;#&amp;gt; [1] &amp;quot;application/json, text/xml, application/xml, */*&amp;quot;&lt;/span&gt;
+&lt;span class=&quot;c1&quot;&gt;#&amp;gt; ...&lt;/span&gt;
+&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;
+&lt;h2&gt;Coming soon&lt;/h2&gt;
+
+&lt;p&gt;There&amp;#39;s a number of interesting features that should be coming soon to &lt;code&gt;request&lt;/code&gt;.&lt;/p&gt;
+
+&lt;ul&gt;
+&lt;li&gt;Paging - a paging helper will make it easy to do paing, and will attempt to handle any parameters used for paging. Some user input will be required, like what parameter names are, and how many records you want returned  &lt;a href=&quot;https://github.com/sckott/request/issues/2&quot;&gt;sckott/request#2&lt;/a&gt;&lt;/li&gt;
+&lt;li&gt;Retry - a retry helper will make it easy to retry http requests on any failure, and execute a user defined function on failure &lt;a href=&quot;https://github.com/sckott/request/issues/6&quot;&gt;sckott/request#6&lt;/a&gt;&lt;/li&gt;
+&lt;li&gt;Rate limit - a rate limit helper will add info to a set of many requests - still in early design stages &lt;a href=&quot;https://github.com/sckott/request/issues/5&quot;&gt;sckott/request#5&lt;/a&gt;&lt;/li&gt;
+&lt;li&gt;Caching - a caching helper - may use in the background the in development &lt;a href=&quot;https://github.com/ropensci/vcr&quot;&gt;vcr R client&lt;/a&gt; when on CRAN or perhaps &lt;a href=&quot;https://github.com/richfitz/storr&quot;&gt;storr&lt;/a&gt;  &lt;a href=&quot;https://github.com/sckott/request/issues/4&quot;&gt;sckott/request#4&lt;/a&gt;&lt;/li&gt;
+&lt;/ul&gt;
+</content>
+ </entry>
  
  <entry>
    <title>binomen - Tools for slicing and dicing taxonomic names</title>

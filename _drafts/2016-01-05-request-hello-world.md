@@ -2,9 +2,9 @@
 name: request-hello-world
 layout: post
 title: request - a high level HTTP client for R
-date: 2016-01-04
+date: 2016-01-05
 author: Scott Chamberlain
-sourceslug: _drafts/2016-01-04-request-hello-world.Rmd
+sourceslug: _drafts/2016-01-05-request-hello-world.Rmd
 tags:
 - R
 - api
@@ -13,38 +13,7 @@ tags:
 - httr
 ---
 
-```{r echo=FALSE}
-hook_output <- knitr::knit_hooks$get("output")
-knitr::knit_hooks$set(output = function(x, options) {
-   lines <- options$output.lines
-   if (is.null(lines)) {
-     return(hook_output(x, options))  # pass to default hook
-   }
-   x <- unlist(strsplit(x, "\n"))
-   more <- "..."
-   if (length(lines) == 1) {        # first n lines
-     if (length(x) > lines) {
-       # truncate the output, but add ....
-       x <- c(head(x, lines), more)
-     }
-   } else {
-     x <- c(if (abs(lines[1])>1) more else NULL,
-            x[lines],
-            if (length(x)>lines[abs(length(lines))]) more else NULL
-           )
-   }
-   # paste these lines together
-   x <- paste(c(x, ""), collapse = "\n")
-   hook_output(x, options)
- })
 
-knitr::opts_chunk$set(
-  comment = "#>",
-  collapse = TRUE,
-  warning = FALSE,
-  message = FALSE
-)
-```
 
 `request` is DSL for http requests for R, and is inspired by the CLI tool [httpie](https://github.com/jakubroztocil/httpie). It's built on `httr`.
 
@@ -63,17 +32,20 @@ The following is a brief demo of some of the package functionality:
 
 From CRAN
 
-```{r eval=FALSE}
+
+```r
 install.packages("request")
 ```
 
 Or from GitHub
 
-```{r eval=FALSE}
+
+```r
 devtools::install_github("sckott/request")
 ```
 
-```{r}
+
+```r
 library("request")
 ```
 
@@ -93,14 +65,16 @@ A high level function `http()` wraps a lower level `R6` object `RequestIterator`
 
 Most if not all functions in `request` support non-standard evaluation (NSE) as well as standard evaluation (SE). If a function supports both, there's a version without an underscore for NSE, while a version with an underscore is for SE. For example, here, we make a HTTP request by passing a base URL, then a series of paths that get combined together. First the NSE version
 
-```{r eval=FALSE}
+
+```r
 api('https://api.github.com/') %>%
   api_path(repos, ropensci, rgbif, issues)
 ```
 
 Then the SE version
 
-```{r eval=FALSE}
+
+```r
 api('https://api.github.com/') %>%
   api_path_('repos', 'ropensci', 'rgbif', 'issues')
 ```
@@ -111,34 +85,68 @@ The first thing you'll want to do is lay out the base URL for your request. The 
 
 `api()` works with full or partial URLs:
 
-```{r}
+
+```r
 api('https://api.github.com/')
+#> URL: https://api.github.com/
 api('http://api.gbif.org/v1')
+#> URL: http://api.gbif.org/v1
 api('api.gbif.org/v1')
+#> URL: api.gbif.org/v1
 ```
 
 And works with ports, full or partial
 
-```{r}
+
+```r
 api('http://localhost:9200')
+#> URL: http://localhost:9200
 api('localhost:9200')
+#> URL: http://localhost:9200
 api(':9200')
+#> URL: http://localhost:9200
 api('9200')
+#> URL: http://localhost:9200
 api('9200/stuff')
+#> URL: http://localhost:9200/stuff
 ```
 
 ## Make HTTP requests
 
 The above examples with `api()` are not passed through a pipe, so only define a URL, but don't do an HTTP request. To make an HTTP request, you can either pipe a url or partial url to e.g., `api()`, or call `http()` at the end of a string of function calls:
 
-```{r output.lines = 1:10}
+
+```r
 'https://api.github.com/' %>% api()
+#> $current_user_url
+#> [1] "https://api.github.com/user"
+#> 
+#> $current_user_authorizations_html_url
+#> [1] "https://github.com/settings/connections/applications{/client_id}"
+#> 
+#> $authorizations_url
+#> [1] "https://api.github.com/authorizations"
+#> 
+#> $code_search_url
+...
 ```
 
 Or
 
-```{r output.lines = 1:10}
+
+```r
 api('https://api.github.com/') %>% http()
+#> $current_user_url
+#> [1] "https://api.github.com/user"
+#> 
+#> $current_user_authorizations_html_url
+#> [1] "https://github.com/settings/connections/applications{/client_id}"
+#> 
+#> $authorizations_url
+#> [1] "https://api.github.com/authorizations"
+#> 
+#> $code_search_url
+...
 ```
 
 `http()` is called at the end of a chain of piped commands, so no need to invoke it. However, you can if you like.
@@ -165,33 +173,72 @@ api('https://api.github.com/') %>%
 
 `api_path()` adds paths to the base URL
 
-```{r}
+
+```r
 api('https://api.github.com/') %>%
   api_path(repos, ropensci, rgbif, issues) %>%
   peep
+#> <http request> 
+#>   url: https://api.github.com/
+#>   paths: repos/ropensci/rgbif/issues
+#>   query: 
+#>   body: 
+#>   paging: 
+#>   headers: 
+#>   rate limit: 
+#>   retry (n/delay (s)): /
+#>   error handler: 
+#>   config:
 ```
 
 ## Query
 
-```{r}
+
+```r
 api("http://api.plos.org/search") %>%
   api_query(q = ecology, wt = json, fl = journal) %>%
   peep
+#> <http request> 
+#>   url: http://api.plos.org/search
+#>   paths: 
+#>   query: q=ecology, wt=json, fl=journal
+#>   body: 
+#>   paging: 
+#>   headers: 
+#>   rate limit: 
+#>   retry (n/delay (s)): /
+#>   error handler: 
+#>   config:
 ```
 
 ## Headers
 
-```{r}
+
+```r
 api('http://httpbin.org/headers') %>%
   api_headers(`X-FARGO-SEASON` = 3, `X-NARCOS-SEASON` = 5) %>%
   peep
+#> <http request> 
+#>   url: http://httpbin.org/headers
+#>   paths: 
+#>   query: 
+#>   body: 
+#>   paging: 
+#>   headers: 
+#>     X-FARGO-SEASON: 3
+#>     X-NARCOS-SEASON: 5
+#>   rate limit: 
+#>   retry (n/delay (s)): /
+#>   error handler: 
+#>   config:
 ```
 
 ## curl configuration
 
 `httr` is exported in `request`, so you can use `httr` functions like `verbose()` to get verbose curl output
 
-```{r eval=FALSE}
+
+```r
 api('http://httpbin.org/headers') %>%
   api_config(verbose())
 #> -> GET /headers HTTP/1.1
