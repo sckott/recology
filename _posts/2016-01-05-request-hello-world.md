@@ -120,13 +120,13 @@ The above examples with `api()` are not passed through a pipe, so only define a 
 'https://api.github.com/' %>% api()
 #> $current_user_url
 #> [1] "https://api.github.com/user"
-#> 
+#>
 #> $current_user_authorizations_html_url
 #> [1] "https://github.com/settings/connections/applications{/client_id}"
-#> 
+#>
 #> $authorizations_url
 #> [1] "https://api.github.com/authorizations"
-#> 
+#>
 #> $code_search_url
 ...
 ```
@@ -138,13 +138,13 @@ Or
 api('https://api.github.com/') %>% http()
 #> $current_user_url
 #> [1] "https://api.github.com/user"
-#> 
+#>
 #> $current_user_authorizations_html_url
 #> [1] "https://github.com/settings/connections/applications{/client_id}"
-#> 
+#>
 #> $authorizations_url
 #> [1] "https://api.github.com/authorizations"
-#> 
+#>
 #> $code_search_url
 ...
 ```
@@ -160,10 +160,10 @@ api('https://api.github.com/') %>%
 #> [[1]]
 #> [[1]]$url
 #> [1] "https://api.github.com/repos/craigcitro/r-travis/issues/164"
-#> 
+#>
 #> [[1]]$labels_url
 #> [1] "https://api.github.com/repos/craigcitro/r-travis/issues/164/labels{/name}"
-#> 
+#>
 #> [[1]]$comments_url
 #> [1] "https://api.github.com/repos/craigcitro/r-travis/issues/164/comments"
 #> ...
@@ -178,16 +178,16 @@ api('https://api.github.com/') %>%
 api('https://api.github.com/') %>%
   api_path(repos, ropensci, rgbif, issues) %>%
   peep
-#> <http request> 
+#> <http request>
 #>   url: https://api.github.com/
 #>   paths: repos/ropensci/rgbif/issues
-#>   query: 
-#>   body: 
-#>   paging: 
-#>   headers: 
-#>   rate limit: 
+#>   query:
+#>   body:
+#>   paging:
+#>   headers:
+#>   rate limit:
 #>   retry (n/delay (s)): /
-#>   error handler: 
+#>   error handler:
 #>   config:
 ```
 
@@ -198,16 +198,16 @@ api('https://api.github.com/') %>%
 api("http://api.plos.org/search") %>%
   api_query(q = ecology, wt = json, fl = journal) %>%
   peep
-#> <http request> 
+#> <http request>
 #>   url: http://api.plos.org/search
-#>   paths: 
+#>   paths:
 #>   query: q=ecology, wt=json, fl=journal
-#>   body: 
-#>   paging: 
-#>   headers: 
-#>   rate limit: 
+#>   body:
+#>   paging:
+#>   headers:
+#>   rate limit:
 #>   retry (n/delay (s)): /
-#>   error handler: 
+#>   error handler:
 #>   config:
 ```
 
@@ -218,18 +218,18 @@ api("http://api.plos.org/search") %>%
 api('http://httpbin.org/headers') %>%
   api_headers(`X-FARGO-SEASON` = 3, `X-NARCOS-SEASON` = 5) %>%
   peep
-#> <http request> 
+#> <http request>
 #>   url: http://httpbin.org/headers
-#>   paths: 
-#>   query: 
-#>   body: 
-#>   paging: 
-#>   headers: 
+#>   paths:
+#>   query:
+#>   body:
+#>   paging:
+#>   headers:
 #>     X-FARGO-SEASON: 3
 #>     X-NARCOS-SEASON: 5
-#>   rate limit: 
+#>   rate limit:
 #>   retry (n/delay (s)): /
-#>   error handler: 
+#>   error handler:
 #>   config:
 ```
 

@@ -1,0 +1,460 @@
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en" lang="en-us">
+
+  <head>
+  <meta http-equiv="content-type" content="text/html; charset=utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1">
+  <link href="http://gmpg.org/xfn/11" rel="profile">
+
+  <title>
+    scrubr - clean species occurrence records &middot; 
+    Recology, R/etc.
+  </title>
+
+  <!-- CSS -->
+  <link rel="stylesheet" href="/public/css/hyde.css">
+  <link rel="stylesheet" href="/public/css/syntax.css">
+  <link rel="stylesheet" href="http://fonts.googleapis.com/css?family=Open+Sans:300,400italic,400,600,700|Abril+Fatface">
+
+  <link rel="stylesheet" href="/public/css/bootstrap/css/bootstrap.css">
+
+  <!-- Icons -->
+  <link rel="apple-touch-icon-precomposed" sizes="144x144" href="/public/favicon.ico">
+  <link rel="shortcut icon" href="/public/favicon.ico">
+  <link href="//netdna.bootstrapcdn.com/font-awesome/4.2.0/css/font-awesome.css" rel="stylesheet">
+
+  <!-- RSS -->
+  <link rel="alternate" type="application/rss+xml" title="RSS" href="/atom.xml">
+</head>
+
+
+  <body class="theme-base-0f layout-reverse">
+
+    <header class="masthead">
+      <div class="masthead-inner">
+        <h1>Recology</h1>
+        <!-- <h1> <a href="http://recology.info/">Recology</a></h1> -->
+        <p class="lead">R/etc.</p>
+
+        <div class="colophon">
+          <ul class="colophon-links">
+            <li>
+              <a href="/"><i class="fa fa-home fa-lg"></i></a>&nbsp;
+              <a href="/about"><i class="fa fa-info-circle fa-lg"></i></a>&nbsp;
+              <a href="/archives"><i class="fa fa-archive fa-lg"></i></a>&nbsp;
+              <a href="/rresources"><i class="fa fa-book fa-lg"></i></a>&nbsp;
+              <a href="http://rforcats.net/" rel><i class="fa fa-graduation-cap fa-lg"></i></a>&nbsp;
+              <a href="/feed.xml"><i class="fa fa-rss fa-lg"></i></a>&nbsp;
+              <a href="https://twitter.com/sckottie"><i class="fa fa-twitter fa-lg"></i></a>&nbsp;
+              <a href="/fork"><i class="fa fa-spinner fa-lg"></i></a>
+            </li>
+          </ul>
+          <!-- <small><a href="https://github.com/mdo/hyde">Hyde</a> from <a href="https://twitter.com/mdo" target="_blank">@mdo</a>.</small> -->
+        </div>
+      </div>
+    </header>
+
+    <div class="content container">
+      <div class="post">
+  <h1>scrubr - clean species occurrence records</h1><a style="float:right;" href="/archives"><i class="fa fa-archive fa-lg"></i></a>&nbsp;<a style="float:right;" href="/tags"><i class="fa fa-tags fa-lg"></i></a>
+  <span class="post-date">04 Mar 2016</span>
+  <i class="fa fa-tags fa-large"></i>&nbsp;
+     <a href="/tags/R" class="badge" rel="tooltip" data-placement="bottom" title="View posts tagged with &quot;R&quot;"><span class="blog_tag">R</span></a>   <a href="/tags/occurrences" class="badge" rel="tooltip" data-placement="bottom" title="View posts tagged with &quot;occurrences&quot;"><span class="blog_tag">occurrences</span></a>   <a href="/tags/occurrence records" class="badge" rel="tooltip" data-placement="bottom" title="View posts tagged with &quot;occurrence records&quot;"><span class="blog_tag">occurrence records</span></a>   <a href="/tags/species" class="badge" rel="tooltip" data-placement="bottom" title="View posts tagged with &quot;species&quot;"><span class="blog_tag">species</span></a>   <a href="/tags/ecology" class="badge" rel="tooltip" data-placement="bottom" title="View posts tagged with &quot;ecology&quot;"><span class="blog_tag">ecology</span></a>   <br>
+  <!-- <i class="fa fa-code fa-large"></i>&nbsp;Source: <a href="https://github.com/sckott/sckott.github.com/tree/master/_drafts/2016-03-04-scrubr.Rmd">.Rmd</a> -->
+  <i class="fa fa-code fa-large"></i>&nbsp;Source: <a href="https://github.com/sckott/sckott.github.com/tree/master/_drafts/2016-03-04-scrubr.Rmd">.Rmd/.md</a>
+  <br><br>
+  <p><code>scrubr</code> is an R library for cleaning species occurrence records. It&#39;s general purpose, and has the following approach:</p>
+
+<ul>
+<li>We think using a piping workflow (<code>%&gt;%</code>) makes code easier to build up, and easier to understand. However, you don&#39;t have to use pipes in this package.</li>
+<li>All inputs and outputs are data.frame&#39;s - which makes the above point easier</li>
+<li>Records trimmed off due to various filters are retained as attributes, so can still be accessed for later inspection, but don&#39;t get in the way of the data.frame that gets modified for downstream use</li>
+<li>User interface vs. speed: This is the kind of package that surely can get faster. However, we&#39;re focusing on the UI first, then make speed improvements down the road. </li>
+<li>Since occurrence record datasets should all have columns with lat/long information, we automatically look for those columns for you. If identified, we use them, but you can supply lat/long column names manually as well.</li>
+</ul>
+
+<p>We have many packages that fetch species occurrence records from GBIF, iNaturalist, VertNet, iDigBio, Ecoengine, and more. <code>scrubr</code> fills a crucial missing niche as likely all uses of occurrence data requires cleaning of some kind. When using GBIF data via <code>rgbif</code>, that package has some utilities for cleaning data based on the issues returned with GBIF data - <code>scrubr</code> is a companion to do the rest of the cleaning.</p>
+
+<h2>scrubr use cases</h2>
+
+<h3>Those covered</h3>
+
+<ul>
+<li>Impossible lat/long values: e.g., latitude 75</li>
+<li>Incomplete cases: one or the other of lat/long missing</li>
+<li>Unlikely lat/long values: e.g., points at 0,0</li>
+<li>Deduplication: try to identify duplicates, esp. when pulling data from multiple sources, e.g., can try to use occurrence IDs, if provided</li>
+<li>Date based cleaning</li>
+<li>Outside political boundary: User input to check for points in the wrong country, or points outside of a known country</li>
+<li>Taxonomic name based cleaning: via <code>taxize</code> (one method so far)</li>
+</ul>
+
+<h3>To be covered</h3>
+
+<ul>
+<li>Political centroids: unlikely that occurrences fall exactly on these points, more likely a
+default position (Draft function started, but not exported, and commented out)</li>
+<li>Herbaria/Museums: many specimens may have location of the collection they are housed in</li>
+<li>Habitat type filtering: e.g., fish should not be on land; marine fish should not be in fresh water</li>
+<li>Check for contextually wrong values: That is, if 99 out of 100 lat/long coordinates are within the continental US, but 1 is in China, then perhaps something is wrong with that one point</li>
+<li>and many more...</li>
+</ul>
+
+<p>What else do you want included? <a href="https://github.com/ropenscilabs/scrubr/issues">Open an issue in the repo</a> to chat about use cases.</p>
+
+<h2>Install</h2>
+
+<p>From CRAN (binaries may not be up yet, but source is)</p>
+<div class="highlight"><pre><code class="language-r" data-lang="r">install.packages<span class="p">(</span><span class="s">&quot;scrubr&quot;</span><span class="p">)</span>
+</code></pre></div>
+<p>Or from GitHub</p>
+<div class="highlight"><pre><code class="language-r" data-lang="r">devtools<span class="o">::</span>install_github<span class="p">(</span><span class="s">&quot;ropenscilabs/scrubr&quot;</span><span class="p">)</span>
+</code></pre></div><div class="highlight"><pre><code class="language-r" data-lang="r"><span class="kn">library</span><span class="p">(</span><span class="s">&quot;scrubr&quot;</span><span class="p">)</span>
+</code></pre></div>
+<h2>dframe</h2>
+
+<p><code>dframe()</code> is a tool to convert your data.frame to a compact <code>dplyr</code> like data.frame so that you can get a quick peek at your data each time you call a function - BUT, you don&#39;t have to use it.</p>
+
+<p>Compare <code>mtcars</code></p>
+<div class="highlight"><pre><code class="language-r" data-lang="r">mtcars
+<span class="c1">#&gt;                      mpg cyl  disp  hp drat    wt  qsec vs am gear carb</span>
+<span class="c1">#&gt; Mazda RX4           21.0   6 160.0 110 3.90 2.620 16.46  0  1    4    4</span>
+<span class="c1">#&gt; Mazda RX4 Wag       21.0   6 160.0 110 3.90 2.875 17.02  0  1    4    4</span>
+<span class="c1">#&gt; Datsun 710          22.8   4 108.0  93 3.85 2.320 18.61  1  1    4    1</span>
+<span class="c1">#&gt; Hornet 4 Drive      21.4   6 258.0 110 3.08 3.215 19.44  1  0    3    1</span>
+<span class="c1">#&gt; Hornet Sportabout   18.7   8 360.0 175 3.15 3.440 17.02  0  0    3    2</span>
+<span class="c1">#&gt; Valiant             18.1   6 225.0 105 2.76 3.460 20.22  1  0    3    1</span>
+<span class="c1">#&gt; Duster 360          14.3   8 360.0 245 3.21 3.570 15.84  0  0    3    4</span>
+<span class="c1">#&gt; Merc 240D           24.4   4 146.7  62 3.69 3.190 20.00  1  0    4    2</span>
+<span class="c1">#&gt; Merc 230            22.8   4 140.8  95 3.92 3.150 22.90  1  0    4    2</span>
+<span class="c1">#&gt; Merc 280            19.2   6 167.6 123 3.92 3.440 18.30  1  0    4    4</span>
+<span class="c1">#&gt; Merc 280C           17.8   6 167.6 123 3.92 3.440 18.90  1  0    4    4</span>
+<span class="c1">#&gt; Merc 450SE          16.4   8 275.8 180 3.07 4.070 17.40  0  0    3    3</span>
+<span class="c1">#&gt; Merc 450SL          17.3   8 275.8 180 3.07 3.730 17.60  0  0    3    3</span>
+<span class="c1">#&gt; Merc 450SLC         15.2   8 275.8 180 3.07 3.780 18.00  0  0    3    3</span>
+<span class="c1">#&gt; Cadillac Fleetwood  10.4   8 472.0 205 2.93 5.250 17.98  0  0    3    4</span>
+<span class="c1">#&gt; Lincoln Continental 10.4   8 460.0 215 3.00 5.424 17.82  0  0    3    4</span>
+<span class="c1">#&gt; Chrysler Imperial   14.7   8 440.0 230 3.23 5.345 17.42  0  0    3    4</span>
+<span class="c1">#&gt; Fiat 128            32.4   4  78.7  66 4.08 2.200 19.47  1  1    4    1</span>
+<span class="c1">#&gt; Honda Civic         30.4   4  75.7  52 4.93 1.615 18.52  1  1    4    2</span>
+<span class="c1">#&gt; Toyota Corolla      33.9   4  71.1  65 4.22 1.835 19.90  1  1    4    1</span>
+<span class="c1">#&gt; Toyota Corona       21.5   4 120.1  97 3.70 2.465 20.01  1  0    3    1</span>
+<span class="c1">#&gt; Dodge Challenger    15.5   8 318.0 150 2.76 3.520 16.87  0  0    3    2</span>
+<span class="c1">#&gt; AMC Javelin         15.2   8 304.0 150 3.15 3.435 17.30  0  0    3    2</span>
+<span class="c1">#&gt; Camaro Z28          13.3   8 350.0 245 3.73 3.840 15.41  0  0    3    4</span>
+<span class="c1">#&gt; Pontiac Firebird    19.2   8 400.0 175 3.08 3.845 17.05  0  0    3    2</span>
+<span class="c1">#&gt; Fiat X1-9           27.3   4  79.0  66 4.08 1.935 18.90  1  1    4    1</span>
+<span class="c1">#&gt; Porsche 914-2       26.0   4 120.3  91 4.43 2.140 16.70  0  1    5    2</span>
+<span class="c1">#&gt; Lotus Europa        30.4   4  95.1 113 3.77 1.513 16.90  1  1    5    2</span>
+<span class="c1">#&gt; Ford Pantera L      15.8   8 351.0 264 4.22 3.170 14.50  0  1    5    4</span>
+<span class="c1">#&gt; Ferrari Dino        19.7   6 145.0 175 3.62 2.770 15.50  0  1    5    6</span>
+<span class="c1">#&gt; Maserati Bora       15.0   8 301.0 335 3.54 3.570 14.60  0  1    5    8</span>
+<span class="c1">#&gt; Volvo 142E          21.4   4 121.0 109 4.11 2.780 18.60  1  1    4    2</span>
+</code></pre></div>
+<p>To</p>
+<div class="highlight"><pre><code class="language-r" data-lang="r">dframe<span class="p">(</span>mtcars<span class="p">)</span>
+<span class="c1">#&gt; &lt;scrubr dframe&gt;</span>
+<span class="c1">#&gt; Size: 32 X 11</span>
+<span class="c1">#&gt; </span>
+<span class="c1">#&gt; </span>
+<span class="c1">#&gt;      mpg   cyl  disp    hp  drat    wt  qsec    vs    am  gear  carb</span>
+<span class="c1">#&gt;    (dbl) (dbl) (dbl) (dbl) (dbl) (dbl) (dbl) (dbl) (dbl) (dbl) (dbl)</span>
+<span class="c1">#&gt; 1   21.0     6 160.0   110  3.90 2.620 16.46     0     1     4     4</span>
+<span class="c1">#&gt; 2   21.0     6 160.0   110  3.90 2.875 17.02     0     1     4     4</span>
+<span class="c1">#&gt; 3   22.8     4 108.0    93  3.85 2.320 18.61     1     1     4     1</span>
+<span class="c1">#&gt; 4   21.4     6 258.0   110  3.08 3.215 19.44     1     0     3     1</span>
+<span class="c1">#&gt; 5   18.7     8 360.0   175  3.15 3.440 17.02     0     0     3     2</span>
+<span class="c1">#&gt; 6   18.1     6 225.0   105  2.76 3.460 20.22     1     0     3     1</span>
+<span class="c1">#&gt; 7   14.3     8 360.0   245  3.21 3.570 15.84     0     0     3     4</span>
+<span class="c1">#&gt; 8   24.4     4 146.7    62  3.69 3.190 20.00     1     0     4     2</span>
+<span class="c1">#&gt; 9   22.8     4 140.8    95  3.92 3.150 22.90     1     0     4     2</span>
+<span class="c1">#&gt; 10  19.2     6 167.6   123  3.92 3.440 18.30     1     0     4     4</span>
+<span class="c1">#&gt; ..   ...   ...   ...   ...   ...   ...   ...   ...   ...   ...   ...</span>
+</code></pre></div>
+<h2>Coordinate based cleaning</h2>
+
+<p>Load some sample data that comes with the package</p>
+<div class="highlight"><pre><code class="language-r" data-lang="r">data<span class="p">(</span><span class="s">&quot;sampledata1&quot;</span><span class="p">)</span>
+</code></pre></div>
+<p>Remove impossible coordinates (using sample data included in the pkg)</p>
+<div class="highlight"><pre><code class="language-r" data-lang="r">dframe<span class="p">(</span>sample_data_1<span class="p">)</span> <span class="o">%&gt;%</span> coord_impossible<span class="p">()</span>
+<span class="c1">#&gt; &lt;scrubr dframe&gt;</span>
+<span class="c1">#&gt; Size: 1500 X 5</span>
+<span class="c1">#&gt; Lat/Lon vars: latitude/longitude</span>
+<span class="c1">#&gt; </span>
+<span class="c1">#&gt;                name  longitude latitude                date        key</span>
+<span class="c1">#&gt;               (chr)      (dbl)    (dbl)              (time)      (int)</span>
+<span class="c1">#&gt; 1  Ursus americanus  -79.68283 38.36662 2015-01-14 16:36:45 1065590124</span>
+<span class="c1">#&gt; 2  Ursus americanus  -82.42028 35.73304 2015-01-13 00:25:39 1065588899</span>
+<span class="c1">#&gt; 3  Ursus americanus  -99.09625 23.66893 2015-02-20 23:00:00 1098894889</span>
+<span class="c1">#&gt; 4  Ursus americanus  -72.77432 43.94883 2015-02-13 16:16:41 1065611122</span>
+<span class="c1">#&gt; 5  Ursus americanus  -72.34617 43.86464 2015-03-01 20:20:45 1088908315</span>
+<span class="c1">#&gt; 6  Ursus americanus -108.53674 32.65219 2015-03-29 17:06:54 1088932238</span>
+<span class="c1">#&gt; 7  Ursus americanus -108.53691 32.65237 2015-03-29 17:12:50 1088932273</span>
+<span class="c1">#&gt; 8  Ursus americanus -123.82900 40.13240 2015-03-28 23:00:00 1132403409</span>
+<span class="c1">#&gt; 9  Ursus americanus  -78.25027 36.93018 2015-03-20 21:11:24 1088923534</span>
+<span class="c1">#&gt; 10 Ursus americanus  -76.78671 35.53079 2015-04-05 23:00:00 1088954559</span>
+<span class="c1">#&gt; ..              ...        ...      ...                 ...        ...</span>
+</code></pre></div>
+<p>Remove incomplete coordinates</p>
+<div class="highlight"><pre><code class="language-r" data-lang="r">dframe<span class="p">(</span>sample_data_1<span class="p">)</span> <span class="o">%&gt;%</span> coord_incomplete<span class="p">()</span>
+<span class="c1">#&gt; &lt;scrubr dframe&gt;</span>
+<span class="c1">#&gt; Size: 1306 X 5</span>
+<span class="c1">#&gt; Lat/Lon vars: latitude/longitude</span>
+<span class="c1">#&gt; </span>
+<span class="c1">#&gt;                name  longitude latitude                date        key</span>
+<span class="c1">#&gt;               (chr)      (dbl)    (dbl)              (time)      (int)</span>
+<span class="c1">#&gt; 1  Ursus americanus  -79.68283 38.36662 2015-01-14 16:36:45 1065590124</span>
+<span class="c1">#&gt; 2  Ursus americanus  -82.42028 35.73304 2015-01-13 00:25:39 1065588899</span>
+<span class="c1">#&gt; 3  Ursus americanus  -99.09625 23.66893 2015-02-20 23:00:00 1098894889</span>
+<span class="c1">#&gt; 4  Ursus americanus  -72.77432 43.94883 2015-02-13 16:16:41 1065611122</span>
+<span class="c1">#&gt; 5  Ursus americanus  -72.34617 43.86464 2015-03-01 20:20:45 1088908315</span>
+<span class="c1">#&gt; 6  Ursus americanus -108.53674 32.65219 2015-03-29 17:06:54 1088932238</span>
+<span class="c1">#&gt; 7  Ursus americanus -108.53691 32.65237 2015-03-29 17:12:50 1088932273</span>
+<span class="c1">#&gt; 8  Ursus americanus -123.82900 40.13240 2015-03-28 23:00:00 1132403409</span>
+<span class="c1">#&gt; 9  Ursus americanus  -78.25027 36.93018 2015-03-20 21:11:24 1088923534</span>
+<span class="c1">#&gt; 10 Ursus americanus  -76.78671 35.53079 2015-04-05 23:00:00 1088954559</span>
+<span class="c1">#&gt; ..              ...        ...      ...                 ...        ...</span>
+</code></pre></div>
+<p>Remove unlikely coordinates (e.g., those at 0,0)</p>
+<div class="highlight"><pre><code class="language-r" data-lang="r">dframe<span class="p">(</span>sample_data_1<span class="p">)</span> <span class="o">%&gt;%</span> coord_unlikely<span class="p">()</span>
+<span class="c1">#&gt; &lt;scrubr dframe&gt;</span>
+<span class="c1">#&gt; Size: 1488 X 5</span>
+<span class="c1">#&gt; Lat/Lon vars: latitude/longitude</span>
+<span class="c1">#&gt; </span>
+<span class="c1">#&gt;                name  longitude latitude                date        key</span>
+<span class="c1">#&gt;               (chr)      (dbl)    (dbl)              (time)      (int)</span>
+<span class="c1">#&gt; 1  Ursus americanus  -79.68283 38.36662 2015-01-14 16:36:45 1065590124</span>
+<span class="c1">#&gt; 2  Ursus americanus  -82.42028 35.73304 2015-01-13 00:25:39 1065588899</span>
+<span class="c1">#&gt; 3  Ursus americanus  -99.09625 23.66893 2015-02-20 23:00:00 1098894889</span>
+<span class="c1">#&gt; 4  Ursus americanus  -72.77432 43.94883 2015-02-13 16:16:41 1065611122</span>
+<span class="c1">#&gt; 5  Ursus americanus  -72.34617 43.86464 2015-03-01 20:20:45 1088908315</span>
+<span class="c1">#&gt; 6  Ursus americanus -108.53674 32.65219 2015-03-29 17:06:54 1088932238</span>
+<span class="c1">#&gt; 7  Ursus americanus -108.53691 32.65237 2015-03-29 17:12:50 1088932273</span>
+<span class="c1">#&gt; 8  Ursus americanus -123.82900 40.13240 2015-03-28 23:00:00 1132403409</span>
+<span class="c1">#&gt; 9  Ursus americanus  -78.25027 36.93018 2015-03-20 21:11:24 1088923534</span>
+<span class="c1">#&gt; 10 Ursus americanus  -76.78671 35.53079 2015-04-05 23:00:00 1088954559</span>
+<span class="c1">#&gt; ..              ...        ...      ...                 ...        ...</span>
+</code></pre></div>
+<p>Do all three</p>
+<div class="highlight"><pre><code class="language-r" data-lang="r">dframe<span class="p">(</span>sample_data_1<span class="p">)</span> <span class="o">%&gt;%</span>
+  coord_impossible<span class="p">()</span> <span class="o">%&gt;%</span>
+  coord_incomplete<span class="p">()</span> <span class="o">%&gt;%</span>
+  coord_unlikely<span class="p">()</span>
+<span class="c1">#&gt; &lt;scrubr dframe&gt;</span>
+<span class="c1">#&gt; Size: 1294 X 5</span>
+<span class="c1">#&gt; Lat/Lon vars: latitude/longitude</span>
+<span class="c1">#&gt; </span>
+<span class="c1">#&gt;                name  longitude latitude                date        key</span>
+<span class="c1">#&gt;               (chr)      (dbl)    (dbl)              (time)      (int)</span>
+<span class="c1">#&gt; 1  Ursus americanus  -79.68283 38.36662 2015-01-14 16:36:45 1065590124</span>
+<span class="c1">#&gt; 2  Ursus americanus  -82.42028 35.73304 2015-01-13 00:25:39 1065588899</span>
+<span class="c1">#&gt; 3  Ursus americanus  -99.09625 23.66893 2015-02-20 23:00:00 1098894889</span>
+<span class="c1">#&gt; 4  Ursus americanus  -72.77432 43.94883 2015-02-13 16:16:41 1065611122</span>
+<span class="c1">#&gt; 5  Ursus americanus  -72.34617 43.86464 2015-03-01 20:20:45 1088908315</span>
+<span class="c1">#&gt; 6  Ursus americanus -108.53674 32.65219 2015-03-29 17:06:54 1088932238</span>
+<span class="c1">#&gt; 7  Ursus americanus -108.53691 32.65237 2015-03-29 17:12:50 1088932273</span>
+<span class="c1">#&gt; 8  Ursus americanus -123.82900 40.13240 2015-03-28 23:00:00 1132403409</span>
+<span class="c1">#&gt; 9  Ursus americanus  -78.25027 36.93018 2015-03-20 21:11:24 1088923534</span>
+<span class="c1">#&gt; 10 Ursus americanus  -76.78671 35.53079 2015-04-05 23:00:00 1088954559</span>
+<span class="c1">#&gt; ..              ...        ...      ...                 ...        ...</span>
+</code></pre></div>
+<p>Do vs. don&#39;t drop bad data</p>
+<div class="highlight"><pre><code class="language-r" data-lang="r"><span class="c1"># do</span>
+dframe<span class="p">(</span>sample_data_1<span class="p">)</span> <span class="o">%&gt;%</span> coord_incomplete<span class="p">(</span>drop <span class="o">=</span> <span class="kc">TRUE</span><span class="p">)</span> <span class="o">%&gt;%</span> <span class="kp">NROW</span>
+<span class="c1">#&gt; [1] 1306</span>
+<span class="c1"># don&#39;t</span>
+dframe<span class="p">(</span>sample_data_1<span class="p">)</span> <span class="o">%&gt;%</span> coord_incomplete<span class="p">(</span>drop <span class="o">=</span> <span class="kc">FALSE</span><span class="p">)</span> <span class="o">%&gt;%</span> <span class="kp">NROW</span>
+<span class="c1">#&gt; [1] 1500</span>
+</code></pre></div>
+<h2>Deduplicate</h2>
+
+<p>Get a smaller subset of a data.frame</p>
+<div class="highlight"><pre><code class="language-r" data-lang="r">smalldf <span class="o">&lt;-</span> sample_data_1<span class="p">[</span><span class="m">1</span><span class="o">:</span><span class="m">20</span><span class="p">,</span> <span class="p">]</span>
+</code></pre></div>
+<p>create a duplicate record</p>
+<div class="highlight"><pre><code class="language-r" data-lang="r">smalldf <span class="o">&lt;-</span> <span class="kp">rbind</span><span class="p">(</span>smalldf<span class="p">,</span> smalldf<span class="p">[</span><span class="m">10</span><span class="p">,])</span>
+<span class="kp">row.names</span><span class="p">(</span>smalldf<span class="p">)</span> <span class="o">&lt;-</span> <span class="kc">NULL</span>
+</code></pre></div>
+<p>make it slightly different</p>
+<div class="highlight"><pre><code class="language-r" data-lang="r">smalldf<span class="p">[</span><span class="m">21</span><span class="p">,</span> <span class="s">&quot;key&quot;</span><span class="p">]</span> <span class="o">&lt;-</span> <span class="m">1088954555</span>
+<span class="kp">NROW</span><span class="p">(</span>smalldf<span class="p">)</span>
+<span class="c1">#&gt; [1] 21</span>
+</code></pre></div>
+<p>It&#39;s 21 rows, including 1 duplicate. Do the deduplication</p>
+<div class="highlight"><pre><code class="language-r" data-lang="r"><span class="p">(</span>dp <span class="o">&lt;-</span> dframe<span class="p">(</span>smalldf<span class="p">)</span> <span class="o">%&gt;%</span> dedup<span class="p">())</span>
+<span class="c1">#&gt; &lt;scrubr dframe&gt;</span>
+<span class="c1">#&gt; Size: 20 X 5</span>
+<span class="c1">#&gt; </span>
+<span class="c1">#&gt; </span>
+<span class="c1">#&gt;                name  longitude latitude                date        key</span>
+<span class="c1">#&gt;               (chr)      (dbl)    (dbl)              (time)      (dbl)</span>
+<span class="c1">#&gt; 1  Ursus americanus  -79.68283 38.36662 2015-01-14 16:36:45 1065590124</span>
+<span class="c1">#&gt; 2  Ursus americanus  -82.42028 35.73304 2015-01-13 00:25:39 1065588899</span>
+<span class="c1">#&gt; 3  Ursus americanus  -99.09625 23.66893 2015-02-20 23:00:00 1098894889</span>
+<span class="c1">#&gt; 4  Ursus americanus  -72.77432 43.94883 2015-02-13 16:16:41 1065611122</span>
+<span class="c1">#&gt; 5  Ursus americanus  -72.34617 43.86464 2015-03-01 20:20:45 1088908315</span>
+<span class="c1">#&gt; 6  Ursus americanus -108.53674 32.65219 2015-03-29 17:06:54 1088932238</span>
+<span class="c1">#&gt; 7  Ursus americanus -108.53691 32.65237 2015-03-29 17:12:50 1088932273</span>
+<span class="c1">#&gt; 8  Ursus americanus -123.82900 40.13240 2015-03-28 23:00:00 1132403409</span>
+<span class="c1">#&gt; 9  Ursus americanus  -78.25027 36.93018 2015-03-20 21:11:24 1088923534</span>
+<span class="c1">#&gt; 10 Ursus americanus -103.30058 29.27042 2015-04-29 22:00:00 1088964797</span>
+<span class="c1">#&gt; ..              ...        ...      ...                 ...        ...</span>
+</code></pre></div>
+<p>Now its 20 rows, duplicate removed</p>
+
+<p>Here&#39;s the duplicates</p>
+<div class="highlight"><pre><code class="language-r" data-lang="r"><span class="kp">attr</span><span class="p">(</span>dp<span class="p">,</span> <span class="s">&quot;dups&quot;</span><span class="p">)</span>
+<span class="c1">#&gt; &lt;scrubr dframe&gt;</span>
+<span class="c1">#&gt; Size: 1 X 5</span>
+<span class="c1">#&gt; </span>
+<span class="c1">#&gt; </span>
+<span class="c1">#&gt;               name longitude latitude                date        key</span>
+<span class="c1">#&gt;              (chr)     (dbl)    (dbl)              (time)      (dbl)</span>
+<span class="c1">#&gt; 1 Ursus americanus -76.78671 35.53079 2015-04-05 23:00:00 1088954555</span>
+</code></pre></div>
+<h2>Dates</h2>
+
+<p>Standardize/convert dates</p>
+<div class="highlight"><pre><code class="language-r" data-lang="r">df <span class="o">&lt;-</span> sample_data_1
+dframe<span class="p">(</span>df<span class="p">)</span> <span class="o">%&gt;%</span> 
+  date_standardize<span class="p">(</span><span class="s">&quot;%d%b%Y&quot;</span><span class="p">)</span>
+<span class="c1">#&gt; &lt;scrubr dframe&gt;</span>
+<span class="c1">#&gt; Size: 1500 X 5</span>
+<span class="c1">#&gt; </span>
+<span class="c1">#&gt; </span>
+<span class="c1">#&gt;                name  longitude latitude      date        key</span>
+<span class="c1">#&gt;               (chr)      (dbl)    (dbl)     (chr)      (int)</span>
+<span class="c1">#&gt; 1  Ursus americanus  -79.68283 38.36662 14Jan2015 1065590124</span>
+<span class="c1">#&gt; 2  Ursus americanus  -82.42028 35.73304 13Jan2015 1065588899</span>
+<span class="c1">#&gt; 3  Ursus americanus  -99.09625 23.66893 20Feb2015 1098894889</span>
+<span class="c1">#&gt; 4  Ursus americanus  -72.77432 43.94883 13Feb2015 1065611122</span>
+<span class="c1">#&gt; 5  Ursus americanus  -72.34617 43.86464 01Mar2015 1088908315</span>
+<span class="c1">#&gt; 6  Ursus americanus -108.53674 32.65219 29Mar2015 1088932238</span>
+<span class="c1">#&gt; 7  Ursus americanus -108.53691 32.65237 29Mar2015 1088932273</span>
+<span class="c1">#&gt; 8  Ursus americanus -123.82900 40.13240 28Mar2015 1132403409</span>
+<span class="c1">#&gt; 9  Ursus americanus  -78.25027 36.93018 20Mar2015 1088923534</span>
+<span class="c1">#&gt; 10 Ursus americanus  -76.78671 35.53079 05Apr2015 1088954559</span>
+<span class="c1">#&gt; ..              ...        ...      ...       ...        ...</span>
+</code></pre></div>
+<p>Drop records without dates</p>
+<div class="highlight"><pre><code class="language-r" data-lang="r"><span class="kp">NROW</span><span class="p">(</span>df<span class="p">)</span>
+<span class="c1">#&gt; [1] 1500</span>
+<span class="kp">NROW</span><span class="p">(</span>dframe<span class="p">(</span>df<span class="p">)</span> <span class="o">%&gt;%</span> date_missing<span class="p">())</span>
+<span class="c1">#&gt; [1] 1498</span>
+</code></pre></div>
+<p>Create date field from other fields</p>
+<div class="highlight"><pre><code class="language-r" data-lang="r">dframe<span class="p">(</span>sample_data_2<span class="p">)</span> <span class="o">%&gt;%</span> 
+  date_create<span class="p">(</span>year<span class="p">,</span> month<span class="p">,</span> day<span class="p">)</span>
+<span class="c1">#&gt; &lt;scrubr dframe&gt;</span>
+<span class="c1">#&gt; Size: 1500 X 8</span>
+<span class="c1">#&gt; </span>
+<span class="c1">#&gt; </span>
+<span class="c1">#&gt;                name  longitude latitude        key  year month   day</span>
+<span class="c1">#&gt;               (chr)      (dbl)    (dbl)      (int) (chr) (chr) (chr)</span>
+<span class="c1">#&gt; 1  Ursus americanus  -79.68283 38.36662 1065590124  2015    01    14</span>
+<span class="c1">#&gt; 2  Ursus americanus  -82.42028 35.73304 1065588899  2015    01    13</span>
+<span class="c1">#&gt; 3  Ursus americanus  -99.09625 23.66893 1098894889  2015    02    20</span>
+<span class="c1">#&gt; 4  Ursus americanus  -72.77432 43.94883 1065611122  2015    02    13</span>
+<span class="c1">#&gt; 5  Ursus americanus  -72.34617 43.86464 1088908315  2015    03    01</span>
+<span class="c1">#&gt; 6  Ursus americanus -108.53674 32.65219 1088932238  2015    03    29</span>
+<span class="c1">#&gt; 7  Ursus americanus -108.53691 32.65237 1088932273  2015    03    29</span>
+<span class="c1">#&gt; 8  Ursus americanus -123.82900 40.13240 1132403409  2015    03    28</span>
+<span class="c1">#&gt; 9  Ursus americanus  -78.25027 36.93018 1088923534  2015    03    20</span>
+<span class="c1">#&gt; 10 Ursus americanus  -76.78671 35.53079 1088954559  2015    04    05</span>
+<span class="c1">#&gt; ..              ...        ...      ...        ...   ...   ...   ...</span>
+<span class="c1">#&gt; Variables not shown: date (chr).</span>
+</code></pre></div>
+<h2>bugs and such</h2>
+
+<p>Report them in the <a href="https://github.com/ropenscilabs/scrubr/issues">scrubr issue tracker</a></p>
+
+</div>
+
+<div id="disqus_thread"></div>
+<script type="text/javascript">
+    /* * * CONFIGURATION VARIABLES: EDIT BEFORE PASTING INTO YOUR WEBPAGE * * */
+    var disqus_shortname = 'coffeehaus'; // required: replace example with your forum shortname
+
+    /* * * DON'T EDIT BELOW THIS LINE * * */
+    (function() {
+        var dsq = document.createElement('script'); dsq.type = 'text/javascript'; dsq.async = true;
+        dsq.src = '//' + disqus_shortname + '.disqus.com/embed.js';
+        (document.getElementsByTagName('head')[0] || document.getElementsByTagName('body')[0]).appendChild(dsq);
+    })();
+</script>
+<noscript>Please enable JavaScript to view the <a href="http://disqus.com/?ref_noscript">comments powered by Disqus.</a></noscript>
+<a href="http://disqus.com" class="dsq-brlink">comments powered by <span class="logo-disqus">Disqus</span></a>
+
+<!-- <div class="related">
+  <h2>Related Posts</h2>
+  <ul class="related-posts">
+    
+      <li>
+        <h3>
+          <a href="/2016/01/request-hello-world/">
+            request - a high level HTTP client for R
+            <small>05 Jan 2016</small>
+          </a>
+        </h3>
+      </li>
+    
+      <li>
+        <h3>
+          <a href="/2015/12/binomen-taxonomy-tools/">
+            binomen - Tools for slicing and dicing taxonomic names
+            <small>08 Dec 2015</small>
+          </a>
+        </h3>
+      </li>
+    
+      <li>
+        <h3>
+          <a href="/2015/11/crossref-clients/">
+            Crossref programmatic clients
+            <small>30 Nov 2015</small>
+          </a>
+        </h3>
+      </li>
+    
+  </ul>
+</div>
+ -->
+
+    </div>
+
+    <!-- for bootstrap tooltips -->
+    <script type="text/javascript">
+      $("[data-toggle=\"tooltip\"]").tooltip();
+    </script>
+
+  </body>
+
+  <footer>
+  <!-- Disqus code -->
+  <script type="text/javascript">
+      /* * * CONFIGURATION VARIABLES: EDIT BEFORE PASTING INTO YOUR WEBPAGE * * */
+      var disqus_shortname = 'recology'; // required: replace example with your forum shortname
+
+      /* * * DON'T EDIT BELOW THIS LINE * * */
+      (function () {
+          var s = document.createElement('script'); s.async = true;
+          s.type = 'text/javascript';
+          s.src = 'http://' + disqus_shortname + '.disqus.com/count.js';
+          (document.getElementsByTagName('HEAD')[0] || document.getElementsByTagName('BODY')[0]).appendChild(s);
+      }());
+  </script>
+
+  <!-- google analytics -->
+  <script>
+    (function(i,s,o,g,r,a,m){i['GoogleAnalyticsObject']=r;i[r]=i[r]||function(){
+    (i[r].q=i[r].q||[]).push(arguments)},i[r].l=1*new Date();a=s.createElement(o),
+    m=s.getElementsByTagName(o)[0];a.async=1;a.src=g;m.parentNode.insertBefore(a,m)
+    })(window,document,'script','//www.google-analytics.com/analytics.js','ga');
+
+    ga('create', 'UA-63197374-1', 'auto');
+    ga('send', 'pageview');
+  </script>
+</footer>
+
+</html>
