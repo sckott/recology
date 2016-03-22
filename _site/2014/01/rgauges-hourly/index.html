@@ -63,58 +63,64 @@
   <!-- <i class="fa fa-code fa-large"></i>&nbsp;Source: <a href="https://github.com/sckott/sckott.github.com/tree/master/_drafts/2014-01-17-rgauges-hourly.Rmd">.Rmd</a> -->
   <i class="fa fa-code fa-large"></i>&nbsp;Source: <a href="https://github.com/sckott/sckott.github.com/tree/master/_drafts/2014-01-17-rgauges-hourly.Rmd">.Rmd/.md</a>
   <br><br>
-  <p><a href="http://get.gaug.es/">Gaug.es</a> is a really nice looking analytics platform as an alternative to Google Analytics. It is a paid service, but not that expensive really. </p>
+  <p><a href="http://get.gaug.es/">Gaug.es</a> is a really nice looking analytics platform as an alternative to Google Analytics. It is a paid service, but not that expensive really.</p>
 
-<p>We&#39;ve made an R package to interact with the Gaug.es API called <code>rgauges</code>. Find it <a href="https://github.com/ropensci/rgauges">on Github</a> and <a href="http://cran.r-project.org/web/packages/rgauges/index.html">on CRAN</a>.</p>
+<p>We’ve made an R package to interact with the Gaug.es API called <code>rgauges</code>. Find it <a href="https://github.com/ropensci/rgauges">on Github</a> and <a href="http://cran.r-project.org/web/packages/rgauges/index.html">on CRAN</a>.</p>
 
-<p>Although working with the Gaug.es API is nice and easy, they don&#39;t keep hourly visit stats and provide those via the API, so that you have to continually collect them yourself if you want them. That&#39;s what I have done for my own website. </p>
+<p>Although working with the Gaug.es API is nice and easy, they don’t keep hourly visit stats and provide those via the API, so that you have to continually collect them yourself if you want them. That’s what I have done for my own website.</p>
 
 <p>It took a few steps to get this data:</p>
 
 <ul>
-<li>I wrote a little Ruby script using <a href="http://rubygems.org/gems/twelve">Twelve gem</a> to collect data from the Gaug.es API every day at the same time, which just gets the patst 24 hours of data. This script makes a call to the Gaug.es API and sends the data to a <a href="http://couchdb.apache.org/">CouchDB</a> database hosted on <a href="https://cloudant.com/">Cloudant</a>. In reality, the script is is embeded in a rack app as I don&#39;t think you can throw up a standalone script to Heroku. Here&#39;s the script:</li>
+  <li>I wrote a little Ruby script using <a href="http://rubygems.org/gems/twelve">Twelve gem</a> to collect data from the Gaug.es API every day at the same time, which just gets the patst 24 hours of data. This script makes a call to the Gaug.es API and sends the data to a <a href="http://couchdb.apache.org/">CouchDB</a> database hosted on <a href="https://cloudant.com/">Cloudant</a>. In reality, the script is is embeded in a rack app as I don’t think you can throw up a standalone script to Heroku. Here’s the script:</li>
 </ul>
-<div class="highlight"><pre><code class="language-ruby" data-lang="ruby"><span class="k">class</span> <span class="nc">MyApp</span>
-  <span class="nb">require</span> <span class="s1">&#39;couchrest&#39;</span>
-  <span class="nb">require</span> <span class="s1">&#39;twelve&#39;</span>
-  <span class="nb">require</span> <span class="s1">&#39;date&#39;</span>
-  <span class="nb">require</span> <span class="s1">&#39;time&#39;</span>
 
-  <span class="k">def</span> <span class="nc">self</span><span class="o">.</span><span class="nf">getgaugesdata_scott</span>
-    <span class="n">bfg</span> <span class="o">=</span> <span class="no">Twelve</span><span class="o">.</span><span class="n">new</span><span class="p">(</span><span class="s1">&#39;&lt;gaugeskey&gt;&#39;</span><span class="p">)</span>
-    <span class="n">out</span> <span class="o">=</span> <span class="n">bfg</span><span class="o">.</span><span class="n">gauges</span><span class="p">(</span><span class="s1">&#39;&lt;gaugeskey&gt;&#39;</span><span class="p">)</span><span class="o">[</span><span class="s1">&#39;recent_hours&#39;</span><span class="o">]</span>
-    <span class="n">yip</span> <span class="o">=</span> <span class="p">{</span> <span class="s2">&quot;from_url&quot;</span><span class="o">=&gt;</span> <span class="s2">&quot;http://sckott.github.io/&quot;</span><span class="p">,</span> <span class="s2">&quot;coll_date&quot;</span><span class="o">=&gt;</span> <span class="no">Date</span><span class="o">.</span><span class="n">today</span><span class="o">.</span><span class="n">to_s</span><span class="p">,</span> <span class="s2">&quot;coll_time&quot;</span><span class="o">=&gt;</span> <span class="no">Time</span><span class="o">.</span><span class="n">now</span><span class="o">.</span><span class="n">utc</span><span class="o">.</span><span class="n">localtime</span><span class="o">.</span><span class="n">to_s</span><span class="p">,</span> <span class="s2">&quot;recent_hours&quot;</span><span class="o">=&gt;</span> <span class="n">out</span> <span class="p">}</span>
-    <span class="vi">@db</span> <span class="o">=</span> <span class="no">CouchRest</span><span class="o">.</span><span class="n">database!</span><span class="p">(</span><span class="s2">&quot;https://app16517180.heroku:&lt;key&gt;@app16517180.heroku.cloudant.com/gaugesdb_scott&quot;</span><span class="p">)</span>
-    <span class="vi">@db</span><span class="o">.</span><span class="n">save_doc</span><span class="p">(</span><span class="n">yip</span><span class="p">)</span>
+<pre><code class="language-ruby">class MyApp
+  require 'couchrest'
+  require 'twelve'
+  require 'date'
+  require 'time'
+  
+  def self.getgaugesdata_scott
+    bfg = Twelve.new('&lt;gaugeskey&gt;')
+    out = bfg.gauges('&lt;gaugeskey&gt;')['recent_hours']
+    yip = { "from_url"=&gt; "http://sckott.github.io/", "coll_date"=&gt; Date.today.to_s, "coll_time"=&gt; Time.now.utc.localtime.to_s, "recent_hours"=&gt; out }
+    @db = CouchRest.database!("https://app16517180.heroku:&lt;key&gt;@app16517180.heroku.cloudant.com/gaugesdb_scott")
+    @db.save_doc(yip)
 
-  <span class="k">def</span> <span class="nf">call</span> <span class="n">env</span>
-    <span class="o">[</span><span class="mi">200</span><span class="p">,</span> <span class="p">{</span><span class="s2">&quot;Content-Type&quot;</span> <span class="o">=&gt;</span> <span class="s2">&quot;text/html&quot;</span><span class="p">},</span> <span class="o">[</span><span class="s2">&quot;no output printed here&quot;</span><span class="o">]]</span> 
-  <span class="k">end</span>
-<span class="k">end</span>
-</code></pre></div>
+  def call env
+    [200, {"Content-Type" =&gt; "text/html"}, ["no output printed here"]] 
+  end
+end
+</code></pre>
+
 <ul>
-<li><p>One little catch though: I run the Ruby script on Heroku, so I don&#39;t have to do it locally, but Heroku free instance goes down unless it&#39;s doing something. So I used a little service called <a href="http://uptimerobot.com/">UptimeRobot</a> to ping the Heroku app every 5 minutes. UptimeRobot also is giving you uptime stats too on your app, which I don&#39;t really need, but is a cool feature. </p></li>
-<li><p>And that&#39;s it. Now the data is stored from each day&#39;s collection of visitor stats to a free Cloudant CouchDB database. </p></li>
+  <li>
+    <p>One little catch though: I run the Ruby script on Heroku, so I don’t have to do it locally, but Heroku free instance goes down unless it’s doing something. So I used a little service called <a href="http://uptimerobot.com/">UptimeRobot</a> to ping the Heroku app every 5 minutes. UptimeRobot also is giving you uptime stats too on your app, which I don’t really need, but is a cool feature.</p>
+  </li>
+  <li>
+    <p>And that’s it. Now the data is stored from each day’s collection of visitor stats to a free Cloudant CouchDB database.</p>
+  </li>
 </ul>
 
-<h2>Regular Gaug.es data</h2>
+<h2 id="regular-gauges-data">Regular Gaug.es data</h2>
 
-<p>First, let&#39;s look at what you can do with data that Gaug.es does give to you, using the <code>rgauges</code> R package.</p>
+<p>First, let’s look at what you can do with data that Gaug.es does give to you, using the <code>rgauges</code> R package.</p>
 
-<hr>
+<hr />
 
-<h3>Install rgauges</h3>
+<h3 id="install-rgauges">Install rgauges</h3>
 
 <figure class="highlight"><pre><code class="language-r" data-lang="r">install.packages<span class="p">(</span><span class="s">&quot;devtools&quot;</span><span class="p">)</span>
 <span class="kn">library</span><span class="p">(</span>devtools<span class="p">)</span>
 install_github<span class="p">(</span><span class="s">&quot;rgauges&quot;</span><span class="p">,</span> <span class="s">&quot;ropensci&quot;</span><span class="p">)</span></code></pre></figure>
 
-<h3>Load rgauges and other dependency libraries</h3>
+<h3 id="load-rgauges-and-other-dependency-libraries">Load rgauges and other dependency libraries</h3>
 
 <figure class="highlight"><pre><code class="language-r" data-lang="r"><span class="kn">library</span><span class="p">(</span>rgauges<span class="p">)</span>
 <span class="kn">library</span><span class="p">(</span>ggplot2<span class="p">)</span></code></pre></figure>
 
-<h3>Your info</h3>
+<h3 id="your-info">Your info</h3>
 
 <figure class="highlight"><pre><code class="language-r" data-lang="r">gs_me<span class="p">()</span></code></pre></figure>
 
@@ -145,7 +151,7 @@ install_github<span class="p">(</span><span class="s">&quot;rgauges&quot;</span>
 ## $user$first_name
 ## [1] &quot;Scott&quot;</code></pre></figure>
 
-<h4>Traffic</h4>
+<h4 id="traffic">Traffic</h4>
 
 <figure class="highlight"><pre><code class="language-r" data-lang="r">gs_traffic<span class="p">(</span>id <span class="o">=</span> <span class="s">&quot;4efd83a6f5a1f5158a000004&quot;</span><span class="p">)</span></code></pre></figure>
 
@@ -188,7 +194,7 @@ install_github<span class="p">(</span><span class="s">&quot;rgauges&quot;</span>
 ## 16    16 2014-01-16     14
 ## 17    32 2014-01-17     25</code></pre></figure>
 
-<h3>Screen/browser information</h3>
+<h3 id="screenbrowser-information">Screen/browser information</h3>
 
 <figure class="highlight"><pre><code class="language-r" data-lang="r">gs_reso<span class="p">(</span>id <span class="o">=</span> <span class="s">&quot;4efd83a6f5a1f5158a000004&quot;</span><span class="p">)</span></code></pre></figure>
 
@@ -222,9 +228,9 @@ install_github<span class="p">(</span><span class="s">&quot;rgauges&quot;</span>
 ## 7     6   480
 ## 8     4   800</code></pre></figure>
 
-<h3>Visualize traffic data</h3>
+<h3 id="visualize-traffic-data">Visualize traffic data</h3>
 
-<p>You&#39;ll need to load ggplot2 </p>
+<p>You’ll need to load ggplot2</p>
 
 <figure class="highlight"><pre><code class="language-r" data-lang="r"><span class="kn">library</span><span class="p">(</span>ggplot2<span class="p">)</span>
 out <span class="o">&lt;-</span> gs_gauge_detail<span class="p">(</span>id <span class="o">=</span> <span class="s">&quot;4efd83a6f5a1f5158a000004&quot;</span><span class="p">)</span>
@@ -234,19 +240,18 @@ vis_gauge<span class="p">(</span>out<span class="p">)</span></code></pre></figur
 ## Using date as id variables
 ## Using date as id variables</code></pre></figure>
 
-<p><img src="/public/img/2014-01-17-rgauges-hourly/unnamed-chunk-4.png" alt="center"> </p>
+<p><img src="/public/img/2014-01-17-rgauges-hourly/unnamed-chunk-4.png" alt="center" /></p>
 
 <figure class="highlight"><pre><code class="language-text" data-lang="text">## NULL</code></pre></figure>
 
-<hr>
+<hr />
+<hr />
 
-<hr>
+<h2 id="historic-hourly-gauges-data">Historic hourly Gaug.es data</h2>
 
-<h2>Historic hourly Gaug.es data</h2>
+<p>Now let’s play with the hourly data. To do that we aren’t going to use <code>rgauges</code>, but rather call the Cloudant API. CouchDB provides a RESTful API out of the box, so we can do a call like <code>https://app16517180.heroku.cloudant.com/gaugesdb_scott/_all_docs?limit=20</code> to get metadata (or other calls to get the documents themselves). (note: that url won’t work for you since you don’t have my login info)</p>
 
-<p>Now let&#39;s play with the hourly data. To do that we aren&#39;t going to use <code>rgauges</code>, but rather call the Cloudant API. CouchDB provides a RESTful API out of the box, so we can do a call like <code>https://app16517180.heroku.cloudant.com/gaugesdb_scott/_all_docs?limit=20</code> to get metadata (or other calls to get the documents themselves). (note: that url won&#39;t work for you since you don&#39;t have my login info) </p>
-
-<h3>Get some data</h3>
+<h3 id="get-some-data">Get some data</h3>
 
 <figure class="highlight"><pre><code class="language-r" data-lang="r"><span class="kn">library</span><span class="p">(</span>devtools<span class="p">)</span>
 install_github<span class="p">(</span><span class="s">&quot;sckott/sofa&quot;</span><span class="p">)</span>  <span class="c1"># or install_github(&#39;sofa&#39;, &#39;sckott&#39;)</span></code></pre></figure>
@@ -257,7 +262,7 @@ cloudant_pwd <span class="o">&lt;-</span> <span class="kp">getOption</span><span
 cushion<span class="p">(</span>sofa_cloudant <span class="o">=</span> <span class="kt">c</span><span class="p">(</span>cloudant_name<span class="p">,</span> cloudant_pwd<span class="p">))</span>
 dat <span class="o">&lt;-</span> sofa_alldocs<span class="p">(</span>cushion <span class="o">=</span> <span class="s">&quot;sofa_cloudant&quot;</span><span class="p">,</span> dbname <span class="o">=</span> <span class="s">&quot;gaugesdb_scott&quot;</span><span class="p">,</span> include_docs <span class="o">=</span> <span class="s">&quot;true&quot;</span><span class="p">)</span></code></pre></figure>
 
-<h3>Manipulate and visualize</h3>
+<h3 id="manipulate-and-visualize">Manipulate and visualize</h3>
 
 <figure class="highlight"><pre><code class="language-r" data-lang="r"><span class="kn">library</span><span class="p">(</span>plyr<span class="p">)</span>
 dates <span class="o">&lt;-</span> ldply<span class="p">(</span>dat<span class="o">$</span>rows<span class="p">,</span> <span class="kr">function</span><span class="p">(</span>x<span class="p">)</span> x<span class="o">$</span>doc<span class="o">$</span>coll_date<span class="p">)</span>
@@ -273,7 +278,7 @@ dates <span class="o">&lt;-</span> ldply<span class="p">(</span>dat<span class="
 
 <figure class="highlight"><pre><code class="language-text" data-lang="text">## [1] 198</code></pre></figure>
 
-<p>So we&#39;ve got 198 days of data, first collected near end of June, and most recent yesterday. Now get actual visits data</p>
+<p>So we’ve got 198 days of data, first collected near end of June, and most recent yesterday. Now get actual visits data</p>
 
 <figure class="highlight"><pre><code class="language-r" data-lang="r">df <span class="o">&lt;-</span> ldply<span class="p">(</span>dat<span class="o">$</span>rows<span class="p">,</span> <span class="kr">function</span><span class="p">(</span>x<span class="p">)</span> <span class="p">{</span>
     y <span class="o">&lt;-</span> <span class="kp">do.call</span><span class="p">(</span><span class="kp">rbind</span><span class="p">,</span> <span class="kp">lapply</span><span class="p">(</span>x<span class="o">$</span>doc<span class="o">$</span>recent_hours<span class="p">,</span> <span class="kt">data.frame</span><span class="p">))</span>
@@ -326,7 +331,7 @@ ggplot<span class="p">(</span>df_melt<span class="p">,</span> aes<span class="p"
     labs<span class="p">(</span>x<span class="o">=</span><span class="s">&quot;&quot;</span><span class="p">,</span> y<span class="o">=</span><span class="s">&quot;&quot;</span><span class="p">)</span> <span class="o">+</span>
     gauge_theme<span class="p">()</span></code></pre></figure>
 
-<p><img src="/public/img/2014-01-17-rgauges-hourly/unnamed-chunk-8.png" alt="center"> </p>
+<p><img src="/public/img/2014-01-17-rgauges-hourly/unnamed-chunk-8.png" alt="center" /></p>
 
 <p>And just one day</p>
 
@@ -338,7 +343,8 @@ ggplot<span class="p">(</span>oneday<span class="p">,</span> aes<span class="p">
     labs<span class="p">(</span>x<span class="o">=</span><span class="s">&quot;&quot;</span><span class="p">,</span> y<span class="o">=</span><span class="s">&quot;&quot;</span><span class="p">)</span> <span class="o">+</span>
     gauge_theme<span class="p">()</span></code></pre></figure>
 
-<p><img src="/public/img/2014-01-17-rgauges-hourly/unnamed-chunk-9.png" alt="center"> </p>
+<p><img src="/public/img/2014-01-17-rgauges-hourly/unnamed-chunk-9.png" alt="center" /></p>
+
 
 </div>
 
