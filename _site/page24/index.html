@@ -61,6 +61,142 @@
   
   <div class="post">
     <h1>
+      <a href="/2013/03/ropensci-collaboration/">
+        Visualizing rOpenSci collaboration
+      </a>
+    </h1>
+
+    <span class="post-date">08 Mar 2013</span>
+
+    We ([rOpenSci](http://ropensci.org/)) have been writing code for R packages for a couple years, so it is time to take a look back at the data. What data you ask? The commits data from GitHub ~ data that records who did what and when. 
+
+Using the [Github commits API](http://developer.github.com/v3/repos/commits/) we can gather data on who commited code to a Github repository, and when they did it. Then we can visualize this hitorical record. 
+
+***************
+
+### Install some functions for interacting with the Github API via R
+
+{% highlight r %}
+
+install_github('sandbox', 'ropensci') 
+
+library(sandbox)
+library(httr)
+library(ggplot2)
+library(scales)
+library(reshape2)
+library(bipartite)
+library(doMC)
+library(plyr)
+library(ggthemes)
+library(picante)
+
+# And authenticate - pops open a page in your default browser, then tells 
+# you authentication was successful
+github_auth()
+{% endhighlight %}
+
+
+***************
+
+### Get all repos for an organization, here ropensci of course
+
+{% highlight r %}
+ropensci_repos <- github_allrepos(userorg = "ropensci")
+{% endhighlight %}
+
+
+***************
+
+### Get commits broken down in to additions and deletions, though below we just collapse them to all commits
+
+{% highlight r %}
+registerDoMC(cores = 4)
+github_commits_safe <- plyr::failwith(NULL, github_commits)
+out <- llply(ropensci_repos, function(x) github_commits_safe("ropensci", x, 
+    since = "2009-01-01T", limit = 500), .parallel = TRUE)
+names(out) <- ropensci_repos
+out2 <- compact(out)
+outdf <- ldply(out2)
+{% endhighlight %}
+
+
+***************
+
+### Plot commits by date and repo
+
+{% highlight r %}
+outdf_subset <- outdf[!outdf$.id %in% c("citeulike", "challenge", "docs", "ropensci-book", 
+    "usecases", "textmine", "usgs", "ropenscitoolkit", "neotoma", "rEWDB", "rgauges", 
+    "rodash", "ropensci.github.com", "ROAuth"), ]
+outdf_subset$.id <- tolower(outdf_subset$.id)
+outdf_subset <- ddply(outdf_subset, .(.id, date), summarise, value = sum(value))
+
+mindates <- llply(unique(outdf_subset$.id), function(x) min(outdf_subset[outdf_subset$.id == 
+    x, "date"]))
+names(mindates) <- unique(outdf_subset$.id)
+mindates <- sort(do.call(c, mindates))
+outdf_subset$.id <- factor(outdf_subset$.id, levels = names(mindates))
+
+ggplot(outdf_subset, aes(date, value, fill = .id)) + 
+    geom_bar(stat = "identity", width = 0.5) + 
+    geom_rangeframe(sides = "b", colour = "grey") + 
+    theme_bw(base_size = 9) + 
+    scale_x_date(labels = date_format("%Y"), breaks = date_breaks("year")) + 
+    scale_y_log10() + 
+    facet_grid(.id ~ .) + 
+    labs(x = "", y = "") + 
+    theme(axis.text.y = element_blank(), 
+        axis.text.x = element_text(colour = "black"), 
+        axis.ticks.y = element_blank(), 
+        strip.text.y = element_text(angle = 0, size = 8, ), 
+        strip.background = element_rect(size = 0), 
+        panel.grid.major = element_blank(), 
+        panel.grid.minor = element_blank(), 
+        legend.text = element_text(size = 8), 
+        legend.position = "none", 
+        panel.border = element_blank())
+{% endhighlight %}
+
+
+![center](/public/img/commitsbydate.png) 
+
+
+The plot above plots the sum of additions+deletions, and is sorted by the first commit date of reach repo, with the first being [treebase](https://github.com/ropensci/treeBASE), which wraps the [Treebase API](http://treebase.org/treebase-web/urlAPI.html), and the most recent being [rwbclimate](https://github.com/ropensci/rWBclimate), which wraps the [World Blank climate data API](http://data.worldbank.org/developers/climate-data-api). 
+
+You can see that some repos have recieved commits more or less consistently over their life time, while others have seen a little development here and there. 
+
+***************
+w
+### In addition, there are quite a few people that have committed code now to rOpenSci repos, calling for a network vizualization of course.
+
+{% highlight r %}
+outdf_network <- droplevels(outdf[!outdf$.id %in% c("citeulike", "challenge", 
+    "docs", "ropensci-book", "usecases", "textmine", "usgs", "ropenscitoolkit", 
+    "retriever", "rodash", "ropensci.github.com", "ROAuth", "rgauges", "sandbox", 
+    "rfna", "rmetadata", "rhindawi", "rpmc", "rpensoft", "ritis"), ])
+casted <- dcast(outdf_network, .id + date + name ~ variable, fun.aggregate = length, 
+    value.var = "value")
+names(casted)[1] <- "repo"
+casted2 <- ddply(casted, .(repo, name), summarise, commits = sum(additions))
+casted2 <- data.frame(repo = casted2$repo, weight = casted2$commits, name = casted2$name)
+mat <- sample2matrix(casted2)
+plotweb(sortweb(mat, sort.order = "dec"), method = "normal", text.rot = 90, 
+    adj.high = c(-0.3, 0), adj.low = c(1, -0.3), y.width.low = 0.05, y.width.high = 0.05, 
+    ybig = 0.09, labsize = 0.7)
+{% endhighlight %}
+
+![center](/public/img/collabnetwork.png) 
+
+
+The plot above shows repos on one side and contributors on the other. Some folks (the core rOpenSci team: cboettig, karthikram, emhart, and schamberlain) have committed quite a lot to many packages. We also have amny awesome contributors to our packages (some contributors and repos have been removed for clarity). 
+
+rOpenSci is truly a collaborative effort to develop tools for open science, so thanks to all our contributors - keep on forking, pull requesting, and commiting. 
+
+  </div>
+  
+  <div class="post">
+    <h1>
       <a href="/2013/02/academia-reboot/">
         Academia reboot
       </a>
@@ -68,55 +204,48 @@
 
     <span class="post-date">22 Feb 2013</span>
 
-    <h2 id="reboot">Reboot</h2>
+    ## Reboot
 
-<p>We need to reboot academia, at least for graduate training. I am speaking from the point of view of ecology/evolution (EEB). Why you ask? Because of the following line of reasoning:</p>
+We need to reboot academia, at least for graduate training. I am speaking from the point of view of ecology/evolution (EEB). Why you ask? Because of the following line of reasoning:
 
-<ul>
-  <li>
-    <p>First, the most important factor for me comes down to supply and demand. We have too much supply (=graduate students) and not enough demand (=faculty positions, etc.) - see <a href="http://www.phdcomics.com/comics/archive.php?comicid=911">this comic at PhDComics</a> for proof. This seems especially apparent when you hear from your fellow postdoc friends that there were hundreds of other people with Ph.D.’s applying for the same position.</p>
-  </li>
-  <li>
-    <p>Second, funding is getting thin. I have never received funding from a competitive grant, despite having 12 published papers to my name. Recent cuts to the NSF, NIH, and other federal agencies mean that getting a grant will be harder and harder. Furthermore, the mean age of a first time NIH grant recipient in 2008 was 51 according to a recent study in PLoS One (Matthews <em>et. al.</em> 2011).</p>
-  </li>
-  <li>
-    <p>Third, we don’t learn the skills we really need. This is many fold. First, we don’t learn the appropriate mathematical and statistical techniques in undergraduate and grad school - a forthcoming paper found that in a survey of nearly 1000 ecology and evolution graduate students, most thought they were unprepared wrt to math and stats (interview with author in Soundcloud widget below). Second, we don’t learn enough computational skills. Digital data (not on your physical clipboard, but your digital one) is more and more important, requiring knowing how to leverage and keep track of data. Yet, we aren’t taught these skills, at least in my experience. The need for training in computation/coding is evident from the sold out <a href="http://software-carpentry.org/">Software Carpentry workshops</a>. Third, reproducibility is not something we are taught. Well, we are taught to check over everything in detail (read: proof your data), but there is often no way to reproduce analyses when we use 10 different expensive software programs to do an analysis (read: MS Word, JMP, SAS, SigmaPlot, etc.). And isn’t reproduciblity important?</p>
-  </li>
-</ul>
++ First, the most important factor for me comes down to supply and demand. We have too much supply (=graduate students) and not enough demand (=faculty positions, etc.) - see [this comic at PhDComics](http://www.phdcomics.com/comics/archive.php?comicid=911) for proof. This seems especially apparent when you hear from your fellow postdoc friends that there were hundreds of other people with Ph.D.'s applying for the same position. 
 
-<hr />
++ Second, funding is getting thin. I have never received funding from a competitive grant, despite having 12 published papers to my name. Recent cuts to the NSF, NIH, and other federal agencies mean that getting a grant will be harder and harder. Furthermore, the mean age of a first time NIH grant recipient in 2008 was 51 according to a recent study in PLoS One (Matthews _et. al._ 2011). 
+
++ Third, we don't learn the skills we really need. This is many fold. First, we don't learn the appropriate mathematical and statistical techniques in undergraduate and grad school - a forthcoming paper found that in a survey of nearly 1000 ecology and evolution graduate students, most thought they were unprepared wrt to math and stats (interview with author in Soundcloud widget below). Second, we don't learn enough computational skills. Digital data (not on your physical clipboard, but your digital one) is more and more important, requiring knowing how to leverage and keep track of data. Yet, we aren't taught these skills, at least in my experience. The need for training in computation/coding is evident from the sold out [Software Carpentry workshops](http://software-carpentry.org/). Third, reproducibility is not something we are taught. Well, we are taught to check over everything in detail (read: proof your data), but there is often no way to reproduce analyses when we use 10 different expensive software programs to do an analysis (read: MS Word, JMP, SAS, SigmaPlot, etc.). And isn't reproduciblity important?
+
+***************
 
 <iframe width="30%" height="140" scrolling="no" frameborder="no" src="https://w.soundcloud.com/player/?url=http%3A%2F%2Fapi.soundcloud.com%2Ftracks%2F78215101&amp;color=ff6600&amp;auto_play=false&amp;show_artwork=false"></iframe>
 
-<hr />
+***************
 
-<h2 id="what-do-we-do">What do we do?</h2>
+## What do we do?
 
-<p>To address the supply/demand issue, I think we need fewer graduate students, period. I think this will work for a few reasons. If there are fewer graduate students, those that get in will be of higher quality because profs can be more selective, they may get payed more (hopefully) since there are few students, and they should in theory get more attention from their advisers (if they want it). In addition, there would be less competition for the very few grants out there for grad students.  This would then lead to fewer postdocs, and less competition for faculty positions. I think the supply/demand issue in EEB is particularly problematic. That is, in EEB there doesn’t seem to be the large quantity of private sector jobs as there is for Ph.D. graduates in engineering, physics, etc.</p>
+To address the supply/demand issue, I think we need fewer graduate students, period. I think this will work for a few reasons. If there are fewer graduate students, those that get in will be of higher quality because profs can be more selective, they may get payed more (hopefully) since there are few students, and they should in theory get more attention from their advisers (if they want it). In addition, there would be less competition for the very few grants out there for grad students.  This would then lead to fewer postdocs, and less competition for faculty positions. I think the supply/demand issue in EEB is particularly problematic. That is, in EEB there doesn't seem to be the large quantity of private sector jobs as there is for Ph.D. graduates in engineering, physics, etc. 
 
-<p>The funding situation is beyond me, but definitely makes me want to leave academia. Crowdfunding, especially <a href="http://scifundchallenge.org/">#SciFund</a>, is an option for scientists, but mostly only on a small financial scale. Any thoughts?</p>
+The funding situation is beyond me, but definitely makes me want to leave academia. Crowdfunding, especially [#SciFund](http://scifundchallenge.org/), is an option for scientists, but mostly only on a small financial scale. Any thoughts?
 
-<p>The skills issue will likely be addressed in time, and vary among schools for sure. Some schools will focus on natural history, which is good (that’s where I did my undergrad and it was great), and some schools will incorporate more of these science 2.0 skills (advanced stats, better math training, and computer science).</p>
+The skills issue will likely be addressed in time, and vary among schools for sure. Some schools will focus on natural history, which is good (that's where I did my undergrad and it was great), and some schools will incorporate more of these science 2.0 skills (advanced stats, better math training, and computer science).
 
-<hr />
+***************
 
-<h2 id="thoughts"><em>Thoughts?</em></h2>
+## _Thoughts?_
 
-<hr />
+***************
 
-<h4 id="get-the-rmd-file-used-to-create-this-post-at-my-github-accounthttpsgithubcomsckottsckottgithubcomtreemasterdrafts2013-02-22-academia-rebootrmd---or-md-filehttpsgithubcomsckottsckottgithubcomtreemasterposts2013-02-22-academia-rebootmd">Get the .Rmd file used to create this post <a href="https://github.com/sckott/sckott.github.com/tree/master/_drafts/2013-02-22-academia-reboot.Rmd">at my github account</a> - or <a href="https://github.com/sckott/sckott.github.com/tree/master/_posts/2013-02-22-academia-reboot.md">.md file</a>.</h4>
+#### Get the .Rmd file used to create this post [at my github account](https://github.com/sckott/sckott.github.com/tree/master/_drafts/2013-02-22-academia-reboot.Rmd) - or [.md file](https://github.com/sckott/sckott.github.com/tree/master/_posts/2013-02-22-academia-reboot.md).
 
-<h4 id="written-in-markdownhttpdaringfireballnetprojectsmarkdown-with-help-from-knitrhttpyihuinameknitr-and-knitcitationshttpsgithubcomcboettigknitcitations">Written in <a href="http://daringfireball.net/projects/markdown/">Markdown</a>, with help from <a href="http://yihui.name/knitr/">knitr</a>, and <a href="https://github.com/cboettig/knitcitations">knitcitations</a>.</h4>
+#### Written in [Markdown](http://daringfireball.net/projects/markdown/), with help from [knitr](http://yihui.name/knitr/), and [knitcitations](https://github.com/cboettig/knitcitations).
 
-<hr />
+***************
 
-<h4 id="references">References</h4>
+#### References
 <p>Matthews KRW, Calhoun KM, lo N, ho V and Germano G (2011).
 &ldquo;The Aging of Biomedical Research in The United States.&rdquo;
-<em>Plos One</em>, <b>6</b>.
+<EM>Plos One</EM>, <B>6</B>.
 <a href="http://dx.doi.org/10.1371/journal.pone.0029738">http://dx.doi.org/10.1371/journal.pone.0029738</a>.
 
-</p>
 
   </div>
   
@@ -129,77 +258,68 @@
 
     <span class="post-date">14 Feb 2013</span>
 
-    <p>I was just at the <a href="http://www.evoio.org/wiki/Phylotastic">Phylotastic hackathon</a> in Tucson, AZ at the <a href="http://www.iplantcollaborative.org/">iPlant</a> facilities at the UofA.</p>
+    I was just at the [Phylotastic hackathon](http://www.evoio.org/wiki/Phylotastic) in Tucson, AZ at the [iPlant](http://www.iplantcollaborative.org/) facilities at the UofA.
 
-<p>A problem that needs to be solved is getting the incrasingly vast phylogenetic information to folks not comfortable building their own phylogenies. <a href="http://phylodiversity.net/phylomatic/">Phylomatic</a> has made this super easy for people that want plant phylogenies (at least 250 or so papers have used and cited Phylomatic in their papers) - however, there are few options for those that want phylogenies for other taxonomic groups.</p>
+A problem that needs to be solved is getting the incrasingly vast phylogenetic information to folks not comfortable building their own phylogenies. [Phylomatic](http://phylodiversity.net/phylomatic/) has made this super easy for people that want plant phylogenies (at least 250 or so papers have used and cited Phylomatic in their papers) - however, there are few options for those that want phylogenies for other taxonomic groups. 
 
-<p>One cool tool that was brought up was the <a href="http://www.ncbi.nlm.nih.gov/Taxonomy/CommonTree/wwwcmt.cgi">Common Tree</a> service provided by NCBI. <a href="http://www.ncbi.nlm.nih.gov/Taxonomy/CommonTree/cmthelp.html">Here’s</a> some help on the service. Unlike Phylomatic, Common Tree is purely based off of taxonomic relationships (A and B are both in the C family, so are sisters), not an actual phylogeny as Phylomatic is based on.</p>
+One cool tool that was brought up was the [Common Tree](http://www.ncbi.nlm.nih.gov/Taxonomy/CommonTree/wwwcmt.cgi) service provided by NCBI. [Here's](http://www.ncbi.nlm.nih.gov/Taxonomy/CommonTree/cmthelp.html) some help on the service. Unlike Phylomatic, Common Tree is purely based off of taxonomic relationships (A and B are both in the C family, so are sisters), not an actual phylogeny as Phylomatic is based on. 
 
-<p>But how do you use Common Tree?</p>
+But how do you use Common Tree?
 
-<hr />
+***************
 
-<h3 id="get-a-species-list">Get a species list</h3>
-<p>Grab the taxon list from my github account <a href="https://raw.github.com/sckott/sckott.github.com/master/public/img/species.txt">here</a></p>
+### Get a species list
+Grab the taxon list from my github account [here](https://raw.github.com/sckott/sckott.github.com/master/public/img/species.txt) 
 
-<h3 id="go-to-the-site">Go to the site</h3>
-<p>Go to the Common Tree site <a href="http://www.ncbi.nlm.nih.gov/Taxonomy/CommonTree/wwwcmt.cgi">here</a></p>
+### Go to the site
+Go to the Common Tree site [here](http://www.ncbi.nlm.nih.gov/Taxonomy/CommonTree/wwwcmt.cgi)
 
-<h3 id="choose-file">Choose file</h3>
-<p>Hit the “choose file” button, then select the <code class="highlighter-rouge">species.txt</code> file you downloaded in the first step.</p>
+### Choose file
+Hit the "choose file" button, then select the `species.txt` file you downloaded in the first step. 
 
-<h3 id="add-the-species-list-to-make-the-tree">Add the species list to make the tree</h3>
-<p>Then hit “add from file”, and you got a “tree”</p>
+### Add the species list to make the tree
+Then hit "add from file", and you got a "tree"
 
-<p><img src="https://raw.github.com/sckott/sckott.github.com/master/public/img/ncbi.png" alt="image" /></p>
+![image](https://raw.github.com/sckott/sckott.github.com/master/public/img/ncbi.png)
 
-<h2 id="download">Download</h2>
-<p>You can download the tree in a variety of formats, including a .phy file</p>
+## Download
+You can download the tree in a variety of formats, including a .phy file
 
-<p><img src="https://raw.github.com/sckott/sckott.github.com/master/public/img/ncbi2.png" alt="image" /></p>
+![image](https://raw.github.com/sckott/sckott.github.com/master/public/img/ncbi2.png)
 
-<h2 id="plot-the-tree-on-your-machine">Plot the tree on your machine</h2>
-<p>Make a tree, in R for me</p>
+## Plot the tree on your machine
+Make a tree, in R for me
 
-<figure class="highlight"><pre><code class="language-r" data-lang="r"><span class="c1"># install.packages('ape') # install if you don't have ape
-</span><span class="n">library</span><span class="p">(</span><span class="n">ape</span><span class="p">)</span>
 
-<span class="c1"># Read the tree in. YOu get the tree back with alot of newlines (\n) -
+{% highlight r %}
+# install.packages('ape') # install if you don't have ape
+library(ape)
+
+# Read the tree in. YOu get the tree back with alot of newlines (\n) -
 # can easily take these out with a good text editor.
-</span><span class="n">tree</span> <span class="o">&lt;-</span> <span class="n">read.tree</span><span class="p">(</span><span class="n">text</span> <span class="o">=</span> <span class="s2">"(Lampetra:4,((((((Umbra:4,((Lota:4,Microgadus:4)Gadiformes:4,((Culaea:4,Apeltes:4,Pungitius:4,Gasterosteus:4)Gasterosteidae:4,(Morone:4,(Ambloplites:4,Micropterus:4,Lepomis:4)Centrarchidae:4,(Sander:4,Perca:4)Percidae:4)Percoidei:4,Cottus:4)Percomorpha:4)Holacanthopterygii:4)Neognathi:4,(((Prosopium:4,Coregonus:4)Coregoninae:4,(Salvelinus:4,Salmo:4,Oncorhynchus:4)Salmoninae:4)Salmonidae:4,Osmerus:4)Protacanthopterygii:4)Euteleostei:4,(Alosa:4,(Ameiurus:4,(Catostomus:4,(Semotilus:4,Rhinichthys:4,Margariscus:4,Couesius:4,Pimephales:4,Luxilus:4,Notemigonus:4,Notropis:4,Carassius:4)Cyprinidae:4)Cypriniformes:4)Otophysi:4)Otocephala:4)Clupeocephala:4,Anguilla:4)Elopocephala:4,Acipenser:4)Actinopteri:4,Scyliorhinus:4)Gnathostomata:4)Vertebrata:4;"</span><span class="p">)</span>
+tree <- read.tree(text = "(Lampetra:4,((((((Umbra:4,((Lota:4,Microgadus:4)Gadiformes:4,((Culaea:4,Apeltes:4,Pungitius:4,Gasterosteus:4)Gasterosteidae:4,(Morone:4,(Ambloplites:4,Micropterus:4,Lepomis:4)Centrarchidae:4,(Sander:4,Perca:4)Percidae:4)Percoidei:4,Cottus:4)Percomorpha:4)Holacanthopterygii:4)Neognathi:4,(((Prosopium:4,Coregonus:4)Coregoninae:4,(Salvelinus:4,Salmo:4,Oncorhynchus:4)Salmoninae:4)Salmonidae:4,Osmerus:4)Protacanthopterygii:4)Euteleostei:4,(Alosa:4,(Ameiurus:4,(Catostomus:4,(Semotilus:4,Rhinichthys:4,Margariscus:4,Couesius:4,Pimephales:4,Luxilus:4,Notemigonus:4,Notropis:4,Carassius:4)Cyprinidae:4)Cypriniformes:4)Otophysi:4)Otocephala:4)Clupeocephala:4,Anguilla:4)Elopocephala:4,Acipenser:4)Actinopteri:4,Scyliorhinus:4)Gnathostomata:4)Vertebrata:4;")
 
-<span class="c1"># stretch the branches so tips line up
-</span><span class="n">tree2</span> <span class="o">&lt;-</span> <span class="n">compute.brlen</span><span class="p">(</span><span class="n">tree</span><span class="p">,</span> <span class="n">method</span> <span class="o">=</span> <span class="s2">"Grafen"</span><span class="p">)</span>
+# stretch the branches so tips line up
+tree2 <- compute.brlen(tree, method = "Grafen")
 
-<span class="c1"># Plot the tree
-</span><span class="n">plot</span><span class="p">(</span><span class="n">tree2</span><span class="p">,</span> <span class="n">no.margin</span> <span class="o">=</span> <span class="n">TRUE</span><span class="p">,</span> <span class="n">cex</span> <span class="o">=</span> <span class="m">0.7</span><span class="p">)</span></code></pre></figure>
+# Plot the tree
+plot(tree2, no.margin = TRUE, cex = 0.7)
+{% endhighlight %}
 
-<h3 id="w00p-there-it-is">w00p, there it is…</h3>
 
-<p><img src="https://raw.github.com/sckott/sckott.github.com/master/public/img/ncbi_tree.png" alt="image4" /></p>
+### w00p, there it is...
 
-<hr />
+![image4](https://raw.github.com/sckott/sckott.github.com/master/public/img/ncbi_tree.png)
 
-<h3 id="and-the-answer-is-no-to-the-question-is-there-an-api-for-common-tree">And the answer is <em>NO</em> to the question: Is there an API for Common Tree?</h3>
+***************
 
-<hr />
+### And the answer is _NO_ to the question: Is there an API for Common Tree?
 
-<h4 id="get-the-rmd-file-used-to-create-this-post-at-my-github-accounthttpsgithubcomsckottsckottgithubcomtreemasterdrafts2013-02-14-common-treermd---or-md-filehttpsgithubcomsckottsckottgithubcomtreemasterposts2013-02-14-common-treemd">Get the .Rmd file used to create this post <a href="https://github.com/sckott/sckott.github.com/tree/master/_drafts/2013-02-14-common-tree.Rmd">at my github account</a> - or <a href="https://github.com/sckott/sckott.github.com/tree/master/_posts/2013-02-14-common-tree.md">.md file</a>.</h4>
+***************
 
-<h4 id="written-in-markdownhttpdaringfireballnetprojectsmarkdown-with-help-from-knitrhttpyihuinameknitr">Written in <a href="http://daringfireball.net/projects/markdown/">Markdown</a>, with help from <a href="http://yihui.name/knitr/">knitr</a>.</h4>
+#### Get the .Rmd file used to create this post [at my github account](https://github.com/sckott/sckott.github.com/tree/master/_drafts/2013-02-14-common-tree.Rmd) - or [.md file](https://github.com/sckott/sckott.github.com/tree/master/_posts/2013-02-14-common-tree.md).
 
-  </div>
-  
-  <div class="post">
-    <h1>
-      <a href="/2013/01/ifttt-test/">
-        testing ifttt recipe, ignore
-      </a>
-    </h1>
-
-    <span class="post-date">26 Jan 2013</span>
-
-    <p>testing ifttt recipe</p>
+#### Written in [Markdown](http://daringfireball.net/projects/markdown/), with help from [knitr](http://yihui.name/knitr/).
 
   </div>
   

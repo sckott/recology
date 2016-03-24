@@ -61,6 +61,204 @@
   
   <div class="post">
     <h1>
+      <a href="/2014/10/conditionality-meta-analysis/">
+        Conditionality meta-analysis data
+      </a>
+    </h1>
+
+    <span class="post-date">06 Oct 2014</span>
+
+    ## The paper
+
+One paper from my graduate work asked most generally ~ "How much does the variation in magnitudes and signs of species interaction outcomes vary?". More specifically, we wanted to know if variation differed among species interaction classes (mutualism, competition, predation), and among various "gradients" (space, time, etc.). To answer this question, we used a meta-analysis approach (rather than e.g., a field experiment). We [published the paper][ecolett] recently.
+
+> p.s. I really really wish we would have put it in an open access journal...
+
+## The data
+
+Anyway, I'm here to talk about the __data__. We didn't get the data up with the paper, but it is [up on Figshare][fig] now. The files there are the following:
+
+* `coniditionality.R` - script used to process the data from `variables_prelim.csv`
+* `variables_prelim.csv` - description of variables in the preliminary data set, matches `conditionality_data_prelim.csv`
+* `variables_used.csv` - description of variables in the used data set, matches `conditionality_data_used.csv`
+* `conditionality_data_prelim.csv` - preliminary data, the raw data
+* `conditionality_data_used.csv` - the data used for our paper
+* `README.md` - the readme
+* `paper_selection.csv` - the list of papers we went through, with remarks about paper selection
+
+Please do play with the data, publish some papers, etc, etc. It took 6 of us about 4 years to collect this data; we skimmed through ~11,000 papers on the first pass (aka. skimming through abstracts in Google Scholar and Web of Science), then decided on nearly 500 papers to get data from, and narrowed down to 247 papers for the publication mentioned above. Now, there was no funding for this, so it was sort of done in between other projects, but still, it was simply __A LOT__ of tables to digitize, and graphs to extract data points from. __Anyway__, hopefully you will find this data useful :p
+
+## EML
+
+I think this dataset would be a great introduction to the potential power of EML ([Ecological Metadata Langauge][eml]). At [rOpenSci](http://ropensci.org/), one of our team [Carl Boettiger][carl], along with Claas-Thido Pfaff, Duncan Temple Lang, Karthik Ram, and Matt Jones, have created an R client for EML, to parse EML files and to create and publish them.
+
+## What is EML?/Why EML?
+
+A demonstration is in order...
+
+## Example using EML with this dataset
+
+### Install EML
+
+
+```r
+library("devtools")
+install.packages("RHTMLForms", repos = "http://www.omegahat.org/R/", type="source")
+install_github("ropensci/EML", build=FALSE, dependencies=c("DEPENDS", "IMPORTS"))
+```
+
+Load `EML`
+
+
+```r
+library('EML')
+```
+
+### Prepare metadata
+
+
+```r
+# dataset
+prelim_dat <- read.csv("conditionality_data_prelim.csv")
+# variable descriptions for each column
+prelim_vars <- read.csv("variables_prelim.csv", stringsAsFactors = FALSE)
+```
+
+Get column definitions in a vector
+
+
+```r
+col_defs <- prelim_vars$description
+```
+
+Create unit definitions for each column
+
+
+```r
+unit_defs <- list(
+  c(unit = "number",
+    bounds = c(0, Inf)),
+  c(unit = "number",
+    bounds = c(0, Inf)),
+  "independent replicates",
+  c(unit = "number",
+    bounds = c(0, Inf)),
+
+  ... <CUTOFF>
+)
+```
+
+
+
+
+### Write an EML file
+
+
+```r
+eml_write(prelim_dat,
+          unit.defs = unit_defs,
+          col.defs = col_defs,
+          creator = "Scott Chamberlain",
+          contact = "myrmecocystus@gmail.com",
+          file = "conditionality_data_prelim_eml.xml")
+```
+
+```
+## [1] "conditionality_data_prelim_eml.xml"
+```
+
+### Validate the EML file
+
+
+```r
+eml_validate("conditionality_data_prelim_eml.xml")
+```
+
+```
+## EML specific tests XML specific tests 
+##               TRUE               TRUE
+```
+
+### Read data and metadata
+
+
+```r
+gg <- eml_read("conditionality_data_prelim_eml.xml")
+eml_get(gg, "contact")
+```
+
+```
+## [1] "myrmecocystus@gmail.com"
+```
+
+```r
+eml_get(gg, "citation_info")
+```
+
+```
+## Chamberlain S (2014-10-06). _metadata_.
+```
+
+```r
+dat <- eml_get(gg, "data.frame")
+head(dat[,c(1:10)])
+```
+
+```
+##   order i indrep avg author_last  finit_1 finit_2 finit_abv co_author
+## 1     1 1      a   1      Devall margaret       s        ms     Thein
+## 2     2 1      a   2      Devall margaret       s        ms     Thein
+## 3     3 1      a   3      Devall margaret       s        ms     Thein
+## 4     4 1      a   4      Devall margaret       s        ms     Thein
+## 5     5 1      a   5      Devall margaret       s        ms     Thein
+## 6     6 1      a   6      Devall margaret       s        ms     Thein
+##   sinit_1
+## 1 leonard
+## 2 leonard
+## 3 leonard
+## 4 leonard
+## 5 leonard
+## 6 leonard
+```
+
+### Publish
+
+We can also use the `EML` package to publish the data, here to [Figshare](http://figshare.com).
+
+First, install `rfigshare`
+
+
+```r
+install.packages("rfigshare")
+library('rfigshare')
+```
+
+Then publish using `eml_publish()`
+
+
+```r
+figid <- eml_publish(
+            file = "conditionality_data_prelim_eml.xml",
+            description = "EML file for Chamberlain, S.A., J.A. Rudgers, and J.L. Bronstein. 2014. How context-dependent are species interactions. Ecology Letters",
+            categories = "Ecology",
+            tags = "EML",
+            destination = "figshare",
+            visibility = "public",
+            title = "condionality data, EML")
+fs_make_public(figid)
+```
+
+![](/public/img/2014-10-06-conditionality-meta-analysis/figshare_conditional.png)
+
+[ecolett]: http://scottchamberlain.info/publications/
+[fig]: http://figshare.com/articles/Conditionality_data/1097657
+[eml]: https://knb.ecoinformatics.org/#external//emlparser/docs/index.html
+[carl]: http://www.carlboettiger.info/
+
+  </div>
+  
+  <div class="post">
+    <h1>
       <a href="/2014/08/rsunlight/">
         rsunlight - R client for Sunlight Labs APIs
       </a>
@@ -68,62 +266,65 @@
 
     <span class="post-date">11 Aug 2014</span>
 
-    <p>My <a href="http://recology.info/2014/05/rsunlight/">last blog post on this package</a> was so long ago the package wrapped both New York Times APIs and Sunlight Labs APIs and the package was called <code class="highlighter-rouge">govdat</code>. I split that package up into <code class="highlighter-rouge">rsunlight</code> for Sunlight Labs APIs and <code class="highlighter-rouge">rtimes</code> for some New York Times APIs. <code class="highlighter-rouge">rtimes</code> is <a href="https://github.com/ropengov/rtimes">in development at Github</a>.</p>
+    My [last blog post on this package](http://recology.info/2014/05/rsunlight/) was so long ago the package wrapped both New York Times APIs and Sunlight Labs APIs and the package was called `govdat`. I split that package up into `rsunlight` for Sunlight Labs APIs and `rtimes` for some New York Times APIs. `rtimes` is [in development at Github](https://github.com/ropengov/rtimes).
 
-<p>We’ve updated the package to include four sets of functions, one set for each of four Sunlight Labs APIs (with a separate prefix for each API):</p>
+We've updated the package to include four sets of functions, one set for each of four Sunlight Labs APIs (with a separate prefix for each API):
 
-<ul>
-  <li>Congress API (<code class="highlighter-rouge">cg_</code>)</li>
-  <li>Open States API (<code class="highlighter-rouge">os_</code>)</li>
-  <li>Capitol Words API (<code class="highlighter-rouge">cw_</code>)</li>
-  <li>Influence Explorer API (<code class="highlighter-rouge">ie_</code>)</li>
-</ul>
+* Congress API (`cg_`)
+* Open States API (`os_`)
+* Capitol Words API (`cw_`)
+* Influence Explorer API (`ie_`)
 
-<p>Then there are many methods for each API.</p>
+Then there are many methods for each API.
 
-<h2 id="rsunlight-intro">rsunlight intro</h2>
+## rsunlight intro
 
-<h3 id="installation">Installation</h3>
+### Installation
 
-<p>First, installation</p>
+First, installation
 
-<div class="highlighter-rouge"><pre class="highlight"><code><span class="n">devtools</span><span class="o">::</span><span class="n">install_github</span><span class="p">(</span><span class="s2">"ropengov/rsunlight"</span><span class="p">)</span>
-</code></pre>
-</div>
 
-<p>Load the library</p>
+```r
+devtools::install_github("ropengov/rsunlight")
+```
 
-<div class="highlighter-rouge"><pre class="highlight"><code><span class="n">library</span><span class="p">(</span><span class="s2">"rsunlight"</span><span class="p">)</span>
-</code></pre>
-</div>
+Load the library
 
-<h3 id="congress-api">Congress API</h3>
 
-<p>Search for Fed level bills that include the term <em>health care</em> in them.</p>
+```r
+library("rsunlight")
+```
 
-<div class="highlighter-rouge"><pre class="highlight"><code><span class="n">res</span> <span class="o">&lt;-</span> <span class="n">cg_bills</span><span class="p">(</span><span class="n">query</span><span class="o">=</span><span class="s1">'health care'</span><span class="p">)</span>
-<span class="n">head</span><span class="p">(</span><span class="n">res</span><span class="o">$</span><span class="n">results</span><span class="p">[,</span><span class="m">1</span><span class="o">:</span><span class="m">4</span><span class="p">])</span>
-</code></pre>
-</div>
+### Congress API
 
-<div class="highlighter-rouge"><pre class="highlight"><code>##          nicknames congress last_version_on sponsor_id
+Search for Fed level bills that include the term _health care_ in them.
+
+
+```r
+res <- cg_bills(query='health care')
+head(res$results[,1:4])
+```
+
+```
+##          nicknames congress last_version_on sponsor_id
 ## 1        obamacare      111      2010-08-25    S000749
 ## 2 obamacare, ppaca      111      2010-08-25    R000053
 ## 3             NULL      113      2013-10-09    K000220
 ## 4             NULL      111      2009-01-06    I000056
 ## 5             NULL      112      2011-01-05    I000056
 ## 6             NULL      111      2009-05-05    D000197
-</code></pre>
-</div>
+```
 
-<p>Search for bills that have the two terms <em>transparency</em> and <em>accountability</em> within 5 words of each other in the bill.</p>
+Search for bills that have the two terms _transparency_ and _accountability_ within 5 words of each other in the bill.
 
-<div class="highlighter-rouge"><pre class="highlight"><code><span class="n">res</span> <span class="o">&lt;-</span> <span class="n">cg_bills</span><span class="p">(</span><span class="n">query</span><span class="o">=</span><span class="s1">'transparency accountability'</span><span class="o">~</span><span class="m">5</span><span class="p">)</span>
-<span class="n">head</span><span class="p">(</span><span class="n">res</span><span class="o">$</span><span class="n">results</span><span class="p">[,</span><span class="m">1</span><span class="o">:</span><span class="m">4</span><span class="p">])</span>
-</code></pre>
-</div>
 
-<div class="highlighter-rouge"><pre class="highlight"><code>##   congress last_version_on sponsor_id
+```r
+res <- cg_bills(query='transparency accountability'~5)
+head(res$results[,1:4])
+```
+
+```
+##   congress last_version_on sponsor_id
 ## 1      111      2009-01-15    R000435
 ## 2      113      2013-07-17    R000595
 ## 3      112      2011-12-08    R000435
@@ -151,19 +352,20 @@
 ## 4  http://beta.congress.gov/bill/113th/house-bill/3155
 ## 5 http://beta.congress.gov/bill/112th/senate-bill/1848
 ## 6 http://beta.congress.gov/bill/113th/senate-bill/1347
-</code></pre>
-</div>
+```
 
-<h3 id="open-states-api">Open States API</h3>
+### Open States API
 
-<p>Search State Bills, in this case search for the term <em>agriculture</em> in Texas.</p>
+Search State Bills, in this case search for the term _agriculture_ in Texas.
 
-<div class="highlighter-rouge"><pre class="highlight"><code><span class="n">res</span> <span class="o">&lt;-</span> <span class="n">os_billsearch</span><span class="p">(</span><span class="n">terms</span> <span class="o">=</span> <span class="s1">'agriculture'</span><span class="p">,</span> <span class="n">state</span> <span class="o">=</span> <span class="s1">'tx'</span><span class="p">)</span>
-<span class="n">head</span><span class="p">(</span><span class="n">res</span><span class="p">)</span>
-</code></pre>
-</div>
 
-<div class="highlighter-rouge"><pre class="highlight"><code>##                                                                                                                                                 title
+```r
+res <- os_billsearch(terms = 'agriculture', state = 'tx')
+head(res)
+```
+
+```
+##                                                                                                                                                 title
 ## 1 Relating to authorizing the issuance of revenue bonds to fund capital projects at public institutions of higher education; making an appropriation.
 ## 2                          Relating to authorizing the issuance of revenue bonds to fund capital projects at public institutions of higher education.
 ## 3                          Relating to authorizing the issuance of revenue bonds to fund capital projects at public institutions of higher education.
@@ -198,37 +400,39 @@
 ## 4    SB 6
 ## 5   SB 44
 ## 6 SB 1010
-</code></pre>
-</div>
+```
 
-<p>Search for legislators in California (<em>ca</em>) and in the democratic party</p>
+Search for legislators in California (_ca_) and in the democratic party
 
-<div class="highlighter-rouge"><pre class="highlight"><code><span class="n">res</span> <span class="o">&lt;-</span> <span class="n">os_legislatorsearch</span><span class="p">(</span><span class="n">state</span> <span class="o">=</span> <span class="s1">'ca'</span><span class="p">,</span> <span class="n">party</span> <span class="o">=</span> <span class="s1">'democratic'</span><span class="p">,</span> <span class="n">fields</span> <span class="o">=</span> <span class="n">c</span><span class="p">(</span><span class="s1">'full_name'</span><span class="p">,</span><span class="s1">'+capitol_office.phone'</span><span class="p">))</span>
-<span class="n">head</span><span class="p">(</span><span class="n">res</span><span class="p">)</span>
-</code></pre>
-</div>
 
-<div class="highlighter-rouge"><pre class="highlight"><code>##            phone        id       full_name
+```r
+res <- os_legislatorsearch(state = 'ca', party = 'democratic', fields = c('full_name','+capitol_office.phone'))
+head(res)
+```
+
+```
+##            phone        id       full_name
 ## 1 (916) 319-2014 CAL000058   Nancy Skinner
 ## 2 (916) 319-2015 CAL000059   Joan Buchanan
 ## 3 (916) 319-2022 CAL000084       Paul Fong
 ## 4 (916) 319-2046 CAL000089      John Pérez
 ## 5 (916) 319-2080 CAL000098 V. Manuel Pérez
 ## 6 (916) 319-2001 CAL000101  Wesley Chesbro
-</code></pre>
-</div>
+```
 
-<p>Now you can call each representative, yay!</p>
+Now you can call each representative, yay!
 
-<h3 id="capitol-words-api">Capitol Words API</h3>
+### Capitol Words API
 
-<p>Search for phrase <em>climate change</em> used by politicians between September 5th and 16th, 2011:</p>
+Search for phrase _climate change_ used by politicians between September 5th and 16th, 2011:
 
-<div class="highlighter-rouge"><pre class="highlight"><code><span class="n">head</span><span class="p">(</span><span class="n">cw_text</span><span class="p">(</span><span class="n">phrase</span><span class="o">=</span><span class="s1">'climate change'</span><span class="p">,</span> <span class="n">start_date</span><span class="o">=</span><span class="s1">'2011-09-05'</span><span class="p">,</span> <span class="n">end_date</span><span class="o">=</span><span class="s1">'2011-09-16'</span><span class="p">,</span> <span class="n">party</span><span class="o">=</span><span class="s1">'D'</span><span class="p">)[,</span><span class="n">c</span><span class="p">(</span><span class="s1">'speaker_last'</span><span class="p">,</span><span class="s1">'origin_url'</span><span class="p">)])</span>
-</code></pre>
-</div>
 
-<div class="highlighter-rouge"><pre class="highlight"><code>##   speaker_last
+```r
+head(cw_text(phrase='climate change', start_date='2011-09-05', end_date='2011-09-16', party='D')[,c('speaker_last','origin_url')])
+```
+
+```
+##   speaker_last
 ## 1      Tsongas
 ## 2       Inslee
 ## 3        Costa
@@ -242,35 +446,37 @@
 ## 4   http://origin.www.gpo.gov/fdsys/pkg/CREC-2011-09-15/html/CREC-2011-09-15-pt1-PgS5650.htm
 ## 5   http://origin.www.gpo.gov/fdsys/pkg/CREC-2011-09-13/html/CREC-2011-09-13-pt1-PgS5510.htm
 ## 6 http://origin.www.gpo.gov/fdsys/pkg/CREC-2011-09-13/html/CREC-2011-09-13-pt1-PgS5513-2.htm
-</code></pre>
-</div>
+```
 
-<p>Plot mentions of the term <em>climate change</em> over time for Democrats vs. Republicans</p>
+Plot mentions of the term _climate change_ over time for Democrats vs. Republicans
 
-<div class="highlighter-rouge"><pre class="highlight"><code><span class="n">library</span><span class="p">(</span><span class="s1">'ggplot2'</span><span class="p">)</span>
-<span class="n">dat_d</span> <span class="o">&lt;-</span> <span class="n">cw_timeseries</span><span class="p">(</span><span class="n">phrase</span><span class="o">=</span><span class="s1">'climate change'</span><span class="p">,</span> <span class="n">party</span><span class="o">=</span><span class="s2">"D"</span><span class="p">)</span>
-<span class="n">dat_d</span><span class="o">$</span><span class="n">party</span> <span class="o">&lt;-</span> <span class="n">rep</span><span class="p">(</span><span class="s2">"D"</span><span class="p">,</span> <span class="n">nrow</span><span class="p">(</span><span class="n">dat_d</span><span class="p">))</span>
-<span class="n">dat_r</span> <span class="o">&lt;-</span> <span class="n">cw_timeseries</span><span class="p">(</span><span class="n">phrase</span><span class="o">=</span><span class="s1">'climate change'</span><span class="p">,</span> <span class="n">party</span><span class="o">=</span><span class="s2">"R"</span><span class="p">)</span>
-<span class="n">dat_r</span><span class="o">$</span><span class="n">party</span> <span class="o">&lt;-</span> <span class="n">rep</span><span class="p">(</span><span class="s2">"R"</span><span class="p">,</span> <span class="n">nrow</span><span class="p">(</span><span class="n">dat_r</span><span class="p">))</span>
-<span class="n">dat_both</span> <span class="o">&lt;-</span> <span class="n">rbind</span><span class="p">(</span><span class="n">dat_d</span><span class="p">,</span> <span class="n">dat_r</span><span class="p">)</span>
-<span class="n">ggplot</span><span class="p">(</span><span class="n">dat_both</span><span class="p">,</span> <span class="n">aes</span><span class="p">(</span><span class="n">day</span><span class="p">,</span> <span class="n">count</span><span class="p">,</span> <span class="n">colour</span><span class="o">=</span><span class="n">party</span><span class="p">))</span> <span class="o">+</span>
-   <span class="n">geom_line</span><span class="p">()</span> <span class="o">+</span>
-   <span class="n">theme_grey</span><span class="p">(</span><span class="n">base_size</span><span class="o">=</span><span class="m">20</span><span class="p">)</span> <span class="o">+</span>
-   <span class="n">scale_colour_manual</span><span class="p">(</span><span class="n">values</span><span class="o">=</span><span class="n">c</span><span class="p">(</span><span class="s2">"blue"</span><span class="p">,</span><span class="s2">"red"</span><span class="p">))</span>
-</code></pre>
-</div>
 
-<p><img src="/public/img/2014-08-11-rsunlight/unnamed-chunk-9.png" alt="plot of chunk unnamed-chunk-9" /></p>
+```r
+library('ggplot2')
+dat_d <- cw_timeseries(phrase='climate change', party="D")
+dat_d$party <- rep("D", nrow(dat_d))
+dat_r <- cw_timeseries(phrase='climate change', party="R")
+dat_r$party <- rep("R", nrow(dat_r))
+dat_both <- rbind(dat_d, dat_r)
+ggplot(dat_both, aes(day, count, colour=party)) +
+   geom_line() +
+   theme_grey(base_size=20) +
+   scale_colour_manual(values=c("blue","red"))
+```
 
-<h3 id="influence-explorer-api">Influence Explorer API</h3>
+![plot of chunk unnamed-chunk-9](/public/img/2014-08-11-rsunlight/unnamed-chunk-9.png)
 
-<p>Search for contributions of equal to or more than <code class="highlighter-rouge">$20,000,000</code>.</p>
+### Influence Explorer API
 
-<div class="highlighter-rouge"><pre class="highlight"><code><span class="n">ie_contr</span><span class="p">(</span><span class="n">amount</span><span class="o">=</span><span class="s1">'&gt;|20000000'</span><span class="p">)[,</span><span class="n">c</span><span class="p">(</span><span class="s1">'amount'</span><span class="p">,</span><span class="s1">'recipient_name'</span><span class="p">,</span><span class="s1">'contributor_name'</span><span class="p">)]</span>
-</code></pre>
-</div>
+Search for contributions of equal to or more than `$20,000,000`.
 
-<div class="highlighter-rouge"><pre class="highlight"><code>##         amount
+
+```r
+ie_contr(amount='>|20000000')[,c('amount','recipient_name','contributor_name')]
+```
+
+```
+##         amount
 ## 1  25177212.00
 ## 2  20000000.00
 ## 3  20000000.00
@@ -303,16 +509,17 @@
 ## 8       GOLISANO, B THOMAS
 ## 9       GOLISANO, B THOMAS
 ## 10      GOLISANO, B THOMAS
-</code></pre>
-</div>
+```
 
-<p>Top industries, by contributions given. <em>UNKOWN</em> is a very influential industry. Of course <em>law firms</em> are high up there, as well as <em>real estate</em>. I’m sure <em>oil and gas</em> is embarrased that they’re contributing less than <em>pulic sector unions</em>.</p>
+Top industries, by contributions given. _UNKOWN_ is a very influential industry. Of course _law firms_ are high up there, as well as _real estate_. I'm sure _oil and gas_ is embarrased that they're contributing less than _pulic sector unions_.
 
-<div class="highlighter-rouge"><pre class="highlight"><code><span class="p">(</span><span class="n">res</span> <span class="o">&lt;-</span> <span class="n">ie_industries</span><span class="p">(</span><span class="n">method</span><span class="o">=</span><span class="s1">'top_ind'</span><span class="p">,</span> <span class="n">limit</span><span class="o">=</span><span class="m">10</span><span class="p">))</span>
-</code></pre>
-</div>
 
-<div class="highlighter-rouge"><pre class="highlight"><code>##       count        amount                               id
+```r
+(res <- ie_industries(method='top_ind', limit=10))
+```
+
+```
+##       count        amount                               id
 ## 1  14919818 3825359507.21 cdb3f500a3f74179bb4a5eb8b2932fa6
 ## 2   3600761 2787678962.95 f50cf984a2e3477c8167d32e2b14e052
 ## 3    329906 1717649914.58 9cac88377c3b400e89c2d6762e3f28f6
@@ -328,40 +535,37 @@
 ## 2                TRUE       LAWYERS/LAW FIRMS
 ## 3                TRUE  CANDIDATE SELF-FINANCE
 ## 4                TRUE             REAL ESTATE
-## 5                TRUE SECURITIES &amp; INVESTMENT
+## 5                TRUE SECURITIES & INVESTMENT
 ## 6                TRUE    PUBLIC SECTOR UNIONS
 ## 7                TRUE    HEALTH PROFESSIONALS
 ## 8                TRUE               INSURANCE
-## 9                TRUE               OIL &amp; GAS
+## 9                TRUE               OIL & GAS
 ## 10               TRUE        CASINOS/GAMBLING
-</code></pre>
-</div>
+```
 
-<div class="highlighter-rouge"><pre class="highlight"><code><span class="n">res</span><span class="o">$</span><span class="n">amount</span> <span class="o">&lt;-</span> <span class="n">as.numeric</span><span class="p">(</span><span class="n">res</span><span class="o">$</span><span class="n">amount</span><span class="p">)</span>
-<span class="n">ggplot</span><span class="p">(</span><span class="n">res</span><span class="p">,</span> <span class="n">aes</span><span class="p">(</span><span class="n">reorder</span><span class="p">(</span><span class="n">name</span><span class="p">,</span> <span class="n">amount</span><span class="p">),</span> <span class="n">amount</span><span class="p">))</span> <span class="o">+</span>
-  <span class="n">geom_bar</span><span class="p">(</span><span class="n">stat</span> <span class="o">=</span> <span class="s2">"identity"</span><span class="p">)</span> <span class="o">+</span>
-  <span class="n">coord_flip</span><span class="p">()</span> <span class="o">+</span>
-  <span class="n">scale_y_continuous</span><span class="p">(</span><span class="n">labels</span><span class="o">=</span><span class="n">dollar</span><span class="p">)</span> <span class="o">+</span>
-  <span class="n">theme_grey</span><span class="p">(</span><span class="n">base_size</span> <span class="o">=</span> <span class="m">14</span><span class="p">)</span>
-</code></pre>
-</div>
+```r
+res$amount <- as.numeric(res$amount)
+ggplot(res, aes(reorder(name, amount), amount)) +
+  geom_bar(stat = "identity") +
+  coord_flip() +
+  scale_y_continuous(labels=dollar) +
+  theme_grey(base_size = 14)
+```
 
-<p><img src="/public/img/2014-08-11-rsunlight/unnamed-chunk-11.png" alt="plot of chunk unnamed-chunk-11" /></p>
+![plot of chunk unnamed-chunk-11](/public/img/2014-08-11-rsunlight/unnamed-chunk-11.png)
 
-<hr />
+-------
 
-<h2 id="feedback">Feedback</h2>
+## Feedback
 
-<p>Please do use <code class="highlighter-rouge">rsunlight</code>, and let us know what you want fixed, new features, etc.</p>
+Please do use `rsunlight`, and let us know what you want fixed, new features, etc.
 
-<h2 id="still-to-come">Still to come:</h2>
+## Still to come:
 
-<ul>
-  <li>Functions to visualize data from each API. You can do this yourself, but a few functions will be created to help those that are new to R.</li>
-  <li>Vectorize functions so that you can give many inputs to a function instead of a single input.</li>
-  <li>test suite: embarrasingly, there is no test suite yet, boo me.</li>
-  <li>I plan to push <code class="highlighter-rouge">rsunlight</code> to CRAN soon as <code class="highlighter-rouge">v0.3</code></li>
-</ul>
+* Functions to visualize data from each API. You can do this yourself, but a few functions will be created to help those that are new to R.
+* Vectorize functions so that you can give many inputs to a function instead of a single input.
+* test suite: embarrasingly, there is no test suite yet, boo me.
+* I plan to push `rsunlight` to CRAN soon as `v0.3`
 
   </div>
   
@@ -374,61 +578,67 @@
 
     <span class="post-date">18 Jun 2014</span>
 
-    <p>My <a href="http://recology.info/2014/05/analogsea/">last blog </a> post introduced the R package I’m working on <code class="highlighter-rouge">analogsea</code>, an R client for the Digital Ocean API.</p>
+    My [last blog ](http://recology.info/2014/05/analogsea/) post introduced the R package I'm working on `analogsea`, an R client for the Digital Ocean API.
 
-<p>Things have changed a bit, including fillig out more functions for all API endpoints, and incorparting feedback from Hadley and Karthik. The package is as <code class="highlighter-rouge">v0.1</code> now, so I thought I’d say a few things about how it works.</p>
+Things have changed a bit, including fillig out more functions for all API endpoints, and incorparting feedback from Hadley and Karthik. The package is as `v0.1` now, so I thought I'd say a few things about how it works.
 
-<p>Note that Digital Ocean’s v2 API is in beta stage now, so the current version of <code class="highlighter-rouge">analogsea</code> at <code class="highlighter-rouge">v0.1</code> works with their v1 API. The <a href="https://github.com/sckott/analogsea/tree/v2">v2 branch of analogsea</a> is being developed for their v2 API.</p>
+Note that Digital Ocean's v2 API is in beta stage now, so the current version of `analogsea` at `v0.1` works with their v1 API. The [v2 branch of analogsea](https://github.com/sckott/analogsea/tree/v2) is being developed for their v2 API.
 
-<p>If you sign up for an account with Digital Ocean use this referral link: <a href="https://www.digitalocean.com/?refcode=0740f5169634">https://www.digitalocean.com/?refcode=0740f5169634</a> so I can earn some credits. thx :)</p>
+If you sign up for an account with Digital Ocean use this referral link: [https://www.digitalocean.com/?refcode=0740f5169634](https://www.digitalocean.com/?refcode=0740f5169634) so I can earn some credits. thx :)
 
-<p>First, installation</p>
+First, installation
 
-<p>Note: I did try to submit to CRAN, but Ripley complained about the package name so I’d rather not waste my time esp since people using this likely will already know about <code class="highlighter-rouge">install_github()</code>.</p>
+Note: I did try to submit to CRAN, but Ripley complained about the package name so I'd rather not waste my time esp since people using this likely will already know about `install_github()`.
 
-<div class="highlighter-rouge"><pre class="highlight"><code><span class="n">devtools</span><span class="o">::</span><span class="n">install_github</span><span class="p">(</span><span class="s2">"sckott/analogsea"</span><span class="p">)</span>
-</code></pre>
-</div>
 
-<p>Load the library</p>
+```r
+devtools::install_github("sckott/analogsea")
+```
 
-<div class="highlighter-rouge"><pre class="highlight"><code><span class="n">library</span><span class="p">(</span><span class="s2">"analogsea"</span><span class="p">)</span>
-</code></pre>
-</div>
+Load the library
 
-<div class="highlighter-rouge"><pre class="highlight"><code>## Loading required package: magrittr
-</code></pre>
-</div>
 
-<p>Authenticate has changed a bit. Whereas auth details were stored as environment variables before, I’m just using R’s options. <code class="highlighter-rouge">do_auth()</code> will ask for your Digital Ocean details. You can enter them each R session, or store them in your <code class="highlighter-rouge">.Rprofile</code> file. After successful authentication, each function simply looks for your auth details with <code class="highlighter-rouge">getOption()</code>.  You don’t have to use this function first, though if you don’t your first call to another function will ask for auth details.</p>
+```r
+library("analogsea")
+```
 
-<div class="highlighter-rouge"><pre class="highlight"><code><span class="n">do_auth</span><span class="p">()</span>
-</code></pre>
-</div>
+```
+## Loading required package: magrittr
+```
 
-<p><code class="highlighter-rouge">sizes</code>, <code class="highlighter-rouge">images</code>, and <code class="highlighter-rouge">keys</code> functions have changed a bit, by default outputting a <code class="highlighter-rouge">data.frame</code> now.</p>
+Authenticate has changed a bit. Whereas auth details were stored as environment variables before, I'm just using R's options. `do_auth()` will ask for your Digital Ocean details. You can enter them each R session, or store them in your `.Rprofile` file. After successful authentication, each function simply looks for your auth details with `getOption()`.  You don't have to use this function first, though if you don't your first call to another function will ask for auth details.
 
-<p>List available regions</p>
 
-<div class="highlighter-rouge"><pre class="highlight"><code><span class="n">regions</span><span class="p">()</span>
-</code></pre>
-</div>
+```r
+do_auth()
+```
 
-<div class="highlighter-rouge"><pre class="highlight"><code>##   id            name slug
+`sizes`, `images`, and `keys` functions have changed a bit, by default outputting a `data.frame` now.
+
+List available regions
+
+
+```r
+regions()
+```
+
+```
+##   id            name slug
 ## 1  3 San Francisco 1 sfo1
 ## 2  4      New York 2 nyc2
 ## 3  5     Amsterdam 2 ams2
 ## 4  6     Singapore 1 sgp1
-</code></pre>
-</div>
+```
 
-<p>List available sizes</p>
+List available sizes
 
-<div class="highlighter-rouge"><pre class="highlight"><code><span class="n">sizes</span><span class="p">()</span>
-</code></pre>
-</div>
 
-<div class="highlighter-rouge"><pre class="highlight"><code>##   id  name  slug memory cpu disk cost_per_hour cost_per_month
+```r
+sizes()
+```
+
+```
+##   id  name  slug memory cpu disk cost_per_hour cost_per_month
 ## 1 66 512MB 512mb    512   1   20       0.00744            5.0
 ## 2 63   1GB   1gb   1024   1   30       0.01488           10.0
 ## 3 62   2GB   2gb   2048   2   40       0.02976           20.0
@@ -438,17 +648,18 @@
 ## 7 60  32GB  32gb  32768  12  320       0.47619          320.0
 ## 8 70  48GB  48gb  49152  16  480       0.71429          480.0
 ## 9 69  64GB  64gb  65536  20  640       0.95238          640.0
-</code></pre>
-</div>
+```
 
-<p>List available images</p>
+List available images
 
-<div class="highlighter-rouge"><pre class="highlight"><code><span class="n">head</span><span class="p">(</span><span class="n">images</span><span class="p">())</span>
-</code></pre>
-</div>
 
-<div class="highlighter-rouge"><pre class="highlight"><code>##        id                  name             slug distribution public sfo1
-## 1 3209452 rstudioserverssh_snap             &lt;NA&gt;       Ubuntu  FALSE    1
+```r
+head(images())
+```
+
+```
+##        id                  name             slug distribution public sfo1
+## 1 3209452 rstudioserverssh_snap             <NA>       Ubuntu  FALSE    1
 ## 2    1601        CentOS 5.8 x64   centos-5-8-x64       CentOS   TRUE    1
 ## 3    1602        CentOS 5.8 x32   centos-5-8-x32       CentOS   TRUE    1
 ## 4   12573        Debian 6.0 x64   debian-6-0-x64       Debian   TRUE    1
@@ -461,60 +672,63 @@
 ## 4    1    1    1    1    1
 ## 5    1    1    1    1    1
 ## 6    1    1    1    1    1
-</code></pre>
-</div>
+```
 
-<p>List ssh keys</p>
+List ssh keys
 
-<div class="highlighter-rouge"><pre class="highlight"><code><span class="n">keys</span><span class="p">()</span>
-</code></pre>
-</div>
 
-<div class="highlighter-rouge"><pre class="highlight"><code>## $ssh_keys
+```r
+keys()
+```
+
+```
+## $ssh_keys
 ## $ssh_keys[[1]]
 ## $ssh_keys[[1]]$id
 ## [1] 89103
 ##
 ## $ssh_keys[[1]]$name
 ## [1] "Scott Chamberlain"
-</code></pre>
-</div>
+```
 
-<p>One change that’s of interest is that most of the various <code class="highlighter-rouge">droplets_*()</code> functions take in the outputs of other <code class="highlighter-rouge">droplets_*()</code> functions. This means that we can pipe outputs of one <code class="highlighter-rouge">droplets_*()</code> function to another, including non-<code class="highlighter-rouge">droplet_*</code> functions (see examples).</p>
+One change that's of interest is that most of the various `droplets_*()` functions take in the outputs of other `droplets_*()` functions. This means that we can pipe outputs of one `droplets_*()` function to another, including non-`droplet_*` functions (see examples).
 
-<p>Let’s create a droplet:</p>
+Let's create a droplet:
 
-<div class="highlighter-rouge"><pre class="highlight"><code><span class="p">(</span><span class="n">res</span> <span class="o">&lt;-</span> <span class="n">droplets_new</span><span class="p">(</span><span class="n">name</span><span class="o">=</span><span class="s2">"foo"</span><span class="p">,</span> <span class="n">size_slug</span> <span class="o">=</span> <span class="s1">'512mb'</span><span class="p">,</span> <span class="n">image_slug</span> <span class="o">=</span> <span class="s1">'ubuntu-14-04-x64'</span><span class="p">,</span> <span class="n">region_slug</span> <span class="o">=</span> <span class="s1">'sfo1'</span><span class="p">,</span> <span class="n">ssh_key_ids</span> <span class="o">=</span> <span class="m">89103</span><span class="p">))</span>
-</code></pre>
-</div>
 
-<div class="highlighter-rouge"><pre class="highlight"><code><span class="o">$</span><span class="n">droplet</span>
-<span class="o">$</span><span class="n">droplet</span><span class="o">$</span><span class="n">id</span>
-<span class="p">[</span><span class="m">1</span><span class="p">]</span> <span class="m">1880805</span>
+```r
+(res <- droplets_new(name="foo", size_slug = '512mb', image_slug = 'ubuntu-14-04-x64', region_slug = 'sfo1', ssh_key_ids = 89103))
+```
 
-<span class="o">$</span><span class="n">droplet</span><span class="o">$</span><span class="n">name</span>
-<span class="p">[</span><span class="m">1</span><span class="p">]</span> <span class="s2">"foo"</span>
+```r
+$droplet
+$droplet$id
+[1] 1880805
 
-<span class="o">$</span><span class="n">droplet</span><span class="o">$</span><span class="n">image_id</span>
-<span class="p">[</span><span class="m">1</span><span class="p">]</span> <span class="m">3240036</span>
+$droplet$name
+[1] "foo"
 
-<span class="o">$</span><span class="n">droplet</span><span class="o">$</span><span class="n">size_id</span>
-<span class="p">[</span><span class="m">1</span><span class="p">]</span> <span class="m">66</span>
+$droplet$image_id
+[1] 3240036
 
-<span class="o">$</span><span class="n">droplet</span><span class="o">$</span><span class="n">event_id</span>
-<span class="p">[</span><span class="m">1</span><span class="p">]</span> <span class="m">26711810</span>
-</code></pre>
-</div>
+$droplet$size_id
+[1] 66
 
-<p>List my droplets</p>
+$droplet$event_id
+[1] 26711810
+```
 
-<p>This function used to be <code class="highlighter-rouge">do_droplets_get()</code></p>
+List my droplets
 
-<div class="highlighter-rouge"><pre class="highlight"><code><span class="n">droplets</span><span class="p">()</span>
-</code></pre>
-</div>
+This function used to be `do_droplets_get()`
 
-<div class="highlighter-rouge"><pre class="highlight"><code>## $droplet_ids
+
+```r
+droplets()
+```
+
+```
+## $droplet_ids
 ## [1] 1880805
 ##
 ## $droplets
@@ -556,30 +770,32 @@
 ##
 ## $event_id
 ## NULL
-</code></pre>
-</div>
+```
 
-<p>As mentioned above we can now pipe output of <code class="highlighter-rouge">droplet*()</code> functions to other <code class="highlighter-rouge">droplet*()</code> functions.</p>
+As mentioned above we can now pipe output of `droplet*()` functions to other `droplet*()` functions.
 
-<p>Here, pipe output of lising droplets <code class="highlighter-rouge">droplets()</code> to the <code class="highlighter-rouge">events()</code> function</p>
+Here, pipe output of lising droplets `droplets()` to the `events()` function
 
-<div class="highlighter-rouge"><pre class="highlight"><code><span class="n">droplets</span><span class="p">()</span> <span class="o">%&gt;%</span> <span class="n">events</span><span class="p">()</span>
-</code></pre>
-</div>
 
-<div class="highlighter-rouge"><pre class="highlight"><code>## Error: No event id found
-</code></pre>
-</div>
+```r
+droplets() %>% events()
+```
 
-<p>In this case there were no event ids to get event data on.</p>
+```
+## Error: No event id found
+```
 
-<p>Here, we’ll get details for the droplet we just created, then pipe that to <code class="highlighter-rouge">droplets_power_off()</code></p>
+In this case there were no event ids to get event data on.
 
-<div class="highlighter-rouge"><pre class="highlight"><code><span class="n">droplets</span><span class="p">(</span><span class="m">1880805</span><span class="p">)</span> <span class="o">%&gt;%</span> <span class="n">droplets_power_off</span>
-</code></pre>
-</div>
+Here, we'll get details for the droplet we just created, then pipe that to `droplets_power_off()`
 
-<div class="highlighter-rouge"><pre class="highlight"><code>## $droplet_ids
+
+```r
+droplets(1880805) %>% droplets_power_off
+```
+
+```
+## $droplet_ids
 ## [1] 1880805
 ##
 ## $droplets
@@ -633,17 +849,20 @@
 ##
 ## $event_id
 ## [1] 26714109
-</code></pre>
-</div>
+```
 
-<p>Then pipe it again to <code class="highlighter-rouge">droplets_power_on()</code></p>
+Then pipe it again to `droplets_power_on()`
 
-<div class="highlighter-rouge"><pre class="highlight"><code><span class="n">droplets</span><span class="p">(</span><span class="m">1880805</span><span class="p">)</span> <span class="o">%&gt;%</span>
-  <span class="n">droplets_power_on</span>
-</code></pre>
-</div>
 
-<div class="highlighter-rouge"><pre class="highlight"><code>## $droplet_ids
+
+
+```r
+droplets(1880805) %>%
+  droplets_power_on
+```
+
+```
+## $droplet_ids
 ## [1] 1880805
 ##
 ## $droplets
@@ -697,248 +916,30 @@
 ##
 ## $event_id
 ## [1] 26714152
-</code></pre>
-</div>
+```
 
-<div class="highlighter-rouge"><pre class="highlight"><code><span class="n">Sys.sleep</span><span class="p">(</span><span class="m">6</span><span class="p">)</span>
-<span class="n">droplets</span><span class="p">(</span><span class="m">1880805</span><span class="p">)</span><span class="o">$</span><span class="n">droplets</span><span class="o">$</span><span class="n">status</span>
-</code></pre>
-</div>
+```r
+Sys.sleep(6)
+droplets(1880805)$droplets$status
+```
 
-<div class="highlighter-rouge"><pre class="highlight"><code>## [1] "off"
-</code></pre>
-</div>
+```
+## [1] "off"
+```
 
-<p>Why not use more pipes?</p>
-
-<div class="highlighter-rouge"><pre class="highlight"><code><span class="n">droplets</span><span class="p">(</span><span class="m">1880805</span><span class="p">)</span> <span class="o">%&gt;%</span>
-  <span class="n">droplets_power_off</span> <span class="o">%&gt;%</span>
-  <span class="n">droplets_power_on</span> <span class="o">%&gt;%</span>
-  <span class="n">events</span>
-</code></pre>
-</div>
-
-<hr />
-
-<p>Last time I talked about installing R, RStudio, etc. on a droplet. I’m still working out bugs in that stuff, but do test out so it can get better faster. See <code class="highlighter-rouge">do_install()</code>.</p>
-
-  </div>
-  
-  <div class="post">
-    <h1>
-      <a href="/2014/05/analogsea/">
-        analogsea - an R client for the Digital Ocean API
-      </a>
-    </h1>
-
-    <span class="post-date">28 May 2014</span>
-
-    <p>I think this package name is my best yet. Maybe it doesn’t make sense though? At least it did at the time…</p>
-
-<p>Anyway, the main motivation for this package was to be able to automate spinning up Linux boxes to do cloud R/RStudio work. Of course if you are a command line native this is all easy for you, but if you are afraid of the command line and/or just don’t want to deal with it, this tool will hopefully help.</p>
-
-<p>Most of the functions in this package wrap the Digital Ocean API. So you can do things like create a new <em>droplet</em>, get information on your droplets, <em>destroy</em> droplets, get information on available images, make snapshots, etc. Basically everything you can do from their website you can do here. Note that all functions are prefixed with <code class="highlighter-rouge">do_</code> (for Digital Ocean).</p>
-
-<p>The droplet creation part is what we can leverage to spin up a cloud machine to then install R on, and optionally RStudio server, and even RStudio Shiny server. This allows you to stay within R entirely, not having to go to <code class="highlighter-rouge">ssh</code> into the Linux machine itself or go to the Digital Ocean website (after initial setup of course).</p>
-
-<p>If you try this, I recommend using this on R on the command line as you can more easily kill the R session if something goes wrong, and quickly open a new tab/window to <code class="highlighter-rouge">ssh</code> into the Linux machine if you want.</p>
-
-<p>First, installation</p>
-
-<div class="highlighter-rouge"><pre class="highlight"><code><span class="n">devtools</span><span class="o">::</span><span class="n">install_github</span><span class="p">(</span><span class="s2">"sckott/analogsea"</span><span class="p">)</span>
-</code></pre>
-</div>
-
-<p>Load the library</p>
-
-<div class="highlighter-rouge"><pre class="highlight"><code><span class="n">library</span><span class="p">(</span><span class="s2">"analogsea"</span><span class="p">)</span>
-</code></pre>
-</div>
-
-<p>Firt, authenticate. This will ask for your Digital Ocean details. You can enter them each R session, or store them in your <code class="highlighter-rouge">.Renviron</code> file. After successful authentication, each function simply looks for your auth details with <code class="highlighter-rouge">Sys.getenv()</code>.</p>
-
-<div class="highlighter-rouge"><pre class="highlight"><code><span class="n">do_auth</span><span class="p">()</span>
-</code></pre>
-</div>
-
-<p>List available regions</p>
-
-<div class="highlighter-rouge"><pre class="highlight"><code><span class="n">sapply</span><span class="p">(</span><span class="n">do_regions</span><span class="p">()</span><span class="o">$</span><span class="n">regions</span><span class="p">,</span> <span class="s2">"[["</span><span class="p">,</span> <span class="s2">"name"</span><span class="p">)</span>
-</code></pre>
-</div>
-
-<div class="highlighter-rouge"><pre class="highlight"><code>## [1] "San Francisco 1" "New York 2"      "Amsterdam 2"     "Singapore 1"
-</code></pre>
-</div>
-
-<p>List available images</p>
-
-<div class="highlighter-rouge"><pre class="highlight"><code><span class="n">sapply</span><span class="p">(</span><span class="n">do_images</span><span class="p">()</span><span class="o">$</span><span class="n">images</span><span class="p">,</span> <span class="s2">"[["</span><span class="p">,</span> <span class="s2">"name"</span><span class="p">)</span>
-</code></pre>
-</div>
-
-<div class="highlighter-rouge"><pre class="highlight"><code>##  [1] "rstudioserverssh_snap"                          
-##  [2] "CentOS 5.8 x64"                                 
-##  [3] "CentOS 5.8 x32"                                 
-##  [4] "Debian 6.0 x64"                                 
-##  [5] "Debian 6.0 x32"                                 
-##  [6] "Ubuntu 10.04 x64"                               
-##  [7] "Ubuntu 10.04 x32"                               
-##  [8] "Arch Linux 2013.05 x64"                         
-##  [9] "Arch Linux 2013.05 x32"                         
-## [10] "CentOS 6.4 x32"                                 
-## [11] "CentOS 6.4 x64"                                 
-## [12] "Ubuntu 12.04.4 x32"                             
-## [13] "Ubuntu 12.04.4 x64"                             
-## [14] "Ubuntu 13.10 x32"                               
-## [15] "Ubuntu 13.10 x64"                               
-## [16] "Fedora 19 x32"                                  
-## [17] "Fedora 19 x64"                                  
-## [18] "MEAN on Ubuntu 12.04.4"                         
-## [19] "Ghost 0.4.2 on Ubuntu 12.04"                    
-## [20] "Wordpress on Ubuntu 13.10"                      
-## [21] "Ruby on Rails on Ubuntu 12.10 (Nginx + Unicorn)"
-## [22] "Redmine on Ubuntu 12.04"                        
-## [23] "Ubuntu 14.04 x32"                               
-## [24] "Ubuntu 14.04 x64"                               
-## [25] "Fedora 20 x32"                                  
-## [26] "Fedora 20 x64"                                  
-## [27] "Dokku v0.2.3 on Ubuntu 14.04"                   
-## [28] "Debian 7.0 x64"                                 
-## [29] "Debian 7.0 x32"                                 
-## [30] "CentOS 6.5 x64"                                 
-## [31] "CentOS 6.5 x32"                                 
-## [32] "Docker 0.11.1 on Ubuntu 13.10 x64"              
-## [33] "Django on Ubuntu 14.04"                         
-## [34] "LAMP on Ubuntu 14.04"                           
-## [35] "node-v0.10.28 on Ubuntu 14.04"                  
-## [36] "GitLab 6.9.0 CE"
-</code></pre>
-</div>
-
-<p>List available sizes</p>
-
-<div class="highlighter-rouge"><pre class="highlight"><code><span class="n">do.call</span><span class="p">(</span><span class="n">rbind</span><span class="p">,</span> <span class="n">do_sizes</span><span class="p">()</span><span class="o">$</span><span class="n">sizes</span><span class="p">)</span>
-</code></pre>
-</div>
-
-<div class="highlighter-rouge"><pre class="highlight"><code>##       id name    slug    memory cpu disk cost_per_hour cost_per_month
-##  [1,] 66 "512MB" "512mb" 512    1   20   0.00744       "5.0"         
-##  [2,] 63 "1GB"   "1gb"   1024   1   30   0.01488       "10.0"        
-##  [3,] 62 "2GB"   "2gb"   2048   2   40   0.02976       "20.0"        
-##  [4,] 64 "4GB"   "4gb"   4096   2   60   0.05952       "40.0"        
-##  [5,] 65 "8GB"   "8gb"   8192   4   80   0.1191        "80.0"        
-##  [6,] 61 "16GB"  "16gb"  16384  8   160  0.2381        "160.0"       
-##  [7,] 60 "32GB"  "32gb"  32768  12  320  0.4762        "320.0"       
-##  [8,] 70 "48GB"  "48gb"  49152  16  480  0.7143        "480.0"       
-##  [9,] 69 "64GB"  "64gb"  65536  20  640  0.9524        "640.0"
-</code></pre>
-</div>
-
-<p>Let’s create a droplet:</p>
-
-<div class="highlighter-rouge"><pre class="highlight"><code><span class="p">(</span><span class="n">res</span> <span class="o">&lt;-</span> <span class="n">do_droplets_new</span><span class="p">(</span><span class="n">name</span><span class="o">=</span><span class="s2">"foo"</span><span class="p">,</span> <span class="n">size_slug</span> <span class="o">=</span> <span class="s1">'512mb'</span><span class="p">,</span> <span class="n">image_slug</span> <span class="o">=</span> <span class="s1">'ubuntu-14-04-x64'</span><span class="p">,</span> <span class="n">region_slug</span> <span class="o">=</span> <span class="s1">'sfo1'</span><span class="p">,</span> <span class="n">ssh_key_ids</span> <span class="o">=</span> <span class="m">89103</span><span class="p">))</span>
-</code></pre>
-</div>
-
-<div class="highlighter-rouge"><pre class="highlight"><code><span class="o">$</span><span class="n">status</span>
-<span class="p">[</span><span class="m">1</span><span class="p">]</span> <span class="s2">"OK"</span>
-
-<span class="o">$</span><span class="n">droplet</span>
-<span class="o">$</span><span class="n">droplet</span><span class="o">$</span><span class="n">id</span>
-<span class="p">[</span><span class="m">1</span><span class="p">]</span> <span class="m">1733336</span>
-
-<span class="o">$</span><span class="n">droplet</span><span class="o">$</span><span class="n">name</span>
-<span class="p">[</span><span class="m">1</span><span class="p">]</span> <span class="s2">"foo"</span>
-
-<span class="o">$</span><span class="n">droplet</span><span class="o">$</span><span class="n">image_id</span>
-<span class="p">[</span><span class="m">1</span><span class="p">]</span> <span class="m">3240036</span>
-
-<span class="o">$</span><span class="n">droplet</span><span class="o">$</span><span class="n">size_id</span>
-<span class="p">[</span><span class="m">1</span><span class="p">]</span> <span class="m">66</span>
-
-<span class="o">$</span><span class="n">droplet</span><span class="o">$</span><span class="n">event_id</span>
-<span class="p">[</span><span class="m">1</span><span class="p">]</span> <span class="m">25278892</span>
+Why not use more pipes?
 
 
-<span class="n">attr</span><span class="p">(,</span><span class="s2">"class"</span><span class="p">)</span>
-<span class="p">[</span><span class="m">1</span><span class="p">]</span> <span class="s2">"dodroplet"</span>
-</code></pre>
-</div>
+```r
+droplets(1880805) %>%
+  droplets_power_off %>%
+  droplets_power_on %>%
+  events
+```
 
-<p>List my droplets</p>
+-------
 
-<div class="highlighter-rouge"><pre class="highlight"><code><span class="n">do_droplets_get</span><span class="p">()</span>
-</code></pre>
-</div>
-
-<div class="highlighter-rouge"><pre class="highlight"><code>## $status
-## [1] "OK"
-## 
-## $droplets
-## $droplets[[1]]
-## $droplets[[1]]$id
-## [1] 1733336
-## 
-## $droplets[[1]]$name
-## [1] "foo"
-## 
-## $droplets[[1]]$image_id
-## [1] 3240036
-## 
-## $droplets[[1]]$size_id
-## [1] 66
-## 
-## $droplets[[1]]$region_id
-## [1] 3
-## 
-## $droplets[[1]]$backups_active
-## [1] FALSE
-## 
-## $droplets[[1]]$ip_address
-## [1] "107.170.211.252"
-## 
-## $droplets[[1]]$private_ip_address
-## NULL
-## 
-## $droplets[[1]]$locked
-## [1] FALSE
-## 
-## $droplets[[1]]$status
-## [1] "active"
-## 
-## $droplets[[1]]$created_at
-## [1] "2014-05-28T05:59:22Z"
-</code></pre>
-</div>
-
-<p>Cool, we have a new Linux box with 512 mb RAM, running Ubuntu 14.04 in the SF region. Notice that I’m using my SSH key here. If you don’t use your SSH key, Digital Ocean will email you a password, which you then use. We just have to wait a bit (sometimes 20 seconds, sometimes a few minutes) for it to spin up.</p>
-
-<p>Now we can install stuff. Here, I’ll install R, and RStudio Server. This step prints out the progress as you would see if you did <code class="highlighter-rouge">ssh</code> into the box itself outside of R. The RStudio Server instance will pop up in your default browser when this operation is done.</p>
-
-<div class="highlighter-rouge"><pre class="highlight"><code><span class="n">do_install</span><span class="p">(</span><span class="n">res</span><span class="o">$</span><span class="n">droplet</span><span class="o">$</span><span class="n">id</span><span class="p">,</span> <span class="n">what</span><span class="o">=</span><span class="s1">'rstudio'</span><span class="p">,</span> <span class="n">usr</span><span class="o">=</span><span class="s1">'hey'</span><span class="p">,</span> <span class="n">pwd</span><span class="o">=</span><span class="s1">'there'</span><span class="p">)</span>
-</code></pre>
-</div>
-
-<p><img src="/public/img/2014-05-28-analogsea/rstudioinstance.png" width="100%" /></p>
-
-<p>You can install some things like the <code class="highlighter-rouge">libcurl</code> and <code class="highlighter-rouge">libxml</code> libraries too with the <code class="highlighter-rouge">deps</code> parameter.</p>
-
-<p>When you’re done, you can destroy your droplet from R too</p>
-
-<div class="highlighter-rouge"><pre class="highlight"><code><span class="n">do_droplets_destroy</span><span class="p">(</span><span class="n">res</span><span class="o">$</span><span class="n">droplet</span><span class="o">$</span><span class="n">id</span><span class="p">)</span>
-</code></pre>
-</div>
-
-<div class="highlighter-rouge"><pre class="highlight"><code>## $status
-## [1] "OK"
-## 
-## $event_id
-## [1] 25279124
-</code></pre>
-</div>
-
-<p>Let me know if you have any thoughts :)</p>
+Last time I talked about installing R, RStudio, etc. on a droplet. I'm still working out bugs in that stuff, but do test out so it can get better faster. See `do_install()`.
 
   </div>
   

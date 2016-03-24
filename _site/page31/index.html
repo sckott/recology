@@ -61,6 +61,208 @@
   
   <div class="post">
     <h1>
+      <a href="/2012/08/making-matrices/">
+        Making matrices with zeros and ones
+      </a>
+    </h1>
+
+    <span class="post-date">30 Aug 2012</span>
+
+    *********
+
+## So I was trying to figure out a fast way to make matrices with randomly allocated 0 or 1 in each cell of the matrix. I reached out on Twitter, and got many responses (thanks tweeps!). 
+
+*********
+
+### Here is the solution I came up with. See if you can tell why it would be slow.
+
+{% highlight r linenos %}
+mm <- matrix(0, 10, 5)
+apply(mm, c(1, 2), function(x) sample(c(0, 1), 1))
+{% endhighlight %}
+
+
+
+{% highlight text %}
+      [,1] [,2] [,3] [,4] [,5]
+ [1,]    1    0    1    0    1
+ [2,]    0    0    1    1    1
+ [3,]    0    0    0    0    1
+ [4,]    0    1    1    0    1
+ [5,]    0    1    1    1    1
+ [6,]    1    0    1    1    1
+ [7,]    0    1    0    1    0
+ [8,]    0    0    1    0    1
+ [9,]    1    0    1    1    1
+[10,]    1    0    0    1    1
+{% endhighlight %}
+
+
+*********
+
+### Ted Hart (@distribecology) replied first with:
+
+{% highlight r linenos %}
+matrix(rbinom(10 * 5, 1, 0.5), ncol = 5, nrow = 10)
+{% endhighlight %}
+
+
+
+{% highlight text %}
+      [,1] [,2] [,3] [,4] [,5]
+ [1,]    1    1    0    1    1
+ [2,]    1    0    0    1    0
+ [3,]    0    1    0    0    0
+ [4,]    0    0    1    0    0
+ [5,]    1    0    1    0    0
+ [6,]    0    0    0    0    1
+ [7,]    1    0    0    0    0
+ [8,]    0    1    0    1    0
+ [9,]    1    1    1    1    0
+[10,]    0    1    1    0    0
+{% endhighlight %}
+
+
+*********
+
+
+### Next, David Smith (@revodavid) and Rafael Maia (@hylospar) came up with about the same solution. 
+
+{% highlight r linenos %}
+m <- 10
+n <- 5
+matrix(sample(0:1, m * n, replace = TRUE), m, n)
+{% endhighlight %}
+
+
+
+{% highlight text %}
+      [,1] [,2] [,3] [,4] [,5]
+ [1,]    0    0    0    0    1
+ [2,]    0    0    0    0    0
+ [3,]    0    1    1    0    1
+ [4,]    1    0    0    1    0
+ [5,]    0    0    0    0    1
+ [6,]    1    0    1    1    1
+ [7,]    1    1    1    1    0
+ [8,]    0    0    0    1    1
+ [9,]    1    0    0    0    1
+[10,]    0    1    0    1    1
+{% endhighlight %}
+
+
+*********
+
+
+### Then there was the solution by Luis Apiolaza (@zentree).
+
+{% highlight r linenos %}
+m <- 10
+n <- 5
+round(matrix(runif(m * n), m, n))
+{% endhighlight %}
+
+
+
+{% highlight text %}
+      [,1] [,2] [,3] [,4] [,5]
+ [1,]    0    1    1    0    0
+ [2,]    1    0    1    1    0
+ [3,]    1    0    1    0    0
+ [4,]    1    0    0    0    1
+ [5,]    1    0    1    1    0
+ [6,]    1    0    0    0    0
+ [7,]    1    0    0    0    0
+ [8,]    1    1    1    0    0
+ [9,]    0    0    0    0    1
+[10,]    1    0    0    1    1
+{% endhighlight %}
+
+
+*********
+
+### Last, a solution was proposed using `RcppArmadillo`, but I couldn't get it to work on my machine, but here is the function anyway if someone can. 
+
+{% highlight r linenos %}
+library(inline)
+library(RcppArmadillo)
+f <- cxxfunction(body = "return wrap(arma::randu(5,10));", plugin = "RcppArmadillo")
+{% endhighlight %}
+
+
+*********
+
+### And here is the comparison of system.time for each solution. 
+
+{% highlight r linenos %}
+mm <- matrix(0, 10, 5)
+m <- 10
+n <- 5
+
+system.time(replicate(1000, apply(mm, c(1, 2), function(x) sample(c(0, 1), 1))))  # @recology_
+{% endhighlight %}
+
+
+
+{% highlight text %}
+   user  system elapsed 
+  0.470   0.002   0.471 
+{% endhighlight %}
+
+
+
+{% highlight r linenos %}
+system.time(replicate(1000, matrix(rbinom(10 * 5, 1, 0.5), ncol = 5, nrow = 10)))  # @distribecology
+{% endhighlight %}
+
+
+
+{% highlight text %}
+   user  system elapsed 
+  0.014   0.000   0.015 
+{% endhighlight %}
+
+
+
+{% highlight r linenos %}
+system.time(replicate(1000, matrix(sample(0:1, m * n, replace = TRUE), m, n)))  # @revodavid & @hylospar
+{% endhighlight %}
+
+
+
+{% highlight text %}
+   user  system elapsed 
+  0.015   0.000   0.014 
+{% endhighlight %}
+
+
+
+{% highlight r linenos %}
+system.time(replicate(1000, round(matrix(runif(m * n), m, n)), ))  # @zentree
+{% endhighlight %}
+
+
+
+{% highlight text %}
+   user  system elapsed 
+  0.014   0.000   0.014 
+{% endhighlight %}
+
+
+### If you want to take the time to learn C++ or already know it, the RcppArmadillo option would likely be the fastest, but I think (IMO) for many scientists, especially ecologists, we probably don't already know C++, so will stick to the next fastest options. 
+
+*********
+
+### Get the .Rmd file used to create this post [at my github account](https://github.com/sckott/sckott.github.com/tree/master/_drafts/2012-08-30-making-matrices.Rmd).
+
+*********
+
+### Written in [Markdown](http://daringfireball.net/projects/markdown/), with help from [knitr](http://yihui.name/knitr/), and nice knitr highlighting/etc. in in [RStudio](http://rstudio.org/).
+
+  </div>
+  
+  <div class="post">
+    <h1>
       <a href="/2012/08/ggplot-inset-map/">
         ggplot2 maps with insets
       </a>
@@ -68,128 +270,136 @@
 
     <span class="post-date">22 Aug 2012</span>
 
-    <blockquote>
-  <p>UPDATE: changed data source so that the entire example can be run by anyone on their own machine. Also, per Joachim’s suggestion, I put a box around the blown up area of the map. In addition, rgeos and maptools removed, not needed.</p>
-</blockquote>
+    > UPDATE: changed data source so that the entire example can be run by anyone on their own machine. Also, per Joachim's suggestion, I put a box around the blown up area of the map. In addition, rgeos and maptools removed, not needed.
 
-<hr />
+*********
 
-<p>Here’s a quick demo of creating a map with an inset within it using ggplot. The inset is achieved using the <code class="highlighter-rouge">gridExtra</code> package.</p>
+Here's a quick demo of creating a map with an inset within it using ggplot. The inset is achieved using the `gridExtra` package.
 
-<h3 id="install-libraries">Install libraries</h3>
+### Install libraries
 
-<div class="highlighter-rouge"><pre class="highlight"><code><span class="n">install.packages</span><span class="p">(</span><span class="n">c</span><span class="p">(</span><span class="s2">"ggplot2"</span><span class="p">,</span> <span class="s2">"maps"</span><span class="p">,</span> <span class="s2">"grid"</span><span class="p">,</span> <span class="s2">"gridExtra"</span><span class="p">))</span>
-</code></pre>
-</div>
 
-<div class="highlighter-rouge"><pre class="highlight"><code><span class="n">library</span><span class="p">(</span><span class="s2">"ggplot2"</span><span class="p">)</span>
-<span class="n">library</span><span class="p">(</span><span class="s2">"maps"</span><span class="p">)</span>
-<span class="n">library</span><span class="p">(</span><span class="s2">"grid"</span><span class="p">)</span>
-<span class="n">library</span><span class="p">(</span><span class="s2">"gridExtra"</span><span class="p">)</span>
-</code></pre>
-</div>
+```r
+install.packages(c("ggplot2", "maps", "grid", "gridExtra"))
+```
 
-<h3 id="create-a-data-frame">Create a data frame</h3>
 
-<div class="highlighter-rouge"><pre class="highlight"><code><span class="n">dat</span> <span class="o">&lt;-</span> <span class="n">data.frame</span><span class="p">(</span><span class="n">ecosystem</span> <span class="o">=</span> <span class="n">rep</span><span class="p">(</span><span class="n">c</span><span class="p">(</span><span class="s2">"oak"</span><span class="p">,</span> <span class="s2">"steppe"</span><span class="p">,</span> <span class="s2">"prairie"</span><span class="p">),</span> <span class="n">each</span> <span class="o">=</span> <span class="m">8</span><span class="p">),</span>
-    <span class="n">lat</span> <span class="o">=</span> <span class="n">rnorm</span><span class="p">(</span><span class="m">24</span><span class="p">,</span> <span class="n">mean</span> <span class="o">=</span> <span class="m">51</span><span class="p">,</span> <span class="n">sd</span> <span class="o">=</span> <span class="m">1</span><span class="p">),</span> <span class="n">lon</span> <span class="o">=</span> <span class="n">rnorm</span><span class="p">(</span><span class="m">24</span><span class="p">,</span> <span class="n">mean</span> <span class="o">=</span> <span class="m">-113</span><span class="p">,</span> <span class="n">sd</span> <span class="o">=</span> <span class="m">5</span><span class="p">))</span>
-<span class="n">head</span><span class="p">(</span><span class="n">dat</span><span class="p">)</span>
-<span class="c1">#&gt;   ecosystem      lat       lon
-#&gt; 1       oak 49.58285 -107.6930
-#&gt; 2       oak 52.58942 -116.6920
-#&gt; 3       oak 50.49277 -114.5542
-#&gt; 4       oak 50.05943 -116.5660
-#&gt; 5       oak 51.76492 -112.1457
-#&gt; 6       oak 52.82153 -112.8858
-</span></code></pre>
-</div>
+```r
+library("ggplot2")
+library("maps")
+library("grid")
+library("gridExtra")
+```
 
-<h3 id="get-maps-using-the-maps-library">Get maps using the maps library</h3>
+### Create a data frame
 
-<p>Get a map of Canada</p>
 
-<div class="highlighter-rouge"><pre class="highlight"><code><span class="n">canadamap</span> <span class="o">&lt;-</span> <span class="n">data.frame</span><span class="p">(</span><span class="n">map</span><span class="p">(</span><span class="s2">"world"</span><span class="p">,</span> <span class="s2">"Canada"</span><span class="p">,</span> <span class="n">plot</span> <span class="o">=</span> <span class="n">FALSE</span><span class="p">)[</span><span class="n">c</span><span class="p">(</span><span class="s2">"x"</span><span class="p">,</span> <span class="s2">"y"</span><span class="p">)])</span>
-</code></pre>
-</div>
+```r
+dat <- data.frame(ecosystem = rep(c("oak", "steppe", "prairie"), each = 8),
+    lat = rnorm(24, mean = 51, sd = 1), lon = rnorm(24, mean = -113, sd = 5))
+head(dat)
+#>   ecosystem      lat       lon
+#> 1       oak 49.58285 -107.6930
+#> 2       oak 52.58942 -116.6920
+#> 3       oak 50.49277 -114.5542
+#> 4       oak 50.05943 -116.5660
+#> 5       oak 51.76492 -112.1457
+#> 6       oak 52.82153 -112.8858
+```
 
-<p>Get a map of smaller extent</p>
+### Get maps using the maps library
 
-<div class="highlighter-rouge"><pre class="highlight"><code><span class="n">canadamapsmall</span> <span class="o">&lt;-</span> <span class="n">canadamap</span><span class="p">[</span><span class="n">canadamap</span><span class="o">$</span><span class="n">x</span> <span class="o">&lt;</span> <span class="m">-90</span> <span class="o">&amp;</span> <span class="n">canadamap</span><span class="o">$</span><span class="n">y</span> <span class="o">&lt;</span> <span class="m">54</span><span class="p">,</span> <span class="p">]</span>
-<span class="n">canadamapsmall_</span> <span class="o">&lt;-</span> <span class="n">na.omit</span><span class="p">(</span><span class="n">canadamapsmall</span><span class="p">)</span>
-</code></pre>
-</div>
+Get a map of Canada
 
-<p>This should get your corner points for the box, picking min and max of lat and lon</p>
 
-<div class="highlighter-rouge"><pre class="highlight"><code><span class="p">(</span><span class="n">insetrect</span> <span class="o">&lt;-</span> <span class="n">data.frame</span><span class="p">(</span><span class="n">xmin</span> <span class="o">=</span> <span class="n">min</span><span class="p">(</span><span class="n">canadamapsmall_</span><span class="o">$</span><span class="n">x</span><span class="p">),</span> <span class="n">xmax</span> <span class="o">=</span> <span class="n">max</span><span class="p">(</span><span class="n">canadamapsmall_</span><span class="o">$</span><span class="n">x</span><span class="p">),</span>
-    <span class="n">ymin</span> <span class="o">=</span> <span class="n">min</span><span class="p">(</span><span class="n">canadamapsmall_</span><span class="o">$</span><span class="n">y</span><span class="p">),</span> <span class="n">ymax</span> <span class="o">=</span> <span class="n">max</span><span class="p">(</span><span class="n">canadamapsmall_</span><span class="o">$</span><span class="n">y</span><span class="p">)))</span>
-<span class="c1">#&gt;        xmin      xmax     ymin     ymax
-#&gt; 1 -133.0975 -90.38942 48.04721 53.99915
-</span></code></pre>
-</div>
+```r
+canadamap <- data.frame(map("world", "Canada", plot = FALSE)[c("x", "y")])
+```
 
-<h3 id="make-the-maps">Make the maps</h3>
+Get a map of smaller extent
 
-<p>Create a theme to be used by both plots</p>
 
-<div class="highlighter-rouge"><pre class="highlight"><code><span class="n">ptheme</span> <span class="o">&lt;-</span> <span class="n">theme</span><span class="p">(</span>
-  <span class="n">panel.border</span> <span class="o">=</span> <span class="n">element_rect</span><span class="p">(</span><span class="n">colour</span> <span class="o">=</span> <span class="s1">'black'</span><span class="p">,</span> <span class="n">size</span> <span class="o">=</span> <span class="m">1</span><span class="p">,</span> <span class="n">linetype</span> <span class="o">=</span> <span class="m">1</span><span class="p">),</span>
-  <span class="n">panel.grid.major</span> <span class="o">=</span> <span class="n">element_blank</span><span class="p">(),</span> 
-  <span class="n">panel.grid.minor</span> <span class="o">=</span> <span class="n">element_blank</span><span class="p">(),</span>
-  <span class="n">panel.background</span> <span class="o">=</span> <span class="n">element_rect</span><span class="p">(</span><span class="n">fill</span> <span class="o">=</span> <span class="s1">'white'</span><span class="p">),</span>
-  <span class="n">legend.key</span> <span class="o">=</span> <span class="n">element_blank</span><span class="p">()</span>
-<span class="p">)</span>
-</code></pre>
-</div>
+```r
+canadamapsmall <- canadamap[canadamap$x < -90 & canadamap$y < 54, ]
+canadamapsmall_ <- na.omit(canadamapsmall)
+```
 
-<p>The inset map, all of Canada</p>
+This should get your corner points for the box, picking min and max of lat and lon
 
-<div class="highlighter-rouge"><pre class="highlight"><code><span class="n">a</span> <span class="o">&lt;-</span> <span class="n">ggplot</span><span class="p">(</span><span class="n">canadamap</span><span class="p">)</span> <span class="o">+</span>
-	<span class="n">theme_bw</span><span class="p">(</span><span class="n">base_size</span> <span class="o">=</span> <span class="m">22</span><span class="p">)</span> <span class="o">+</span>
-	<span class="n">geom_path</span><span class="p">(</span><span class="n">data</span> <span class="o">=</span> <span class="n">canadamap</span><span class="p">,</span> <span class="n">aes</span><span class="p">(</span><span class="n">x</span><span class="p">,</span> <span class="n">y</span><span class="p">),</span> <span class="n">colour</span> <span class="o">=</span> <span class="s2">"black"</span><span class="p">,</span> <span class="n">fill</span> <span class="o">=</span> <span class="s2">"white"</span><span class="p">)</span> <span class="o">+</span>
-	<span class="n">geom_rect</span><span class="p">(</span><span class="n">data</span> <span class="o">=</span> <span class="n">insetrect</span><span class="p">,</span> <span class="n">aes</span><span class="p">(</span><span class="n">xmin</span> <span class="o">=</span> <span class="n">xmin</span><span class="p">,</span> <span class="n">xmax</span> <span class="o">=</span> <span class="n">xmax</span><span class="p">,</span> <span class="n">ymin</span> <span class="o">=</span> <span class="n">ymin</span><span class="p">,</span> <span class="n">ymax</span> <span class="o">=</span> <span class="n">ymax</span><span class="p">),</span> <span class="n">alpha</span> <span class="o">=</span> <span class="m">0</span><span class="p">,</span> <span class="n">colour</span> <span class="o">=</span> <span class="s2">"blue"</span><span class="p">,</span> <span class="n">size</span> <span class="o">=</span> <span class="m">1</span><span class="p">,</span> <span class="n">linetype</span> <span class="o">=</span> <span class="m">1</span><span class="p">)</span> <span class="o">+</span>
-  <span class="n">ptheme</span> <span class="o">%+%</span> <span class="n">theme</span><span class="p">(</span>
-    <span class="n">legend.position</span> <span class="o">=</span> <span class="n">c</span><span class="p">(</span><span class="m">0.15</span><span class="p">,</span> <span class="m">0.80</span><span class="p">),</span>
-    <span class="n">axis.ticks</span> <span class="o">=</span> <span class="n">element_blank</span><span class="p">(),</span> 
-    <span class="n">axis.text.x</span> <span class="o">=</span> <span class="n">element_blank</span><span class="p">(),</span>
-    <span class="n">axis.text.y</span> <span class="o">=</span> <span class="n">element_blank</span><span class="p">()</span>
-  <span class="p">)</span> <span class="o">+</span>
-	<span class="n">labs</span><span class="p">(</span><span class="n">x</span> <span class="o">=</span> <span class="s1">''</span><span class="p">,</span> <span class="n">y</span> <span class="o">=</span> <span class="s1">''</span><span class="p">)</span>
-</code></pre>
-</div>
 
-<p>The larger map, zoomed in, with the data</p>
+```r
+(insetrect <- data.frame(xmin = min(canadamapsmall_$x), xmax = max(canadamapsmall_$x),
+    ymin = min(canadamapsmall_$y), ymax = max(canadamapsmall_$y)))
+#>        xmin      xmax     ymin     ymax
+#> 1 -133.0975 -90.38942 48.04721 53.99915
+```
 
-<div class="highlighter-rouge"><pre class="highlight"><code><span class="n">b</span> <span class="o">&lt;-</span> <span class="n">ggplot</span><span class="p">(</span><span class="n">dat</span><span class="p">,</span> <span class="n">aes</span><span class="p">(</span><span class="n">lon</span><span class="p">,</span> <span class="n">lat</span><span class="p">,</span> <span class="n">colour</span> <span class="o">=</span> <span class="n">ecosystem</span><span class="p">))</span> <span class="o">+</span>
-	<span class="n">theme_bw</span><span class="p">(</span><span class="n">base_size</span> <span class="o">=</span> <span class="m">22</span><span class="p">)</span> <span class="o">+</span>
-	<span class="n">geom_jitter</span><span class="p">(</span><span class="n">size</span> <span class="o">=</span> <span class="m">4</span><span class="p">,</span> <span class="n">alpha</span> <span class="o">=</span> <span class="m">0.6</span><span class="p">)</span> <span class="o">+</span>
-	<span class="n">geom_path</span><span class="p">(</span><span class="n">data</span> <span class="o">=</span> <span class="n">canadamapsmall</span><span class="p">,</span> <span class="n">aes</span><span class="p">(</span><span class="n">x</span><span class="p">,</span> <span class="n">y</span><span class="p">),</span> <span class="n">colour</span> <span class="o">=</span> <span class="s2">"black"</span><span class="p">,</span> <span class="n">fill</span> <span class="o">=</span> <span class="s2">"white"</span><span class="p">)</span> <span class="o">+</span>
-	<span class="n">scale_size</span><span class="p">(</span><span class="n">guide</span> <span class="o">=</span> <span class="s2">"none"</span><span class="p">)</span> <span class="o">+</span>
-  <span class="n">ptheme</span> <span class="o">%+%</span> <span class="n">theme</span><span class="p">(</span>
-    <span class="n">legend.position</span> <span class="o">=</span> <span class="n">c</span><span class="p">(</span><span class="m">0.1</span><span class="p">,</span> <span class="m">0.20</span><span class="p">),</span>
-    <span class="n">legend.text</span> <span class="o">=</span> <span class="n">element_text</span><span class="p">(</span><span class="n">size</span> <span class="o">=</span> <span class="m">12</span><span class="p">,</span> <span class="n">face</span> <span class="o">=</span> <span class="s1">'bold'</span><span class="p">),</span>
-    <span class="n">legend.title</span> <span class="o">=</span> <span class="n">element_text</span><span class="p">(</span><span class="n">size</span> <span class="o">=</span> <span class="m">12</span><span class="p">,</span> <span class="n">face</span> <span class="o">=</span> <span class="s1">'bold'</span><span class="p">),</span> 
-    <span class="n">axis.ticks</span> <span class="o">=</span> <span class="n">element_line</span><span class="p">(</span><span class="n">size</span> <span class="o">=</span> <span class="m">2</span><span class="p">)</span>
-  <span class="p">)</span> <span class="o">+</span>
-	<span class="n">labs</span><span class="p">(</span><span class="n">x</span> <span class="o">=</span> <span class="s1">''</span><span class="p">,</span> <span class="n">y</span> <span class="o">=</span> <span class="s1">''</span><span class="p">)</span>
-</code></pre>
-</div>
+### Make the maps
 
-<h3 id="print-maps">Print maps</h3>
+Create a theme to be used by both plots
 
-<p>One an inset of the other. This approach uses the <code class="highlighter-rouge">gridExtra</code> package for flexible alignment, etc. of ggplot graphs.</p>
 
-<div class="highlighter-rouge"><pre class="highlight"><code><span class="n">grid.newpage</span><span class="p">()</span>
-<span class="n">vpb_</span> <span class="o">&lt;-</span> <span class="n">viewport</span><span class="p">(</span><span class="n">width</span> <span class="o">=</span> <span class="m">1</span><span class="p">,</span> <span class="n">height</span> <span class="o">=</span> <span class="m">1</span><span class="p">,</span> <span class="n">x</span> <span class="o">=</span> <span class="m">0.5</span><span class="p">,</span> <span class="n">y</span> <span class="o">=</span> <span class="m">0.5</span><span class="p">)</span>  <span class="c1"># the larger map
-</span><span class="n">vpa_</span> <span class="o">&lt;-</span> <span class="n">viewport</span><span class="p">(</span><span class="n">width</span> <span class="o">=</span> <span class="m">0.4</span><span class="p">,</span> <span class="n">height</span> <span class="o">=</span> <span class="m">0.4</span><span class="p">,</span> <span class="n">x</span> <span class="o">=</span> <span class="m">0.8</span><span class="p">,</span> <span class="n">y</span> <span class="o">=</span> <span class="m">0.8</span><span class="p">)</span>  <span class="c1"># the inset in upper right
-</span><span class="n">print</span><span class="p">(</span><span class="n">b</span><span class="p">,</span> <span class="n">vp</span> <span class="o">=</span> <span class="n">vpb_</span><span class="p">)</span>
-<span class="n">print</span><span class="p">(</span><span class="n">a</span><span class="p">,</span> <span class="n">vp</span> <span class="o">=</span> <span class="n">vpa_</span><span class="p">)</span>
-</code></pre>
-</div>
+```r
+ptheme <- theme(
+  panel.border = element_rect(colour = 'black', size = 1, linetype = 1),
+  panel.grid.major = element_blank(), 
+  panel.grid.minor = element_blank(),
+  panel.background = element_rect(fill = 'white'),
+  legend.key = element_blank()
+)
+```
 
-<p><img src="/public/img/2012-08-22-ggplot-inset-map/unnamed-chunk-11-1.png" alt="plot of chunk unnamed-chunk-11" /></p>
+The inset map, all of Canada
 
-<p>Written in <a href="http://daringfireball.net/projects/markdown/">Markdown</a>, with help from <a href="http://yihui.name/knitr/">knitr</a>, and nice knitr highlighting/etc. in in <a href="http://rstudio.org/">RStudio</a>.</p>
+
+```r
+a <- ggplot(canadamap) +
+	theme_bw(base_size = 22) +
+	geom_path(data = canadamap, aes(x, y), colour = "black", fill = "white") +
+	geom_rect(data = insetrect, aes(xmin = xmin, xmax = xmax, ymin = ymin, ymax = ymax), alpha = 0, colour = "blue", size = 1, linetype = 1) +
+  ptheme %+% theme(
+    legend.position = c(0.15, 0.80),
+    axis.ticks = element_blank(), 
+    axis.text.x = element_blank(),
+    axis.text.y = element_blank()
+  ) +
+	labs(x = '', y = '')
+```
+
+The larger map, zoomed in, with the data
+
+
+```r
+b <- ggplot(dat, aes(lon, lat, colour = ecosystem)) +
+	theme_bw(base_size = 22) +
+	geom_jitter(size = 4, alpha = 0.6) +
+	geom_path(data = canadamapsmall, aes(x, y), colour = "black", fill = "white") +
+	scale_size(guide = "none") +
+  ptheme %+% theme(
+    legend.position = c(0.1, 0.20),
+    legend.text = element_text(size = 12, face = 'bold'),
+    legend.title = element_text(size = 12, face = 'bold'), 
+    axis.ticks = element_line(size = 2)
+  ) +
+	labs(x = '', y = '')
+```
+
+### Print maps 
+
+One an inset of the other. This approach uses the `gridExtra` package for flexible alignment, etc. of ggplot graphs.
+
+
+```r
+grid.newpage()
+vpb_ <- viewport(width = 1, height = 1, x = 0.5, y = 0.5)  # the larger map
+vpa_ <- viewport(width = 0.4, height = 0.4, x = 0.8, y = 0.8)  # the inset in upper right
+print(b, vp = vpb_)
+print(a, vp = vpa_)
+```
+
+![plot of chunk unnamed-chunk-11](/public/img/2012-08-22-ggplot-inset-map/unnamed-chunk-11-1.png) 
+
+Written in [Markdown](http://daringfireball.net/projects/markdown/), with help from [knitr](http://yihui.name/knitr/), and nice knitr highlighting/etc. in in [RStudio](http://rstudio.org/).
 
   </div>
   
@@ -202,212 +412,146 @@
 
     <span class="post-date">20 Jul 2012</span>
 
-    <h2 id="example-of-using-the-global-names-resolver-api-to-check-species-names">Example of using the Global Names Resolver API to check species names</h2>
+    ## Example of using the Global Names Resolver API to check species names
 
-<hr />
+*********
 
-<p>There are a number of options for resolution of taxonomic names. The <a href="http://tnrs.iplantcollaborative.org/">Taxonomic Name Resolution Service (TNRS)</a> comes to mind. There is a new service for taxonomic name resoultion called the <a href="http://resolver.globalnames.org/">Global Names Resolver</a>. They describe the service thusly “<em>Resolve lists of scientific names against known sources. This service parses incoming names, executes exact or fuzzy matching as required, and displays a confidence score for each match along with its identifier.</em>”.</p>
+There are a number of options for resolution of taxonomic names. The [Taxonomic Name Resolution Service (TNRS)](http://tnrs.iplantcollaborative.org/) comes to mind. There is a new service for taxonomic name resoultion called the [Global Names Resolver](http://resolver.globalnames.org/). They describe the service thusly "_Resolve lists of scientific names against known sources. This service parses incoming names, executes exact or fuzzy matching as required, and displays a confidence score for each match along with its identifier._". 
 
-<hr />
+*********
 
-<h2 id="load-required-packages">Load required packages</h2>
+## Load required packages
 
-<h3 id="just-uncomment-the-code-to-use">Just uncomment the code to use.</h3>
+### Just uncomment the code to use.
 
-<figure class="highlight"><pre><code class="language-r" data-lang="r"><table style="border-spacing: 0"><tbody><tr><td class="gutter gl" style="text-align: right"><pre class="lineno">1
-2
-3
-4
-5
-6</pre></td><td class="code"><pre><span class="c1"># If you don't have them already
+
+{% highlight r linenos %}
+# If you don't have them already
 # install.packages(c('RJSONIO','plyr','devtools')) require(devtools)
 # install_github('taxize_','ropensci')
-</span><span class="n">library</span><span class="p">(</span><span class="n">RJSONIO</span><span class="p">)</span>
-<span class="n">library</span><span class="p">(</span><span class="n">plyr</span><span class="p">)</span>
-<span class="n">library</span><span class="p">(</span><span class="n">taxize</span><span class="p">)</span><span class="w">
-</span></pre></td></tr></tbody></table></code></pre></figure>
+library(RJSONIO)
+library(plyr)
+library(taxize)
+{% endhighlight %}
 
-<h2 id="get-the-data-sources-available">Get the data sources available</h2>
 
-<h3 id="get-just-ids-and-names-of-sources-in-a-dataframe">Get just id’s and names of sources in a data.frame</h3>
+## Get the data sources available
 
-<figure class="highlight"><pre><code class="language-r" data-lang="r"><table style="border-spacing: 0"><tbody><tr><td class="gutter gl" style="text-align: right"><pre class="lineno">1</pre></td><td class="code"><pre><span class="n">tail</span><span class="p">(</span><span class="n">gnr_datasources</span><span class="p">(</span><span class="n">todf</span> <span class="o">=</span> <span class="n">T</span><span class="p">))</span><span class="w">
-</span></pre></td></tr></tbody></table></code></pre></figure>
+### Get just id's and names of sources in a data.frame
 
-<figure class="highlight"><pre><code class="language-text" data-lang="text">##     id                                title
+{% highlight r linenos %}
+tail(gnr_datasources(todf = T))
+{% endhighlight %}
+
+
+
+{% highlight text %}
+##     id                                title
 ## 82 164                            BioLib.cz
 ## 83 165 Tropicos - Missouri Botanical Garden
 ## 84 166                                nlbif
 ## 85 167                                 IPNI
 ## 86 168              Index to Organism Names
-## 87 169                        uBio NameBank</code></pre></figure>
+## 87 169                        uBio NameBank
+{% endhighlight %}
 
-<hr />
 
-<h3 id="give-me-the-id-for-eol-encyclopedia-of-life">Give me the id for EOL (Encyclopedia of Life)</h3>
+*********
 
-<figure class="highlight"><pre><code class="language-r" data-lang="r"><table style="border-spacing: 0"><tbody><tr><td class="gutter gl" style="text-align: right"><pre class="lineno">1
-2</pre></td><td class="code"><pre><span class="n">out</span> <span class="o">&lt;-</span> <span class="n">gnr_datasources</span><span class="p">(</span><span class="n">todf</span> <span class="o">=</span> <span class="n">T</span><span class="p">)</span>
-<span class="n">out</span><span class="p">[</span><span class="n">out</span><span class="o">$</span><span class="n">title</span> <span class="o">==</span> <span class="s2">"EOL"</span><span class="p">,</span> <span class="s2">"id"</span><span class="p">]</span><span class="w">
-</span></pre></td></tr></tbody></table></code></pre></figure>
+### Give me the id for EOL (Encyclopedia of Life)
 
-<figure class="highlight"><pre><code class="language-text" data-lang="text">## [1] 12</code></pre></figure>
+{% highlight r linenos %}
+out <- gnr_datasources(todf = T)
+out[out$title == "EOL", "id"]
+{% endhighlight %}
 
-<hr />
 
-<h3 id="fuzzy-search-for-sources-with-the-word-zoo">Fuzzy search for sources with the word “zoo”</h3>
 
-<figure class="highlight"><pre><code class="language-r" data-lang="r"><table style="border-spacing: 0"><tbody><tr><td class="gutter gl" style="text-align: right"><pre class="lineno">1
-2
-3</pre></td><td class="code"><pre><span class="n">out</span> <span class="o">&lt;-</span> <span class="n">gnr_datasources</span><span class="p">(</span><span class="n">todf</span> <span class="o">=</span> <span class="n">T</span><span class="p">)</span>
-<span class="n">outdf</span> <span class="o">&lt;-</span> <span class="n">out</span><span class="p">[</span><span class="n">agrep</span><span class="p">(</span><span class="s2">"zoo"</span><span class="p">,</span> <span class="n">out</span><span class="o">$</span><span class="n">title</span><span class="p">,</span> <span class="n">ignore.case</span> <span class="o">=</span> <span class="n">T</span><span class="p">),</span> <span class="p">]</span>
-<span class="n">outdf</span><span class="p">[</span><span class="m">1</span><span class="o">:</span><span class="m">2</span><span class="p">,</span> <span class="p">]</span><span class="w">
-</span></pre></td></tr></tbody></table></code></pre></figure>
+{% highlight text %}
+## [1] 12
+{% endhighlight %}
 
-<figure class="highlight"><pre><code class="language-text" data-lang="text">##     id             title
+
+*********
+
+### Fuzzy search for sources with the word "zoo"
+
+{% highlight r linenos %}
+out <- gnr_datasources(todf = T)
+outdf <- out[agrep("zoo", out$title, ignore.case = T), ]
+outdf[1:2, ]
+{% endhighlight %}
+
+
+
+{% highlight text %}
+##     id             title
 ## 20 100 Mushroom Observer
-## 25 105           ZooKeys</code></pre></figure>
+## 25 105           ZooKeys
+{% endhighlight %}
 
-<h2 id="resolve-some-names">Resolve some names</h2>
 
-<h3 id="search-for-helianthus-annuus-and-homo-sapiens-return-a-dataframe">Search for <em>Helianthus annuus</em> and <em>Homo sapiens</em>, return a data.frame</h3>
+## Resolve some names
 
-<figure class="highlight"><pre><code class="language-r" data-lang="r"><table style="border-spacing: 0"><tbody><tr><td class="gutter gl" style="text-align: right"><pre class="lineno">1</pre></td><td class="code"><pre><span class="n">gnr</span><span class="p">(</span><span class="n">names</span> <span class="o">=</span> <span class="n">c</span><span class="p">(</span><span class="s2">"Helianthus annuus"</span><span class="p">,</span> <span class="s2">"Homo sapiens"</span><span class="p">),</span> <span class="n">returndf</span> <span class="o">=</span> <span class="n">TRUE</span><span class="p">)[</span><span class="m">1</span><span class="o">:</span><span class="m">2</span><span class="p">,</span> <span class="p">]</span><span class="w">
-</span></pre></td></tr></tbody></table></code></pre></figure>
+### Search for _Helianthus annuus_ and _Homo sapiens_, return a data.frame
 
-<figure class="highlight"><pre><code class="language-text" data-lang="text">##   data_source_id    submitted_name       name_string score    title
+{% highlight r linenos %}
+gnr(names = c("Helianthus annuus", "Homo sapiens"), returndf = TRUE)[1:2, ]
+{% endhighlight %}
+
+
+
+{% highlight text %}
+##   data_source_id    submitted_name       name_string score    title
 ## 1              4 Helianthus annuus Helianthus annuus 0.988     NCBI
-## 3             10 Helianthus annuus Helianthus annuus 0.988 Freebase</code></pre></figure>
+## 3             10 Helianthus annuus Helianthus annuus 0.988 Freebase
+{% endhighlight %}
 
-<hr />
 
-<h3 id="search-for-the-same-species-with-only-using-data-source-12-ie-eol">Search for the same species, with only using data source 12 (i.e., EOL)</h3>
+*********
 
-<figure class="highlight"><pre><code class="language-r" data-lang="r"><table style="border-spacing: 0"><tbody><tr><td class="gutter gl" style="text-align: right"><pre class="lineno">1
-2</pre></td><td class="code"><pre><span class="n">gnr</span><span class="p">(</span><span class="n">names</span> <span class="o">=</span> <span class="n">c</span><span class="p">(</span><span class="s2">"Helianthus annuus"</span><span class="p">,</span> <span class="s2">"Homo sapiens"</span><span class="p">),</span> <span class="n">data_source_ids</span> <span class="o">=</span> <span class="s2">"12"</span><span class="p">,</span> 
-    <span class="n">returndf</span> <span class="o">=</span> <span class="n">TRUE</span><span class="p">)</span><span class="w">
-</span></pre></td></tr></tbody></table></code></pre></figure>
+### Search for the same species, with only using data source 12 (i.e., EOL)
 
-<figure class="highlight"><pre><code class="language-text" data-lang="text">##   data_source_id    submitted_name       name_string score title
+{% highlight r linenos %}
+gnr(names = c("Helianthus annuus", "Homo sapiens"), data_source_ids = "12", 
+    returndf = TRUE)
+{% endhighlight %}
+
+
+
+{% highlight text %}
+##   data_source_id    submitted_name       name_string score title
 ## 1             12 Helianthus annuus Helianthus annuus 0.988   EOL
-## 2             12      Homo sapiens      Homo sapiens 0.988   EOL</code></pre></figure>
+## 2             12      Homo sapiens      Homo sapiens 0.988   EOL
+{% endhighlight %}
 
-<h3 id="thats-it-have-fun-and-put-bugscommentsetc-herehttpsgithubcomropenscitaxizeissues">That’s it. Have fun! And put bugs/comments/etc. <a href="https://github.com/ropensci/taxize_/issues">here</a>.</h3>
 
-<hr />
 
-<h3 id="written-in-markdownhttpdaringfireballnetprojectsmarkdown-with-help-from-knitrhttpyihuinameknitr-and-nice-knitr-highlightingetc-in-in-rstudiohttprstudioorg">Written in <a href="http://daringfireball.net/projects/markdown/">Markdown</a>, with help from <a href="http://yihui.name/knitr/">knitr</a>, and nice knitr highlighting/etc. in in <a href="http://rstudio.org/">RStudio</a>.</h3>
+### That's it. Have fun! And put bugs/comments/etc. [here](https://github.com/ropensci/taxize_/issues).
 
-<hr />
+*********
 
-<h3 id="i-prepared-the-markdown-for-this-post-by">I prepared the markdown for this post by:</h3>
+### Written in [Markdown](http://daringfireball.net/projects/markdown/), with help from [knitr](http://yihui.name/knitr/), and nice knitr highlighting/etc. in in [RStudio](http://rstudio.org/).
 
-<figure class="highlight"><pre><code class="language-r" data-lang="r"><table style="border-spacing: 0"><tbody><tr><td class="gutter gl" style="text-align: right"><pre class="lineno">1
-2
-3
-4
-5
-6
-7
-8
-9
-10
-11</pre></td><td class="code"><pre><span class="n">KnitPost</span> <span class="o">&lt;-</span> <span class="k">function</span><span class="p">(</span><span class="n">input</span><span class="p">,</span> <span class="n">base.url</span> <span class="o">=</span> <span class="s2">"/"</span><span class="p">)</span> <span class="p">{</span>
-    <span class="n">require</span><span class="p">(</span><span class="n">knitr</span><span class="p">)</span>
-    <span class="n">opts_knit</span><span class="o">$</span><span class="n">set</span><span class="p">(</span><span class="n">base.url</span> <span class="o">=</span> <span class="n">base.url</span><span class="p">)</span>
-    <span class="n">fig.path</span> <span class="o">&lt;-</span> <span class="n">paste0</span><span class="p">(</span><span class="s2">"img/"</span><span class="p">,</span> <span class="n">sub</span><span class="p">(</span><span class="s2">".Rmd$"</span><span class="p">,</span> <span class="s2">""</span><span class="p">,</span> <span class="n">basename</span><span class="p">(</span><span class="n">input</span><span class="p">)),</span> <span class="s2">"/"</span><span class="p">)</span>
-    <span class="n">opts_chunk</span><span class="o">$</span><span class="n">set</span><span class="p">(</span><span class="n">fig.path</span> <span class="o">=</span> <span class="n">fig.path</span><span class="p">)</span>
-    <span class="n">opts_chunk</span><span class="o">$</span><span class="n">set</span><span class="p">(</span><span class="n">fig.cap</span> <span class="o">=</span> <span class="s2">"center"</span><span class="p">)</span>
-    <span class="n">render_jekyll</span><span class="p">()</span>
-    <span class="n">knit</span><span class="p">(</span><span class="n">input</span><span class="p">,</span> <span class="n">envir</span> <span class="o">=</span> <span class="n">parent.frame</span><span class="p">())</span>
-<span class="p">}</span>
-<span class="n">setwd</span><span class="p">(</span><span class="s2">"/path/to/_posts"</span><span class="p">)</span>
-<span class="n">KnitPost</span><span class="p">(</span><span class="s2">"/path/to/postfile.Rmd"</span><span class="p">)</span><span class="w">
-</span></pre></td></tr></tbody></table></code></pre></figure>
+*********
 
-<p>from <a href="http://jfisher-usgs.github.com/r/2012/07/03/knitr-jekyll/">jfisher</a>.</p>
+### I prepared the markdown for this post by:
 
-  </div>
-  
-  <div class="post">
-    <h1>
-      <a href="/2012/06/recent-r-eeb-packages/">
-        Recent R packages for ecology and evolution
-      </a>
-    </h1>
+{% highlight r linenos %}
+KnitPost <- function(input, base.url = "/") {
+    require(knitr)
+    opts_knit$set(base.url = base.url)
+    fig.path <- paste0("img/", sub(".Rmd$", "", basename(input)), "/")
+    opts_chunk$set(fig.path = fig.path)
+    opts_chunk$set(fig.cap = "center")
+    render_jekyll()
+    knit(input, envir = parent.frame())
+}
+setwd("/path/to/_posts")
+KnitPost("/path/to/postfile.Rmd")
+{% endhighlight %}
 
-    <span class="post-date">14 Jun 2012</span>
-
-    <p>Many R packages/tools have come out recently for doing ecology and evolution. All of the below were described in Methods in Ecology and Evolution, except for spider, which came out in <a href="http://onlinelibrary.wiley.com/journal/10.1111/(ISSN)1755-0998">Molecular Ecology Resources</a>. Here are some highlights.</p>
-
-<ul>
-  <li>mvabund <a href="http://onlinelibrary.wiley.com/doi/10.1111/j.2041-210X.2012.00190.x/abstract">paper</a> - <a href="http://cran.r-project.org/web/packages/mvabund/index.html">get R pkg</a>
-    <ul>
-      <li>Model-based analysis of multivariate abundance data. Visualising data, fitting predictive models, checking assumptions, hypothesis testing.</li>
-    </ul>
-  </li>
-  <li>popdemo <a href="http://onlinelibrary.wiley.com/doi/10.1111/j.2041-210X.2012.00222.x/abstract">paper</a> - <a href="http://cran.r-project.org/web/packages/popdemo/index.html">get R pkg</a>
-    <ul>
-      <li>Population demography using projection matrix analysis.</li>
-    </ul>
-  </li>
-  <li>motmot <a href="http://onlinelibrary.wiley.com/doi/10.1111/j.2041-210X.2011.00132.x/abstract">paper</a> - <a href="http://cran.r-project.org/web/packages/motmot/index.html">get R pkg</a>
-    <ul>
-      <li>Models of trait macroevolution on trees</li>
-    </ul>
-  </li>
-  <li>spider <a href="http://onlinelibrary.wiley.com/doi/10.1111/j.1755-0998.2011.03108.x/abstract?deniedAccessCustomisedMessage=&amp;userIsAuthenticated=false">paper</a> - <a href="http://cran.r-project.org/web/packages/spider/index.html">get R pkg</a>
-    <ul>
-      <li>Analysis of species identity and evolution, with particular reference to DNA barcoding</li>
-    </ul>
-  </li>
-  <li>BaSTA <a href="http://onlinelibrary.wiley.com/doi/10.1111/j.2041-210X.2012.00186.x/abstract">paper</a> - <a href="http://cran.r-project.org/web/packages/BaSTA/index.html">get R pkg</a>
-    <ul>
-      <li>Bayesian estimation of age-specific survival from incomplete mark–recapture/recovery data with covariates</li>
-    </ul>
-  </li>
-  <li>abc <a href="http://onlinelibrary.wiley.com/doi/10.1111/j.2041-210X.2011.00179.x/abstract">paper</a> - <a href="http://cran.r-project.org/web/packages/abc/index.html">get R pkg</a>
-    <ul>
-      <li>Approximate Bayesian Computation (ABC)</li>
-    </ul>
-  </li>
-  <li>RNetLogo <a href="http://onlinelibrary.wiley.com/doi/10.1111/j.2041-210X.2011.00180.x/abstract">paper</a> - <a href="http://cran.r-project.org/web/packages/RNetLogo/index.html">get R pkg</a>
-    <ul>
-      <li>Running and exploring individual-based models implemented in NetLogo</li>
-    </ul>
-  </li>
-  <li>phytools <a href="http://onlinelibrary.wiley.com/doi/10.1111/j.2041-210X.2011.00169.x/abstract">paper</a> - <a href="http://cran.r-project.org/web/packages/phytools/index.html">get R pkg</a>
-    <ul>
-      <li>Tools for phylogenetic comparative biology</li>
-    </ul>
-  </li>
-  <li>smatr <a href="http://onlinelibrary.wiley.com/doi/10.1111/j.2041-210X.2011.00153.x/abstract">paper</a> - <a href="http://cran.r-project.org/web/packages/smatr/index.html">get R pkg</a>
-    <ul>
-      <li>Estimation and inference about allometric lines</li>
-    </ul>
-  </li>
-  <li>RBrownie <a href="http://onlinelibrary.wiley.com/doi/10.1111/j.2041-210X.2011.00112.x/abstract">paper</a> - <a href="http://www.brianomeara.info/tutorials/brownie">get R pkg ?</a>
-    <ul>
-      <li>Testing hypotheses about rates of evolutionary change</li>
-    </ul>
-  </li>
-  <li>polytomy resolver <a href="http://onlinelibrary.wiley.com/doi/10.1111/j.2041-210X.2011.00103.x/abstract">paper</a> - <a href="http://onlinelibrary.wiley.com/doi/10.1111/j.2041-210X.2011.00103.x/suppinfo">get R pkg</a>
-    <ul>
-      <li>Resolve polytomies on dated phylogenies with their R scripts [here][].</li>
-    </ul>
-  </li>
-</ul>
-
-<p>And a cool tool came out for the Python programming language.</p>
-
-<ul>
-  <li>NichePy <a href="http://onlinelibrary.wiley.com/doi/10.1111/j.2041-210X.2011.00184.x/abstract">paper</a> - <a href="https://github.com/bastodian/NichePy">get python</a>
-    <ul>
-      <li>Modular tools for estimating the similarity of ecological niche and species distribution models</li>
-    </ul>
-  </li>
-</ul>
-
+from [jfisher](http://jfisher-usgs.github.com/r/2012/07/03/knitr-jekyll/).
 
   </div>
   

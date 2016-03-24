@@ -61,6 +61,203 @@
   
   <div class="post">
     <h1>
+      <a href="/2013/08/sciordata/">
+        Working with climate data from the web in R
+      </a>
+    </h1>
+
+    <span class="post-date">17 Aug 2013</span>
+
+    I recently attended [ScienceOnline Climate][sciocweb], a conference in Washington, D.C. at AAAS. You may have heard of the [ScienceOnline annual meeting in North Carolina][sciox] - this was one of their topical meetings focused on Climate Change. I moderated a session on [working with data from the web in R][sciordata], focusing on climate data. Search Twitter for \#scioClimate for tweets from the conference, and \#sciordata for tweets from the session I ran. The following is an abbreviated demo of what I did in the workshop showing some of what you can do with climate data in R using our packages.
+
+Before digging in, why would you want to get climate data programatically vs. via pushing buttons in a browser? Learning a programming language can take some time - we all already know how to use browsers. So why?!  First, getting data programatically, especially in R (or Python), allows you to then easily do other stuff, like manipulate data, visualize, and analyze data. Second, if you do your work programatically, **you** and *others* can reproduce, and extend, the work you did with little extra effort. Third, programatically getting data makes tasks that are repetitive and slow, fast and easy - you can't easily automate button clicks in a browser. Fourth, you can combine code with writing to make your entire workflow reproducible, whether it's notes, a blog post, or even a research article.
+
+## Interactive visualizations in R
+
+Let's start off with something shiny. The majority of time I make static visualizations, which are great for me to look at during analyses, and for publications of research findings in PDFs. However, static visualizations don't take advantage of the interactive nature of the web. Ramnath Vaidyanathan has developed an R package, [rCharts][rcharts], to generate dynamic Javascript visualizations directly from R that can be used interactively in a browser. Here is an example visualizing a dataset that comes with R. 
+
+
+{% highlight r %}
+library(devtools)
+install_github("rCharts", "ramnathv")
+library(rCharts)
+
+# Load a data set
+hair_eye_male <- subset(as.data.frame(HairEyeColor), Sex == "Male")
+
+# Make a javascript plot object
+n1 <- nPlot(Freq ~ Hair, group = "Eye", data = hair_eye_male, type = "multiBarChart")
+
+# Visualize
+n1$show(cdn = TRUE)
+{% endhighlight %}
+
+
+Check out the output [here][rchartsout]. If you like you can take the source code from the visualization (right click on select *View Page Source*) and put it in your html files, and you're good to go (as long as you have dependencies, etc.) - quicker than learning [d3][d3] and company from scratch, eh. This is a super simple example, but you can imagine the possibilities.  
+
+
+## The data itself
+
+
+### First, install some packages - these are all just on Github, so you need to have devtools installed
+
+
+{% highlight r %}
+library(devtools)
+install_github("govdat", "sckott")
+install_github("rnoaa", "ropensci")
+install_github("rWBclimate", "ropensci")
+install_github("rnpn", "ropensci")
+{% endhighlight %}
+
+
+
+### Politicians talk - Sunlight Foundation listens
+
+#### Look at mentions of the phrase "climate change" in congress, using the govdat package
+
+
+{% highlight r %}
+library(govdat)
+library(ggplot2)
+
+# Get mentions of climate change from Democrats
+dat_d <- sll_cw_timeseries(phrase = "climate change", party = "D")
+
+# Add a column that says this is data from deomcrats
+dat_d$party <- rep("D", nrow(dat_d))
+
+# Get mentions of climate change from Democrats
+dat_r <- sll_cw_timeseries(phrase = "climate change", party = "R")
+
+# Add a column that says this is data from republicans
+dat_r$party <- rep("R", nrow(dat_r))
+
+# Put two tables together
+dat_both <- rbind(dat_d, dat_r)
+
+# Plot data
+ggplot(dat_both, aes(day, count, colour = party)) + theme_grey(base_size = 20) + 
+    geom_line() + scale_colour_manual(values = c("blue", "red"))
+{% endhighlight %}
+
+![center](/public/img/2013-08-17-sciordata/govdat.png) 
+
+
+
+### NOAA climate data, using the rnoaa package
+
+#### Map sea ice for 12 years, for April only, for the North pole
+
+
+{% highlight r %}
+library(rnoaa)
+library(scales)
+library(ggplot2)
+library(doMC)
+library(plyr)
+
+# Get URLs for data
+urls <- seaiceeurls(mo = "Apr", pole = "N")[1:12]
+
+# Download sea ice data
+registerDoMC(cores = 4)
+out <- llply(urls, noaa_seaice, storepath = "~/seaicedata", .parallel = TRUE)
+
+# Name elements of list
+names(out) <- seq(1979, 1990, 1)
+
+# Make a data.frame
+df <- ldply(out)
+
+# Plot data
+ggplot(df, aes(long, lat, group = group)) + geom_polygon(fill = "steelblue") + 
+    theme_ice() + facet_wrap(~.id)
+{% endhighlight %}
+
+![center](/public/img/2013-08-17-sciordata/seaice2.png) 
+
+
+
+### World Bank climate data, using the rWBclimate package
+
+#### Plotting annual data for different countries
+
+Data can be extracted from countries or basins submitted as vectors. Here we will plot the expected temperature anomaly for each 20 year period over a baseline control period of 1961-2000. These countries chosen span the north to south pole. It's clear from the plot that the northern most countries (US and Canada) have the biggest anomaly, and Belize, the most equatorial country, has the smallest anomaly.
+
+
+{% highlight r %}
+library(rWBclimate)
+
+# Search for data
+country.list <- c("CAN", "USA", "MEX", "BLZ", "ARG")
+country.dat <- get_model_temp(country.list, "annualanom", 2010, 2100)
+
+# Subset data to one specific model
+country.dat.bcc <- country.dat[country.dat$gcm == "bccr_bcm2_0", ]
+
+# Exclude A2 scenario
+country.dat.bcc <- subset(country.dat.bcc, country.dat.bcc$scenario != "a2")
+
+# Plot data
+ggplot(country.dat.bcc, aes(x = fromYear, y = data, group = locator, colour = locator)) + 
+    geom_point() + geom_path() + ylab("Temperature anomaly over baseline") + 
+    theme_bw(base_size = 20)
+{% endhighlight %}
+
+![center](/public/img/2013-08-17-sciordata/unnamed-chunk-1.png) 
+
+
+
+
+### Phenology data from the USA National Phenology Network, using rnpn
+
+
+{% highlight r %}
+library(rnpn)
+
+# Lookup names
+temp <- lookup_names(name = "bird", type = "common")
+comnames <- temp[temp$species_id %in% c(357, 359, 1108), "common_name"]
+
+# Get some data
+out <- getobsspbyday(speciesid = c(357, 359, 1108), startdate = "2010-04-01", 
+    enddate = "2013-09-31")
+names(out) <- comnames
+df <- ldply(out)
+df$date <- as.Date(df$date)
+
+# Visualize data
+library(ggplot2)
+ggplot(df, aes(date, count)) + geom_line() + theme_grey(base_size = 20) + facet_grid(.id ~ 
+    .)
+{% endhighlight %}
+
+![center](/public/img/2013-08-17-sciordata/rnpn.png) 
+
+
+
+### Feedback and new climate data sources
+
+Do use the above pacakges ([govdat][govdat], [rnoaa][rnoaa], [rWBclimate][rWBclimate], and [rnpn][rnpn]) to get climate data, and get in touch with bug reports, and feature requests. 
+
+Surely there are other sources of climate data out there that you want to use in R, right? Let us know what else you want to use. Better yet, if you can sling some R code, start writing your own package to interact with a source of climate data on the web - we can lend a hand. 
+
+[sciocweb]: http://scioclimate.wikispaces.com
+[sciox]: https://twitter.com/#sciox
+[rchartsout]: http://recology.info/vis/nvd3_eg.html
+[rcharts]: https://github.com/ramnathv/rCharts
+[sciordata]: http://scioclimate.wikispaces.com/3W.+Working+With+Science+Data+From+Around+The+Web
+[d3]: http://d3js.org/
+[govdat]: https://github.com/sckott/govdat
+[rnoaa]: https://github.com/ropensci/rnoaa
+[rWBclimate]: https://github.com/ropensci/rWBclimate
+[rnpn]: https://github.com/ropensci/rnpn
+
+  </div>
+  
+  <div class="post">
+    <h1>
       <a href="/2013/07/r-ecology-workshop/">
         R ecology workshop
       </a>
@@ -68,16 +265,19 @@
 
     <span class="post-date">31 Jul 2013</span>
 
-    <p>After <a href="http://sckott.github.io/2013/07/r-resources/">my presentation yesterday</a> to a group of grad students on R resources, I did a presentation today on intro to R data manipulation, visualizations, and analyses/visualizations of biparite networks and community level analyses (diversity, rarefaction, ordination, etc.). As I said <a href="http://sckott.github.io/2013/07/r-resources/">yesterday</a> I’ve been playing with two ways to make reproducible presentations in R: <a href="http://www.rstudio.com/ide/docs/presentations/overview">RStudio’s presentations</a> built in to RStudio IDE, and <a href="http://slidify.org/">Slidify</a>. Yesterday I went with RStudio’s product - today I used Slidify. See the Markdown file for the presentation <a href="https://github.com/sckott/posterstalks/blob/gh-pages/sfu/resources/r_resources.Rpres">here</a>.</p>
+    After [my presentation yesterday][last] to a group of grad students on R resources, I did a presentation today on intro to R data manipulation, visualizations, and analyses/visualizations of biparite networks and community level analyses (diversity, rarefaction, ordination, etc.). As I said [yesterday][last] I've been playing with two ways to make reproducible presentations in R: [RStudio's presentations][rstudio] built in to RStudio IDE, and [Slidify][slidify]. Yesterday I went with RStudio's product - today I used Slidify. See the Markdown file for the presentation [here](https://github.com/sckott/posterstalks/blob/gh-pages/sfu/resources/r_resources.Rpres). 
 
-<p>Check out the presentation slides <a href="https://bitly.com/sfuworkshop">here</a>, and if you want, fork <a href="http://bit.ly/1bKVX2O">the code on Github</a>, change it, submit changes back to me, etc. (click on the image to go to slides)</p>
+Check out the presentation slides [here](https://bitly.com/sfuworkshop), and if you want, fork [the code on Github](http://bit.ly/1bKVX2O), change it, submit changes back to me, etc. (click on the image to go to slides)
 
-<p>How I actually ran the 2 hr workshop was to present a few slides, then live demo writing the code out with students following along, with a number of times where they do something on their own.</p>
+How I actually ran the 2 hr workshop was to present a few slides, then live demo writing the code out with students following along, with a number of times where they do something on their own. 
 
-<p><br /></p>
+<br>
 
-<p><a href="https://bitly.com/sfuworkshop"><img src="/public/img/pres.png" />&lt;/img&gt;</a></p>
+<a href="https://bitly.com/sfuworkshop"><img src="/public/img/pres.png"></img></a>
 
+[last]: http://sckott.github.io/2013/07/r-resources/
+[rstudio]: http://www.rstudio.com/ide/docs/presentations/overview
+[slidify]: http://slidify.org/
 
   </div>
   
@@ -90,60 +290,20 @@
 
     <span class="post-date">30 Jul 2013</span>
 
-    <p>I’m doing a presentation today to grad students on R resources. I have been writing HTML presentations recently, but some great tools are now available to convert text that is easy to read and write to presentations.</p>
+    I'm doing a presentation today to grad students on R resources. I have been writing HTML presentations recently, but some great tools are now available to convert text that is easy to read and write to presentations. 
 
-<ul>
-  <li>RStudio has something called <code class="highlighter-rouge">R presentations</code>, that is basically Markdown. This tool is built in to RStudio. See some docs <a href="http://www.rstudio.com/ide/docs/presentations/overview">here</a>. A cool feature of RStudio’s presentations is that the preview of the presentation live updates on each save - nice <i class="icon-thumbs-up"></i></li>
-  <li>Another option is the slidify package, made by <a href="https://github.com/ramnathv">Ramnath Vaidyanathan</a>. The canonical url for slidify is <a href="http://slidify.org/">here</a>. Slidify gives you more options and flexibity than RStudio presentations.</li>
-</ul>
++ RStudio has something called `R presentations`, that is basically Markdown. This tool is built in to RStudio. See some docs [here](http://www.rstudio.com/ide/docs/presentations/overview). A cool feature of RStudio's presentations is that the preview of the presentation live updates on each save - nice <i class="icon-thumbs-up"></i>
++ Another option is the slidify package, made by [Ramnath Vaidyanathan](https://github.com/ramnathv). The canonical url for slidify is [here](http://slidify.org/). Slidify gives you more options and flexibity than RStudio presentations. 
 
-<p>For this presentation I went with RStudio’s product. See the Markdown file for the presentation <a href="https://github.com/sckott/posterstalks/blob/gh-pages/sfu/resources/r_resources.Rpres">here</a>.</p>
+For this presentation I went with RStudio's product. See the Markdown file for the presentation [here](https://github.com/sckott/posterstalks/blob/gh-pages/sfu/resources/r_resources.Rpres). 
 
-<p>Check out the presentation slides here, and if you want, fork it on Github, change it, submit changes back to me, etc. (click to go to slides)</p>
+Check out the presentation slides here, and if you want, fork it on Github, change it, submit changes back to me, etc. (click to go to slides)
 
-<p><br /></p>
+<br>
 
 <!-- ![](/public/img/rstudio_pres.png) -->
 
-<p><a href="http://rpubs.com/recology_/rresources"><img src="/public/img/rstudio_pres.png" />&lt;/img&gt;</a></p>
-
-  </div>
-  
-  <div class="post">
-    <h1>
-      <a href="/2013/07/beyond-academia/">
-        Beyond academia
-      </a>
-    </h1>
-
-    <span class="post-date">25 Jul 2013</span>
-
-    <p>As ecologists, we often start graduate school worshiping the ivory tower of academia with its freedom to pursue important ecological questions. However, studies have shown that most of us do not end up in academia. Greater numbers of ecology graduates are leaving the ivory tower for non-academic career paths. But for many graduates, moving from an academic environment to a non-academic job may be difficult. In graduate school we are trained to work in a particular way, often with loose deadlines and unlimited intellectual freedom (within reason of course). The culture and expectations of the non-academic world may be quite different. What are the skills that you need in a government job, or in science journalism? How do you market yourself for a non-academic position? This is a timely topic because funding to academic ecologists is being cut, leaving fewer opportunities in the academic arena. In fact, an ESA Student Section survey found that an ESA 2013 session on non-academic career paths in ecology was the topic of greatest interest.</p>
-
-<p><a href="http://sandrachung.com/">Sandra Chung</a> and I organized an ESA lunchtime session on Tuesday the 6th with panelists from an array of non-academic careers to offer advice and share their experiences. Each panelist will speak briefly, introducing themselves and a bit about what they do. About half of the time will be reserved for an open discussion in which you all attending the session help decide what to talk about.</p>
-
-<p>You can find the description of the session at the ESA site <a href="http://eco.confex.com/eco/2013/webprogram/Session9083.html">here</a>.</p>
-
-<p><strong>The details:</strong></p>
-
-<ul>
-  <li>When: Tuesday, August 6, 2013: 11:30 AM-1:15 PM</li>
-  <li>Where: 101B, Minneapolis Convention Center</li>
-  <li>Who (the panelists):
-    <ul>
-      <li><a href="http://www.virginiagewin.com/">Virginia Gewin</a>: Independent science journalist (w/ work in Science/Nature/etc.)</li>
-      <li><a href="http://www.compassonline.org/staff/LizNeeley">Liz Neeley</a>: Science communication/journalism at COMPASS (a non-profit org.)</li>
-      <li><a href="http://www.lpzoo.org/conservation-science/resources/staff-bios/joseph-l-simonis-phd">Joe Simonis</a>: Research scientist at the Lincon Park Zoo (a non-profit org.)</li>
-      <li><a href="http://emhart.github.io/">Ted Hart</a>: Soon to be statistician at NEON</li>
-      <li><a href="http://linkd.in/15NCg3j">Lael Goodman</a>: Analyst w/ the Union of Concerned Scientists</li>
-    </ul>
-  </li>
-</ul>
-
-<p><strong>Get involved</strong></p>
-
-<p>As a placeholder on the web for things related to Beyond Academia, and a place to find out more about the session at ESA, we started a wiki. Check it out <a href="http://beyondacademia.wikispaces.com/home">here</a>. Please do visit the wiki, and contribute your ideas for topics to discuss. In addition, we have a <em>Resources</em> page on the wiki <a href="http://beyondacademia.wikispaces.com/Resources">here</a> to collect resources related to moving beyond academia.</p>
-
+<a href="http://rpubs.com/recology_/rresources"><img src="/public/img/rstudio_pres.png"></img></a>
 
   </div>
   

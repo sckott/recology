@@ -61,6 +61,176 @@
   
   <div class="post">
     <h1>
+      <a href="/2011/03/basic-ggplot2-network-graphs-ver2/">
+        basic ggplot2 network graphs ver2
+      </a>
+    </h1>
+
+    <span class="post-date">23 Mar 2011</span>
+
+    *********
+
+I posted last week a simple function to plot networks using ggplot2 package. Here is version 2. I still need to work on figuring out efficient vertex placement.
+
+Changes in version 2:
+
++ You have one of three options: use an igraph object, a matrix, or a dataframe (matrices will be converted to data frames within the function)
++ If you have data on food webs similar to that provided in the Takapoto dataset provided in the NetIndices package, you can set trophic = "TRUE", and gggraph will use the function TrophInd to assign trophic levels (the y axis value) to each vertex/node. You have to provide additional information along with this option such as what the imports and exports are, see NetIndices documentation.
++ I added some simple error checking.
++ if using method="df" and trophic="FALSE", x axis placement of vertices is now done using the function degreex (see inside the fxn), which sorts vertices according to their degree (so the least connected species are on the left of the graph; note that species with the same degree are not stacked on the y-axis because e.g., two vertices of degree=5 would get x=3 then x=4).
+
+*********
+	
+
+{% highlight r %}
+# ggraph Version 2
+require(bipartite)
+require(igraph)
+require(ggplot2)
+{% endhighlight %}
+
+
+
+{% highlight r %}
+# gggraph, version 3 g = an igraph graph object, a matrix, or data frame
+# vplace = type of vertex placement assignment, one of rnorm, runif, etc.
+# method = one of 'df' for data frame, 'mat' for matrix or 'igraph' for an
+# igraph graph object trophic = TRUE or FALSE for using Netindices
+# function TrophInd to determine trophic level (y value in graph)
+# trophinames = columns in matrix or dataframe to use for calculating
+# trophic level import = named or refereced by col# columns of matrix or
+# dataframe to use for import argument of TrophInd export = named or
+# refereced by col# columns of matrix or dataframe to use for export
+# argument of TrophInd dead = named or refereced by col# columns of matrix
+# or dataframe to use for dead argument of TrophInd
+
+gggraph <- function(g, vplace = rnorm, method, trophic = "FALSE", trophinames, 
+    import, export) {
+    degreex <- function(x) {
+        degreecol <- apply(x, 2, function(y) length(y[y > 0]))
+        degreerow <- apply(x, 1, function(y) length(y[y > 0]))
+        degrees <- sort(c(degreecol, degreerow))
+        df <- data.frame(degrees, x = seq(1, length(degrees), 1))
+        df$value <- rownames(df)
+        df
+    }
+    # require igraph
+    if (!require(igraph)) 
+        stop("must first install 'igraph' package.")
+    # require ggplot2
+    if (!require(ggplot2)) 
+        stop("must first install 'ggplot2' package.")
+    
+    if (method == "df") {
+        if (class(g) == "matrix") {
+            g <- as.data.frame(g)
+        }
+        if (class(g) != "data.frame") 
+            stop("object must be of class 'data.frame.'")
+        if (trophic == "FALSE") {
+            # data preparation from adjacency matrix
+            temp <- data.frame(expand.grid(dimnames(g))[1:2], as.vector(as.matrix(g)))
+            temp <- temp[(temp[, 3] > 0) & !is.na(temp[, 3]), ]
+            temp <- temp[sort.list(temp[, 1]), ]
+            g_df <- data.frame(rows = temp[, 1], cols = temp[, 2], freqint = temp[, 
+                3])
+            
+            g_df$id <- 1:length(g_df[, 1])
+            g_df <- data.frame(id = g_df[, 4], rows = g_df[, 1], cols = g_df[, 
+                2], freqint = g_df[, 3])
+            g_df_ <- melt(g_df, id = c(1, 4))
+            
+            xy_s <- data.frame(degreex(g), y = rnorm(length(unique(g_df_$value))))
+            g_df_2 <- merge(g_df_, xy_s, by = "value")
+        } else if (trophic == "TRUE") {
+            # require NetIndices
+            if (!require(NetIndices)) 
+                stop("must first install 'NetIndices' package.")
+            # data preparation from adjacency matrix
+            temp <- data.frame(expand.grid(dimnames(g[-trophinames, -trophinames]))[1:2], 
+                as.vector(as.matrix(g[-trophinames, -trophinames])))
+            temp <- temp[(temp[, 3] > 0) & !is.na(temp[, 3]), ]
+            temp <- temp[sort.list(temp[, 1]), ]
+            g_df <- data.frame(rows = temp[, 1], cols = temp[, 2], freqint = temp[, 
+                3])
+            
+            g_df$id <- 1:length(g_df[, 1])
+            g_df <- data.frame(id = g_df[, 4], rows = g_df[, 1], cols = g_df[, 
+                2], freqint = g_df[, 3])
+            g_df_ <- melt(g_df, id = c(1, 4))
+            
+            xy_s <- data.frame(value = unique(g_df_$value), x = rnorm(length(unique(g_df_$value))), 
+                y = TrophInd(g, Import = import, Export = export)[, 1])
+            g_df_2 <- merge(g_df_, xy_s, by = "value")
+        }
+        # plotting
+        p <- ggplot(g_df_2, aes(x, y)) + geom_point(size = 5) + geom_line(aes(size = freqint, 
+            group = id)) + geom_text(size = 3, hjust = 1.5, aes(label = value)) + 
+            theme_bw() + opts(panel.grid.major = theme_blank(), panel.grid.minor = theme_blank(), 
+            axis.text.x = theme_blank(), axis.text.y = theme_blank(), axis.title.x = theme_blank(), 
+            axis.title.y = theme_blank(), axis.ticks = theme_blank(), panel.border = theme_blank(), 
+            legend.position = "none")
+        
+        p  # return graph
+    } else if (method == "igraph") {
+        if (class(g) != "igraph") 
+            stop("object must be of class 'igraph.'")
+        # data preparation from igraph object
+        g_ <- get.edgelist(g)
+        g_df <- as.data.frame(g_)
+        g_df$id <- 1:length(g_df[, 1])
+        g_df <- melt(g_df, id = 3)
+        xy_s <- data.frame(value = unique(g_df$value), x = vplace(length(unique(g_df$value))), 
+            y = vplace(length(unique(g_df$value))))
+        g_df2 <- merge(g_df, xy_s, by = "value")
+        
+        # plotting
+        p <- ggplot(g_df2, aes(x, y)) + geom_point(size = 2) + geom_line(size = 0.3, 
+            aes(group = id, linetype = id)) + geom_text(size = 3, hjust = 1.5, 
+            aes(label = value)) + theme_bw() + opts(panel.grid.major = theme_blank(), 
+            panel.grid.minor = theme_blank(), axis.text.x = theme_blank(), axis.text.y = theme_blank(), 
+            axis.title.x = theme_blank(), axis.title.y = theme_blank(), axis.ticks = theme_blank(), 
+            panel.border = theme_blank(), legend.position = "none")
+        
+        p  # return graph
+    } else stop(paste("do not recognize method = \"", method, "\";\nmethods are \"df\" and \"igraph\"", 
+        sep = ""))
+}
+{% endhighlight %}
+
+
+
+{% highlight r %}
+# Eg
+library(NetIndices)
+data(Takapoto)
+gggraph(Takapoto, vplace = rnorm, method = "df", trophic = "TRUE", trophinames = c(8:10), 
+    import = "CO2", export = c("CO2", "Sedimentation", "Grazing"))
+{% endhighlight %}
+
+![center](/public/img/gggraph1.png) 
+
+
+
+{% highlight r %}
+plants <- round(rlnorm(n = 5, meanlog = 2, sdlog = 1))
+animals <- round(rlnorm(n = 5, meanlog = 2, sdlog = 1))
+plants <- plants * (100/sum(plants))
+animals <- animals * (100/sum(animals))
+z <- r2dtable(1, animals, plants)  # if errors, rerun again until no error
+z <- as.data.frame(z[[1]])
+rownames(z) <- c("a", "b", "c", "d", "e")
+gggraph(z, vplace = rnorm, method = "df", trophic = "FALSE")
+{% endhighlight %}
+
+![center](/public/img/gggraph2.png) 
+
+
+
+  </div>
+  
+  <div class="post">
+    <h1>
       <a href="/2011/03/basic-ggplot2-network-graphs/">
         basic ggplot2 network graphs
       </a>
@@ -68,18 +238,18 @@
 
     <span class="post-date">17 Mar 2011</span>
 
-    <p>I have been looking around on the web and have not found anything yet related to using ggplot2 for making graphs/networks. I put together a few functions to make very simple graphs. The bipartite function especially is not ideal, as of course we only want to allow connections between unlike nodes, not all nodes. These functions do not, obviously, take full advantage of the power of ggplot2, but it’s a start.</p>
+    I have been looking around on the web and have not found anything yet related to using ggplot2 for making graphs/networks. I put together a few functions to make very simple graphs. The bipartite function especially is not ideal, as of course we only want to allow connections between unlike nodes, not all nodes. These functions do not, obviously, take full advantage of the power of ggplot2, but&nbsp;it’s a start.
 
-<p><br /><br /><br /></p>
+<br /><br /><br />
 
 <script src="https://gist.github.com/3601320.js?file=gggraph.r"></script>
 
-<p><img src="/public/img/gggraph/erdos.jpeg" width="500" height="500" />
-<img src="/public/img/gggraph/barabasi.jpeg" width="500" height="500" />
-<img src="/public/img/gggraph/grg.jpeg" width="500" height="500" />
-<img src="/public/img/gggraph/growing.jpeg" width="500" height="500" />
-<img src="/public/img/gggraph/watts.jpeg" width="500" height="500" />
-<img src="/public/img/gggraph/grg-bipartite.jpeg" width="500" height="500" /></p>
+<img src="/public/img/gggraph/erdos.jpeg" width="500" height="500">
+<img src="/public/img/gggraph/barabasi.jpeg" width="500" height="500">
+<img src="/public/img/gggraph/grg.jpeg" width="500" height="500">
+<img src="/public/img/gggraph/growing.jpeg" width="500" height="500">
+<img src="/public/img/gggraph/watts.jpeg" width="500" height="500">
+<img src="/public/img/gggraph/grg-bipartite.jpeg" width="500" height="500">
 
   </div>
   
@@ -92,20 +262,7 @@
 
     <span class="post-date">13 Mar 2011</span>
 
-    <p>A post over at the Phased blog (http://www.nasw.org/users/mslong/) highlights a recent paper in PLoS One by Robert Warren et al. Similar results were obtained in a 2007 Ecology Letters paper by Nekola and Brown, who showed that abundance distributions found in ecology are similar to those found for scientific citations, Eastern North American precipitation, among other things. A similar argument was made by Nee et al. in 1991 (in the journal PRSL-B). The author of the blog appears to agree with the outcome of the Warren et al. study.<br /><br />I tend to disagree.<br /><br />In the field of graphs/networks, many networks (social, sexual intercourse among humans, etc.) are found to have similar statistical properties to those of ecological networks (food webs, interactions among mutualists, etc.). However, just because these networks have similar statistical properties does not mean that the statistical properties of ecological networks have no biological meaning.<br /><br />They make the argument that the common SAD fit may be an artifact of large data sets alone. However, I don’t see any explanation of why they think large data sets is a valid explanation of SADs. Surely SAD’s are fit to varying sizes of datasets. The problem with small datasets is lack of statistical power to detect a particular pattern, but surely you can get a fit for a particular SAD to a small dataset.<br /><br />There are ecological mechanistic theories behind different SAD models. They argue that because very similar SADs are found in ecological and non-ecological datasets alike one option is that a universal mechanism structures ecological and non-ecological data (with the mechanism unknown in both). Why can’t the same SAD pattern be generated by different mechanisms? <br /><br />Are Warren et al, Nekola, and Nee right in questioning the utility of SADs? Questioning our theories and ideas only makes the theories better in the end by weeding out shortcomings, etc.<br /><br /><br /><span style="float: left; padding-bottom: 5px; padding-left: 5px; padding-right: 5px; padding-top: 5px;"><a href="http://www.researchblogging.org/"><img alt="ResearchBlogging.org" src="http://www.researchblogging.org/public/citation_icons/rb2_large_white.png" style="border: 0;" /></a></span><br /><span class="Z3988" title="ctx_ver=Z39.88-2004&amp;rft_val_fmt=info%3Aofi%2Ffmt%3Akev%3Amtx%3Ajournal&amp;rft.jtitle=PLoS+ONE&amp;rft_id=info%3Adoi%2F10.1371%2Fjournal.pone.0017342&amp;rfr_id=info%3Asid%2Fresearchblogging.org&amp;rft.atitle=Universal+Ecological+Patterns+in+College+Basketball+Communities&amp;rft.issn=1932-6203&amp;rft.date=2011&amp;rft.volume=6&amp;rft.issue=3&amp;rft.spage=0&amp;rft.epage=&amp;rft.artnum=http%3A%2F%2Fdx.plos.org%2F10.1371%2Fjournal.pone.0017342&amp;rft.au=Warren%2C+R.&amp;rft.au=Skelly%2C+D.&amp;rft.au=Schmitz%2C+O.&amp;rft.au=Bradford%2C+M.&amp;rfe_dat=bpr3.included=1;bpr3.tags=Ecology+%2F+Conservation">Warren, R., Skelly, D., Schmitz, O., &amp; Bradford, M. (2011). Universal Ecological Patterns in College Basketball Communities <span style="font-style: italic;">PLoS ONE, 6</span> (3) DOI: <a href="http://dx.doi.org/10.1371/journal.pone.0017342" rev="review">10.1371/journal.pone.0017342</a></span></p>
-
-  </div>
-  
-  <div class="post">
-    <h1>
-      <a href="/2011/03/cloudnumbers-com/">
-        cloudnumbers.com
-      </a>
-    </h1>
-
-    <span class="post-date">11 Mar 2011</span>
-
-    <p>UPDATE: I guess it still is not actually available. Bummer…<br /><br /><br /><br />Has anyone used cloudnumbers.com?<br /><br />http://www.cloudnumbers.com/<br /><br />They provide cloud computing, and have built in applications, including R.<br /><br />How well does it work? Does it increase processing speed? I guess it may at the least free up RAM and processor space on your own machine.</p>
+    A post over at the Phased blog (http://www.nasw.org/users/mslong/) highlights a recent paper in PLoS One by Robert Warren et al. Similar results were obtained in a 2007 Ecology Letters paper by Nekola and Brown, who showed that abundance distributions found in ecology are similar to those found for scientific citations, Eastern North American precipitation, among other things. A similar argument was made by Nee et al. in 1991 (in the journal PRSL-B). The author of the blog appears to agree with the outcome of the Warren et al. study.<br /><br />I tend to disagree.<br /><br />In the field of graphs/networks, many networks (social, sexual intercourse among humans, etc.) are found to have similar statistical properties to those of ecological networks (food webs, interactions among mutualists, etc.). However, just because these networks have similar statistical properties does not mean that the statistical properties of ecological networks have no biological meaning.<br /><br />They make the argument that the common SAD fit may be an artifact of large data sets alone. However, I don't see any explanation of why they think large data sets is a valid explanation of SADs. Surely SAD's are fit to varying sizes of datasets. The problem with small datasets is lack of statistical power to detect a particular pattern, but surely you can get a fit for a particular SAD to a small dataset.<br /><br />There are ecological mechanistic theories behind different SAD models. They argue that because very similar SADs are found in ecological and non-ecological datasets alike one option is that a universal mechanism structures ecological and non-ecological data (with the mechanism unknown in both). Why can't the same SAD pattern be generated by different mechanisms? <br /><br />Are Warren et al, Nekola, and Nee right in questioning the utility of SADs? Questioning our theories and ideas only makes the theories better in the end by weeding out shortcomings, etc.<br /><br /><br /><span style="float: left; padding-bottom: 5px; padding-left: 5px; padding-right: 5px; padding-top: 5px;"><a href="http://www.researchblogging.org/"><img alt="ResearchBlogging.org" src="http://www.researchblogging.org/public/citation_icons/rb2_large_white.png" style="border: 0;" /></a></span><br /><span class="Z3988" title="ctx_ver=Z39.88-2004&amp;rft_val_fmt=info%3Aofi%2Ffmt%3Akev%3Amtx%3Ajournal&amp;rft.jtitle=PLoS+ONE&amp;rft_id=info%3Adoi%2F10.1371%2Fjournal.pone.0017342&amp;rfr_id=info%3Asid%2Fresearchblogging.org&amp;rft.atitle=Universal+Ecological+Patterns+in+College+Basketball+Communities&amp;rft.issn=1932-6203&amp;rft.date=2011&amp;rft.volume=6&amp;rft.issue=3&amp;rft.spage=0&amp;rft.epage=&amp;rft.artnum=http%3A%2F%2Fdx.plos.org%2F10.1371%2Fjournal.pone.0017342&amp;rft.au=Warren%2C+R.&amp;rft.au=Skelly%2C+D.&amp;rft.au=Schmitz%2C+O.&amp;rft.au=Bradford%2C+M.&amp;rfe_dat=bpr3.included=1;bpr3.tags=Ecology+%2F+Conservation">Warren, R., Skelly, D., Schmitz, O., &amp; Bradford, M. (2011). Universal Ecological Patterns in College Basketball Communities <span style="font-style: italic;">PLoS ONE, 6</span> (3) DOI: <a href="http://dx.doi.org/10.1371/journal.pone.0017342" rev="review">10.1371/journal.pone.0017342</a></span>
 
   </div>
   

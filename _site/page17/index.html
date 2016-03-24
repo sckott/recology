@@ -61,6 +61,210 @@
   
   <div class="post">
     <h1>
+      <a href="/2014/01/cites/">
+        cites - citation stuff from the command line
+      </a>
+    </h1>
+
+    <span class="post-date">18 Jan 2014</span>
+
+    I've been learning Ruby, and decided to scratch an itch: getting citations for papers to put in a bibtex file or my Zotero library. This usually requires two parts: 1) searching for an article with keywords, and then 2) getting the citation once the paper is found.  Since I am lazy, I would prefer to do this from the command line instead of opening up a browser.  Thus => `cites`. (Note, I'm sure someone has created something better - the point is I'm learnin' me some Ruby)
+<br><br>
+__cites does two things:__ 
+
+* Search for a paper. Uses the [CrossRef Metadata Search API](http://search.crossref.org/help/api), which allows POST requests of free form text. 
+* Get a citation from a DOI. Uses CrossRef [citation formatting service](http://labs.crossref.org/citation-formatting-service/) to search for citation information.
+
+Each of the two above tasks are functions that you can use within Ruby, and are available from the command line/terminal so that you don't have to spin up Ruby. During a typical writing workflow (in which you are using bibtex formatted references) one can want a citation for their paper, and instead of opening up a browser and using Google Scholar or Web of Science, etc., you can quickly search in your terminal by doing e.g., `thor cite:search 'keywords that will help find the paper, including author, year, etc.'`. Which if matches will give you a DOI. Then you can do `thor cite:getcite DOI/string | pbcopy` and you get the bibtex reference in your clipboard. Then just paste into your bibtex file or references manager. See more examples below.
+<br><br>
+First, we need to install dependencies
+
+```
+gem install httparty bibtex-ruby launchy
+sudo gem install thor
+```
+
+Then clone the repo down. The `Makefile` in the repo builds the gem, and installs the Thor module so you have access to it from anywhere. If you don't want the Thor commands, just do `make install` and just the gem will be installed.
+
+```
+git clone git@github.com:sckott/cites.git
+cd cites
+make
+```
+<br><br>
+### From the command line: Thor
+
+I decided to use [Thor](http://whatisthor.com/) to make functions within `cites` available on the cli. Thor is cool. For example, you can list the commands available like
+
+```
+thor list
+```
+
+```
+cite
+-----
+thor cite:getcite        # Get a citation from a DOI
+thor cite:launch paper   # Open a paper from a given DOI in your default browser
+thor cite:search STRING  # Get a DOI from a search string
+```
+
+Get help for a particular method
+
+```
+thor help cite:getcite
+```
+
+```
+Usage:
+  thor cite:getcite
+
+Options:
+  [--format=FORMAT]
+                     # Default: text
+  [--style=STYLE]
+                     # Default: apa
+  [--locale=LOCALE]
+                     # Default: en-US
+
+Get a citation from a DOI
+```
+
+This is what's associated with `cites` from the cli using Thor.
+
+Other commands are available, just type `thor` on the cli, and press enter. 
+<br><br>
+### Search for a paper 
+
+From the CLI
+
+```
+thor cite:search 'Piwowar sharing data increases citation PLOS'
+```
+
+```
+{"match"=>true, "doi"=>"10.1371/journal.pone.0000308", "text"=>"Piwowar sharing data increases citation PLOS"}
+```
+
+And you can do many searches, separated with commas, like
+
+```
+thor cite:search 'Piwowar sharing data increases citation PLOS,boettiger Modeling stabilizing selection'
+```
+
+Search within Ruby
+
+```ruby
+require 'cites'
+Cites.search('Piwowar sharing data increases citation PLOS')
+```
+
+```ruby
+=> [{"match"=>true,
+  "doi"=>"10.1371/journal.pone.0000308",
+  "text"=>"Piwowar sharing data increases citation PLOS"}]
+```
+<br><br>
+### Get a reference from a DOI
+
+From the CLI, default output is text format, apa style, locale en-US
+
+```
+thor cite:getcite '10.1186/1471-2105-14-16'
+```
+
+```
+Boyle, B., Hopkins, N., Lu, Z., Raygoza Garay, J. A., Mozzherin, D., Rees, T., Matasci, N., et al. (2013). The taxonomic name resolution service: an online tool for automated standardization of plant names. BMC Bioinformatics, 14(1), 16. Springer (Biomed Central Ltd.). doi:10.1186/1471-2105-14-16
+```
+
+Because we're using [thor](http://whatisthor.com/) you can pass in options to the call on the cli, like here choose `ris` for the format
+
+```
+thor cite:getcite '10.1371/journal.pone.0000308' --format=ris
+```
+
+```
+TY  - JOUR
+T2  - PLoS ONE
+AU  - Piwowar, Heather A.
+AU  - Day, Roger S.
+AU  - Fridsma, Douglas B.
+SN  - 1932-6203
+TI  - Sharing Detailed Research Data Is Associated with Increased Citation Rate
+SP  - e308
+VL  - 2
+PB  - Public Library of Science
+DO  - 10.1371/journal.pone.0000308
+PY  - 2007
+UR  - http://dx.doi.org/10.1371/journal.pone.0000308
+ER  -
+```
+
+And here `bibtex` for the format
+
+```
+thor cite:getcite '10.1371/journal.pone.0000308' --format=bibtex
+```
+
+```
+@article{Piwowar_Day_Fridsma_2007,
+  title = {Sharing Detailed Research Data Is Associated with Increased Citation Rate},
+  volume = {2},
+  url = {http://dx.doi.org/10.1371/journal.pone.0000308},
+  doi = {10.1371/journal.pone.0000308},
+  number = {3},
+  journal = {PLoS ONE},
+  publisher = {Public Library of Science},
+  author = {Piwowar, Heather A. and Day, Roger S. and Fridsma, Douglas B.},
+  editor = {Ioannidis, JohnEditor},
+  year = {2007},
+  month = {mar},
+  pages = {e308}
+}
+```
+
+Two more options, `style` and `locale` are only available with text format, like
+
+```
+thor cite:getcite '10.1371/journal.pone.0000308' --format=text --style=mla --locale=fr-FR
+```
+
+```
+Piwowar, Heather A., Roger S. Day, et Douglas B. Fridsma. « Sharing Detailed Research Data Is Associated with Increased Citation Rate ». éd par. John Ioannidis. PLoS ONE 2.3 (2007): e308.
+```
+
+Within Ruby
+
+```ruby
+require 'cites'
+Cites.doi2cit('10.1371/journal.pone.0000308')
+```
+
+```ruby
+=> ["Piwowar, H. A., Day, R. S., & Fridsma, D. B. (2007). Sharing Detailed Research Data Is Associated with Increased Citation Rate. (J. Ioannidis, Ed.)PLoS ONE, 2(3), e308. Public Library of Science. doi:10.1371/journal.pone.0000308"]
+```
+<br><br>
+### Open paper in browser
+
+Uses [Macrodocs](http://macrodocs.org/). The default, using Macrodocs, only works for open access (#OA) articles. You can set the option `oa` to be false. 
+
+```
+thor cite:launch '10.1371/journal.pone.0000308'
+```
+
+It's super simple, it just concatenates your DOI onto `http://macrodocs.org/?doi=` to give in this case [http://macrodocs.org/?doi=10.1371/journal.pone.0000308](http://macrodocs.org/?doi=10.1371/journal.pone.0000308) for what you will get from that command. 
+
+When you don't have an open access article, set the oa option flag to false, like `--oa=false`
+
+```
+thor cite:launch '10.1111/1365-2745.12157' --oa=false
+```
+
+Setting `--oa=false` simply concatenates your doi onto `http://dx.doi.org/`, which then attempts to resolve to likely the publishers page for the article.
+
+  </div>
+  
+  <div class="post">
+    <h1>
       <a href="/2014/01/rgauges-hourly/">
         rgauges - fun with hourly web site analytics
       </a>
@@ -68,69 +272,76 @@
 
     <span class="post-date">17 Jan 2014</span>
 
-    <p><a href="http://get.gaug.es/">Gaug.es</a> is a really nice looking analytics platform as an alternative to Google Analytics. It is a paid service, but not that expensive really.</p>
+    [Gaug.es](http://get.gaug.es/) is a really nice looking analytics platform as an alternative to Google Analytics. It is a paid service, but not that expensive really. 
 
-<p>We’ve made an R package to interact with the Gaug.es API called <code class="highlighter-rouge">rgauges</code>. Find it <a href="https://github.com/ropensci/rgauges">on Github</a> and <a href="http://cran.r-project.org/web/packages/rgauges/index.html">on CRAN</a>.</p>
+We've made an R package to interact with the Gaug.es API called `rgauges`. Find it [on Github](https://github.com/ropensci/rgauges) and [on CRAN](http://cran.r-project.org/web/packages/rgauges/index.html).
 
-<p>Although working with the Gaug.es API is nice and easy, they don’t keep hourly visit stats and provide those via the API, so that you have to continually collect them yourself if you want them. That’s what I have done for my own website.</p>
+Although working with the Gaug.es API is nice and easy, they don't keep hourly visit stats and provide those via the API, so that you have to continually collect them yourself if you want them. That's what I have done for my own website. 
 
-<p>It took a few steps to get this data:</p>
+It took a few steps to get this data:
 
-<ul>
-  <li>I wrote a little Ruby script using <a href="http://rubygems.org/gems/twelve">Twelve gem</a> to collect data from the Gaug.es API every day at the same time, which just gets the patst 24 hours of data. This script makes a call to the Gaug.es API and sends the data to a <a href="http://couchdb.apache.org/">CouchDB</a> database hosted on <a href="https://cloudant.com/">Cloudant</a>. In reality, the script is is embeded in a rack app as I don’t think you can throw up a standalone script to Heroku. Here’s the script:</li>
-</ul>
+* I wrote a little Ruby script using [Twelve gem](http://rubygems.org/gems/twelve) to collect data from the Gaug.es API every day at the same time, which just gets the patst 24 hours of data. This script makes a call to the Gaug.es API and sends the data to a [CouchDB](http://couchdb.apache.org/) database hosted on [Cloudant](https://cloudant.com/). In reality, the script is is embeded in a rack app as I don't think you can throw up a standalone script to Heroku. Here's the script:
 
-<div class="highlighter-rouge"><pre class="highlight"><code><span class="k">class</span> <span class="nc">MyApp</span>
-  <span class="nb">require</span> <span class="s1">'couchrest'</span>
-  <span class="nb">require</span> <span class="s1">'twelve'</span>
-  <span class="nb">require</span> <span class="s1">'date'</span>
-  <span class="nb">require</span> <span class="s1">'time'</span>
+```ruby
+class MyApp
+  require 'couchrest'
+  require 'twelve'
+  require 'date'
+  require 'time'
   
-  <span class="k">def</span> <span class="nc">self</span><span class="o">.</span><span class="nf">getgaugesdata_scott</span>
-    <span class="n">bfg</span> <span class="o">=</span> <span class="no">Twelve</span><span class="p">.</span><span class="nf">new</span><span class="p">(</span><span class="s1">'&lt;gaugeskey&gt;'</span><span class="p">)</span>
-    <span class="n">out</span> <span class="o">=</span> <span class="n">bfg</span><span class="p">.</span><span class="nf">gauges</span><span class="p">(</span><span class="s1">'&lt;gaugeskey&gt;'</span><span class="p">)[</span><span class="s1">'recent_hours'</span><span class="p">]</span>
-    <span class="n">yip</span> <span class="o">=</span> <span class="p">{</span> <span class="s2">"from_url"</span><span class="o">=&gt;</span> <span class="s2">"http://sckott.github.io/"</span><span class="p">,</span> <span class="s2">"coll_date"</span><span class="o">=&gt;</span> <span class="no">Date</span><span class="p">.</span><span class="nf">today</span><span class="p">.</span><span class="nf">to_s</span><span class="p">,</span> <span class="s2">"coll_time"</span><span class="o">=&gt;</span> <span class="no">Time</span><span class="p">.</span><span class="nf">now</span><span class="p">.</span><span class="nf">utc</span><span class="p">.</span><span class="nf">localtime</span><span class="p">.</span><span class="nf">to_s</span><span class="p">,</span> <span class="s2">"recent_hours"</span><span class="o">=&gt;</span> <span class="n">out</span> <span class="p">}</span>
-    <span class="vi">@db</span> <span class="o">=</span> <span class="no">CouchRest</span><span class="p">.</span><span class="nf">database!</span><span class="p">(</span><span class="s2">"https://app16517180.heroku:&lt;key&gt;@app16517180.heroku.cloudant.com/gaugesdb_scott"</span><span class="p">)</span>
-    <span class="vi">@db</span><span class="p">.</span><span class="nf">save_doc</span><span class="p">(</span><span class="n">yip</span><span class="p">)</span>
+  def self.getgaugesdata_scott
+    bfg = Twelve.new('<gaugeskey>')
+    out = bfg.gauges('<gaugeskey>')['recent_hours']
+    yip = { "from_url"=> "http://sckott.github.io/", "coll_date"=> Date.today.to_s, "coll_time"=> Time.now.utc.localtime.to_s, "recent_hours"=> out }
+    @db = CouchRest.database!("https://app16517180.heroku:<key>@app16517180.heroku.cloudant.com/gaugesdb_scott")
+    @db.save_doc(yip)
 
-  <span class="k">def</span> <span class="nf">call</span> <span class="n">env</span>
-    <span class="p">[</span><span class="mi">200</span><span class="p">,</span> <span class="p">{</span><span class="s2">"Content-Type"</span> <span class="o">=&gt;</span> <span class="s2">"text/html"</span><span class="p">},</span> <span class="p">[</span><span class="s2">"no output printed here"</span><span class="p">]]</span> 
-  <span class="k">end</span>
-<span class="k">end</span>
-</code></pre>
-</div>
+  def call env
+    [200, {"Content-Type" => "text/html"}, ["no output printed here"]] 
+  end
+end
+```
 
-<ul>
-  <li>
-    <p>One little catch though: I run the Ruby script on Heroku, so I don’t have to do it locally, but Heroku free instance goes down unless it’s doing something. So I used a little service called <a href="http://uptimerobot.com/">UptimeRobot</a> to ping the Heroku app every 5 minutes. UptimeRobot also is giving you uptime stats too on your app, which I don’t really need, but is a cool feature.</p>
-  </li>
-  <li>
-    <p>And that’s it. Now the data is stored from each day’s collection of visitor stats to a free Cloudant CouchDB database.</p>
-  </li>
-</ul>
+* One little catch though: I run the Ruby script on Heroku, so I don't have to do it locally, but Heroku free instance goes down unless it's doing something. So I used a little service called [UptimeRobot](http://uptimerobot.com/) to ping the Heroku app every 5 minutes. UptimeRobot also is giving you uptime stats too on your app, which I don't really need, but is a cool feature. 
 
-<h2 id="regular-gauges-data">Regular Gaug.es data</h2>
+* And that's it. Now the data is stored from each day's collection of visitor stats to a free Cloudant CouchDB database. 
 
-<p>First, let’s look at what you can do with data that Gaug.es does give to you, using the <code class="highlighter-rouge">rgauges</code> R package.</p>
+## Regular Gaug.es data
 
-<hr />
+First, let's look at what you can do with data that Gaug.es does give to you, using the `rgauges` R package.
 
-<h3 id="install-rgauges">Install rgauges</h3>
+********************
 
-<figure class="highlight"><pre><code class="language-r" data-lang="r"><span class="n">install.packages</span><span class="p">(</span><span class="s2">"devtools"</span><span class="p">)</span>
-<span class="n">library</span><span class="p">(</span><span class="n">devtools</span><span class="p">)</span>
-<span class="n">install_github</span><span class="p">(</span><span class="s2">"rgauges"</span><span class="p">,</span> <span class="s2">"ropensci"</span><span class="p">)</span></code></pre></figure>
+### Install rgauges
 
-<h3 id="load-rgauges-and-other-dependency-libraries">Load rgauges and other dependency libraries</h3>
 
-<figure class="highlight"><pre><code class="language-r" data-lang="r"><span class="n">library</span><span class="p">(</span><span class="n">rgauges</span><span class="p">)</span>
-<span class="n">library</span><span class="p">(</span><span class="n">ggplot2</span><span class="p">)</span></code></pre></figure>
+{% highlight r %}
+install.packages("devtools")
+library(devtools)
+install_github("rgauges", "ropensci")
+{% endhighlight %}
 
-<h3 id="your-info">Your info</h3>
 
-<figure class="highlight"><pre><code class="language-r" data-lang="r"><span class="n">gs_me</span><span class="p">()</span></code></pre></figure>
+### Load rgauges and other dependency libraries
 
-<figure class="highlight"><pre><code class="language-text" data-lang="text">## $user
+
+{% highlight r %}
+library(rgauges)
+library(ggplot2)
+{% endhighlight %}
+
+
+### Your info
+
+
+{% highlight r %}
+gs_me()
+{% endhighlight %}
+
+
+
+{% highlight text %}
+## $user
 ## $user$name
 ## [1] "Scott Chamberlain"
 ## 
@@ -155,13 +366,21 @@
 ## 
 ## 
 ## $user$first_name
-## [1] "Scott"</code></pre></figure>
+## [1] "Scott"
+{% endhighlight %}
 
-<h4 id="traffic">Traffic</h4>
 
-<figure class="highlight"><pre><code class="language-r" data-lang="r"><span class="n">gs_traffic</span><span class="p">(</span><span class="n">id</span> <span class="o">=</span> <span class="s2">"4efd83a6f5a1f5158a000004"</span><span class="p">)</span></code></pre></figure>
+#### Traffic
 
-<figure class="highlight"><pre><code class="language-text" data-lang="text">## $metadata
+
+{% highlight r %}
+gs_traffic(id = "4efd83a6f5a1f5158a000004")
+{% endhighlight %}
+
+
+
+{% highlight text %}
+## $metadata
 ## $metadata$views
 ## [1] 386
 ## 
@@ -198,13 +417,21 @@
 ## 14    11 2014-01-14      9
 ## 15    23 2014-01-15     16
 ## 16    16 2014-01-16     14
-## 17    32 2014-01-17     25</code></pre></figure>
+## 17    32 2014-01-17     25
+{% endhighlight %}
 
-<h3 id="screenbrowser-information">Screen/browser information</h3>
 
-<figure class="highlight"><pre><code class="language-r" data-lang="r"><span class="n">gs_reso</span><span class="p">(</span><span class="n">id</span> <span class="o">=</span> <span class="s2">"4efd83a6f5a1f5158a000004"</span><span class="p">)</span></code></pre></figure>
+### Screen/browser information
 
-<figure class="highlight"><pre><code class="language-text" data-lang="text">## $browser_height
+
+{% highlight r %}
+gs_reso(id = "4efd83a6f5a1f5158a000004")
+{% endhighlight %}
+
+
+
+{% highlight text %}
+## $browser_height
 ##   views title
 ## 1   190   600
 ## 2    77   768
@@ -232,124 +459,192 @@
 ## 5    14  2000
 ## 6     6   320
 ## 7     6   480
-## 8     4   800</code></pre></figure>
+## 8     4   800
+{% endhighlight %}
 
-<h3 id="visualize-traffic-data">Visualize traffic data</h3>
 
-<p>You’ll need to load ggplot2</p>
+### Visualize traffic data
 
-<figure class="highlight"><pre><code class="language-r" data-lang="r"><span class="n">library</span><span class="p">(</span><span class="n">ggplot2</span><span class="p">)</span>
-<span class="n">out</span> <span class="o">&lt;-</span> <span class="n">gs_gauge_detail</span><span class="p">(</span><span class="n">id</span> <span class="o">=</span> <span class="s2">"4efd83a6f5a1f5158a000004"</span><span class="p">)</span>
-<span class="n">vis_gauge</span><span class="p">(</span><span class="n">out</span><span class="p">)</span></code></pre></figure>
+You'll need to load ggplot2 
 
-<figure class="highlight"><pre><code class="language-text" data-lang="text">## Using hour, time as id variables
+
+{% highlight r %}
+library(ggplot2)
+out <- gs_gauge_detail(id = "4efd83a6f5a1f5158a000004")
+vis_gauge(out)
+{% endhighlight %}
+
+
+
+{% highlight text %}
+## Using hour, time as id variables
 ## Using date as id variables
-## Using date as id variables</code></pre></figure>
+## Using date as id variables
+{% endhighlight %}
 
-<p><img src="/public/img/2014-01-17-rgauges-hourly/unnamed-chunk-4.png" alt="center" /></p>
+![center](/public/img/2014-01-17-rgauges-hourly/unnamed-chunk-4.png) 
 
-<figure class="highlight"><pre><code class="language-text" data-lang="text">## NULL</code></pre></figure>
+{% highlight text %}
+## NULL
+{% endhighlight %}
 
-<hr />
-<hr />
 
-<h2 id="historic-hourly-gauges-data">Historic hourly Gaug.es data</h2>
+********************
+********************
 
-<p>Now let’s play with the hourly data. To do that we aren’t going to use <code class="highlighter-rouge">rgauges</code>, but rather call the Cloudant API. CouchDB provides a RESTful API out of the box, so we can do a call like <code class="highlighter-rouge">https://app16517180.heroku.cloudant.com/gaugesdb_scott/_all_docs?limit=20</code> to get metadata (or other calls to get the documents themselves). (note: that url won’t work for you since you don’t have my login info)</p>
+## Historic hourly Gaug.es data
 
-<h3 id="get-some-data">Get some data</h3>
+Now let's play with the hourly data. To do that we aren't going to use `rgauges`, but rather call the Cloudant API. CouchDB provides a RESTful API out of the box, so we can do a call like `https://app16517180.heroku.cloudant.com/gaugesdb_scott/_all_docs?limit=20` to get metadata (or other calls to get the documents themselves). (note: that url won't work for you since you don't have my login info) 
 
-<figure class="highlight"><pre><code class="language-r" data-lang="r"><span class="n">library</span><span class="p">(</span><span class="n">devtools</span><span class="p">)</span>
-<span class="n">install_github</span><span class="p">(</span><span class="s2">"sckott/sofa"</span><span class="p">)</span>  <span class="err">#</span> <span class="n">or</span> <span class="n">install_github</span><span class="p">(</span><span class="s1">'sofa'</span><span class="p">,</span> <span class="s1">'sckott'</span><span class="p">)</span></code></pre></figure>
+### Get some data
 
-<figure class="highlight"><pre><code class="language-r" data-lang="r"><span class="n">library</span><span class="p">(</span><span class="n">sofa</span><span class="p">)</span>
-<span class="n">cloudant_name</span> <span class="o">&lt;-</span> <span class="s2">"app16517180.heroku"</span>
-<span class="n">cloudant_pwd</span> <span class="o">&lt;-</span> <span class="n">getOption</span><span class="p">(</span><span class="s2">"sofa_cloudant_heroku"</span><span class="p">)[[</span><span class="m">2</span><span class="p">]]</span>
-<span class="n">cushion</span><span class="p">(</span><span class="n">sofa_cloudant</span> <span class="o">=</span> <span class="n">c</span><span class="p">(</span><span class="n">cloudant_name</span><span class="p">,</span> <span class="n">cloudant_pwd</span><span class="p">))</span>
-<span class="n">dat</span> <span class="o">&lt;-</span> <span class="n">sofa_alldocs</span><span class="p">(</span><span class="n">cushion</span> <span class="o">=</span> <span class="s2">"sofa_cloudant"</span><span class="p">,</span> <span class="n">dbname</span> <span class="o">=</span> <span class="s2">"gaugesdb_scott"</span><span class="p">,</span> <span class="n">include_docs</span> <span class="o">=</span> <span class="s2">"true"</span><span class="p">)</span></code></pre></figure>
 
-<h3 id="manipulate-and-visualize">Manipulate and visualize</h3>
+{% highlight r %}
+library(devtools)
+install_github("sckott/sofa")  # or install_github('sofa', 'sckott')
+{% endhighlight %}
 
-<figure class="highlight"><pre><code class="language-r" data-lang="r"><span class="n">library</span><span class="p">(</span><span class="n">plyr</span><span class="p">)</span>
-<span class="n">dates</span> <span class="o">&lt;-</span> <span class="n">ldply</span><span class="p">(</span><span class="n">dat</span><span class="o">$</span><span class="n">rows</span><span class="p">,</span> <span class="k">function</span><span class="p">(</span><span class="n">x</span><span class="p">)</span> <span class="n">x</span><span class="o">$</span><span class="n">doc</span><span class="o">$</span><span class="n">coll_date</span><span class="p">)</span>
-<span class="n">min</span><span class="p">(</span><span class="n">dates</span><span class="o">$</span><span class="n">V1</span><span class="p">)</span></code></pre></figure>
 
-<figure class="highlight"><pre><code class="language-text" data-lang="text">## [1] "2013-06-26"</code></pre></figure>
 
-<figure class="highlight"><pre><code class="language-r" data-lang="r"><span class="n">max</span><span class="p">(</span><span class="n">dates</span><span class="o">$</span><span class="n">V1</span><span class="p">)</span></code></pre></figure>
 
-<figure class="highlight"><pre><code class="language-text" data-lang="text">## [1] "2014-01-16"</code></pre></figure>
+{% highlight r %}
+library(sofa)
+cloudant_name <- "app16517180.heroku"
+cloudant_pwd <- getOption("sofa_cloudant_heroku")[[2]]
+cushion(sofa_cloudant = c(cloudant_name, cloudant_pwd))
+dat <- sofa_alldocs(cushion = "sofa_cloudant", dbname = "gaugesdb_scott", include_docs = "true")
+{% endhighlight %}
 
-<figure class="highlight"><pre><code class="language-r" data-lang="r"><span class="n">length</span><span class="p">(</span><span class="n">dates</span><span class="o">$</span><span class="n">V1</span><span class="p">)</span></code></pre></figure>
 
-<figure class="highlight"><pre><code class="language-text" data-lang="text">## [1] 198</code></pre></figure>
+### Manipulate and visualize
 
-<p>So we’ve got 198 days of data, first collected near end of June, and most recent yesterday. Now get actual visits data</p>
 
-<figure class="highlight"><pre><code class="language-r" data-lang="r"><span class="n">df</span> <span class="o">&lt;-</span> <span class="n">ldply</span><span class="p">(</span><span class="n">dat</span><span class="o">$</span><span class="n">rows</span><span class="p">,</span> <span class="k">function</span><span class="p">(</span><span class="n">x</span><span class="p">)</span> <span class="p">{</span>
-    <span class="n">y</span> <span class="o">&lt;-</span> <span class="n">do.call</span><span class="p">(</span><span class="n">rbind</span><span class="p">,</span> <span class="n">lapply</span><span class="p">(</span><span class="n">x</span><span class="o">$</span><span class="n">doc</span><span class="o">$</span><span class="n">recent_hours</span><span class="p">,</span> <span class="n">data.frame</span><span class="p">))</span>
-    <span class="n">data.frame</span><span class="p">(</span><span class="n">date</span> <span class="o">=</span> <span class="n">x</span><span class="o">$</span><span class="n">doc</span><span class="o">$</span><span class="n">coll_date</span><span class="p">,</span> <span class="n">y</span><span class="p">)</span>
-<span class="p">})</span>
-<span class="n">df</span><span class="o">$</span><span class="n">date</span> <span class="o">&lt;-</span> <span class="n">as.Date</span><span class="p">(</span><span class="n">df</span><span class="o">$</span><span class="n">date</span><span class="p">)</span>
-<span class="n">df</span><span class="o">$</span><span class="n">hour</span> <span class="o">&lt;-</span> <span class="n">as.numeric</span><span class="p">(</span><span class="n">df</span><span class="o">$</span><span class="n">hour</span><span class="p">)</span>
+{% highlight r %}
+library(plyr)
+dates <- ldply(dat$rows, function(x) x$doc$coll_date)
+min(dates$V1)
+{% endhighlight %}
 
-<span class="n">library</span><span class="p">(</span><span class="n">reshape2</span><span class="p">)</span>
-<span class="n">df_melt</span> <span class="o">&lt;-</span> <span class="n">melt</span><span class="p">(</span><span class="n">df</span><span class="p">,</span> <span class="n">id.vars</span> <span class="o">=</span> <span class="n">c</span><span class="p">(</span><span class="s2">"date"</span><span class="p">,</span> <span class="s2">"hour"</span><span class="p">))</span>
-<span class="n">head</span><span class="p">(</span><span class="n">df_melt</span><span class="p">)</span></code></pre></figure>
 
-<figure class="highlight"><pre><code class="language-text" data-lang="text">##         date hour variable value
+
+{% highlight text %}
+## [1] "2013-06-26"
+{% endhighlight %}
+
+
+
+{% highlight r %}
+max(dates$V1)
+{% endhighlight %}
+
+
+
+{% highlight text %}
+## [1] "2014-01-16"
+{% endhighlight %}
+
+
+
+{% highlight r %}
+length(dates$V1)
+{% endhighlight %}
+
+
+
+{% highlight text %}
+## [1] 198
+{% endhighlight %}
+
+
+So we've got 198 days of data, first collected near end of June, and most recent yesterday. Now get actual visits data
+
+
+{% highlight r %}
+df <- ldply(dat$rows, function(x) {
+    y <- do.call(rbind, lapply(x$doc$recent_hours, data.frame))
+    data.frame(date = x$doc$coll_date, y)
+})
+df$date <- as.Date(df$date)
+df$hour <- as.numeric(df$hour)
+
+library(reshape2)
+df_melt <- melt(df, id.vars = c("date", "hour"))
+head(df_melt)
+{% endhighlight %}
+
+
+
+{% highlight text %}
+##         date hour variable value
 ## 1 2013-09-18    1    views     2
 ## 2 2013-09-18    2    views     3
 ## 3 2013-09-18    3    views     2
 ## 4 2013-09-18    4    views     0
 ## 5 2013-09-18    5    views     1
-## 6 2013-09-18    6    views    10</code></pre></figure>
+## 6 2013-09-18    6    views    10
+{% endhighlight %}
 
-<p>We need to combine the date and hour in to one date time string:</p>
 
-<figure class="highlight"><pre><code class="language-r" data-lang="r"><span class="n">df_melt</span> <span class="o">&lt;-</span> <span class="n">transform</span><span class="p">(</span><span class="n">df_melt</span><span class="p">,</span> <span class="n">datetime</span> <span class="o">=</span> <span class="n">as.POSIXct</span><span class="p">(</span><span class="n">paste</span><span class="p">(</span><span class="n">date</span><span class="p">,</span> <span class="n">sprintf</span><span class="p">(</span><span class="s2">"%s:00:00"</span><span class="p">,</span> 
-    <span class="n">hour</span><span class="p">))))</span>
-<span class="n">head</span><span class="p">(</span><span class="n">df_melt</span><span class="p">)</span></code></pre></figure>
+We need to combine the date and hour in to one date time string:
 
-<figure class="highlight"><pre><code class="language-text" data-lang="text">##         date hour variable value            datetime
+
+{% highlight r %}
+df_melt <- transform(df_melt, datetime = as.POSIXct(paste(date, sprintf("%s:00:00", 
+    hour))))
+head(df_melt)
+{% endhighlight %}
+
+
+
+{% highlight text %}
+##         date hour variable value            datetime
 ## 1 2013-09-18    1    views     2 2013-09-18 01:00:00
 ## 2 2013-09-18    2    views     3 2013-09-18 02:00:00
 ## 3 2013-09-18    3    views     2 2013-09-18 03:00:00
 ## 4 2013-09-18    4    views     0 2013-09-18 04:00:00
 ## 5 2013-09-18    5    views     1 2013-09-18 05:00:00
-## 6 2013-09-18    6    views    10 2013-09-18 06:00:00</code></pre></figure>
+## 6 2013-09-18    6    views    10 2013-09-18 06:00:00
+{% endhighlight %}
 
-<p>Now plot all data</p>
 
-<figure class="highlight"><pre><code class="language-r" data-lang="r"><span class="n">library</span><span class="p">(</span><span class="n">ggplot2</span><span class="p">);</span> <span class="n">library</span><span class="p">(</span><span class="n">scales</span><span class="p">)</span>
+Now plot all data
 
-<span class="n">gauge_theme</span> <span class="o">&lt;-</span> <span class="k">function</span><span class="p">(){</span>
-  <span class="n">list</span><span class="p">(</span><span class="n">theme</span><span class="p">(</span><span class="n">panel.grid.major</span> <span class="o">=</span> <span class="n">element_blank</span><span class="p">(),</span>
-             <span class="n">panel.grid.minor</span> <span class="o">=</span> <span class="n">element_blank</span><span class="p">(),</span>
-             <span class="n">legend.position</span> <span class="o">=</span> <span class="n">c</span><span class="p">(</span><span class="m">0.85</span><span class="p">,</span><span class="m">0.85</span><span class="p">),</span>
-             <span class="n">legend.key</span> <span class="o">=</span> <span class="n">element_blank</span><span class="p">()))</span>
-<span class="p">}</span>
 
-<span class="n">ggplot</span><span class="p">(</span><span class="n">df_melt</span><span class="p">,</span> <span class="n">aes</span><span class="p">(</span><span class="n">datetime</span><span class="p">,</span> <span class="n">value</span><span class="p">,</span> <span class="n">group</span><span class="o">=</span><span class="n">variable</span><span class="p">,</span> <span class="n">colour</span><span class="o">=</span><span class="n">variable</span><span class="p">))</span> <span class="o">+</span>
-    <span class="n">theme_bw</span><span class="p">(</span><span class="n">base_size</span><span class="o">=</span><span class="m">18</span><span class="p">)</span> <span class="o">+</span> 
-    <span class="n">geom_line</span><span class="p">(</span><span class="n">size</span><span class="o">=</span><span class="m">2</span><span class="p">)</span> <span class="o">+</span>
-    <span class="n">scale_color_brewer</span><span class="p">(</span><span class="n">name</span><span class="o">=</span><span class="s2">""</span><span class="p">,</span> <span class="n">palette</span><span class="o">=</span><span class="m">3</span><span class="p">)</span> <span class="o">+</span>
-    <span class="n">labs</span><span class="p">(</span><span class="n">x</span><span class="o">=</span><span class="s2">""</span><span class="p">,</span> <span class="n">y</span><span class="o">=</span><span class="s2">""</span><span class="p">)</span> <span class="o">+</span>
-    <span class="n">gauge_theme</span><span class="p">()</span></code></pre></figure>
+{% highlight r %}
+library(ggplot2); library(scales)
 
-<p><img src="/public/img/2014-01-17-rgauges-hourly/unnamed-chunk-8.png" alt="center" /></p>
+gauge_theme <- function(){
+  list(theme(panel.grid.major = element_blank(),
+             panel.grid.minor = element_blank(),
+             legend.position = c(0.85,0.85),
+             legend.key = element_blank()))
+}
 
-<p>And just one day</p>
+ggplot(df_melt, aes(datetime, value, group=variable, colour=variable)) +
+    theme_bw(base_size=18) + 
+    geom_line(size=2) +
+    scale_color_brewer(name="", palette=3) +
+    labs(x="", y="") +
+    gauge_theme()
+{% endhighlight %}
 
-<figure class="highlight"><pre><code class="language-r" data-lang="r"><span class="n">oneday</span> <span class="o">&lt;-</span> <span class="n">df_melt</span><span class="p">[</span> <span class="n">as.character</span><span class="p">(</span><span class="n">df_melt</span><span class="o">$</span><span class="n">date</span><span class="p">)</span> <span class="o">%</span><span class="k">in</span><span class="o">%</span> <span class="s2">"2013-11-12"</span><span class="p">,</span> <span class="p">]</span>
-<span class="n">ggplot</span><span class="p">(</span><span class="n">oneday</span><span class="p">,</span> <span class="n">aes</span><span class="p">(</span><span class="n">datetime</span><span class="p">,</span> <span class="n">value</span><span class="p">,</span> <span class="n">group</span><span class="o">=</span><span class="n">variable</span><span class="p">,</span> <span class="n">colour</span><span class="o">=</span><span class="n">variable</span><span class="p">))</span> <span class="o">+</span>
-    <span class="n">theme_bw</span><span class="p">(</span><span class="n">base_size</span><span class="o">=</span><span class="m">18</span><span class="p">)</span> <span class="o">+</span> 
-    <span class="n">geom_line</span><span class="p">(</span><span class="n">size</span><span class="o">=</span><span class="m">2</span><span class="p">)</span> <span class="o">+</span>
-    <span class="n">scale_color_brewer</span><span class="p">(</span><span class="n">name</span><span class="o">=</span><span class="s2">""</span><span class="p">,</span> <span class="n">palette</span><span class="o">=</span><span class="m">3</span><span class="p">)</span> <span class="o">+</span>
-    <span class="n">labs</span><span class="p">(</span><span class="n">x</span><span class="o">=</span><span class="s2">""</span><span class="p">,</span> <span class="n">y</span><span class="o">=</span><span class="s2">""</span><span class="p">)</span> <span class="o">+</span>
-    <span class="n">gauge_theme</span><span class="p">()</span></code></pre></figure>
+![center](/public/img/2014-01-17-rgauges-hourly/unnamed-chunk-8.png) 
 
-<p><img src="/public/img/2014-01-17-rgauges-hourly/unnamed-chunk-9.png" alt="center" /></p>
+
+And just one day
+
+
+{% highlight r %}
+oneday <- df_melt[ as.character(df_melt$date) %in% "2013-11-12", ]
+ggplot(oneday, aes(datetime, value, group=variable, colour=variable)) +
+    theme_bw(base_size=18) + 
+    geom_line(size=2) +
+    scale_color_brewer(name="", palette=3) +
+    labs(x="", y="") +
+    gauge_theme()
+{% endhighlight %}
+
+![center](/public/img/2014-01-17-rgauges-hourly/unnamed-chunk-9.png) 
 
 
   </div>
@@ -363,138 +658,117 @@
 
     <span class="post-date">20 Nov 2013</span>
 
-    <p>I started using Jekyll when I didn’t really know HTML, CSS, or Ruby - so I’ve had to learn a lot - but using Jekyll has been a great learning experience for all those languages.</p>
+    I started using Jekyll when I didn't really know HTML, CSS, or Ruby - so I've had to learn a lot - but using Jekyll has been a great learning experience for all those languages. 
 
-<p>I’ve tried to boil down steps to building a Jekyll site or blog to the minimal steps:</p>
+I've tried to boil down steps to building a Jekyll site or blog to the minimal steps:
 
-<p><br /><br /></p>
+<br><br>
 
-<h3 id="install-jekyll">Install Jekyll</h3>
+### Install Jekyll
 
-<ul>
-  <li>Mac/Linux/Unix:
-    <ul>
-      <li>Install dependencies:
-        <ul>
-          <li><a href="http://www.ruby-lang.org/en/downloads/">Ruby</a></li>
-          <li><a href="http://rubygems.org/pages/download">RubyGems</a></li>
-        </ul>
-      </li>
-      <li>Install Jekyll using RubyGems <code class="highlighter-rouge">gem install jekyll</code> (you may need to do <code class="highlighter-rouge">sudo...</code>)</li>
-      <li>If you’re having trouble installing, see the <a href="http://jekyllrb.com/docs/troubleshooting/">troubleshooting page</a>.</li>
-    </ul>
-  </li>
-  <li>Windows: Jekyll doesn’t officially support installation on Windows - follow <a href="http://www.madhur.co.in/blog/2011/09/01/runningjekyllwindows.html">these steps</a> for a Windows install.</li>
-</ul>
++ Mac/Linux/Unix: 
+	+ Install dependencies: 
+		+ [Ruby](http://www.ruby-lang.org/en/downloads/)
+		+ [RubyGems](http://rubygems.org/pages/download)
+	+ Install Jekyll using RubyGems `gem install jekyll` (you may need to do `sudo...`)
+	+ If you're having trouble installing, see the [troubleshooting page](http://jekyllrb.com/docs/troubleshooting/).
++ Windows: Jekyll doesn't officially support installation on Windows - follow [these steps](http://www.madhur.co.in/blog/2011/09/01/runningjekyllwindows.html) for a Windows install. 
 
-<p><br /><br /></p>
+<br><br>
 
-<h3 id="make-a-site">Make a site</h3>
+### Make a site
 
-<p>The easiest way to get started is by using the command <code class="highlighter-rouge">jekyll new SITENAME</code> - let’s replace <code class="highlighter-rouge">SITENAME</code> with <code class="highlighter-rouge">foobar</code> for this example.</p>
+The easiest way to get started is by using the command `jekyll new SITENAME` - let's replace `SITENAME` with `foobar` for this example.
 
-<p>So we run <code class="highlighter-rouge">jekyll new foobar</code>, which gives us:</p>
+So we run `jekyll new foobar`, which gives us:
 
-<figure class="highlight"><pre><code class="language-bash" data-lang="bash">New jekyll site installed <span class="k">in</span> /Users/scottmac2/foobar.</code></pre></figure>
+{% highlight bash %}
+New jekyll site installed in /Users/scottmac2/foobar.
+{% endhighlight %}
 
-<p>Go into that directory, and run</p>
+Go into that directory, and run 
 
-<figure class="highlight"><pre><code class="language-bash" data-lang="bash"><span class="nb">cd </span>foobar
-jekyll serve</code></pre></figure>
+{% highlight bash %}
+cd foobar
+jekyll serve
+{% endhighlight %}
 
-<p>Which gives you the files and directories:</p>
+Which gives you the files and directories:
 
-<figure class="highlight"><pre><code class="language-bash" data-lang="bash">|
+{% highlight bash %}
+|
 --|- _config.yml
   |- _posts
   |- css
   |- _layouts
   |- _site
-  |- index.html</code></pre></figure>
+  |- index.html
+{% endhighlight %}
 
-<p>Then point your browser to <a href="http://localhost:4000/">http://localhost:4000/</a>. And you should see the following:</p>
+Then point your browser to [http://localhost:4000/](http://localhost:4000/). And you should see the following:
 
-<p><img src="http://f.cl.ly/items/2q322a2P3f2m2A3a3l0O/Screen%20Shot%202013-11-20%20at%209.54.21%20AM.png" alt="" /></p>
+![](http://f.cl.ly/items/2q322a2P3f2m2A3a3l0O/Screen%20Shot%202013-11-20%20at%209.54.21%20AM.png)
 
-<p><br /><br /></p>
+<br><br>
 
-<h3 id="write-a-new-blog-post">Write a new blog post</h3>
+### Write a new blog post
 
-<p>We’ll add a new file to the _posts folder.</p>
+We'll add a new file to the _posts folder. 
 
-<figure class="highlight"><pre><code class="language-bash" data-lang="bash">---
+{% highlight bash %}
+---
 layout: post
 title:  My second post
 date:   2013-11-20
 categories: jekyll programming R
 ---
 
-My second blog post!</code></pre></figure>
+My second blog post!
+{% endhighlight %}
 
-<p>Paste this in to a new file in the <code class="highlighter-rouge">_posts</code> folder, save as today’s date (2013-11-20) plus the post name, which gives us 2013-11-20-second-post.md.</p>
+Paste this in to a new file in the `_posts` folder, save as today's date ({{ page.date | date: "%Y-%m-%d" }}) plus the post name, which gives us {{ page.date | date: "%Y-%m-%d" }}-second-post.md.
 
-<p><br /><br /></p>
+<br><br>
 
-<h3 id="deploying">Deploying</h3>
+### Deploying
 
-<p>An obvious option given that Jekyll was built by Github, is to put it up on Github. Github has some instructions <a href="http://jekyllrb.com/docs/github-pages/">here</a>. Here is my attempt at instructions:</p>
+An obvious option given that Jekyll was built by Github, is to put it up on Github. Github has some instructions [here](http://jekyllrb.com/docs/github-pages/). Here is my attempt at instructions: 
 
-<ul>
-  <li>If you don’t have a Github account already, <a href="https://help.github.com/articles/signing-up-for-a-new-github-account">create one</a> - it’s free.</li>
-  <li>Set up Git. Github’s help for this: https://help.github.com/articles/set-up-git</li>
-  <li>Creat a new repo on Github, with the same name as your repo on your machine, in this case <code class="highlighter-rouge">foobar</code>.</li>
-  <li>Make your new blog directory <code class="highlighter-rouge">foobar</code> a git repo by doing <code class="highlighter-rouge">git init</code> within the repo.</li>
-  <li>Add you files to be tracked by git via <code class="highlighter-rouge">git add --all</code></li>
-  <li>Commit your changes by <code class="highlighter-rouge">git commit -am 'new blog files added'</code></li>
-  <li>Make a <code class="highlighter-rouge">gh-pages</code> branch by doing <code class="highlighter-rouge">git branch gh-pages</code>.</li>
-  <li>Add link for your repo on Github: <code class="highlighter-rouge">git remote add origin https://github.com/&lt;yourgithubusername&gt;/foobar.git</code></li>
-  <li>Push to Github using <code class="highlighter-rouge">git push -u origin master</code></li>
-</ul>
++ If you don't have a Github account already, [create one](https://help.github.com/articles/signing-up-for-a-new-github-account) - it's free.
++ Set up Git. Github's help for this: https://help.github.com/articles/set-up-git
++ Creat a new repo on Github, with the same name as your repo on your machine, in this case `foobar`. 
++ Make your new blog directory `foobar` a git repo by doing `git init` within the repo.
++ Add you files to be tracked by git via `git add --all`
++ Commit your changes by `git commit -am 'new blog files added'`
++ Make a `gh-pages` branch by doing `git branch gh-pages`.
++ Add link for your repo on Github: `git remote add origin https://github.com/<yourgithubusername>/foobar.git`
++ Push to Github using `git push -u origin master`
 
-<p>Github gives you one repo that you can name <code class="highlighter-rouge">&lt;yourgithubusername&gt;.github.io</code> that will be viewable at the URL <code class="highlighter-rouge">http://&lt;yourgithubusername&gt;.github.io</code>. You can have your blog/website on the master branch, and you don’t need to create a <code class="highlighter-rouge">gh-pages</code> branch. But if you have your site in any other named repo, you will need the <code class="highlighter-rouge">gh-pages</code> branch. If you don’t use a <code class="highlighter-rouge">&lt;yourgithubusername&gt;.github.io</code> repo, your site will be viewable at <code class="highlighter-rouge">&lt;yourgithubusername&gt;.github.io/&lt;reponame&gt;</code>, in this case <code class="highlighter-rouge">&lt;yourgithubusername&gt;.github.io/foobar</code>.</p>
+Github gives you one repo that you can name `<yourgithubusername>.github.io` that will be viewable at the URL `http://<yourgithubusername>.github.io`. You can have your blog/website on the master branch, and you don't need to create a `gh-pages` branch. But if you have your site in any other named repo, you will need the `gh-pages` branch. If you don't use a `<yourgithubusername>.github.io` repo, your site will be viewable at `<yourgithubusername>.github.io/<reponame>`, in this case `<yourgithubusername>.github.io/foobar`. 
 
-<p><em>Beginners take note:</em> Instead of the command line, you could use a Git GUI, from Github (<a href="http://mac.github.com/">OSX</a>, <a href="http://windows.github.com/">Windows</a>), or others, e.g., <a href="http://gitboxapp.com/">GitBox</a>.</p>
+*Beginners take note:* Instead of the command line, you could use a Git GUI, from Github ([OSX](http://mac.github.com/), [Windows](http://windows.github.com/)), or others, e.g., [GitBox](http://gitboxapp.com/).
 
-<p><br /><br /></p>
+<br><br>
 
-<h3 id="other-info">Other info</h3>
+### Other info 
 
-<p>That’s the basics of how to get started. Inevitably, you’ll run into problems with various dependencies. The <a href="http://jekyllrb.com/">Jekyll site</a> has a lot of documntation now, so go there for help - and see a roundup of links below.</p>
+That's the basics of how to get started. Inevitably, you'll run into problems with various dependencies. The [Jekyll site](http://jekyllrb.com/) has a lot of documntation now, so go there for help - and see a roundup of links below. 
 
-<p>For inspiration, here are many examples of sites that use Jekyll: http://jekyllrb.com/docs/sites/. If you want to build off someone else’s work, find one that provides their code.</p>
+For inspiration, here are many examples of sites that use Jekyll: http://jekyllrb.com/docs/sites/. If you want to build off someone else's work, find one that provides their code.
 
-<hr />
+----------------
 
-<p>A roundup of links for building static sites with jekyll</p>
+A roundup of links for building static sites with jekyll
 
-<ul>
-  <li><a href="http://net.tutsplus.com/tutorials/other/building-static-sites-with-jekyll/">http://net.tutsplus.com/tutorials/other/building-static-sites-with-jekyll/</a></li>
-  <li><a href="http://www.andrewmunsell.com/tutorials/jekyll-by-example/">http://www.andrewmunsell.com/tutorials/jekyll-by-example/</a></li>
-  <li><a href="http://jekyllbootstrap.com/">Jekyll Bootstrap</a></li>
-  <li>Jekyll thoughts by <a href="http://carlboettiger.info/index.html">Carl Boettiger</a>: <a href="http://carlboettiger.info/2012/12/30/learning-jekyll.html">http://carlboettiger.info/2012/12/30/learning-jekyll.html</a></li>
-  <li><a href="http://danielmcgraw.com/2011/04/14/The-Ultimate-Guide-To-Getting-Started-With-Jekyll-Part-1/">http://danielmcgraw.com/2011/04/14/The-Ultimate-Guide-To-Getting-Started-With-Jekyll-Part-1/</a></li>
-  <li><a href="http://mijingo.com/products/screencasts/static-websites-with-jekyll/">A book on building sites with Jekyll</a></li>
-  <li><a href="http://yeswejekyll.com/">http://yeswejekyll.com/</a></li>
-  <li><a href="http://hellarobots.com/2012/01/06/blogging-with-jekyll-quickstart.html">http://hellarobots.com/2012/01/06/blogging-with-jekyll-quickstart.html</a></li>
-  <li><a href="http://www.sitepoint.com/zero-to-jekyll-in-20-minutes/">http://www.sitepoint.com/zero-to-jekyll-in-20-minutes/</a></li>
-</ul>
-
-  </div>
-  
-  <div class="post">
-    <h1>
-      <a href="/2013/10/codeinpapers/">
-        Code display in scholarly journals
-      </a>
-    </h1>
-
-    <span class="post-date">25 Oct 2013</span>
-
-    <p>Code in journals, that is, code you would type to do some programmatic operation in say R or Python, is kind of a mess to say the least. Okay, so you can <strong>SEE</strong> code in papers, but code is not formatted in a way that facilites reuse. If an author in a paper writes out some code for software they create, or an analysis they do in the paper, wouldn’t it be nice for a reader to be able to copy and paste that code directly into whatever environment that code should execute in, and actually work. Of course there is dependencies, etc. for that software to worry about, but here I am just concerned with the code formatting in articles. Code is displayed as an image in some cases (gasp!). Additionally, there’s this thing called the internet, and we can use color, so let’s highlight code already. At least in one of our recent <a href="http://ropensci.org/">rOpenSci</a> papers in F1000 Research, <a href="http://f1000research.com/articles/2-191/v1">they do use syntax highlighting</a> - w00t!</p>
-
-<p>Carl Boettiger (@cboettig) and I disccused how frustrated we are with the state of code in papers, and started a Github gist, listing publishers/journals and how they display code. It lives here: <a href="https://gist.github.com/sckott/6787278">https://gist.github.com/sckott/6787278</a>.</p>
-
-<p>We have a start, but would like your help in filling this list out more. What are the code presentation practices for various publishers and journals? With a list of what currently happens, perhaps we can start to convince publishers to display code more appropriately, partly by pointing out that “XYZ publisher does it really well, why can’t you?”. I tried to record info in a standardized way across publishers…</p>
+* [http://net.tutsplus.com/tutorials/other/building-static-sites-with-jekyll/](http://net.tutsplus.com/tutorials/other/building-static-sites-with-jekyll/)
+* [http://www.andrewmunsell.com/tutorials/jekyll-by-example/](http://www.andrewmunsell.com/tutorials/jekyll-by-example/)
+* [Jekyll Bootstrap](http://jekyllbootstrap.com/)
+* Jekyll thoughts by [Carl Boettiger](http://carlboettiger.info/index.html): [http://carlboettiger.info/2012/12/30/learning-jekyll.html](http://carlboettiger.info/2012/12/30/learning-jekyll.html)
+* [http://danielmcgraw.com/2011/04/14/The-Ultimate-Guide-To-Getting-Started-With-Jekyll-Part-1/](http://danielmcgraw.com/2011/04/14/The-Ultimate-Guide-To-Getting-Started-With-Jekyll-Part-1/)
+* [A book on building sites with Jekyll](http://mijingo.com/products/screencasts/static-websites-with-jekyll/)
+* [http://yeswejekyll.com/](http://yeswejekyll.com/)
+* [http://hellarobots.com/2012/01/06/blogging-with-jekyll-quickstart.html](http://hellarobots.com/2012/01/06/blogging-with-jekyll-quickstart.html)
+* [http://www.sitepoint.com/zero-to-jekyll-in-20-minutes/](http://www.sitepoint.com/zero-to-jekyll-in-20-minutes/)
 
   </div>
   
