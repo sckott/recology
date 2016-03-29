@@ -61,6 +61,142 @@
   
   <div class="post">
     <h1>
+      <a href="/2012/07/global-names-resolver/">
+        Hitting the Global Names Resolver API
+      </a>
+    </h1>
+
+    <span class="post-date">20 Jul 2012</span>
+
+    <h2 id="example-of-using-the-global-names-resolver-api-to-check-species-names">Example of using the Global Names Resolver API to check species names</h2>
+
+<hr />
+
+<p>There are a number of options for resolution of taxonomic names. The <a href="http://tnrs.iplantcollaborative.org/">Taxonomic Name Resolution Service (TNRS)</a> comes to mind. There is a new service for taxonomic name resoultion called the <a href="http://resolver.globalnames.org/">Global Names Resolver</a>. They describe the service thusly “<em>Resolve lists of scientific names against known sources. This service parses incoming names, executes exact or fuzzy matching as required, and displays a confidence score for each match along with its identifier.</em>”.</p>
+
+<hr />
+
+<h2 id="load-required-packages">Load required packages</h2>
+
+<h3 id="just-uncomment-the-code-to-use">Just uncomment the code to use.</h3>
+
+<figure class="highlight"><pre><code class="language-r" data-lang="r"><table style="border-spacing: 0"><tbody><tr><td class="gutter gl" style="text-align: right"><pre class="lineno">1
+2
+3
+4
+5
+6</pre></td><td class="code"><pre><span class="c1"># If you don't have them already
+# install.packages(c('RJSONIO','plyr','devtools')) require(devtools)
+# install_github('taxize_','ropensci')
+</span><span class="n">library</span><span class="p">(</span><span class="n">RJSONIO</span><span class="p">)</span>
+<span class="n">library</span><span class="p">(</span><span class="n">plyr</span><span class="p">)</span>
+<span class="n">library</span><span class="p">(</span><span class="n">taxize</span><span class="p">)</span><span class="w">
+</span></pre></td></tr></tbody></table></code></pre></figure>
+
+<h2 id="get-the-data-sources-available">Get the data sources available</h2>
+
+<h3 id="get-just-ids-and-names-of-sources-in-a-dataframe">Get just id’s and names of sources in a data.frame</h3>
+
+<figure class="highlight"><pre><code class="language-r" data-lang="r"><table style="border-spacing: 0"><tbody><tr><td class="gutter gl" style="text-align: right"><pre class="lineno">1</pre></td><td class="code"><pre><span class="n">tail</span><span class="p">(</span><span class="n">gnr_datasources</span><span class="p">(</span><span class="n">todf</span> <span class="o">=</span> <span class="n">T</span><span class="p">))</span><span class="w">
+</span></pre></td></tr></tbody></table></code></pre></figure>
+
+<figure class="highlight"><pre><code class="language-text" data-lang="text">##     id                                title
+## 82 164                            BioLib.cz
+## 83 165 Tropicos - Missouri Botanical Garden
+## 84 166                                nlbif
+## 85 167                                 IPNI
+## 86 168              Index to Organism Names
+## 87 169                        uBio NameBank</code></pre></figure>
+
+<hr />
+
+<h3 id="give-me-the-id-for-eol-encyclopedia-of-life">Give me the id for EOL (Encyclopedia of Life)</h3>
+
+<figure class="highlight"><pre><code class="language-r" data-lang="r"><table style="border-spacing: 0"><tbody><tr><td class="gutter gl" style="text-align: right"><pre class="lineno">1
+2</pre></td><td class="code"><pre><span class="n">out</span> <span class="o">&lt;-</span> <span class="n">gnr_datasources</span><span class="p">(</span><span class="n">todf</span> <span class="o">=</span> <span class="n">T</span><span class="p">)</span>
+<span class="n">out</span><span class="p">[</span><span class="n">out</span><span class="o">$</span><span class="n">title</span> <span class="o">==</span> <span class="s2">"EOL"</span><span class="p">,</span> <span class="s2">"id"</span><span class="p">]</span><span class="w">
+</span></pre></td></tr></tbody></table></code></pre></figure>
+
+<figure class="highlight"><pre><code class="language-text" data-lang="text">## [1] 12</code></pre></figure>
+
+<hr />
+
+<h3 id="fuzzy-search-for-sources-with-the-word-zoo">Fuzzy search for sources with the word “zoo”</h3>
+
+<figure class="highlight"><pre><code class="language-r" data-lang="r"><table style="border-spacing: 0"><tbody><tr><td class="gutter gl" style="text-align: right"><pre class="lineno">1
+2
+3</pre></td><td class="code"><pre><span class="n">out</span> <span class="o">&lt;-</span> <span class="n">gnr_datasources</span><span class="p">(</span><span class="n">todf</span> <span class="o">=</span> <span class="n">T</span><span class="p">)</span>
+<span class="n">outdf</span> <span class="o">&lt;-</span> <span class="n">out</span><span class="p">[</span><span class="n">agrep</span><span class="p">(</span><span class="s2">"zoo"</span><span class="p">,</span> <span class="n">out</span><span class="o">$</span><span class="n">title</span><span class="p">,</span> <span class="n">ignore.case</span> <span class="o">=</span> <span class="n">T</span><span class="p">),</span> <span class="p">]</span>
+<span class="n">outdf</span><span class="p">[</span><span class="m">1</span><span class="o">:</span><span class="m">2</span><span class="p">,</span> <span class="p">]</span><span class="w">
+</span></pre></td></tr></tbody></table></code></pre></figure>
+
+<figure class="highlight"><pre><code class="language-text" data-lang="text">##     id             title
+## 20 100 Mushroom Observer
+## 25 105           ZooKeys</code></pre></figure>
+
+<h2 id="resolve-some-names">Resolve some names</h2>
+
+<h3 id="search-for-helianthus-annuus-and-homo-sapiens-return-a-dataframe">Search for <em>Helianthus annuus</em> and <em>Homo sapiens</em>, return a data.frame</h3>
+
+<figure class="highlight"><pre><code class="language-r" data-lang="r"><table style="border-spacing: 0"><tbody><tr><td class="gutter gl" style="text-align: right"><pre class="lineno">1</pre></td><td class="code"><pre><span class="n">gnr</span><span class="p">(</span><span class="n">names</span> <span class="o">=</span> <span class="n">c</span><span class="p">(</span><span class="s2">"Helianthus annuus"</span><span class="p">,</span> <span class="s2">"Homo sapiens"</span><span class="p">),</span> <span class="n">returndf</span> <span class="o">=</span> <span class="n">TRUE</span><span class="p">)[</span><span class="m">1</span><span class="o">:</span><span class="m">2</span><span class="p">,</span> <span class="p">]</span><span class="w">
+</span></pre></td></tr></tbody></table></code></pre></figure>
+
+<figure class="highlight"><pre><code class="language-text" data-lang="text">##   data_source_id    submitted_name       name_string score    title
+## 1              4 Helianthus annuus Helianthus annuus 0.988     NCBI
+## 3             10 Helianthus annuus Helianthus annuus 0.988 Freebase</code></pre></figure>
+
+<hr />
+
+<h3 id="search-for-the-same-species-with-only-using-data-source-12-ie-eol">Search for the same species, with only using data source 12 (i.e., EOL)</h3>
+
+<figure class="highlight"><pre><code class="language-r" data-lang="r"><table style="border-spacing: 0"><tbody><tr><td class="gutter gl" style="text-align: right"><pre class="lineno">1
+2</pre></td><td class="code"><pre><span class="n">gnr</span><span class="p">(</span><span class="n">names</span> <span class="o">=</span> <span class="n">c</span><span class="p">(</span><span class="s2">"Helianthus annuus"</span><span class="p">,</span> <span class="s2">"Homo sapiens"</span><span class="p">),</span> <span class="n">data_source_ids</span> <span class="o">=</span> <span class="s2">"12"</span><span class="p">,</span> 
+    <span class="n">returndf</span> <span class="o">=</span> <span class="n">TRUE</span><span class="p">)</span><span class="w">
+</span></pre></td></tr></tbody></table></code></pre></figure>
+
+<figure class="highlight"><pre><code class="language-text" data-lang="text">##   data_source_id    submitted_name       name_string score title
+## 1             12 Helianthus annuus Helianthus annuus 0.988   EOL
+## 2             12      Homo sapiens      Homo sapiens 0.988   EOL</code></pre></figure>
+
+<h3 id="thats-it-have-fun-and-put-bugscommentsetc-herehttpsgithubcomropenscitaxizeissues">That’s it. Have fun! And put bugs/comments/etc. <a href="https://github.com/ropensci/taxize_/issues">here</a>.</h3>
+
+<hr />
+
+<h3 id="written-in-markdownhttpdaringfireballnetprojectsmarkdown-with-help-from-knitrhttpyihuinameknitr-and-nice-knitr-highlightingetc-in-in-rstudiohttprstudioorg">Written in <a href="http://daringfireball.net/projects/markdown/">Markdown</a>, with help from <a href="http://yihui.name/knitr/">knitr</a>, and nice knitr highlighting/etc. in in <a href="http://rstudio.org/">RStudio</a>.</h3>
+
+<hr />
+
+<h3 id="i-prepared-the-markdown-for-this-post-by">I prepared the markdown for this post by:</h3>
+
+<figure class="highlight"><pre><code class="language-r" data-lang="r"><table style="border-spacing: 0"><tbody><tr><td class="gutter gl" style="text-align: right"><pre class="lineno">1
+2
+3
+4
+5
+6
+7
+8
+9
+10
+11</pre></td><td class="code"><pre><span class="n">KnitPost</span> <span class="o">&lt;-</span> <span class="k">function</span><span class="p">(</span><span class="n">input</span><span class="p">,</span> <span class="n">base.url</span> <span class="o">=</span> <span class="s2">"/"</span><span class="p">)</span> <span class="p">{</span>
+    <span class="n">require</span><span class="p">(</span><span class="n">knitr</span><span class="p">)</span>
+    <span class="n">opts_knit</span><span class="o">$</span><span class="n">set</span><span class="p">(</span><span class="n">base.url</span> <span class="o">=</span> <span class="n">base.url</span><span class="p">)</span>
+    <span class="n">fig.path</span> <span class="o">&lt;-</span> <span class="n">paste0</span><span class="p">(</span><span class="s2">"img/"</span><span class="p">,</span> <span class="n">sub</span><span class="p">(</span><span class="s2">".Rmd$"</span><span class="p">,</span> <span class="s2">""</span><span class="p">,</span> <span class="n">basename</span><span class="p">(</span><span class="n">input</span><span class="p">)),</span> <span class="s2">"/"</span><span class="p">)</span>
+    <span class="n">opts_chunk</span><span class="o">$</span><span class="n">set</span><span class="p">(</span><span class="n">fig.path</span> <span class="o">=</span> <span class="n">fig.path</span><span class="p">)</span>
+    <span class="n">opts_chunk</span><span class="o">$</span><span class="n">set</span><span class="p">(</span><span class="n">fig.cap</span> <span class="o">=</span> <span class="s2">"center"</span><span class="p">)</span>
+    <span class="n">render_jekyll</span><span class="p">()</span>
+    <span class="n">knit</span><span class="p">(</span><span class="n">input</span><span class="p">,</span> <span class="n">envir</span> <span class="o">=</span> <span class="n">parent.frame</span><span class="p">())</span>
+<span class="p">}</span>
+<span class="n">setwd</span><span class="p">(</span><span class="s2">"/path/to/_posts"</span><span class="p">)</span>
+<span class="n">KnitPost</span><span class="p">(</span><span class="s2">"/path/to/postfile.Rmd"</span><span class="p">)</span><span class="w">
+</span></pre></td></tr></tbody></table></code></pre></figure>
+
+<p>from <a href="http://jfisher-usgs.github.com/r/2012/07/03/knitr-jekyll/">jfisher</a>.</p>
+
+  </div>
+  
+  <div class="post">
+    <h1>
       <a href="/2012/06/recent-r-eeb-packages/">
         Recent R packages for ecology and evolution
       </a>
@@ -68,49 +204,76 @@
 
     <span class="post-date">14 Jun 2012</span>
 
-    Many R packages/tools have come out recently for doing ecology and evolution. All of the below were described in Methods in Ecology and Evolution, except for spider, which came out in [Molecular Ecology Resources][mer]. Here are some highlights.
+    <p>Many R packages/tools have come out recently for doing ecology and evolution. All of the below were described in Methods in Ecology and Evolution, except for spider, which came out in <a href="http://onlinelibrary.wiley.com/journal/10.1111/(ISSN)1755-0998">Molecular Ecology Resources</a>. Here are some highlights.</p>
 
-+ mvabund [paper][mvabund] - [get R pkg](http://cran.r-project.org/web/packages/mvabund/index.html)
-	+ Model-based analysis of multivariate abundance data. Visualising data, fitting predictive models, checking assumptions, hypothesis testing.
-+ popdemo [paper][popdemo] - [get R pkg](http://cran.r-project.org/web/packages/popdemo/index.html)
-	+ Population demography using projection matrix analysis. 
-+ motmot [paper][motmot] - [get R pkg](http://cran.r-project.org/web/packages/motmot/index.html)
-	+ Models of trait macroevolution on trees
-+ spider [paper][spider] - [get R pkg](http://cran.r-project.org/web/packages/spider/index.html)
-	+ Analysis of species identity and evolution, with particular reference to DNA barcoding
-+ BaSTA [paper][BaSTA] - [get R pkg](http://cran.r-project.org/web/packages/BaSTA/index.html)
-	+ Bayesian estimation of age-specific survival from incomplete mark–recapture/recovery data with covariates
-+ abc [paper][abc] - [get R pkg](http://cran.r-project.org/web/packages/abc/index.html)
-	+ Approximate Bayesian Computation (ABC)
-+ RNetLogo [paper][RNetLogo] - [get R pkg](http://cran.r-project.org/web/packages/RNetLogo/index.html)
-	+ Running and exploring individual-based models implemented in NetLogo
-+ phytools [paper][phytools] - [get R pkg](http://cran.r-project.org/web/packages/phytools/index.html)
-	+ Tools for phylogenetic comparative biology
-+ smatr [paper][smatr] - [get R pkg](http://cran.r-project.org/web/packages/smatr/index.html)
-	+ Estimation and inference about allometric lines
-+ RBrownie [paper][brown] - [get R pkg ?](http://www.brianomeara.info/tutorials/brownie)
-	+ Testing hypotheses about rates of evolutionary change
-+ polytomy resolver [paper][poly] - [get R pkg](http://onlinelibrary.wiley.com/doi/10.1111/j.2041-210X.2011.00103.x/suppinfo)
-	+ Resolve polytomies on dated phylogenies with their R scripts [here][].
+<ul>
+  <li>mvabund <a href="http://onlinelibrary.wiley.com/doi/10.1111/j.2041-210X.2012.00190.x/abstract">paper</a> - <a href="http://cran.r-project.org/web/packages/mvabund/index.html">get R pkg</a>
+    <ul>
+      <li>Model-based analysis of multivariate abundance data. Visualising data, fitting predictive models, checking assumptions, hypothesis testing.</li>
+    </ul>
+  </li>
+  <li>popdemo <a href="http://onlinelibrary.wiley.com/doi/10.1111/j.2041-210X.2012.00222.x/abstract">paper</a> - <a href="http://cran.r-project.org/web/packages/popdemo/index.html">get R pkg</a>
+    <ul>
+      <li>Population demography using projection matrix analysis.</li>
+    </ul>
+  </li>
+  <li>motmot <a href="http://onlinelibrary.wiley.com/doi/10.1111/j.2041-210X.2011.00132.x/abstract">paper</a> - <a href="http://cran.r-project.org/web/packages/motmot/index.html">get R pkg</a>
+    <ul>
+      <li>Models of trait macroevolution on trees</li>
+    </ul>
+  </li>
+  <li>spider <a href="http://onlinelibrary.wiley.com/doi/10.1111/j.1755-0998.2011.03108.x/abstract?deniedAccessCustomisedMessage=&amp;userIsAuthenticated=false">paper</a> - <a href="http://cran.r-project.org/web/packages/spider/index.html">get R pkg</a>
+    <ul>
+      <li>Analysis of species identity and evolution, with particular reference to DNA barcoding</li>
+    </ul>
+  </li>
+  <li>BaSTA <a href="http://onlinelibrary.wiley.com/doi/10.1111/j.2041-210X.2012.00186.x/abstract">paper</a> - <a href="http://cran.r-project.org/web/packages/BaSTA/index.html">get R pkg</a>
+    <ul>
+      <li>Bayesian estimation of age-specific survival from incomplete mark–recapture/recovery data with covariates</li>
+    </ul>
+  </li>
+  <li>abc <a href="http://onlinelibrary.wiley.com/doi/10.1111/j.2041-210X.2011.00179.x/abstract">paper</a> - <a href="http://cran.r-project.org/web/packages/abc/index.html">get R pkg</a>
+    <ul>
+      <li>Approximate Bayesian Computation (ABC)</li>
+    </ul>
+  </li>
+  <li>RNetLogo <a href="http://onlinelibrary.wiley.com/doi/10.1111/j.2041-210X.2011.00180.x/abstract">paper</a> - <a href="http://cran.r-project.org/web/packages/RNetLogo/index.html">get R pkg</a>
+    <ul>
+      <li>Running and exploring individual-based models implemented in NetLogo</li>
+    </ul>
+  </li>
+  <li>phytools <a href="http://onlinelibrary.wiley.com/doi/10.1111/j.2041-210X.2011.00169.x/abstract">paper</a> - <a href="http://cran.r-project.org/web/packages/phytools/index.html">get R pkg</a>
+    <ul>
+      <li>Tools for phylogenetic comparative biology</li>
+    </ul>
+  </li>
+  <li>smatr <a href="http://onlinelibrary.wiley.com/doi/10.1111/j.2041-210X.2011.00153.x/abstract">paper</a> - <a href="http://cran.r-project.org/web/packages/smatr/index.html">get R pkg</a>
+    <ul>
+      <li>Estimation and inference about allometric lines</li>
+    </ul>
+  </li>
+  <li>RBrownie <a href="http://onlinelibrary.wiley.com/doi/10.1111/j.2041-210X.2011.00112.x/abstract">paper</a> - <a href="http://www.brianomeara.info/tutorials/brownie">get R pkg ?</a>
+    <ul>
+      <li>Testing hypotheses about rates of evolutionary change</li>
+    </ul>
+  </li>
+  <li>polytomy resolver <a href="http://onlinelibrary.wiley.com/doi/10.1111/j.2041-210X.2011.00103.x/abstract">paper</a> - <a href="http://onlinelibrary.wiley.com/doi/10.1111/j.2041-210X.2011.00103.x/suppinfo">get R pkg</a>
+    <ul>
+      <li>Resolve polytomies on dated phylogenies with their R scripts [here][].</li>
+    </ul>
+  </li>
+</ul>
 
-And a cool tool came out for the Python programming language. 
+<p>And a cool tool came out for the Python programming language.</p>
 
-+ NichePy [paper][NichePy] - [get python](https://github.com/bastodian/NichePy)
-	+ Modular tools for estimating the similarity of ecological niche and species distribution models
+<ul>
+  <li>NichePy <a href="http://onlinelibrary.wiley.com/doi/10.1111/j.2041-210X.2011.00184.x/abstract">paper</a> - <a href="https://github.com/bastodian/NichePy">get python</a>
+    <ul>
+      <li>Modular tools for estimating the similarity of ecological niche and species distribution models</li>
+    </ul>
+  </li>
+</ul>
 
-[mvabund]: http://onlinelibrary.wiley.com/doi/10.1111/j.2041-210X.2012.00190.x/abstract
-[popdemo]: http://onlinelibrary.wiley.com/doi/10.1111/j.2041-210X.2012.00222.x/abstract
-[motmot]: http://onlinelibrary.wiley.com/doi/10.1111/j.2041-210X.2011.00132.x/abstract
-[spider]: http://onlinelibrary.wiley.com/doi/10.1111/j.1755-0998.2011.03108.x/abstract?deniedAccessCustomisedMessage=&userIsAuthenticated=false
-[BaSTA]: http://onlinelibrary.wiley.com/doi/10.1111/j.2041-210X.2012.00186.x/abstract
-[abc]: http://onlinelibrary.wiley.com/doi/10.1111/j.2041-210X.2011.00179.x/abstract
-[RNetLogo]: http://onlinelibrary.wiley.com/doi/10.1111/j.2041-210X.2011.00180.x/abstract
-[phytools]: http://onlinelibrary.wiley.com/doi/10.1111/j.2041-210X.2011.00169.x/abstract
-[smatr]: http://onlinelibrary.wiley.com/doi/10.1111/j.2041-210X.2011.00153.x/abstract
-[brown]: http://onlinelibrary.wiley.com/doi/10.1111/j.2041-210X.2011.00112.x/abstract
-[poly]: http://onlinelibrary.wiley.com/doi/10.1111/j.2041-210X.2011.00103.x/abstract
-[NichePy]: http://onlinelibrary.wiley.com/doi/10.1111/j.2041-210X.2011.00184.x/abstract
-[mer]: http://onlinelibrary.wiley.com/journal/10.1111/(ISSN)1755-0998
 
   </div>
   
@@ -123,68 +286,30 @@ And a cool tool came out for the Python programming language.
 
     <span class="post-date">05 May 2012</span>
 
-    So [OpenCPU][] is pretty awesome.  You can run R in a browser using URL calls with an alphanumeric code (e.g., x3e50ee0780) defining a stored function, and any arguments you pass to it. 
+    <p>So <a href="http://opencpu.org/">OpenCPU</a> is pretty awesome.  You can run R in a browser using URL calls with an alphanumeric code (e.g., x3e50ee0780) defining a stored function, and any arguments you pass to it.</p>
 
-Go [here][] to store a function.  And you can output lots of different types of things: png, pdf, json, etc - see [here][here2].
+<p>Go <a href="http://beta.opencpu.org/apps/opencpu.demo/storefunction/">here</a> to store a function.  And you can output lots of different types of things: png, pdf, json, etc - see <a href="http://opencpu.org/documentation/outputs/">here</a>.</p>
 
-
-Here's a function I created:
+<p>Here’s a function I created:</p>
 
 <script src="https://gist.github.com/2602432.js?file=getgithubstats.r"></script>
 
-It makes a [ggplot2][] graphic of your watchers and forks on each repo (up to 100 repos), sorted by descending number of forks/watchers.
+<p>It makes a <a href="http://had.co.nz/ggplot2/">ggplot2</a> graphic of your watchers and forks on each repo (up to 100 repos), sorted by descending number of forks/watchers.</p>
 
-Here's an example from the function.  Paste the following in to your browser and you should get the below figure. 
+<p>Here’s an example from the function.  Paste the following in to your browser and you should get the below figure.</p>
 
-http://beta.opencpu.org/R/call/opencpu.demo/gitstats/png
+<p>http://beta.opencpu.org/R/call/opencpu.demo/gitstats/png</p>
 
-![had](/public/img/hadley.png)
+<p><img src="/public/img/hadley.png" alt="had" /></p>
 
+<p>And you can specify user or organization name using arguments in the URL</p>
 
+<p>http://beta.opencpu.org/R/call/opencpu.demo/gitstats/png?type=’org’&amp;id=’ropensci’</p>
 
-And you can specify user or organization name using arguments in the URL
+<p><img src="/public/img/ropensci.png" alt="ropensci" /></p>
 
-http://beta.opencpu.org/R/call/opencpu.demo/gitstats/png?type='org'&id='ropensci'
+<p>Sweet. Have fun.</p>
 
-![ropensci](/public/img/ropensci.png)
-
-
-
-Sweet. Have fun. 
-
-[ggplot2]: http://had.co.nz/ggplot2/
-[OpenCPU]: http://opencpu.org/
-[here]: http://beta.opencpu.org/apps/opencpu.demo/storefunction/
-[http://beta.opencpu.org/R/call/store:tmp/x3e50ee0780/png]: http://beta.opencpu.org/R/call/store:tmp/x3e50ee0780/png
-[http://beta.opencpu.org/R/call/store:tmp/x3e50ee0780/png?id='ropensci'&type='org']: http://beta.opencpu.org/R/call/store:tmp/x3e50ee0780/png?id='ropensci'&type='org'
-[here2]: http://opencpu.org/documentation/outputs/
-
-  </div>
-  
-  <div class="post">
-    <h1>
-      <a href="/2012/03/mvabund/">
-        mvabund - new R pkg for multivariate abundance data
-      </a>
-    </h1>
-
-    <span class="post-date">19 Mar 2012</span>
-
-    There is a new R package in town, mvabund, which does, as they say "statistical methods for analysing multivariate abundance data".  The authors introduced the paper in an online early paper in Methods in Ecology and Evolution [here][], R package [here][here2]. 
-
-The package is meant to visualize data, fit predictive models, check model assumptions, and test hypotheses about community-environment associations. 
-
-Here is a quick example. 
-
-<script src="https://gist.github.com/2112141.js?file=mvabund.r"></script>
-
-![mvabund1](/public/img/mvabund1.png)
-
-![mvabund2](/public/img/mvabund2.png)
-
-
-[here]: http://onlinelibrary.wiley.com/doi/10.1111/j.2041-210X.2012.00190.x/full 
-[here2]: http://cran.r-project.org/web/packages/mvabund/index.html
 
   </div>
   

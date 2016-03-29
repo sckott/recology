@@ -5,6 +5,116 @@
 		<link>http://recology.info/</link>
 		
 			<item>
+				<title>GenBank IDs API - get, match, swap id types</title>
+				<description>&lt;p&gt;GenBank IDs, accession numbers and GI identifiers, are the two types of identifiers for entries in GenBank. (see &lt;a href=&quot;http://www.ncbi.nlm.nih.gov/Sitemap/sequenceIDs.html&quot;&gt;this page&lt;/a&gt; for why there are two types of identifiers). Actually, &lt;a href=&quot;http://www.ncbi.nlm.nih.gov/news/03-02-2016-phase-out-of-GI-numbers/&quot;&gt;recent news&lt;/a&gt; from NCBI is that GI identifiers will be phased out by September this year, which affects what I’ll talk about below.&lt;/p&gt;
+
+&lt;p&gt;There are a lot of sequences in GenBank. Sometimes you have identifiers and you want to check if they exist in GenBank, or want to get one type from another (accession from GI, or vice versa; although GI phase out will make this use case no longer needed), or just get a bunch of identifiers for software testing purposes perhaps.&lt;/p&gt;
+
+&lt;p&gt;Currently, the ENTREZ web services aren’t super performant or easy to use for the above use cases. Thus, I’ve built out a RESTful API for these use cases, called &lt;a href=&quot;https://github.com/sckott/gbids&quot;&gt;gbids&lt;/a&gt;.&lt;/p&gt;
+
+&lt;p&gt;&lt;code class=&quot;highlighter-rouge&quot;&gt;gbids&lt;/code&gt; on GitHub: &lt;a href=&quot;https://github.com/sckott/gbids&quot;&gt;sckott/gbids&lt;/a&gt;&lt;/p&gt;
+
+&lt;p&gt;Here’s the tech stack:&lt;/p&gt;
+
+&lt;ul&gt;
+  &lt;li&gt;API: Ruby/Sinatra&lt;/li&gt;
+  &lt;li&gt;Storage: MySQL&lt;/li&gt;
+  &lt;li&gt;Caching: Redis
+    &lt;ul&gt;
+      &lt;li&gt;each key cached for 3 hours&lt;/li&gt;
+    &lt;/ul&gt;
+  &lt;/li&gt;
+  &lt;li&gt;Server: Caddy
+    &lt;ul&gt;
+      &lt;li&gt;https&lt;/li&gt;
+    &lt;/ul&gt;
+  &lt;/li&gt;
+  &lt;li&gt;Authentication: none&lt;/li&gt;
+&lt;/ul&gt;
+
+&lt;p&gt;Will soon have a cron job update when new dump is available every Sunday, but for now we’re about a month behind the current dump of identifiers. If usage of the API picks up, I’ll know it’s worth maintaining and make sure data is up to date.&lt;/p&gt;
+
+&lt;p&gt;The base url is &lt;a href=&quot;https://gbids.xyz&quot;&gt;https://gbids.xyz&lt;/a&gt;.&lt;/p&gt;
+
+&lt;p&gt;Here’s a rundown of the API routes:&lt;/p&gt;
+
+&lt;ul&gt;
+  &lt;li&gt;&lt;code class=&quot;highlighter-rouge&quot;&gt;/&lt;/code&gt; re-routes to &lt;code class=&quot;highlighter-rouge&quot;&gt;/heartbeat&lt;/code&gt;&lt;/li&gt;
+  &lt;li&gt;&lt;code class=&quot;highlighter-rouge&quot;&gt;/heartbeat&lt;/code&gt; - list routes&lt;/li&gt;
+  &lt;li&gt;&lt;code class=&quot;highlighter-rouge&quot;&gt;/acc&lt;/code&gt; - &lt;code class=&quot;highlighter-rouge&quot;&gt;GET&lt;/code&gt; - list accession ids&lt;/li&gt;
+  &lt;li&gt;&lt;code class=&quot;highlighter-rouge&quot;&gt;/acc/:id,:id,...&lt;/code&gt; - &lt;code class=&quot;highlighter-rouge&quot;&gt;GET&lt;/code&gt; - submit many accession numbers, get back boolean (match or no match)&lt;/li&gt;
+  &lt;li&gt;&lt;code class=&quot;highlighter-rouge&quot;&gt;/acc&lt;/code&gt; - &lt;code class=&quot;highlighter-rouge&quot;&gt;POST&lt;/code&gt;&lt;/li&gt;
+  &lt;li&gt;&lt;code class=&quot;highlighter-rouge&quot;&gt;/gi&lt;/code&gt; - &lt;code class=&quot;highlighter-rouge&quot;&gt;GET&lt;/code&gt; - list gi numbers&lt;/li&gt;
+  &lt;li&gt;&lt;code class=&quot;highlighter-rouge&quot;&gt;/gi/:id,:id,...&lt;/code&gt; - &lt;code class=&quot;highlighter-rouge&quot;&gt;GET&lt;/code&gt; - submit many gi numbers, get back boolean (match or no match)&lt;/li&gt;
+  &lt;li&gt;&lt;code class=&quot;highlighter-rouge&quot;&gt;/gi&lt;/code&gt; - &lt;code class=&quot;highlighter-rouge&quot;&gt;POST&lt;/code&gt;&lt;/li&gt;
+  &lt;li&gt;&lt;code class=&quot;highlighter-rouge&quot;&gt;/acc2gi/:id,:id,...&lt;/code&gt; - &lt;code class=&quot;highlighter-rouge&quot;&gt;GET&lt;/code&gt; - get gi numbers from accession numbers&lt;/li&gt;
+  &lt;li&gt;&lt;code class=&quot;highlighter-rouge&quot;&gt;/acc2gi&lt;/code&gt; - &lt;code class=&quot;highlighter-rouge&quot;&gt;POST&lt;/code&gt;&lt;/li&gt;
+  &lt;li&gt;&lt;code class=&quot;highlighter-rouge&quot;&gt;/gi2acc/:id,:id,...&lt;/code&gt; - &lt;code class=&quot;highlighter-rouge&quot;&gt;GET&lt;/code&gt; - get accession numbers from gi numbers&lt;/li&gt;
+  &lt;li&gt;&lt;code class=&quot;highlighter-rouge&quot;&gt;/gi2acc&lt;/code&gt; - &lt;code class=&quot;highlighter-rouge&quot;&gt;POST&lt;/code&gt;&lt;/li&gt;
+&lt;/ul&gt;
+
+&lt;p&gt;Of course after GI identifiers are phased out, all &lt;code class=&quot;highlighter-rouge&quot;&gt;gi&lt;/code&gt; routes will be removed.&lt;/p&gt;
+
+&lt;p&gt;The API docs are at &lt;a href=&quot;http://recology.info/gbidsdocs&quot;&gt;recology.info/gbidsdocs&lt;/a&gt; - let me know if you have any feedback on those.&lt;/p&gt;
+
+&lt;p&gt;I also have a status page up at &lt;a href=&quot;http://recology.info/gbidsstatus/&quot;&gt;recology.info/gbidsstatus&lt;/a&gt; - it’s not automated, I have to update the status manually, but I do update that page whenever I’m doing maintenance and the API will be down, or if it goes down due to any other reason.&lt;/p&gt;
+
+&lt;h2 id=&quot;examples&quot;&gt;examples&lt;/h2&gt;
+
+&lt;p&gt;Request to list accession identifiers, limit to 5&lt;/p&gt;
+
+&lt;div class=&quot;highlighter-rouge&quot;&gt;&lt;pre class=&quot;highlight&quot;&gt;&lt;code&gt;curl &#39;https://gbids.xyz/acc?limit=5&#39; | jq .
+{
+  &quot;matched&quot;: 692006925,
+  &quot;returned&quot;: 5,
+  &quot;data&quot;: [
+    &quot;A00002&quot;,
+    &quot;A00003&quot;,
+    &quot;X17276&quot;,
+    &quot;X60065&quot;,
+    &quot;CAA42669&quot;
+  ],
+  &quot;error&quot;: null
+}
+&lt;/code&gt;&lt;/pre&gt;
+&lt;/div&gt;
+
+&lt;p&gt;Request to match accession identifiers, some exist, while some do not&lt;/p&gt;
+
+&lt;div class=&quot;highlighter-rouge&quot;&gt;&lt;pre class=&quot;highlight&quot;&gt;&lt;code&gt;curl &#39;https://gbids.xyz/acc/AACY024124486,AACY024124483,asdfd,asdf,AACY024124476&#39; | jq .
+{
+  &quot;matched&quot;: 3,
+  &quot;returned&quot;: 5,
+  &quot;data&quot;: {
+    &quot;AACY024124486&quot;: true,
+    &quot;AACY024124483&quot;: true,
+    &quot;asdfd&quot;: false,
+    &quot;asdf&quot;: false,
+    &quot;AACY024124476&quot;: true
+  },
+  &quot;error&quot;: null
+}
+&lt;/code&gt;&lt;/pre&gt;
+&lt;/div&gt;
+
+&lt;h2 id=&quot;to-do&quot;&gt;to do&lt;/h2&gt;
+
+&lt;p&gt;I think it’d probably be worth adding routes for getting accession from taxonomy id and vice versa since that’s something that is currently not very easy. We could use the dumped accession2taxid data from ftp://ftp.ncbi.nih.gov/pub/taxonomy/accession2taxid/&lt;/p&gt;
+
+&lt;h2 id=&quot;feedback&quot;&gt;feedback!&lt;/h2&gt;
+
+&lt;p&gt;If you think this could be potentially useful, do try it out and send any feedback. I watch logs from the API, so I’m hoping for an increase in usage so I know people find it useful.&lt;/p&gt;
+
+&lt;p&gt;Since servers aren’t free, costs add up, and if I don’t see usage pick up I’ll discontinue the service at some point. So do use it!&lt;/p&gt;
+
+&lt;p&gt;And if anyone can offer free servers, I’d gladly take advantage of that. I’ve applied for AWS research grant, but won’t hear back for a few months.&lt;/p&gt;
+
+</description>
+				<published>2016-03-29 00:00:00 -0700</published>
+				<link>http://recology.info//2016/03/genbank-ids/</link>
+			</item>
+		
+			<item>
 				<title>heythere - a robot to automate GitHub issue comments</title>
 				<description>&lt;p&gt;GitHub issues are great for humans to correspond over software, or any other project. At rOpenSci we use an issue based software review system (&lt;a href=&quot;https://github.com/ropensci/onboarding&quot;&gt;ropensci/onboarding&lt;/a&gt;). Software authors and reviewers go back and forth on the software, making a better product in the end.&lt;/p&gt;
 
@@ -123,6 +233,10 @@ heroku addons:open scheduler
 &lt;p&gt;&lt;img src=&quot;/public/img/2016-03-24-hey-there/testhey.png&quot; alt=&quot;assertr_img&quot; /&gt;&lt;/p&gt;
 
 &lt;p&gt;You could set up a different GitHub account as your robot so it’s clearly not coming from a real person.&lt;/p&gt;
+
+&lt;h2 id=&quot;feedback&quot;&gt;feedback&lt;/h2&gt;
+
+&lt;p&gt;I’ll continue to improve &lt;code class=&quot;highlighter-rouge&quot;&gt;heythere&lt;/code&gt; as we get feedback on its use in &lt;code class=&quot;highlighter-rouge&quot;&gt;ropensci/onboarding&lt;/code&gt;. Would also love any feedback from you, internet. Thanks!&lt;/p&gt;
 
 </description>
 				<published>2016-03-24 00:00:00 -0700</published>
@@ -1885,182 +1999,6 @@ creating a Digital Ocean account, authenticating, and have many examples.&lt;/p&
 </description>
 				<published>2015-10-02 00:00:00 -0700</published>
 				<link>http://recology.info//2015/10/analogsea-cran/</link>
-			</item>
-		
-			<item>
-				<title>oai - an OAI-PMH client</title>
-				<description>&lt;p&gt;&lt;code class=&quot;highlighter-rouge&quot;&gt;oai&lt;/code&gt; is a general purpose client to work with any ‘OAI-PMH’ service. The ‘OAI-PMH’ protocol is described at &lt;a href=&quot;http://www.openarchives.org/OAI/openarchivesprotocol.html&quot;&gt;http://www.openarchives.org/OAI/openarchivesprotocol.html&lt;/a&gt;. The main functions follow the OAI-PMH verbs:&lt;/p&gt;
-
-&lt;ul&gt;
-  &lt;li&gt;&lt;code class=&quot;highlighter-rouge&quot;&gt;GetRecord&lt;/code&gt;&lt;/li&gt;
-  &lt;li&gt;&lt;code class=&quot;highlighter-rouge&quot;&gt;Identify&lt;/code&gt;&lt;/li&gt;
-  &lt;li&gt;&lt;code class=&quot;highlighter-rouge&quot;&gt;ListIdentifiers&lt;/code&gt;&lt;/li&gt;
-  &lt;li&gt;&lt;code class=&quot;highlighter-rouge&quot;&gt;ListMetadataFormats&lt;/code&gt;&lt;/li&gt;
-  &lt;li&gt;&lt;code class=&quot;highlighter-rouge&quot;&gt;ListRecords&lt;/code&gt;&lt;/li&gt;
-  &lt;li&gt;&lt;code class=&quot;highlighter-rouge&quot;&gt;ListSets&lt;/code&gt;&lt;/li&gt;
-&lt;/ul&gt;
-
-&lt;p&gt;The repo is at &lt;a href=&quot;https://github.com/sckott/oai&quot;&gt;https://github.com/sckott/oai&lt;/a&gt;&lt;/p&gt;
-
-&lt;p&gt;I will be using this in a number of packages I maintain that use OAI-PMH data services. If you try it, let me know what you think.&lt;/p&gt;
-
-&lt;p&gt;This package is heading to rOpenSci soon: &lt;a href=&quot;https://github.com/ropensci/onboarding/issues/19&quot;&gt;https://github.com/ropensci/onboarding/issues/19&lt;/a&gt;&lt;/p&gt;
-
-&lt;p&gt;Here’s a few usage examples:&lt;/p&gt;
-
-&lt;h2 id=&quot;install&quot;&gt;Install&lt;/h2&gt;
-
-&lt;p&gt;Is on CRAN now, but binaries may not be available yet.&lt;/p&gt;
-
-&lt;div class=&quot;highlighter-rouge&quot;&gt;&lt;pre class=&quot;highlight&quot;&gt;&lt;code&gt;&lt;span class=&quot;n&quot;&gt;install.packages&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;s2&quot;&gt;&quot;oai&quot;&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt;
-&lt;/code&gt;&lt;/pre&gt;
-&lt;/div&gt;
-
-&lt;p&gt;Or install development version from GitHub&lt;/p&gt;
-
-&lt;div class=&quot;highlighter-rouge&quot;&gt;&lt;pre class=&quot;highlight&quot;&gt;&lt;code&gt;&lt;span class=&quot;n&quot;&gt;devtools&lt;/span&gt;&lt;span class=&quot;o&quot;&gt;::&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;install_github&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;s2&quot;&gt;&quot;sckott/oai&quot;&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt;
-&lt;/code&gt;&lt;/pre&gt;
-&lt;/div&gt;
-
-&lt;p&gt;Load &lt;code class=&quot;highlighter-rouge&quot;&gt;oai&lt;/code&gt;&lt;/p&gt;
-
-&lt;div class=&quot;highlighter-rouge&quot;&gt;&lt;pre class=&quot;highlight&quot;&gt;&lt;code&gt;&lt;span class=&quot;n&quot;&gt;library&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;s2&quot;&gt;&quot;oai&quot;&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt;
-&lt;/code&gt;&lt;/pre&gt;
-&lt;/div&gt;
-
-&lt;h2 id=&quot;identify&quot;&gt;Identify&lt;/h2&gt;
-
-&lt;div class=&quot;highlighter-rouge&quot;&gt;&lt;pre class=&quot;highlight&quot;&gt;&lt;code&gt;&lt;span class=&quot;n&quot;&gt;id&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;s2&quot;&gt;&quot;http://oai.datacite.org/oai&quot;&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt;
-&lt;span class=&quot;c1&quot;&gt;#&amp;gt;   repositoryName                     baseURL protocolVersion
-#&amp;gt; 1   DataCite MDS http://oai.datacite.org/oai             2.0
-#&amp;gt;           adminEmail    earliestDatestamp deletedRecord
-#&amp;gt; 1 admin@datacite.org 2011-01-01T00:00:00Z    persistent
-#&amp;gt;            granularity compression compression.1
-#&amp;gt; 1 YYYY-MM-DDThh:mm:ssZ        gzip       deflate
-#&amp;gt;                                      description
-#&amp;gt; 1 oaioai.datacite.org:oai:oai.datacite.org:12425
-&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;
-&lt;/div&gt;
-
-&lt;h2 id=&quot;listidentifiers&quot;&gt;ListIdentifiers&lt;/h2&gt;
-
-&lt;div class=&quot;highlighter-rouge&quot;&gt;&lt;pre class=&quot;highlight&quot;&gt;&lt;code&gt;&lt;span class=&quot;n&quot;&gt;list_identifiers&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;from&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;=&lt;/span&gt; &lt;span class=&quot;s1&quot;&gt;&#39;2011-05-01T&#39;&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;until&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;=&lt;/span&gt; &lt;span class=&quot;s1&quot;&gt;&#39;2011-09-01T&#39;&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt;
-&lt;span class=&quot;c1&quot;&gt;#&amp;gt; &amp;lt;ListRecords&amp;gt; 925 X 6 
-#&amp;gt; 
-#&amp;gt;                    identifier            datestamp setSpec setSpec.1
-#&amp;gt; 1  oai:oai.datacite.org:32153 2011-06-08T08:57:11Z     TIB  TIB.WDCC
-#&amp;gt; 2  oai:oai.datacite.org:32200 2011-06-20T08:12:41Z     TIB TIB.DAGST
-#&amp;gt; 3  oai:oai.datacite.org:32220 2011-06-28T14:11:08Z     TIB TIB.DAGST
-#&amp;gt; 4  oai:oai.datacite.org:32241 2011-06-30T13:24:45Z     TIB TIB.DAGST
-#&amp;gt; 5  oai:oai.datacite.org:32255 2011-07-01T12:09:24Z     TIB TIB.DAGST
-#&amp;gt; 6  oai:oai.datacite.org:32282 2011-07-05T09:08:10Z     TIB TIB.DAGST
-#&amp;gt; 7  oai:oai.datacite.org:32309 2011-07-06T12:30:54Z     TIB TIB.DAGST
-#&amp;gt; 8  oai:oai.datacite.org:32310 2011-07-06T12:42:32Z     TIB TIB.DAGST
-#&amp;gt; 9  oai:oai.datacite.org:32325 2011-07-07T11:17:46Z     TIB TIB.DAGST
-#&amp;gt; 10 oai:oai.datacite.org:32326 2011-07-07T11:18:47Z     TIB TIB.DAGST
-#&amp;gt; ..                        ...                  ...     ...       ...
-#&amp;gt; Variables not shown: setSpec.2 (chr), setSpec.3 (chr)
-&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;
-&lt;/div&gt;
-
-&lt;h2 id=&quot;count-identifiers&quot;&gt;Count Identifiers&lt;/h2&gt;
-
-&lt;div class=&quot;highlighter-rouge&quot;&gt;&lt;pre class=&quot;highlight&quot;&gt;&lt;code&gt;&lt;span class=&quot;n&quot;&gt;count_identifiers&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;()&lt;/span&gt;
-&lt;span class=&quot;c1&quot;&gt;#&amp;gt;                           url   count
-#&amp;gt; 1 http://oai.datacite.org/oai 6350706
-&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;
-&lt;/div&gt;
-
-&lt;h2 id=&quot;listrecords&quot;&gt;ListRecords&lt;/h2&gt;
-
-&lt;div class=&quot;highlighter-rouge&quot;&gt;&lt;pre class=&quot;highlight&quot;&gt;&lt;code&gt;&lt;span class=&quot;n&quot;&gt;list_records&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;from&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;=&lt;/span&gt; &lt;span class=&quot;s1&quot;&gt;&#39;2011-05-01T&#39;&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;until&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;=&lt;/span&gt; &lt;span class=&quot;s1&quot;&gt;&#39;2011-08-15T&#39;&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt;
-&lt;span class=&quot;c1&quot;&gt;#&amp;gt; &amp;lt;ListRecords&amp;gt; 126 X 46 
-#&amp;gt; 
-#&amp;gt;                    identifier            datestamp setSpec setSpec.1
-#&amp;gt; 1  oai:oai.datacite.org:32153 2011-06-08T08:57:11Z     TIB  TIB.WDCC
-#&amp;gt; 2  oai:oai.datacite.org:32200 2011-06-20T08:12:41Z     TIB TIB.DAGST
-#&amp;gt; 3  oai:oai.datacite.org:32220 2011-06-28T14:11:08Z     TIB TIB.DAGST
-#&amp;gt; 4  oai:oai.datacite.org:32241 2011-06-30T13:24:45Z     TIB TIB.DAGST
-#&amp;gt; 5  oai:oai.datacite.org:32255 2011-07-01T12:09:24Z     TIB TIB.DAGST
-#&amp;gt; 6  oai:oai.datacite.org:32282 2011-07-05T09:08:10Z     TIB TIB.DAGST
-#&amp;gt; 7  oai:oai.datacite.org:32309 2011-07-06T12:30:54Z     TIB TIB.DAGST
-#&amp;gt; 8  oai:oai.datacite.org:32310 2011-07-06T12:42:32Z     TIB TIB.DAGST
-#&amp;gt; 9  oai:oai.datacite.org:32325 2011-07-07T11:17:46Z     TIB TIB.DAGST
-#&amp;gt; 10 oai:oai.datacite.org:32326 2011-07-07T11:18:47Z     TIB TIB.DAGST
-#&amp;gt; ..                        ...                  ...     ...       ...
-#&amp;gt; Variables not shown: title (chr), creator (chr), creator.1 (chr),
-#&amp;gt;      creator.2 (chr), creator.3 (chr), creator.4 (chr), creator.5 (chr),
-#&amp;gt;      creator.6 (chr), creator.7 (chr), publisher (chr), date (chr),
-#&amp;gt;      identifier.2 (chr), identifier.1 (chr), subject (chr), description
-#&amp;gt;      (chr), description.1 (chr), contributor (chr), language (chr), type
-#&amp;gt;      (chr), type.1 (chr), format (chr), format.1 (chr), rights (chr),
-#&amp;gt;      subject.1 (chr), relation (chr), subject.2 (chr), subject.3 (chr),
-#&amp;gt;      subject.4 (chr), setSpec.2 (chr), setSpec.3 (chr), format.2 (chr),
-#&amp;gt;      subject.5 (chr), subject.6 (chr), subject.7 (chr), description.2
-#&amp;gt;      (chr), description.3 (chr), description.4 (chr), description.5 (chr),
-#&amp;gt;      title.1 (chr), relation.1 (chr), relation.2 (chr), contributor.1
-#&amp;gt;      (chr)
-&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;
-&lt;/div&gt;
-
-&lt;h2 id=&quot;getrecords&quot;&gt;GetRecords&lt;/h2&gt;
-
-&lt;div class=&quot;highlighter-rouge&quot;&gt;&lt;pre class=&quot;highlight&quot;&gt;&lt;code&gt;&lt;span class=&quot;n&quot;&gt;get_records&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;c&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;s2&quot;&gt;&quot;oai:oai.datacite.org:32255&quot;&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt; &lt;span class=&quot;s2&quot;&gt;&quot;oai:oai.datacite.org:32325&quot;&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;))&lt;/span&gt;
-&lt;span class=&quot;c1&quot;&gt;#&amp;gt; &amp;lt;GetRecord&amp;gt; 2 X 23 
-#&amp;gt; 
-#&amp;gt;                   identifier            datestamp setSpec setSpec.1
-#&amp;gt; 1 oai:oai.datacite.org:32255 2011-07-01T12:09:24Z     TIB TIB.DAGST
-#&amp;gt; 2 oai:oai.datacite.org:32325 2011-07-07T11:17:46Z     TIB TIB.DAGST
-#&amp;gt; Variables not shown: title (chr), creator (chr), creator.1 (chr),
-#&amp;gt;      creator.2 (chr), creator.3 (chr), publisher (chr), date (chr),
-#&amp;gt;      identifier.1 (chr), subject (chr), subject.1 (chr), description
-#&amp;gt;      (chr), description.1 (chr), contributor (chr), language (chr), type
-#&amp;gt;      (chr), type.1 (chr), format (chr), format.1 (chr), rights (chr)
-&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;
-&lt;/div&gt;
-
-&lt;h2 id=&quot;list-metadataformats&quot;&gt;List MetadataFormats&lt;/h2&gt;
-
-&lt;div class=&quot;highlighter-rouge&quot;&gt;&lt;pre class=&quot;highlight&quot;&gt;&lt;code&gt;&lt;span class=&quot;n&quot;&gt;list_metadataformats&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;id&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;=&lt;/span&gt; &lt;span class=&quot;s2&quot;&gt;&quot;oai:oai.datacite.org:32348&quot;&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt;
-&lt;span class=&quot;c1&quot;&gt;#&amp;gt; $`oai:oai.datacite.org:32348`
-#&amp;gt;   metadataPrefix
-#&amp;gt; 1         oai_dc
-#&amp;gt; 2       datacite
-#&amp;gt; 3   oai_datacite
-#&amp;gt;                                                        schema
-#&amp;gt; 1              http://www.openarchives.org/OAI/2.0/oai_dc.xsd
-#&amp;gt; 2 http://schema.datacite.org/meta/nonexistant/nonexistant.xsd
-#&amp;gt; 3              http://schema.datacite.org/oai/oai-1.0/oai.xsd
-#&amp;gt;                             metadataNamespace
-#&amp;gt; 1 http://www.openarchives.org/OAI/2.0/oai_dc/
-#&amp;gt; 2      http://datacite.org/schema/nonexistant
-#&amp;gt; 3     http://schema.datacite.org/oai/oai-1.0/
-&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;
-&lt;/div&gt;
-
-&lt;h2 id=&quot;list-sets&quot;&gt;List Sets&lt;/h2&gt;
-
-&lt;div class=&quot;highlighter-rouge&quot;&gt;&lt;pre class=&quot;highlight&quot;&gt;&lt;code&gt;&lt;span class=&quot;n&quot;&gt;list_sets&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;s2&quot;&gt;&quot;http://oai.datacite.org/oai&quot;&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt;
-&lt;span class=&quot;c1&quot;&gt;#&amp;gt; &amp;lt;ListSets&amp;gt; 1227 X 2 
-#&amp;gt; 
-#&amp;gt;                     setSpec
-#&amp;gt; 1                REFQUALITY
-#&amp;gt; 2                      ANDS
-#&amp;gt; 3           ANDS.REFQUALITY
-#&amp;gt; 4             ANDS.CENTRE-1
-#&amp;gt; 5  ANDS.CENTRE-1.REFQUALITY
-#&amp;gt; 6             ANDS.CENTRE-2
-#&amp;gt; 7  ANDS.CENTRE-2.REFQUALITY
-#&amp;gt; 8             ANDS.CENTRE-3
-#&amp;gt; 9  ANDS.CENTRE-3.REFQUALITY
-#&amp;gt; 10            ANDS.CENTRE-5
-#&amp;gt; ..                      ...
-#&amp;gt; Variables not shown: setName (chr)
-&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;
-&lt;/div&gt;
-</description>
-				<published>2015-09-11 00:00:00 -0700</published>
-				<link>http://recology.info//2015/09/oai-client/</link>
 			</item>
 		
 	</channel>

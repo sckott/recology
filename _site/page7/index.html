@@ -61,6 +61,241 @@
   
   <div class="post">
     <h1>
+      <a href="/2015/04/the-new-way/">
+        the new way - httsnap
+      </a>
+    </h1>
+
+    <span class="post-date">29 Apr 2015</span>
+
+    <p>Inspired by <code class="highlighter-rouge">httpie</code>, a Python command line client as a sort of drop in replacement for <code class="highlighter-rouge">curl</code>, I am playing around with something similar-ish in R, at least in spirit. I started a little R pkg called <code class="highlighter-rouge">httsnap</code> with the following ideas:</p>
+
+<ul>
+  <li>The web is increasingly a JSON world, so set <code class="highlighter-rouge">content-type</code> and <code class="highlighter-rouge">accept</code> headers to <code class="highlighter-rouge">applications/json</code> by default</li>
+  <li>The workflow follows logically, or at least should, from, <em>hey, I got this url</em>, to <em>i need to add some options</em>, to <em>execute request</em></li>
+  <li>Whenever possible, transform output to data.frame’s - facilitating downstream manipulation via <code class="highlighter-rouge">dplyr</code>, etc.</li>
+  <li>Do <code class="highlighter-rouge">GET</code> requests by default. Specify a different type if you don’t want <code class="highlighter-rouge">GET</code>. Some functionality does GET by default, though in some cases you need to specify GET</li>
+  <li>You can use non-standard evaluation to easily pass in query parameters without worrying about <code class="highlighter-rouge">&amp;</code>’s, URL escaping, etc. (see <code class="highlighter-rouge">Query()</code>)</li>
+  <li>Same for body params (see <code class="highlighter-rouge">Body()</code>)</li>
+</ul>
+
+<h2 id="install">Install</h2>
+
+<p>Install and load <code class="highlighter-rouge">httsnap</code></p>
+
+<div class="highlighter-rouge"><pre class="highlight"><code><span class="n">devtools</span><span class="o">::</span><span class="n">install_github</span><span class="p">(</span><span class="s2">"sckott/httsnap"</span><span class="p">)</span>
+</code></pre>
+</div>
+
+<div class="highlighter-rouge"><pre class="highlight"><code><span class="n">library</span><span class="p">(</span><span class="s2">"httsnap"</span><span class="p">)</span>
+<span class="n">library</span><span class="p">(</span><span class="s2">"dplyr"</span><span class="p">)</span>
+</code></pre>
+</div>
+
+<h2 id="functions-so-far">Functions so far</h2>
+
+<ul>
+  <li><code class="highlighter-rouge">Get</code> - GET request</li>
+  <li><code class="highlighter-rouge">Query</code> - add query parameters</li>
+  <li><code class="highlighter-rouge">Authenticate</code> - add authentication details</li>
+  <li><code class="highlighter-rouge">Progress</code> - add progress bar</li>
+  <li><code class="highlighter-rouge">Timeout</code> - add a timeout</li>
+  <li><code class="highlighter-rouge">User_agent</code> - add a user agent</li>
+  <li><code class="highlighter-rouge">Verbose</code> - give verbose output</li>
+  <li><code class="highlighter-rouge">Body</code> - add a body</li>
+  <li><code class="highlighter-rouge">h</code> - add headers by key-value pair</li>
+</ul>
+
+<p>These are named to avoid conflict with <code class="highlighter-rouge">httr</code></p>
+
+<h2 id="intro">Intro</h2>
+
+<p>A simple <code class="highlighter-rouge">GET</code> request</p>
+
+<div class="highlighter-rouge"><pre class="highlight"><code><span class="s2">"http://httpbin.org/get"</span> <span class="o">%&gt;%</span>
+  <span class="n">Get</span><span class="p">()</span>
+<span class="c1">#&gt; $args
+#&gt; named list()
+#&gt; 
+#&gt; $headers
+#&gt; $headers$Accept
+#&gt; [1] "application/json, text/xml, application/xml, */*"
+#&gt; 
+#&gt; $headers$`Accept-Encoding`
+#&gt; [1] "gzip"
+#&gt; 
+#&gt; $headers$Host
+#&gt; [1] "httpbin.org"
+#&gt; 
+#&gt; $headers$`User-Agent`
+#&gt; [1] "curl/7.37.1 Rcurl/1.95.4.1 httr/0.6.1 httsnap/0.0.2.99"
+#&gt; 
+#&gt; 
+#&gt; $origin
+#&gt; [1] "24.21.209.71"
+#&gt; 
+#&gt; $url
+#&gt; [1] "http://httpbin.org/get"
+</span></code></pre>
+</div>
+
+<p>You’ll notice that <code class="highlighter-rouge">Get()</code> doesn’t just get the response, but also checks for whether it was a good response (the HTTP status code), and extracts the data.</p>
+
+<p>Or you can just pass the URL into the function itself</p>
+
+<div class="highlighter-rouge"><pre class="highlight"><code><span class="n">Get</span><span class="p">(</span><span class="s2">"http://httpbin.org/get"</span><span class="p">)</span>
+<span class="c1">#&gt; $args
+#&gt; named list()
+#&gt; 
+#&gt; $headers
+#&gt; $headers$Accept
+#&gt; [1] "application/json, text/xml, application/xml, */*"
+#&gt; 
+#&gt; $headers$`Accept-Encoding`
+#&gt; [1] "gzip"
+#&gt; 
+#&gt; $headers$Host
+#&gt; [1] "httpbin.org"
+#&gt; 
+#&gt; $headers$`User-Agent`
+#&gt; [1] "curl/7.37.1 Rcurl/1.95.4.1 httr/0.6.1 httsnap/0.0.2.99"
+#&gt; 
+#&gt; 
+#&gt; $origin
+#&gt; [1] "24.21.209.71"
+#&gt; 
+#&gt; $url
+#&gt; [1] "http://httpbin.org/get"
+</span></code></pre>
+</div>
+
+<p>You can buid up options by calling functions via pipes, and see what the options look like</p>
+
+<div class="highlighter-rouge"><pre class="highlight"><code><span class="s2">"http://httpbin.org/get"</span> <span class="o">%&gt;%</span>
+  <span class="n">Progress</span><span class="p">()</span> <span class="o">%&gt;%</span>
+  <span class="n">Verbose</span><span class="p">()</span>
+<span class="c1">#&gt; &lt;http request&gt; 
+#&gt;   url: http://httpbin.org/get
+#&gt;   config: 
+#&gt; Config: 
+#&gt; List of 4
+#&gt;  $ noprogress      :FALSE
+#&gt;  $ progressfunction:function (...)  
+#&gt;  $ debugfunction   :function (...)  
+#&gt;  $ verbose         :TRUE
+</span></code></pre>
+</div>
+
+<p>Then execute the GET request when you’re ready</p>
+
+<div class="highlighter-rouge"><pre class="highlight"><code><span class="s2">"http://httpbin.org/get"</span> <span class="o">%&gt;%</span>
+  <span class="n">Progress</span><span class="p">()</span> <span class="o">%&gt;%</span>
+  <span class="n">Verbose</span><span class="p">()</span> <span class="o">%&gt;%</span>
+  <span class="n">Get</span><span class="p">()</span>
+<span class="c1">#&gt; $args
+#&gt; named list()
+#&gt; 
+#&gt; $headers
+#&gt; $headers$Accept
+#&gt; [1] "application/json, text/xml, application/xml, */*"
+#&gt; 
+#&gt; $headers$`Accept-Encoding`
+#&gt; [1] "gzip"
+#&gt; 
+#&gt; $headers$Host
+#&gt; [1] "httpbin.org"
+#&gt; 
+#&gt; $headers$`User-Agent`
+#&gt; [1] "curl/7.37.1 Rcurl/1.95.4.1 httr/0.6.1 httsnap/0.0.2.99"
+#&gt; 
+#&gt; 
+#&gt; $origin
+#&gt; [1] "24.21.209.71"
+#&gt; 
+#&gt; $url
+#&gt; [1] "http://httpbin.org/get"
+</span></code></pre>
+</div>
+
+<h2 id="example-1">Example 1</h2>
+
+<p>Get scholarly article metadata from the Crossref API</p>
+
+<div class="highlighter-rouge"><pre class="highlight"><code><span class="s2">"http://api.crossref.org/works"</span> <span class="o">%&gt;%</span>
+  <span class="n">Query</span><span class="p">(</span><span class="n">query</span> <span class="o">=</span> <span class="s2">"ecology"</span><span class="p">)</span> <span class="o">%&gt;%</span> 
+  <span class="err">.</span><span class="o">$</span><span class="n">message</span> <span class="o">%&gt;%</span> 
+  <span class="err">.</span><span class="o">$</span><span class="n">items</span> <span class="o">%&gt;%</span> 
+  <span class="n">select</span><span class="p">(</span><span class="n">DOI</span><span class="p">,</span> <span class="n">title</span><span class="p">,</span> <span class="n">publisher</span><span class="p">)</span>
+<span class="c1">#&gt;                            DOI                title
+#&gt; 1          10.4996/fireecology         Fire Ecology
+#&gt; 2              10.5402/ecology         ISRN Ecology
+#&gt; 3                 10.1155/8641         ISRN Ecology
+#&gt; 4      10.1111/(issn)1526-100x  Restoration Ecology
+#&gt; 5        10.1007/248.1432-184x    Microbial Ecology
+#&gt; 6      10.1007/10144.1438-390x   Population Ecology
+#&gt; 7      10.1007/10452.1573-5125      Aquatic Ecology
+#&gt; 8      10.1007/10682.1573-8477 Evolutionary Ecology
+#&gt; 9      10.1007/10745.1572-9915        Human Ecology
+#&gt; 10     10.1007/10980.1572-9761    Landscape Ecology
+#&gt; 11     10.1007/11258.1573-5052        Plant Ecology
+#&gt; 12     10.1007/12080.1874-1746  Theoretical Ecology
+#&gt; 13     10.1111/(issn)1442-9993      Austral Ecology
+#&gt; 14     10.1111/(issn)1439-0485       Marine Ecology
+#&gt; 15     10.1111/(issn)1365-2435   Functional Ecology
+#&gt; 16     10.1111/(issn)1365-294x    Molecular Ecology
+#&gt; 17     10.1111/(issn)1461-0248      Ecology Letters
+#&gt; 18   10.1002/9780470979365.ch7  Behavioural Ecology
+#&gt; 19 10.1111/fec.2007.21.issue-5                     
+#&gt; 20     10.1111/rec.0.0.issue-0                     
+#&gt;                            publisher
+#&gt; 1       Association for Fire Ecology
+#&gt; 2     Hindawi Publishing Corporation
+#&gt; 3     Hindawi Publishing Corporation
+#&gt; 4                    Wiley-Blackwell
+#&gt; 5  Springer Science + Business Media
+#&gt; 6  Springer Science + Business Media
+#&gt; 7  Springer Science + Business Media
+#&gt; 8  Springer Science + Business Media
+#&gt; 9  Springer Science + Business Media
+#&gt; 10 Springer Science + Business Media
+#&gt; 11 Springer Science + Business Media
+#&gt; 12 Springer Science + Business Media
+#&gt; 13                   Wiley-Blackwell
+#&gt; 14                   Wiley-Blackwell
+#&gt; 15                   Wiley-Blackwell
+#&gt; 16                   Wiley-Blackwell
+#&gt; 17                   Wiley-Blackwell
+#&gt; 18                   Wiley-Blackwell
+#&gt; 19                   Wiley-Blackwell
+#&gt; 20                   Wiley-Blackwell
+</span></code></pre>
+</div>
+
+<h2 id="example-2">Example 2</h2>
+
+<p>Get Public Library of Science article metadata via their API, make a histogram of number of tweets for each article</p>
+
+<div class="highlighter-rouge"><pre class="highlight"><code><span class="s2">"http://api.plos.org/search"</span> <span class="o">%&gt;%</span>
+  <span class="n">Query</span><span class="p">(</span><span class="n">q</span> <span class="o">=</span> <span class="s2">"*:*"</span><span class="p">,</span> <span class="n">wt</span> <span class="o">=</span> <span class="s2">"json"</span><span class="p">,</span> <span class="n">rows</span> <span class="o">=</span> <span class="m">100</span><span class="p">,</span> 
+        <span class="n">fl</span> <span class="o">=</span> <span class="s2">"id,journal,alm_twitterCount"</span><span class="p">,</span>  
+        <span class="n">fq</span> <span class="o">=</span> <span class="s1">'alm_twitterCount:[100 TO 10000]'</span><span class="p">)</span> <span class="o">%&gt;%</span> 
+  <span class="err">.</span><span class="o">$</span><span class="n">response</span> <span class="o">%&gt;%</span> 
+  <span class="err">.</span><span class="o">$</span><span class="n">docs</span> <span class="o">%&gt;%</span> 
+  <span class="err">.</span><span class="o">$</span><span class="n">alm_twitterCount</span> <span class="o">%&gt;%</span> 
+  <span class="n">hist</span><span class="p">()</span>
+</code></pre>
+</div>
+
+<p><img src="/public/img/2015-04-29-the-new-way/unnamed-chunk-9-1.png" alt="image" /></p>
+
+<h2 id="notes">Notes</h2>
+
+<p>Okay, so this isn’t drastically different from what <code class="highlighter-rouge">httr</code> already does, but its early days.</p>
+
+  </div>
+  
+  <div class="post">
+    <h1>
       <a href="/2015/03/faster-solr/">
         Faster solr with csv
       </a>
@@ -68,140 +303,133 @@
 
     <span class="post-date">20 Mar 2015</span>
 
-    With the [help of user input](https://github.com/ropensci/solr/issues/47), I've tweaked `solr` just a bit to make things faster using default setings. I imagine the main interface for people using the `solr` R client is via `solr_search()`, which used to have `wt=json` by default. Changing this to `wt=csv` gives better performance. And it sorta makes sense to use csv, as the point of using an R client is probably do get data eventually into a data.frame, so it makes sense to go csv format (Already in tabular format) if it's faster too.
+    <p>With the <a href="https://github.com/ropensci/solr/issues/47">help of user input</a>, I’ve tweaked <code class="highlighter-rouge">solr</code> just a bit to make things faster using default setings. I imagine the main interface for people using the <code class="highlighter-rouge">solr</code> R client is via <code class="highlighter-rouge">solr_search()</code>, which used to have <code class="highlighter-rouge">wt=json</code> by default. Changing this to <code class="highlighter-rouge">wt=csv</code> gives better performance. And it sorta makes sense to use csv, as the point of using an R client is probably do get data eventually into a data.frame, so it makes sense to go csv format (Already in tabular format) if it’s faster too.</p>
 
-## Install
+<h2 id="install">Install</h2>
 
-Install and load `solr`
+<p>Install and load <code class="highlighter-rouge">solr</code></p>
 
+<div class="highlighter-rouge"><pre class="highlight"><code><span class="n">devtools</span><span class="o">::</span><span class="n">install_github</span><span class="p">(</span><span class="s2">"ropensci/solr"</span><span class="p">)</span>
+</code></pre>
+</div>
 
-```r
-devtools::install_github("ropensci/solr")
-```
+<div class="highlighter-rouge"><pre class="highlight"><code><span class="n">library</span><span class="p">(</span><span class="s2">"solr"</span><span class="p">)</span>
+<span class="n">library</span><span class="p">(</span><span class="s2">"microbenchmark"</span><span class="p">)</span>
+</code></pre>
+</div>
 
+<h2 id="setup">Setup</h2>
 
-```r
-library("solr")
-library("microbenchmark")
-```
+<p>Define base url and fields to return</p>
 
-## Setup
+<div class="highlighter-rouge"><pre class="highlight"><code><span class="n">url</span> <span class="o">&lt;-</span> <span class="s1">'http://api.plos.org/search'</span>
+<span class="n">fields</span> <span class="o">&lt;-</span> <span class="n">c</span><span class="p">(</span><span class="s1">'id'</span><span class="p">,</span><span class="s1">'cross_published_journal_name'</span><span class="p">,</span><span class="s1">'cross_published_journal_key'</span><span class="p">,</span>
+            <span class="s1">'cross_published_journal_eissn'</span><span class="p">,</span><span class="s1">'pmid'</span><span class="p">,</span><span class="s1">'pmcid'</span><span class="p">,</span><span class="s1">'publisher'</span><span class="p">,</span><span class="s1">'journal'</span><span class="p">,</span>
+            <span class="s1">'publication_date'</span><span class="p">,</span><span class="s1">'article_type'</span><span class="p">,</span><span class="s1">'article_type_facet'</span><span class="p">,</span><span class="s1">'author'</span><span class="p">,</span>
+            <span class="s1">'author_facet'</span><span class="p">,</span><span class="s1">'volume'</span><span class="p">,</span><span class="s1">'issue'</span><span class="p">,</span><span class="s1">'elocation_id'</span><span class="p">,</span><span class="s1">'author_display'</span><span class="p">,</span>
+            <span class="s1">'competing_interest'</span><span class="p">,</span><span class="s1">'copyright'</span><span class="p">)</span>
+</code></pre>
+</div>
 
-Define base url and fields to return
+<h2 id="json">json</h2>
 
+<p>The previous default for <code class="highlighter-rouge">solr_search()</code> used <code class="highlighter-rouge">json</code></p>
 
-```r
-url <- 'http://api.plos.org/search'
-fields <- c('id','cross_published_journal_name','cross_published_journal_key',
-            'cross_published_journal_eissn','pmid','pmcid','publisher','journal',
-            'publication_date','article_type','article_type_facet','author',
-            'author_facet','volume','issue','elocation_id','author_display',
-            'competing_interest','copyright')
-```
+<div class="highlighter-rouge"><pre class="highlight"><code><span class="n">solr_search</span><span class="p">(</span><span class="n">q</span><span class="o">=</span><span class="s1">'*:*'</span><span class="p">,</span> <span class="n">rows</span><span class="o">=</span><span class="m">10</span><span class="p">,</span> <span class="n">fl</span><span class="o">=</span><span class="n">fields</span><span class="p">,</span> <span class="n">base</span><span class="o">=</span><span class="n">url</span><span class="p">,</span> <span class="n">wt</span> <span class="o">=</span> <span class="s2">"json"</span><span class="p">)</span>
+<span class="c1">#&gt; Source: local data frame [10 x 19]
+#&gt; 
+#&gt;                                                                    id
+#&gt; 1             10.1371/annotation/856f0890-9d85-4719-8e54-c27530ac94f4
+#&gt; 2       10.1371/annotation/856f0890-9d85-4719-8e54-c27530ac94f4/title
+#&gt; 3    10.1371/annotation/856f0890-9d85-4719-8e54-c27530ac94f4/abstract
+#&gt; 4  10.1371/annotation/856f0890-9d85-4719-8e54-c27530ac94f4/references
+#&gt; 5        10.1371/annotation/856f0890-9d85-4719-8e54-c27530ac94f4/body
+#&gt; 6             10.1371/annotation/8551e3d5-fdd5-413b-a253-170ba13b7525
+#&gt; 7       10.1371/annotation/8551e3d5-fdd5-413b-a253-170ba13b7525/title
+#&gt; 8    10.1371/annotation/8551e3d5-fdd5-413b-a253-170ba13b7525/abstract
+#&gt; 9  10.1371/annotation/8551e3d5-fdd5-413b-a253-170ba13b7525/references
+#&gt; 10       10.1371/annotation/8551e3d5-fdd5-413b-a253-170ba13b7525/body
+#&gt; Variables not shown: cross_published_journal_name (chr),
+#&gt;   cross_published_journal_key (chr), cross_published_journal_eissn (chr),
+#&gt;   pmid (chr), pmcid (chr), publisher (chr), journal (chr),
+#&gt;   publication_date (chr), article_type (chr), article_type_facet (chr),
+#&gt;   author (chr), author_facet (chr), volume (int), issue (int),
+#&gt;   elocation_id (chr), author_display (chr), competing_interest (chr),
+#&gt;   copyright (chr)
+</span></code></pre>
+</div>
 
-## json
+<h2 id="csv">csv</h2>
 
-The previous default for `solr_search()` used `json`
+<p>The default <code class="highlighter-rouge">wt</code> setting is now <code class="highlighter-rouge">csv</code></p>
 
+<div class="highlighter-rouge"><pre class="highlight"><code><span class="n">solr_search</span><span class="p">(</span><span class="n">q</span><span class="o">=</span><span class="s1">'*:*'</span><span class="p">,</span> <span class="n">rows</span><span class="o">=</span><span class="m">10</span><span class="p">,</span> <span class="n">fl</span><span class="o">=</span><span class="n">fields</span><span class="p">,</span> <span class="n">base</span><span class="o">=</span><span class="n">url</span><span class="p">,</span> <span class="n">wt</span> <span class="o">=</span> <span class="s2">"json"</span><span class="p">)</span>
+<span class="c1">#&gt; Source: local data frame [10 x 19]
+#&gt; 
+#&gt;                                                                    id
+#&gt; 1             10.1371/annotation/856f0890-9d85-4719-8e54-c27530ac94f4
+#&gt; 2       10.1371/annotation/856f0890-9d85-4719-8e54-c27530ac94f4/title
+#&gt; 3    10.1371/annotation/856f0890-9d85-4719-8e54-c27530ac94f4/abstract
+#&gt; 4  10.1371/annotation/856f0890-9d85-4719-8e54-c27530ac94f4/references
+#&gt; 5        10.1371/annotation/856f0890-9d85-4719-8e54-c27530ac94f4/body
+#&gt; 6             10.1371/annotation/8551e3d5-fdd5-413b-a253-170ba13b7525
+#&gt; 7       10.1371/annotation/8551e3d5-fdd5-413b-a253-170ba13b7525/title
+#&gt; 8    10.1371/annotation/8551e3d5-fdd5-413b-a253-170ba13b7525/abstract
+#&gt; 9  10.1371/annotation/8551e3d5-fdd5-413b-a253-170ba13b7525/references
+#&gt; 10       10.1371/annotation/8551e3d5-fdd5-413b-a253-170ba13b7525/body
+#&gt; Variables not shown: cross_published_journal_name (chr),
+#&gt;   cross_published_journal_key (chr), cross_published_journal_eissn (chr),
+#&gt;   pmid (chr), pmcid (chr), publisher (chr), journal (chr),
+#&gt;   publication_date (chr), article_type (chr), article_type_facet (chr),
+#&gt;   author (chr), author_facet (chr), volume (int), issue (int),
+#&gt;   elocation_id (chr), author_display (chr), competing_interest (chr),
+#&gt;   copyright (chr)
+</span></code></pre>
+</div>
 
-```r
-solr_search(q='*:*', rows=10, fl=fields, base=url, wt = "json")
-#> Source: local data frame [10 x 19]
-#> 
-#>                                                                    id
-#> 1             10.1371/annotation/856f0890-9d85-4719-8e54-c27530ac94f4
-#> 2       10.1371/annotation/856f0890-9d85-4719-8e54-c27530ac94f4/title
-#> 3    10.1371/annotation/856f0890-9d85-4719-8e54-c27530ac94f4/abstract
-#> 4  10.1371/annotation/856f0890-9d85-4719-8e54-c27530ac94f4/references
-#> 5        10.1371/annotation/856f0890-9d85-4719-8e54-c27530ac94f4/body
-#> 6             10.1371/annotation/8551e3d5-fdd5-413b-a253-170ba13b7525
-#> 7       10.1371/annotation/8551e3d5-fdd5-413b-a253-170ba13b7525/title
-#> 8    10.1371/annotation/8551e3d5-fdd5-413b-a253-170ba13b7525/abstract
-#> 9  10.1371/annotation/8551e3d5-fdd5-413b-a253-170ba13b7525/references
-#> 10       10.1371/annotation/8551e3d5-fdd5-413b-a253-170ba13b7525/body
-#> Variables not shown: cross_published_journal_name (chr),
-#>   cross_published_journal_key (chr), cross_published_journal_eissn (chr),
-#>   pmid (chr), pmcid (chr), publisher (chr), journal (chr),
-#>   publication_date (chr), article_type (chr), article_type_facet (chr),
-#>   author (chr), author_facet (chr), volume (int), issue (int),
-#>   elocation_id (chr), author_display (chr), competing_interest (chr),
-#>   copyright (chr)
-```
+<h2 id="compare-times">Compare times</h2>
 
-## csv
+<p>When parsing to a data.frame (which <code class="highlighter-rouge">solr_search()</code> does by default), csv is quite a bit faster.</p>
 
-The default `wt` setting is now `csv`
+<div class="highlighter-rouge"><pre class="highlight"><code><span class="n">microbenchmark</span><span class="p">(</span>
+  <span class="n">json</span> <span class="o">=</span> <span class="n">solr_search</span><span class="p">(</span><span class="n">q</span><span class="o">=</span><span class="s1">'*:*'</span><span class="p">,</span> <span class="n">rows</span><span class="o">=</span><span class="m">500</span><span class="p">,</span> <span class="n">fl</span><span class="o">=</span><span class="n">fields</span><span class="p">,</span> <span class="n">base</span><span class="o">=</span><span class="n">url</span><span class="p">,</span> <span class="n">wt</span> <span class="o">=</span> <span class="s2">"json"</span><span class="p">,</span> <span class="n">verbose</span> <span class="o">=</span> <span class="n">FALSE</span><span class="p">),</span>
+  <span class="n">csv</span> <span class="o">=</span> <span class="n">solr_search</span><span class="p">(</span><span class="n">q</span><span class="o">=</span><span class="s1">'*:*'</span><span class="p">,</span> <span class="n">rows</span><span class="o">=</span><span class="m">500</span><span class="p">,</span> <span class="n">fl</span><span class="o">=</span><span class="n">fields</span><span class="p">,</span> <span class="n">base</span><span class="o">=</span><span class="n">url</span><span class="p">,</span> <span class="n">wt</span> <span class="o">=</span> <span class="s2">"csv"</span><span class="p">,</span> <span class="n">verbose</span> <span class="o">=</span> <span class="n">FALSE</span><span class="p">),</span> 
+  <span class="n">times</span> <span class="o">=</span> <span class="m">20</span>
+<span class="p">)</span>
+<span class="c1">#&gt; Unit: milliseconds
+#&gt;  expr      min       lq      mean    median        uq       max neval cld
+#&gt;  json 965.7043 1013.014 1124.1229 1086.3225 1227.9054 1441.8332    20   b
+#&gt;   csv 509.6573  520.089  541.5784  532.4546  548.0303  723.7575    20  a
+</span></code></pre>
+</div>
 
+<h2 id="json-vs-xml-vs-csv">json vs xml vs csv</h2>
 
-```r
-solr_search(q='*:*', rows=10, fl=fields, base=url, wt = "json")
-#> Source: local data frame [10 x 19]
-#> 
-#>                                                                    id
-#> 1             10.1371/annotation/856f0890-9d85-4719-8e54-c27530ac94f4
-#> 2       10.1371/annotation/856f0890-9d85-4719-8e54-c27530ac94f4/title
-#> 3    10.1371/annotation/856f0890-9d85-4719-8e54-c27530ac94f4/abstract
-#> 4  10.1371/annotation/856f0890-9d85-4719-8e54-c27530ac94f4/references
-#> 5        10.1371/annotation/856f0890-9d85-4719-8e54-c27530ac94f4/body
-#> 6             10.1371/annotation/8551e3d5-fdd5-413b-a253-170ba13b7525
-#> 7       10.1371/annotation/8551e3d5-fdd5-413b-a253-170ba13b7525/title
-#> 8    10.1371/annotation/8551e3d5-fdd5-413b-a253-170ba13b7525/abstract
-#> 9  10.1371/annotation/8551e3d5-fdd5-413b-a253-170ba13b7525/references
-#> 10       10.1371/annotation/8551e3d5-fdd5-413b-a253-170ba13b7525/body
-#> Variables not shown: cross_published_journal_name (chr),
-#>   cross_published_journal_key (chr), cross_published_journal_eissn (chr),
-#>   pmid (chr), pmcid (chr), publisher (chr), journal (chr),
-#>   publication_date (chr), article_type (chr), article_type_facet (chr),
-#>   author (chr), author_facet (chr), volume (int), issue (int),
-#>   elocation_id (chr), author_display (chr), competing_interest (chr),
-#>   copyright (chr)
-```
+<p>When getting raw data, csv is best, json next, then xml pulling up the rear.</p>
 
-## Compare times
+<div class="highlighter-rouge"><pre class="highlight"><code><span class="n">microbenchmark</span><span class="p">(</span>
+  <span class="n">json</span> <span class="o">=</span> <span class="n">solr_search</span><span class="p">(</span><span class="n">q</span><span class="o">=</span><span class="s1">'*:*'</span><span class="p">,</span> <span class="n">rows</span><span class="o">=</span><span class="m">1000</span><span class="p">,</span> <span class="n">fl</span><span class="o">=</span><span class="n">fields</span><span class="p">,</span> <span class="n">base</span><span class="o">=</span><span class="n">url</span><span class="p">,</span> <span class="n">wt</span> <span class="o">=</span> <span class="s2">"json"</span><span class="p">,</span> <span class="n">verbose</span> <span class="o">=</span> <span class="n">FALSE</span><span class="p">,</span> <span class="n">raw</span> <span class="o">=</span> <span class="n">TRUE</span><span class="p">),</span>
+  <span class="n">csv</span> <span class="o">=</span> <span class="n">solr_search</span><span class="p">(</span><span class="n">q</span><span class="o">=</span><span class="s1">'*:*'</span><span class="p">,</span> <span class="n">rows</span><span class="o">=</span><span class="m">1000</span><span class="p">,</span> <span class="n">fl</span><span class="o">=</span><span class="n">fields</span><span class="p">,</span> <span class="n">base</span><span class="o">=</span><span class="n">url</span><span class="p">,</span> <span class="n">wt</span> <span class="o">=</span> <span class="s2">"csv"</span><span class="p">,</span> <span class="n">verbose</span> <span class="o">=</span> <span class="n">FALSE</span><span class="p">,</span> <span class="n">raw</span> <span class="o">=</span> <span class="n">TRUE</span><span class="p">),</span>
+  <span class="n">xml</span> <span class="o">=</span> <span class="n">solr_search</span><span class="p">(</span><span class="n">q</span><span class="o">=</span><span class="s1">'*:*'</span><span class="p">,</span> <span class="n">rows</span><span class="o">=</span><span class="m">1000</span><span class="p">,</span> <span class="n">fl</span><span class="o">=</span><span class="n">fields</span><span class="p">,</span> <span class="n">base</span><span class="o">=</span><span class="n">url</span><span class="p">,</span> <span class="n">wt</span> <span class="o">=</span> <span class="s2">"xml"</span><span class="p">,</span> <span class="n">verbose</span> <span class="o">=</span> <span class="n">FALSE</span><span class="p">,</span> <span class="n">raw</span> <span class="o">=</span> <span class="n">TRUE</span><span class="p">),</span>
+  <span class="n">times</span> <span class="o">=</span> <span class="m">10</span>
+<span class="p">)</span>
+<span class="c1">#&gt; Unit: milliseconds
+#&gt;  expr       min       lq      mean    median        uq       max neval cld
+#&gt;  json 1110.9515 1142.478 1198.9981 1169.0808 1195.5709 1518.7412    10  b 
+#&gt;   csv  801.6871  802.516  826.0655  819.1532  835.0512  873.4266    10 a  
+#&gt;   xml 1507.1111 1554.002 1618.5963 1617.5208 1671.0026 1740.4448    10   c
+</span></code></pre>
+</div>
 
-When parsing to a data.frame (which `solr_search()` does by default), csv is quite a bit faster.
+<h2 id="notes">Notes</h2>
 
-
-```r
-microbenchmark(
-  json = solr_search(q='*:*', rows=500, fl=fields, base=url, wt = "json", verbose = FALSE),
-  csv = solr_search(q='*:*', rows=500, fl=fields, base=url, wt = "csv", verbose = FALSE), 
-  times = 20
-)
-#> Unit: milliseconds
-#>  expr      min       lq      mean    median        uq       max neval cld
-#>  json 965.7043 1013.014 1124.1229 1086.3225 1227.9054 1441.8332    20   b
-#>   csv 509.6573  520.089  541.5784  532.4546  548.0303  723.7575    20  a
-```
-
-## json vs xml vs csv
-
-When getting raw data, csv is best, json next, then xml pulling up the rear.
-
-
-```r
-microbenchmark(
-  json = solr_search(q='*:*', rows=1000, fl=fields, base=url, wt = "json", verbose = FALSE, raw = TRUE),
-  csv = solr_search(q='*:*', rows=1000, fl=fields, base=url, wt = "csv", verbose = FALSE, raw = TRUE),
-  xml = solr_search(q='*:*', rows=1000, fl=fields, base=url, wt = "xml", verbose = FALSE, raw = TRUE),
-  times = 10
-)
-#> Unit: milliseconds
-#>  expr       min       lq      mean    median        uq       max neval cld
-#>  json 1110.9515 1142.478 1198.9981 1169.0808 1195.5709 1518.7412    10  b 
-#>   csv  801.6871  802.516  826.0655  819.1532  835.0512  873.4266    10 a  
-#>   xml 1507.1111 1554.002 1618.5963 1617.5208 1671.0026 1740.4448    10   c
-```
-
-## Notes
-
-Note that `wt=csv` is only available in `solr_search()` and `solr_all()` because csv writer 
+<p>Note that <code class="highlighter-rouge">wt=csv</code> is only available in <code class="highlighter-rouge">solr_search()</code> and <code class="highlighter-rouge">solr_all()</code> because csv writer 
 only returns the docs element in csv, dropping other elements, including facets, mlt, groups, 
-stats, etc. 
+stats, etc.</p>
 
-Also, note the http client used in `solr` is `httr`, which passes in a gzip compression header by default, so as long as the server serving up the Solr data has compression turned on, that's all set.
+<p>Also, note the http client used in <code class="highlighter-rouge">solr</code> is <code class="highlighter-rouge">httr</code>, which passes in a gzip compression header by default, so as long as the server serving up the Solr data has compression turned on, that’s all set.</p>
 
-Another way I've sped things up is if you use `wt=json` then parse to a data.frame, it uses `dplyr` which sped things up considerably.
+<p>Another way I’ve sped things up is if you use <code class="highlighter-rouge">wt=json</code> then parse to a data.frame, it uses <code class="highlighter-rouge">dplyr</code> which sped things up considerably.</p>
 
   </div>
   
@@ -214,441 +442,224 @@ Another way I've sped things up is if you use `wt=json` then parse to a data.fra
 
     <span class="post-date">12 Mar 2015</span>
 
-    It would be nice to easily push each row or column of a data.frame into CouchDB instead of having to prepare them yourself into JSON, then push in to couch. I recently added ability to push data.frame's into couch using the normal `PUT /{db}` method, and added support for the couch bulk API.
-
-## Install
-
-
-```r
-install.packages("devtools")
-devtools::install_github("sckott/sofa")
-```
-
-
-```r
-library("sofa")
-```
-
-## PUT /db
-
-You can write directly from a data.frame, either by rows or columns. First, rows:
-
-
-```
-#> $ok
-#> [1] TRUE
-```
-
-Create a database
-
-
-```r
-db_create(dbname="mtcarsdb")
-#> $ok
-#> [1] TRUE
-```
-
-
-```r
-out <- doc_create(mtcars, dbname="mtcarsdb", how="rows")
-out[1:2]
-#> $`Mazda RX4`
-#> $`Mazda RX4`$ok
-#> [1] TRUE
-#> 
-#> $`Mazda RX4`$id
-#> [1] "0063109bfb1c15765854cbc9525c3a7a"
-#> 
-#> $`Mazda RX4`$rev
-#> [1] "1-3946941c894a874697554e3e6d9bc176"
-#> 
-#> 
-#> $`Mazda RX4 Wag`
-#> $`Mazda RX4 Wag`$ok
-#> [1] TRUE
-#> 
-#> $`Mazda RX4 Wag`$id
-#> [1] "0063109bfb1c15765854cbc9525c461d"
-#> 
-#> $`Mazda RX4 Wag`$rev
-#> [1] "1-273ff17a938cb956cba21051ab428b95"
-```
-
-Then by columns
-
-
-```r
-out <- doc_create(mtcars, dbname="mtcarsdb", how="columns")
-out[1:2]
-#> $mpg
-#> $mpg$ok
-#> [1] TRUE
-#> 
-#> $mpg$id
-#> [1] "0063109bfb1c15765854cbc9525d4f1f"
-#> 
-#> $mpg$rev
-#> [1] "1-4b83d0ef53a28849a872d47ad03fef9a"
-#> 
-#> 
-#> $cyl
-#> $cyl$ok
-#> [1] TRUE
-#> 
-#> $cyl$id
-#> [1] "0063109bfb1c15765854cbc9525d57d3"
-#> 
-#> $cyl$rev
-#> [1] "1-c21bfa5425c67743f0826fd4b44b0dbf"
-```
-
-## Bulk API
-
-The bulk API will/should be faster for larger data.frames
-
-
-```
-#> $ok
-#> [1] TRUE
-```
-
-We'll use part of the diamonds dataset
-
-
-```r
-library("ggplot2")
-dat <- diamonds[1:20000,]
-```
-
-Create a database
-
-
-```r
-db_create(dbname="bulktest")
-#> $ok
-#> [1] TRUE
-```
-
-Load by row (could instead do each column, see `how` parameter), printing the time it takes
-
-
-```r
-system.time(out <- bulk_create(dat, dbname="bulktest"))
-#>    user  system elapsed 
-#>  16.832   6.039  24.432
-```
-
-The returned data is the same as with `doc_create()`
-
-
-```r
-out[1:2]
-#> [[1]]
-#> [[1]]$ok
-#> [1] TRUE
-#> 
-#> [[1]]$id
-#> [1] "0063109bfb1c15765854cbc9525d8b8d"
-#> 
-#> [[1]]$rev
-#> [1] "1-f407fe4935af7fd17c101f13d3c81679"
-#> 
-#> 
-#> [[2]]
-#> [[2]]$ok
-#> [1] TRUE
-#> 
-#> [[2]]$id
-#> [1] "0063109bfb1c15765854cbc9525d998b"
-#> 
-#> [[2]]$rev
-#> [1] "1-cf8b9a9dcdc026052a663d6fef8a36fe"
-```
-
-So that's 20,000 rows in not that much time, not bad.
-
-### not dataframes
-
-You can also pass in lists or vectors of json as character strings, e.g., 
-
-_lists_
-
-
-```
-#> $ok
-#> [1] TRUE
-```
-
-
-```r
-row.names(mtcars) <- NULL # get rid of row.names
-lst <- parse_df(mtcars, tojson=FALSE)
-db_create(dbname="bulkfromlist")
-#> $ok
-#> [1] TRUE
-out <- bulk_create(lst, dbname="bulkfromlist")
-out[1:2]
-#> [[1]]
-#> [[1]]$ok
-#> [1] TRUE
-#> 
-#> [[1]]$id
-#> [1] "ba70c46d73707662b1e204a90fcd9bb8"
-#> 
-#> [[1]]$rev
-#> [1] "1-3946941c894a874697554e3e6d9bc176"
-#> 
-#> 
-#> [[2]]
-#> [[2]]$ok
-#> [1] TRUE
-#> 
-#> [[2]]$id
-#> [1] "ba70c46d73707662b1e204a90fcda9f6"
-#> 
-#> [[2]]$rev
-#> [1] "1-273ff17a938cb956cba21051ab428b95"
-```
-
-_json_
-
-
-```
-#> $ok
-#> [1] TRUE
-```
-
-
-```r
-strs <- as.character(parse_df(mtcars, "columns"))
-db_create(dbname="bulkfromchr")
-#> $ok
-#> [1] TRUE
-out <- bulk_create(strs, dbname="bulkfromchr")
-out[1:2]
-#> [[1]]
-#> [[1]]$ok
-#> [1] TRUE
-#> 
-#> [[1]]$id
-#> [1] "ba70c46d73707662b1e204a90fce8c20"
-#> 
-#> [[1]]$rev
-#> [1] "1-4b83d0ef53a28849a872d47ad03fef9a"
-#> 
-#> 
-#> [[2]]
-#> [[2]]$ok
-#> [1] TRUE
-#> 
-#> [[2]]$id
-#> [1] "ba70c46d73707662b1e204a90fce9bc1"
-#> 
-#> [[2]]$rev
-#> [1] "1-c21bfa5425c67743f0826fd4b44b0dbf"
-```
-
-  </div>
-  
-  <div class="post">
-    <h1>
-      <a href="/2015/03/csl-client/">
-        csl - an R client for Citation Style Language data
-      </a>
-    </h1>
-
-    <span class="post-date">11 Mar 2015</span>
-
-    CSL (Citation Style Language) is used quite widely now to specify citations in a standard fashion. `csl` is an R client for exploring CSL styles, and is inspired by the Ruby gem [csl](https://github.com/inukshuk/csl-ruby). For example, csl is given back in the PLOS Lagotto article level metric API (follow [http://alm.plos.org/api/v5/articles?ids=10.1371%252Fjournal.pone.0025110&info=detail&source_id=crossref](http://alm.plos.org/api/v5/articles?ids=10.1371%252Fjournal.pone.0025110&info=detail&source_id=crossref)).
-
-Let me know if you have any feedback at the repo [https://github.com/ropensci/csl](https://github.com/ropensci/csl)
-
-## Install
-
-
-```r
-install.packages("devtools")
-devtools::install_github("ropensci/csl")
-```
-
-
-```r
-library("csl")
-```
-
-## Load CSL style from a URL
-
-You can load CSL styles from either a URL or a local file on your machine. Firt, from a URL. In this case from the Zotero style repository, for the American Journal or Political Science.
-
-
-```r
-jps <- style_load('http://www.zotero.org/styles/american-journal-of-political-science')
-```
-
-A list is returned, which you can index to various parts of the style specification.
-
-
-```r
-jps$info
-#> $title
-#> [1] "American Journal of Political Science"
-#> 
-#> $title_short
-#> [1] "AJPS"
-#> 
-#> $id
-#> [1] "http://www.zotero.org/styles/american-journal-of-political-science"
-#> 
-#> $author
-...
-```
-
-
-```r
-jps$title
-#> [1] "American Journal of Political Science"
-```
-
-
-```r
-jps$citation_format
-#> [1] "author-date"
-```
-
-
-```r
-jps$links_template
-#> [1] "http://www.zotero.org/styles/american-political-science-association"
-```
-
-
-```r
-jps$editor
-#> $editor
-#> $editor$variable
-#> [1] "editor"
-#> 
-#> $editor$delimiter
-#> [1] ", "
-#> 
-#> 
-#> $label
-#> $label$form
-...
-```
-
-
-```r
-jps$author
-#> $author
-#> $author$variable
-#> [1] "author"
-#> 
-#> 
-#> $label
-#> $label$form
-#> [1] "short"
-#> 
-#> $label$prefix
-...
-```
-
-## Get raw XML
-
-You can also get raw XML if you'd rather deal with that format.
-
-
-```r
-style_xml('http://www.zotero.org/styles/american-journal-of-political-science')
-#> <?xml version="1.0" encoding="utf-8"?>
-#> <style xmlns="http://purl.org/net/xbiblio/csl" class="in-text" version="1.0" demote-non-dropping-particle="sort-only" default-locale="en-US">
-#>   <info>
-#>     <title>American Journal of Political Science</title>
-#>     <title-short>AJPS</title-short>
-#>     <id>http://www.zotero.org/styles/american-journal-of-political-science</id>
-#>     <link href="http://www.zotero.org/styles/american-journal-of-political-science" rel="self"/>
-#>     <link href="http://www.zotero.org/styles/american-political-science-association" rel="template"/>
-#>     <link href="http://www.ajps.org/AJPS%20Style%20Guide.pdf" rel="documentation"/>
-#>     <author>
-...
-```
-
-## Get styles
-
-There is a GitHub repository of CSL styles at  [https://github.com/citation-style-language/styles-distribution](https://github.com/citation-style-language/styles-distribution). These don't come with the `csl` package, so you have to run `get_styles()` to get them on your machine. The default path is `Sys.getenv("HOME")/styles`, which for me is `/Users/sacmac/styles`. You can change where files are saved by using the `path` parameter.
-
-
-```r
-get_styles()
-#> 
-#> Done! Files put in /Users/sacmac/styles
-```
-
-After getting styles locally you can load them just as we did with `style_load()`, but from your machine. However, since the file is local, we can make this easier by allowing just the name of the style, like
-
-
-```r
-style_load("apa")
-#> $info
-#> $info$title
-#> [1] "American Psychological Association 6th edition"
-#> 
-#> $info$title_short
-#> [1] "APA"
-#> 
-#> $info$id
-#> [1] "http://www.zotero.org/styles/apa"
-#> 
-...
-```
-
-If you are unsure if a style exists, you can use `style_exists()`
-
-
-```r
-style_exists("helloworld")
-#> [1] FALSE
-style_exists("acs-nano")
-#> [1] TRUE
-```
-
-In addition, you can list the path for a single style, more than 1, or all styles with `styles()`
-
-
-```r
-styles("apa")
-#> [1] "/Users/sacmac/styles/apa.csl"
-```
-
-All of them, truncated for blog brevity
-
-
-```r
-styles()
-#> $independent
-#>    [1] "academy-of-management-review"                                                         
-#>    [2] "acm-sig-proceedings-long-author-list"                                                 
-#>    [3] "acm-sig-proceedings"                                                                  
-#>    [4] "acm-sigchi-proceedings-extended-abstract-format"                                      
-#>    [5] "acm-sigchi-proceedings"                                                               
-#>    [6] "acm-siggraph"                                                                         
-#>    [7] "acs-nano"                                                                             
-#>    [8] "acta-anaesthesiologica-scandinavica"                                                  
-#>    [9] "acta-anaesthesiologica-taiwanica"                                                     
-...
-```
-
-## Get locales
-
-In addition to styles, there is a GitHub repo for locales at  [https://github.com/citation-style-language/locales](https://github.com/citation-style-language/locales). These also don't come with the `csl` package, so you have to run `get_locales()` to get them on your machine. Same goes here for paths as above for styles.
-
-
-```r
-get_locales()
-#> 
-#> Done! Files put in /Users/sacmac/locales
-```
-
+    <p>It would be nice to easily push each row or column of a data.frame into CouchDB instead of having to prepare them yourself into JSON, then push in to couch. I recently added ability to push data.frame’s into couch using the normal <code class="highlighter-rouge">PUT /{db}</code> method, and added support for the couch bulk API.</p>
+
+<h2 id="install">Install</h2>
+
+<div class="highlighter-rouge"><pre class="highlight"><code><span class="n">install.packages</span><span class="p">(</span><span class="s2">"devtools"</span><span class="p">)</span>
+<span class="n">devtools</span><span class="o">::</span><span class="n">install_github</span><span class="p">(</span><span class="s2">"sckott/sofa"</span><span class="p">)</span>
+</code></pre>
+</div>
+
+<div class="highlighter-rouge"><pre class="highlight"><code><span class="n">library</span><span class="p">(</span><span class="s2">"sofa"</span><span class="p">)</span>
+</code></pre>
+</div>
+
+<h2 id="put-db">PUT /db</h2>
+
+<p>You can write directly from a data.frame, either by rows or columns. First, rows:</p>
+
+<div class="highlighter-rouge"><pre class="highlight"><code>#&gt; $ok
+#&gt; [1] TRUE
+</code></pre>
+</div>
+
+<p>Create a database</p>
+
+<div class="highlighter-rouge"><pre class="highlight"><code><span class="n">db_create</span><span class="p">(</span><span class="n">dbname</span><span class="o">=</span><span class="s2">"mtcarsdb"</span><span class="p">)</span>
+<span class="c1">#&gt; $ok
+#&gt; [1] TRUE
+</span></code></pre>
+</div>
+
+<div class="highlighter-rouge"><pre class="highlight"><code><span class="n">out</span> <span class="o">&lt;-</span> <span class="n">doc_create</span><span class="p">(</span><span class="n">mtcars</span><span class="p">,</span> <span class="n">dbname</span><span class="o">=</span><span class="s2">"mtcarsdb"</span><span class="p">,</span> <span class="n">how</span><span class="o">=</span><span class="s2">"rows"</span><span class="p">)</span>
+<span class="n">out</span><span class="p">[</span><span class="m">1</span><span class="o">:</span><span class="m">2</span><span class="p">]</span>
+<span class="c1">#&gt; $`Mazda RX4`
+#&gt; $`Mazda RX4`$ok
+#&gt; [1] TRUE
+#&gt; 
+#&gt; $`Mazda RX4`$id
+#&gt; [1] "0063109bfb1c15765854cbc9525c3a7a"
+#&gt; 
+#&gt; $`Mazda RX4`$rev
+#&gt; [1] "1-3946941c894a874697554e3e6d9bc176"
+#&gt; 
+#&gt; 
+#&gt; $`Mazda RX4 Wag`
+#&gt; $`Mazda RX4 Wag`$ok
+#&gt; [1] TRUE
+#&gt; 
+#&gt; $`Mazda RX4 Wag`$id
+#&gt; [1] "0063109bfb1c15765854cbc9525c461d"
+#&gt; 
+#&gt; $`Mazda RX4 Wag`$rev
+#&gt; [1] "1-273ff17a938cb956cba21051ab428b95"
+</span></code></pre>
+</div>
+
+<p>Then by columns</p>
+
+<div class="highlighter-rouge"><pre class="highlight"><code><span class="n">out</span> <span class="o">&lt;-</span> <span class="n">doc_create</span><span class="p">(</span><span class="n">mtcars</span><span class="p">,</span> <span class="n">dbname</span><span class="o">=</span><span class="s2">"mtcarsdb"</span><span class="p">,</span> <span class="n">how</span><span class="o">=</span><span class="s2">"columns"</span><span class="p">)</span>
+<span class="n">out</span><span class="p">[</span><span class="m">1</span><span class="o">:</span><span class="m">2</span><span class="p">]</span>
+<span class="c1">#&gt; $mpg
+#&gt; $mpg$ok
+#&gt; [1] TRUE
+#&gt; 
+#&gt; $mpg$id
+#&gt; [1] "0063109bfb1c15765854cbc9525d4f1f"
+#&gt; 
+#&gt; $mpg$rev
+#&gt; [1] "1-4b83d0ef53a28849a872d47ad03fef9a"
+#&gt; 
+#&gt; 
+#&gt; $cyl
+#&gt; $cyl$ok
+#&gt; [1] TRUE
+#&gt; 
+#&gt; $cyl$id
+#&gt; [1] "0063109bfb1c15765854cbc9525d57d3"
+#&gt; 
+#&gt; $cyl$rev
+#&gt; [1] "1-c21bfa5425c67743f0826fd4b44b0dbf"
+</span></code></pre>
+</div>
+
+<h2 id="bulk-api">Bulk API</h2>
+
+<p>The bulk API will/should be faster for larger data.frames</p>
+
+<div class="highlighter-rouge"><pre class="highlight"><code>#&gt; $ok
+#&gt; [1] TRUE
+</code></pre>
+</div>
+
+<p>We’ll use part of the diamonds dataset</p>
+
+<div class="highlighter-rouge"><pre class="highlight"><code><span class="n">library</span><span class="p">(</span><span class="s2">"ggplot2"</span><span class="p">)</span>
+<span class="n">dat</span> <span class="o">&lt;-</span> <span class="n">diamonds</span><span class="p">[</span><span class="m">1</span><span class="o">:</span><span class="m">20000</span><span class="p">,]</span>
+</code></pre>
+</div>
+
+<p>Create a database</p>
+
+<div class="highlighter-rouge"><pre class="highlight"><code><span class="n">db_create</span><span class="p">(</span><span class="n">dbname</span><span class="o">=</span><span class="s2">"bulktest"</span><span class="p">)</span>
+<span class="c1">#&gt; $ok
+#&gt; [1] TRUE
+</span></code></pre>
+</div>
+
+<p>Load by row (could instead do each column, see <code class="highlighter-rouge">how</code> parameter), printing the time it takes</p>
+
+<div class="highlighter-rouge"><pre class="highlight"><code><span class="n">system.time</span><span class="p">(</span><span class="n">out</span> <span class="o">&lt;-</span> <span class="n">bulk_create</span><span class="p">(</span><span class="n">dat</span><span class="p">,</span> <span class="n">dbname</span><span class="o">=</span><span class="s2">"bulktest"</span><span class="p">))</span>
+<span class="c1">#&gt;    user  system elapsed 
+#&gt;  16.832   6.039  24.432
+</span></code></pre>
+</div>
+
+<p>The returned data is the same as with <code class="highlighter-rouge">doc_create()</code></p>
+
+<div class="highlighter-rouge"><pre class="highlight"><code><span class="n">out</span><span class="p">[</span><span class="m">1</span><span class="o">:</span><span class="m">2</span><span class="p">]</span>
+<span class="c1">#&gt; [[1]]
+#&gt; [[1]]$ok
+#&gt; [1] TRUE
+#&gt; 
+#&gt; [[1]]$id
+#&gt; [1] "0063109bfb1c15765854cbc9525d8b8d"
+#&gt; 
+#&gt; [[1]]$rev
+#&gt; [1] "1-f407fe4935af7fd17c101f13d3c81679"
+#&gt; 
+#&gt; 
+#&gt; [[2]]
+#&gt; [[2]]$ok
+#&gt; [1] TRUE
+#&gt; 
+#&gt; [[2]]$id
+#&gt; [1] "0063109bfb1c15765854cbc9525d998b"
+#&gt; 
+#&gt; [[2]]$rev
+#&gt; [1] "1-cf8b9a9dcdc026052a663d6fef8a36fe"
+</span></code></pre>
+</div>
+
+<p>So that’s 20,000 rows in not that much time, not bad.</p>
+
+<h3 id="not-dataframes">not dataframes</h3>
+
+<p>You can also pass in lists or vectors of json as character strings, e.g.,</p>
+
+<p><em>lists</em></p>
+
+<div class="highlighter-rouge"><pre class="highlight"><code>#&gt; $ok
+#&gt; [1] TRUE
+</code></pre>
+</div>
+
+<div class="highlighter-rouge"><pre class="highlight"><code><span class="n">row.names</span><span class="p">(</span><span class="n">mtcars</span><span class="p">)</span> <span class="o">&lt;-</span> <span class="n">NULL</span> <span class="c1"># get rid of row.names
+</span><span class="n">lst</span> <span class="o">&lt;-</span> <span class="n">parse_df</span><span class="p">(</span><span class="n">mtcars</span><span class="p">,</span> <span class="n">tojson</span><span class="o">=</span><span class="n">FALSE</span><span class="p">)</span>
+<span class="n">db_create</span><span class="p">(</span><span class="n">dbname</span><span class="o">=</span><span class="s2">"bulkfromlist"</span><span class="p">)</span>
+<span class="c1">#&gt; $ok
+#&gt; [1] TRUE
+</span><span class="n">out</span> <span class="o">&lt;-</span> <span class="n">bulk_create</span><span class="p">(</span><span class="n">lst</span><span class="p">,</span> <span class="n">dbname</span><span class="o">=</span><span class="s2">"bulkfromlist"</span><span class="p">)</span>
+<span class="n">out</span><span class="p">[</span><span class="m">1</span><span class="o">:</span><span class="m">2</span><span class="p">]</span>
+<span class="c1">#&gt; [[1]]
+#&gt; [[1]]$ok
+#&gt; [1] TRUE
+#&gt; 
+#&gt; [[1]]$id
+#&gt; [1] "ba70c46d73707662b1e204a90fcd9bb8"
+#&gt; 
+#&gt; [[1]]$rev
+#&gt; [1] "1-3946941c894a874697554e3e6d9bc176"
+#&gt; 
+#&gt; 
+#&gt; [[2]]
+#&gt; [[2]]$ok
+#&gt; [1] TRUE
+#&gt; 
+#&gt; [[2]]$id
+#&gt; [1] "ba70c46d73707662b1e204a90fcda9f6"
+#&gt; 
+#&gt; [[2]]$rev
+#&gt; [1] "1-273ff17a938cb956cba21051ab428b95"
+</span></code></pre>
+</div>
+
+<p><em>json</em></p>
+
+<div class="highlighter-rouge"><pre class="highlight"><code>#&gt; $ok
+#&gt; [1] TRUE
+</code></pre>
+</div>
+
+<div class="highlighter-rouge"><pre class="highlight"><code><span class="n">strs</span> <span class="o">&lt;-</span> <span class="n">as.character</span><span class="p">(</span><span class="n">parse_df</span><span class="p">(</span><span class="n">mtcars</span><span class="p">,</span> <span class="s2">"columns"</span><span class="p">))</span>
+<span class="n">db_create</span><span class="p">(</span><span class="n">dbname</span><span class="o">=</span><span class="s2">"bulkfromchr"</span><span class="p">)</span>
+<span class="c1">#&gt; $ok
+#&gt; [1] TRUE
+</span><span class="n">out</span> <span class="o">&lt;-</span> <span class="n">bulk_create</span><span class="p">(</span><span class="n">strs</span><span class="p">,</span> <span class="n">dbname</span><span class="o">=</span><span class="s2">"bulkfromchr"</span><span class="p">)</span>
+<span class="n">out</span><span class="p">[</span><span class="m">1</span><span class="o">:</span><span class="m">2</span><span class="p">]</span>
+<span class="c1">#&gt; [[1]]
+#&gt; [[1]]$ok
+#&gt; [1] TRUE
+#&gt; 
+#&gt; [[1]]$id
+#&gt; [1] "ba70c46d73707662b1e204a90fce8c20"
+#&gt; 
+#&gt; [[1]]$rev
+#&gt; [1] "1-4b83d0ef53a28849a872d47ad03fef9a"
+#&gt; 
+#&gt; 
+#&gt; [[2]]
+#&gt; [[2]]$ok
+#&gt; [1] TRUE
+#&gt; 
+#&gt; [[2]]$id
+#&gt; [1] "ba70c46d73707662b1e204a90fce9bc1"
+#&gt; 
+#&gt; [[2]]$rev
+#&gt; [1] "1-c21bfa5425c67743f0826fd4b44b0dbf"
+</span></code></pre>
+</div>
 
   </div>
   

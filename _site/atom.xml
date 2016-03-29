@@ -4,13 +4,124 @@
  <title>Recology</title>
  <link href="http://recology.info//atom.xml" rel="self"/>
  <link href="http://recology.info//"/>
- <updated>2016-03-24T15:24:06-07:00</updated>
+ <updated>2016-03-29T11:37:11-07:00</updated>
  <id>http://recology.info/</id>
  <author>
    <name>Scott Chamberlain</name>
    <email>myrmecocystus@gmail.com</email>
  </author>
 
+ 
+ <entry>
+   <title>GenBank IDs API - get, match, swap id types</title>
+   <link href="http://recology.info//2016/03/genbank-ids/"/>
+   <updated>2016-03-29T00:00:00-07:00</updated>
+   <id>http://recology.info//2016/03/genbank-ids</id>
+   <content type="html">&lt;p&gt;GenBank IDs, accession numbers and GI identifiers, are the two types of identifiers for entries in GenBank. (see &lt;a href=&quot;http://www.ncbi.nlm.nih.gov/Sitemap/sequenceIDs.html&quot;&gt;this page&lt;/a&gt; for why there are two types of identifiers). Actually, &lt;a href=&quot;http://www.ncbi.nlm.nih.gov/news/03-02-2016-phase-out-of-GI-numbers/&quot;&gt;recent news&lt;/a&gt; from NCBI is that GI identifiers will be phased out by September this year, which affects what I’ll talk about below.&lt;/p&gt;
+
+&lt;p&gt;There are a lot of sequences in GenBank. Sometimes you have identifiers and you want to check if they exist in GenBank, or want to get one type from another (accession from GI, or vice versa; although GI phase out will make this use case no longer needed), or just get a bunch of identifiers for software testing purposes perhaps.&lt;/p&gt;
+
+&lt;p&gt;Currently, the ENTREZ web services aren’t super performant or easy to use for the above use cases. Thus, I’ve built out a RESTful API for these use cases, called &lt;a href=&quot;https://github.com/sckott/gbids&quot;&gt;gbids&lt;/a&gt;.&lt;/p&gt;
+
+&lt;p&gt;&lt;code class=&quot;highlighter-rouge&quot;&gt;gbids&lt;/code&gt; on GitHub: &lt;a href=&quot;https://github.com/sckott/gbids&quot;&gt;sckott/gbids&lt;/a&gt;&lt;/p&gt;
+
+&lt;p&gt;Here’s the tech stack:&lt;/p&gt;
+
+&lt;ul&gt;
+  &lt;li&gt;API: Ruby/Sinatra&lt;/li&gt;
+  &lt;li&gt;Storage: MySQL&lt;/li&gt;
+  &lt;li&gt;Caching: Redis
+    &lt;ul&gt;
+      &lt;li&gt;each key cached for 3 hours&lt;/li&gt;
+    &lt;/ul&gt;
+  &lt;/li&gt;
+  &lt;li&gt;Server: Caddy
+    &lt;ul&gt;
+      &lt;li&gt;https&lt;/li&gt;
+    &lt;/ul&gt;
+  &lt;/li&gt;
+  &lt;li&gt;Authentication: none&lt;/li&gt;
+&lt;/ul&gt;
+
+&lt;p&gt;Will soon have a cron job update when new dump is available every Sunday, but for now we’re about a month behind the current dump of identifiers. If usage of the API picks up, I’ll know it’s worth maintaining and make sure data is up to date.&lt;/p&gt;
+
+&lt;p&gt;The base url is &lt;a href=&quot;https://gbids.xyz&quot;&gt;https://gbids.xyz&lt;/a&gt;.&lt;/p&gt;
+
+&lt;p&gt;Here’s a rundown of the API routes:&lt;/p&gt;
+
+&lt;ul&gt;
+  &lt;li&gt;&lt;code class=&quot;highlighter-rouge&quot;&gt;/&lt;/code&gt; re-routes to &lt;code class=&quot;highlighter-rouge&quot;&gt;/heartbeat&lt;/code&gt;&lt;/li&gt;
+  &lt;li&gt;&lt;code class=&quot;highlighter-rouge&quot;&gt;/heartbeat&lt;/code&gt; - list routes&lt;/li&gt;
+  &lt;li&gt;&lt;code class=&quot;highlighter-rouge&quot;&gt;/acc&lt;/code&gt; - &lt;code class=&quot;highlighter-rouge&quot;&gt;GET&lt;/code&gt; - list accession ids&lt;/li&gt;
+  &lt;li&gt;&lt;code class=&quot;highlighter-rouge&quot;&gt;/acc/:id,:id,...&lt;/code&gt; - &lt;code class=&quot;highlighter-rouge&quot;&gt;GET&lt;/code&gt; - submit many accession numbers, get back boolean (match or no match)&lt;/li&gt;
+  &lt;li&gt;&lt;code class=&quot;highlighter-rouge&quot;&gt;/acc&lt;/code&gt; - &lt;code class=&quot;highlighter-rouge&quot;&gt;POST&lt;/code&gt;&lt;/li&gt;
+  &lt;li&gt;&lt;code class=&quot;highlighter-rouge&quot;&gt;/gi&lt;/code&gt; - &lt;code class=&quot;highlighter-rouge&quot;&gt;GET&lt;/code&gt; - list gi numbers&lt;/li&gt;
+  &lt;li&gt;&lt;code class=&quot;highlighter-rouge&quot;&gt;/gi/:id,:id,...&lt;/code&gt; - &lt;code class=&quot;highlighter-rouge&quot;&gt;GET&lt;/code&gt; - submit many gi numbers, get back boolean (match or no match)&lt;/li&gt;
+  &lt;li&gt;&lt;code class=&quot;highlighter-rouge&quot;&gt;/gi&lt;/code&gt; - &lt;code class=&quot;highlighter-rouge&quot;&gt;POST&lt;/code&gt;&lt;/li&gt;
+  &lt;li&gt;&lt;code class=&quot;highlighter-rouge&quot;&gt;/acc2gi/:id,:id,...&lt;/code&gt; - &lt;code class=&quot;highlighter-rouge&quot;&gt;GET&lt;/code&gt; - get gi numbers from accession numbers&lt;/li&gt;
+  &lt;li&gt;&lt;code class=&quot;highlighter-rouge&quot;&gt;/acc2gi&lt;/code&gt; - &lt;code class=&quot;highlighter-rouge&quot;&gt;POST&lt;/code&gt;&lt;/li&gt;
+  &lt;li&gt;&lt;code class=&quot;highlighter-rouge&quot;&gt;/gi2acc/:id,:id,...&lt;/code&gt; - &lt;code class=&quot;highlighter-rouge&quot;&gt;GET&lt;/code&gt; - get accession numbers from gi numbers&lt;/li&gt;
+  &lt;li&gt;&lt;code class=&quot;highlighter-rouge&quot;&gt;/gi2acc&lt;/code&gt; - &lt;code class=&quot;highlighter-rouge&quot;&gt;POST&lt;/code&gt;&lt;/li&gt;
+&lt;/ul&gt;
+
+&lt;p&gt;Of course after GI identifiers are phased out, all &lt;code class=&quot;highlighter-rouge&quot;&gt;gi&lt;/code&gt; routes will be removed.&lt;/p&gt;
+
+&lt;p&gt;The API docs are at &lt;a href=&quot;http://recology.info/gbidsdocs&quot;&gt;recology.info/gbidsdocs&lt;/a&gt; - let me know if you have any feedback on those.&lt;/p&gt;
+
+&lt;p&gt;I also have a status page up at &lt;a href=&quot;http://recology.info/gbidsstatus/&quot;&gt;recology.info/gbidsstatus&lt;/a&gt; - it’s not automated, I have to update the status manually, but I do update that page whenever I’m doing maintenance and the API will be down, or if it goes down due to any other reason.&lt;/p&gt;
+
+&lt;h2 id=&quot;examples&quot;&gt;examples&lt;/h2&gt;
+
+&lt;p&gt;Request to list accession identifiers, limit to 5&lt;/p&gt;
+
+&lt;div class=&quot;highlighter-rouge&quot;&gt;&lt;pre class=&quot;highlight&quot;&gt;&lt;code&gt;curl &#39;https://gbids.xyz/acc?limit=5&#39; | jq .
+{
+  &quot;matched&quot;: 692006925,
+  &quot;returned&quot;: 5,
+  &quot;data&quot;: [
+    &quot;A00002&quot;,
+    &quot;A00003&quot;,
+    &quot;X17276&quot;,
+    &quot;X60065&quot;,
+    &quot;CAA42669&quot;
+  ],
+  &quot;error&quot;: null
+}
+&lt;/code&gt;&lt;/pre&gt;
+&lt;/div&gt;
+
+&lt;p&gt;Request to match accession identifiers, some exist, while some do not&lt;/p&gt;
+
+&lt;div class=&quot;highlighter-rouge&quot;&gt;&lt;pre class=&quot;highlight&quot;&gt;&lt;code&gt;curl &#39;https://gbids.xyz/acc/AACY024124486,AACY024124483,asdfd,asdf,AACY024124476&#39; | jq .
+{
+  &quot;matched&quot;: 3,
+  &quot;returned&quot;: 5,
+  &quot;data&quot;: {
+    &quot;AACY024124486&quot;: true,
+    &quot;AACY024124483&quot;: true,
+    &quot;asdfd&quot;: false,
+    &quot;asdf&quot;: false,
+    &quot;AACY024124476&quot;: true
+  },
+  &quot;error&quot;: null
+}
+&lt;/code&gt;&lt;/pre&gt;
+&lt;/div&gt;
+
+&lt;h2 id=&quot;to-do&quot;&gt;to do&lt;/h2&gt;
+
+&lt;p&gt;I think it’d probably be worth adding routes for getting accession from taxonomy id and vice versa since that’s something that is currently not very easy. We could use the dumped accession2taxid data from ftp://ftp.ncbi.nih.gov/pub/taxonomy/accession2taxid/&lt;/p&gt;
+
+&lt;h2 id=&quot;feedback&quot;&gt;feedback!&lt;/h2&gt;
+
+&lt;p&gt;If you think this could be potentially useful, do try it out and send any feedback. I watch logs from the API, so I’m hoping for an increase in usage so I know people find it useful.&lt;/p&gt;
+
+&lt;p&gt;Since servers aren’t free, costs add up, and if I don’t see usage pick up I’ll discontinue the service at some point. So do use it!&lt;/p&gt;
+
+&lt;p&gt;And if anyone can offer free servers, I’d gladly take advantage of that. I’ve applied for AWS research grant, but won’t hear back for a few months.&lt;/p&gt;
+
+</content>
+ </entry>
  
  <entry>
    <title>heythere - a robot to automate GitHub issue comments</title>
@@ -134,6 +245,10 @@ heroku addons:open scheduler
 &lt;p&gt;&lt;img src=&quot;/public/img/2016-03-24-hey-there/testhey.png&quot; alt=&quot;assertr_img&quot; /&gt;&lt;/p&gt;
 
 &lt;p&gt;You could set up a different GitHub account as your robot so it’s clearly not coming from a real person.&lt;/p&gt;
+
+&lt;h2 id=&quot;feedback&quot;&gt;feedback&lt;/h2&gt;
+
+&lt;p&gt;I’ll continue to improve &lt;code class=&quot;highlighter-rouge&quot;&gt;heythere&lt;/code&gt; as we get feedback on its use in &lt;code class=&quot;highlighter-rouge&quot;&gt;ropensci/onboarding&lt;/code&gt;. Would also love any feedback from you, internet. Thanks!&lt;/p&gt;
 
 </content>
  </entry>
