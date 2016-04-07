@@ -61,6 +61,252 @@
   
   <div class="post">
     <h1>
+      <a href="/2015/11/crossref-clients/">
+        Crossref programmatic clients
+      </a>
+    </h1>
+
+    <span class="post-date">30 Nov 2015</span>
+
+    <p>I gave two talks recently at the annual <a href="http://www.crossref.org/annualmeeting/agenda.html">Crossref meeting</a>, one of which was a somewhat technical overview of programmatic clients for Crossref APIs. Check out the talk <a href="https://crossref.wistia.com/medias/8rh0jm5eda">here</a>. I talked about the motivation for working with Crossref data by writing code/etc. rather than going the GUI route, then went over the various clients, with brief examples.</p>
+
+<p>We (rOpenSci) have been working on the R client <a href="https://github.com/ropensci/rcrossref">rcrossref</a> for a while now, but I’m also working on the Python and Ruby clients for Crossref. In addition, the Ruby client has a CLI client inside. The Javascript client is worked on independently by <a href="https://science.ai/">ScienceAI</a>.</p>
+
+<p>The R, Ruby, and Python clients are useable but not feature complete yet, and would benefit from lots of users surfacing bugs and highlighting nice to have features.</p>
+
+<p>The main Crossref API used in all the clients is documented at <a href="https://github.com/CrossRef/rest-api-doc/blob/master/rest_api.md">api.crossref.org</a>.</p>
+
+<p>I’ve tried to make the APIs similar-ish across clients. Functions in each client match the main Crossref search API (api.crossref.org) routes:</p>
+
+<ul>
+  <li><code class="highlighter-rouge">/works</code></li>
+  <li><code class="highlighter-rouge">/members</code></li>
+  <li><code class="highlighter-rouge">/funders</code></li>
+  <li><code class="highlighter-rouge">/journals</code></li>
+  <li><code class="highlighter-rouge">/types</code></li>
+  <li><code class="highlighter-rouge">/licenses</code></li>
+</ul>
+
+<p>Other methods in all three clients:</p>
+
+<ul>
+  <li>Get DOI minting agency
+    <ul>
+      <li>Uses api.crossref.org API</li>
+    </ul>
+  </li>
+  <li>Get random DOIs
+    <ul>
+      <li>Uses api.crossref.org API</li>
+    </ul>
+  </li>
+  <li>Content negotiation
+    <ul>
+      <li>Documented at <a href="http://www.crosscite.org/cn">http://www.crosscite.org/cn</a></li>
+    </ul>
+  </li>
+  <li>Get full text
+    <ul>
+      <li>other clients in each language will focus on this use case</li>
+    </ul>
+  </li>
+  <li>Get citation count
+    <ul>
+      <li>Uses service at <a href="http://www.crossref.org/openurl">http://www.crossref.org/openurl</a> - though this functionality may be in the api.crossref.org API at some point</li>
+    </ul>
+  </li>
+</ul>
+
+<p>The following shows how to install, and then examples from each client for a few use cases.</p>
+
+<h2 id="installation">Installation</h2>
+
+<h3 id="python">Python</h3>
+
+<div class="highlighter-rouge"><pre class="highlight"><code>pip install habanero
+</code></pre>
+</div>
+
+<h3 id="ruby">Ruby</h3>
+
+<div class="highlighter-rouge"><pre class="highlight"><code>gem install serrano
+</code></pre>
+</div>
+
+<h3 id="r">R</h3>
+
+<p>Inside R:</p>
+
+<div class="highlighter-rouge"><pre class="highlight"><code><span class="n">install.packages</span><span class="p">(</span><span class="s2">"rcrossref"</span><span class="p">)</span>
+</code></pre>
+</div>
+
+<h3 id="javascript">Javascript</h3>
+
+<div class="highlighter-rouge"><pre class="highlight"><code>npm install crossref
+</code></pre>
+</div>
+
+<p>I won’t do any examples with the js library, as I don’t maintain it.</p>
+
+<h2 id="use-case-get-orcid-ids-for-authors">Use case: get ORCID IDs for authors</h2>
+
+<p>Python</p>
+
+<div class="highlighter-rouge"><pre class="highlight"><code><span class="kn">from</span> <span class="nn">habanero</span> <span class="kn">import</span> <span class="n">Crossref</span>
+<span class="n">cr</span> <span class="o">=</span> <span class="n">Crossref</span><span class="p">()</span>
+<span class="n">res</span> <span class="o">=</span> <span class="n">cr</span><span class="o">.</span><span class="n">works</span><span class="p">(</span><span class="nb">filter</span> <span class="o">=</span> <span class="p">{</span><span class="s">'has_orcid'</span><span class="p">:</span> <span class="bp">True</span><span class="p">},</span> <span class="n">limit</span> <span class="o">=</span> <span class="mi">10</span><span class="p">)</span>
+<span class="n">res2</span> <span class="o">=</span> <span class="p">[</span> <span class="p">[</span> <span class="n">z</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s">'ORCID'</span><span class="p">)</span> <span class="k">for</span> <span class="n">z</span> <span class="ow">in</span> <span class="n">x</span><span class="p">[</span><span class="s">'author'</span><span class="p">]</span> <span class="p">]</span> <span class="k">for</span> <span class="n">x</span> <span class="ow">in</span> <span class="n">res</span><span class="o">.</span><span class="n">result</span><span class="p">[</span><span class="s">'message'</span><span class="p">][</span><span class="s">'items'</span><span class="p">]</span> <span class="p">]</span>
+<span class="nb">filter</span><span class="p">(</span><span class="bp">None</span><span class="p">,</span> <span class="nb">reduce</span><span class="p">(</span><span class="k">lambda</span> <span class="n">x</span><span class="p">,</span> <span class="n">y</span><span class="p">:</span> <span class="n">x</span><span class="o">+</span><span class="n">y</span><span class="p">,</span> <span class="n">res2</span><span class="p">))</span>
+</code></pre>
+</div>
+
+<div class="highlighter-rouge"><pre class="highlight"><code><span class="p">[</span><span class="s">u'http://orcid.org/0000-0003-4087-8021'</span><span class="p">,</span>
+ <span class="s">u'http://orcid.org/0000-0002-2076-5452'</span><span class="p">,</span>
+ <span class="s">u'http://orcid.org/0000-0003-4087-8021'</span><span class="p">,</span>
+ <span class="s">u'http://orcid.org/0000-0002-2076-5452'</span><span class="p">,</span>
+ <span class="s">u'http://orcid.org/0000-0003-1710-1580'</span><span class="p">,</span>
+ <span class="s">u'http://orcid.org/0000-0003-1710-1580'</span><span class="p">,</span>
+ <span class="s">u'http://orcid.org/0000-0003-4637-238X'</span><span class="p">,</span>
+ <span class="s">u'http://orcid.org/0000-0003-4637-238X'</span><span class="p">,</span>
+ <span class="s">u'http://orcid.org/0000-0003-4637-238X'</span><span class="p">,</span>
+ <span class="s">u'http://orcid.org/0000-0003-4637-238X'</span><span class="p">,</span>
+ <span class="s">u'http://orcid.org/0000-0003-4637-238X'</span><span class="p">,</span>
+ <span class="s">u'http://orcid.org/0000-0003-2510-4271'</span><span class="p">]</span>
+</code></pre>
+</div>
+
+<p>Ruby</p>
+
+<div class="highlighter-rouge"><pre class="highlight"><code><span class="nb">require</span> <span class="s1">'serrano'</span>
+<span class="n">res</span> <span class="o">=</span> <span class="no">Serrano</span><span class="p">.</span><span class="nf">works</span><span class="p">(</span><span class="ss">filter: </span><span class="p">{</span><span class="s1">'has_orcid'</span><span class="p">:</span> <span class="kp">true</span><span class="p">},</span> <span class="ss">limit: </span><span class="mi">10</span><span class="p">)</span>
+<span class="n">res2</span> <span class="o">=</span> <span class="n">res</span><span class="p">[</span><span class="s1">'message'</span><span class="p">][</span><span class="s1">'items'</span><span class="p">].</span><span class="nf">collect</span> <span class="p">{</span> <span class="o">|</span><span class="n">x</span><span class="o">|</span> <span class="n">x</span><span class="p">[</span><span class="s1">'author'</span><span class="p">].</span><span class="nf">collect</span> <span class="p">{</span> <span class="o">|</span><span class="n">z</span><span class="o">|</span> <span class="n">z</span><span class="p">[</span><span class="s1">'ORCID'</span><span class="p">]</span> <span class="p">}</span> <span class="p">}</span>
+<span class="n">res2</span><span class="p">.</span><span class="nf">flatten</span><span class="p">.</span><span class="nf">compact</span>
+</code></pre>
+</div>
+
+<div class="highlighter-rouge"><pre class="highlight"><code><span class="o">=&gt;</span> <span class="p">[</span><span class="s2">"http://orcid.org/0000-0003-4087-8021"</span><span class="p">,</span>
+ <span class="s2">"http://orcid.org/0000-0002-2076-5452"</span><span class="p">,</span>
+ <span class="s2">"http://orcid.org/0000-0003-4087-8021"</span><span class="p">,</span>
+ <span class="s2">"http://orcid.org/0000-0002-2076-5452"</span><span class="p">,</span>
+ <span class="s2">"http://orcid.org/0000-0003-1710-1580"</span><span class="p">,</span>
+ <span class="s2">"http://orcid.org/0000-0003-1710-1580"</span><span class="p">,</span>
+ <span class="s2">"http://orcid.org/0000-0003-4637-238X"</span><span class="p">,</span>
+ <span class="s2">"http://orcid.org/0000-0003-4637-238X"</span><span class="p">,</span>
+ <span class="s2">"http://orcid.org/0000-0003-4637-238X"</span><span class="p">,</span>
+ <span class="s2">"http://orcid.org/0000-0003-4637-238X"</span><span class="p">,</span>
+ <span class="s2">"http://orcid.org/0000-0003-4637-238X"</span><span class="p">,</span>
+ <span class="s2">"http://orcid.org/0000-0003-2510-4271"</span><span class="p">]</span>
+</code></pre>
+</div>
+
+<p>R</p>
+
+<div class="highlighter-rouge"><pre class="highlight"><code><span class="n">library</span><span class="p">(</span><span class="s2">"rcrossref"</span><span class="p">)</span>
+<span class="n">res</span> <span class="o">&lt;-</span> <span class="n">cr_works</span><span class="p">(</span><span class="n">filter</span><span class="o">=</span><span class="n">c</span><span class="p">(</span><span class="n">has_orcid</span><span class="o">=</span><span class="n">TRUE</span><span class="p">),</span> <span class="n">limit</span> <span class="o">=</span> <span class="m">10</span><span class="p">)</span>
+<span class="n">orcids</span> <span class="o">&lt;-</span> <span class="n">unlist</span><span class="p">(</span><span class="n">lapply</span><span class="p">(</span><span class="n">res</span><span class="o">$</span><span class="n">data</span><span class="o">$</span><span class="n">author</span><span class="p">,</span> <span class="k">function</span><span class="p">(</span><span class="n">z</span><span class="p">)</span> <span class="n">z</span><span class="o">$</span><span class="n">ORCID</span><span class="p">))</span>
+<span class="n">Filter</span><span class="p">(</span><span class="k">function</span><span class="p">(</span><span class="n">x</span><span class="p">)</span> <span class="o">!</span><span class="n">is.na</span><span class="p">(</span><span class="n">x</span><span class="p">),</span> <span class="n">orcids</span><span class="p">)</span>
+</code></pre>
+</div>
+
+<div class="highlighter-rouge"><pre class="highlight"><code> <span class="p">[</span><span class="m">1</span><span class="p">]</span> <span class="s2">"http://orcid.org/0000-0003-4087-8021"</span>
+ <span class="p">[</span><span class="m">2</span><span class="p">]</span> <span class="s2">"http://orcid.org/0000-0002-2076-5452"</span>
+ <span class="p">[</span><span class="m">3</span><span class="p">]</span> <span class="s2">"http://orcid.org/0000-0003-4087-8021"</span>
+ <span class="p">[</span><span class="m">4</span><span class="p">]</span> <span class="s2">"http://orcid.org/0000-0002-2076-5452"</span>
+ <span class="p">[</span><span class="m">5</span><span class="p">]</span> <span class="s2">"http://orcid.org/0000-0003-1710-1580"</span>
+ <span class="p">[</span><span class="m">6</span><span class="p">]</span> <span class="s2">"http://orcid.org/0000-0003-1710-1580"</span>
+ <span class="p">[</span><span class="m">7</span><span class="p">]</span> <span class="s2">"http://orcid.org/0000-0003-4637-238X"</span>
+ <span class="p">[</span><span class="m">8</span><span class="p">]</span> <span class="s2">"http://orcid.org/0000-0003-4637-238X"</span>
+ <span class="p">[</span><span class="m">9</span><span class="p">]</span> <span class="s2">"http://orcid.org/0000-0003-4637-238X"</span>
+<span class="p">[</span><span class="m">10</span><span class="p">]</span> <span class="s2">"http://orcid.org/0000-0003-4637-238X"</span>
+<span class="p">[</span><span class="m">11</span><span class="p">]</span> <span class="s2">"http://orcid.org/0000-0003-4637-238X"</span>
+<span class="p">[</span><span class="m">12</span><span class="p">]</span> <span class="s2">"http://orcid.org/0000-0003-2510-4271"</span>
+</code></pre>
+</div>
+
+<p>CLI</p>
+
+<div class="highlighter-rouge"><pre class="highlight"><code>serrano works --filter<span class="o">=</span>has_orcid:true --json --limit<span class="o">=</span>12 | jq <span class="s1">'.message.items[].author[].ORCID | select(. != null)'</span>
+</code></pre>
+</div>
+
+<div class="highlighter-rouge"><pre class="highlight"><code><span class="s2">"http://orcid.org/0000-0003-4087-8021"</span>
+<span class="s2">"http://orcid.org/0000-0002-2076-5452"</span>
+<span class="s2">"http://orcid.org/0000-0003-4087-8021"</span>
+<span class="s2">"http://orcid.org/0000-0002-2076-5452"</span>
+<span class="s2">"http://orcid.org/0000-0003-1710-1580"</span>
+<span class="s2">"http://orcid.org/0000-0003-1710-1580"</span>
+<span class="s2">"http://orcid.org/0000-0003-4637-238X"</span>
+<span class="s2">"http://orcid.org/0000-0003-4637-238X"</span>
+<span class="s2">"http://orcid.org/0000-0003-4637-238X"</span>
+<span class="s2">"http://orcid.org/0000-0003-4637-238X"</span>
+<span class="s2">"http://orcid.org/0000-0003-4637-238X"</span>
+<span class="s2">"http://orcid.org/0000-0003-2510-4271"</span>
+<span class="s2">"http://orcid.org/0000-0001-9408-8207"</span>
+<span class="s2">"http://orcid.org/0000-0002-2076-5452"</span>
+</code></pre>
+</div>
+
+<h2 id="use-case-content-negotation">Use case: content negotation</h2>
+
+<p>Python</p>
+
+<div class="highlighter-rouge"><pre class="highlight"><code><span class="kn">from</span> <span class="nn">habanero</span> <span class="kn">import</span> <span class="n">cn</span>
+<span class="n">cn</span><span class="o">.</span><span class="n">content_negotiation</span><span class="p">(</span><span class="n">ids</span> <span class="o">=</span> <span class="s">'10.1126/science.169.3946.635'</span><span class="p">,</span> <span class="n">format</span> <span class="o">=</span> <span class="s">"text"</span><span class="p">)</span>
+</code></pre>
+</div>
+
+<div class="highlighter-rouge"><pre class="highlight"><code><span class="s">u'Frank, H. S. (1970). The Structure of Ordinary Water: New data and interpretations are yielding new insights into this fascinating substance. Science, 169(3946), 635</span><span class="se">\xe2\x80\x93</span><span class="s">641. doi:10.1126/science.169.3946.635</span><span class="se">\n</span><span class="s">'</span>
+</code></pre>
+</div>
+
+<p>Ruby</p>
+
+<div class="highlighter-rouge"><pre class="highlight"><code><span class="nb">require</span> <span class="s1">'serrano'</span>
+<span class="no">Serrano</span><span class="p">.</span><span class="nf">content_negotiation</span><span class="p">(</span><span class="ss">ids: </span><span class="s1">'10.1126/science.169.3946.635'</span><span class="p">,</span> <span class="ss">format: </span><span class="s2">"text"</span><span class="p">)</span>
+</code></pre>
+</div>
+
+<div class="highlighter-rouge"><pre class="highlight"><code><span class="o">=&gt;</span> <span class="p">[</span><span class="s2">"Frank, H. S. (1970). The Structure of Ordinary Water: New data and interpretations are yielding new insights into this fascinating substance. Science, 169(3946), 635</span><span class="se">\xE2\x80\x93</span><span class="s2">641. doi:10.1126/science.169.3946.635</span><span class="se">\n</span><span class="s2">"</span><span class="p">]</span>
+</code></pre>
+</div>
+
+<p>R</p>
+
+<div class="highlighter-rouge"><pre class="highlight"><code><span class="n">library</span><span class="p">(</span><span class="s2">"rcrossref"</span><span class="p">)</span>
+<span class="n">cr_cn</span><span class="p">(</span><span class="n">dois</span><span class="o">=</span><span class="s2">"10.1126/science.169.3946.635"</span><span class="p">,</span> <span class="s2">"text"</span><span class="p">)</span>
+</code></pre>
+</div>
+
+<div class="highlighter-rouge"><pre class="highlight"><code><span class="p">[</span><span class="m">1</span><span class="p">]</span> <span class="s2">"Frank, H. S. (1970). The Structure of Ordinary Water: New data and interpretations are yielding new insights into this fascinating substance. Science, 169(3946), 635–641. doi:10.1126/science.169.3946.635"</span>
+</code></pre>
+</div>
+
+<p>CLI</p>
+
+<div class="highlighter-rouge"><pre class="highlight"><code>serrano contneg 10.1890/13-0590.1 --format<span class="o">=</span>text
+</code></pre>
+</div>
+
+<div class="highlighter-rouge"><pre class="highlight"><code>Murtaugh, P. A. <span class="o">(</span>2014<span class="o">)</span>.  In defense of P values . Ecology, 95<span class="o">(</span>3<span class="o">)</span>, 611–617. doi:10.1890/13-0590.1
+</code></pre>
+</div>
+
+<h2 id="more">More</h2>
+
+<p>There are definitely issues with data in the Crossref search API, some of which I cover in my talks. However, it is still the best place to go for scholarly metadata.</p>
+
+<p>Let us know of other use cases - there are others not covered here for brevity sake.</p>
+
+<p>There are lots of examples in the docs for each client. If you can think of any doc improvements file an issue.</p>
+
+<p>If you find any bugs, please do file an issue.</p>
+
+
+  </div>
+  
+  <div class="post">
+    <h1>
       <a href="/2015/11/pygbif/">
         pygbif - GBIF client for Python
       </a>
@@ -443,126 +689,6 @@ within X km from the coordinate.</p>
 </div>
 
 <p><img src="/public/img/2015-10-21-noaa-isd/unnamed-chunk-12-1.png" alt="img" /></p>
-
-  </div>
-  
-  <div class="post">
-    <h1>
-      <a href="/2015/10/open-source-metrics/">
-        Metrics for open source projects
-      </a>
-    </h1>
-
-    <span class="post-date">19 Oct 2015</span>
-
-    <p>Measuring use of open source software isn’t always straightforward. The problem is especially acute for software targeted largely at academia, where usage is not measured just by software downloads, but also by citations.</p>
-
-<p>Citations are a well-known pain point because the citation graph is privately held by iron doors (e.g., <a href="http://www.scopus.com/">Scopus</a>, <a href="https://scholar.google.com/">Google Scholar</a>). New ventures aim to open up citation data, but of course it’s an immense amount of work, and so does not come quickly.</p>
-
-<p>The following is a laundry list of metrics on software of which I am aware, and some of which I use in our <a href="http://ropensci.github.io/biweekly/">rOpenSci twice monthly updates</a>.</p>
-
-<p>I primarily develop software for the R language, so some of the metrics are specific to R, but many are not. In addition, we (rOpenSci) don’t develop web apps, which may bring in an additional set of metrics not covered below.</p>
-
-<p>I organize by source instead of type of data because some sources give multiple kinds of data - I note what kinds of data they give with <span class="label label-default">labels</span>.</p>
-
-<h2 id="cran-downloads">CRAN downloads</h2>
-
-<p><span class="label label-warning">downloads</span></p>
-
-<ul>
-  <li>Link: <a href="https://github.com/metacran/cranlogs.app">https://github.com/metacran/cranlogs.app</a></li>
-  <li>This is a REST API for CRAN downloads from the RStudio CRAN CDN. Note however, that the RStudio CDN is only one of many - there are other mirrors users can insall packages from, and are not included in this count. However, a significant portion of downloads probably come from the RStudio CDN.</li>
-  <li>Other programming languages have similar support, e.g., <a href="http://guides.rubygems.org/rubygems-org-api/">Ruby</a> and <a href="https://github.com/npm/download-counts">Node</a>.</li>
-</ul>
-
-<h2 id="lagotto">Lagotto</h2>
-
-<p><small><span class="label label-success">citations</span> <span class="label label-info">github</span> <span class="label label-primary">social-media</span></small></p>
-
-<ul>
-  <li>Link: <a href="http://software.lagotto.io/works">http://software.lagotto.io/works</a></li>
-  <li>Lagotto is a Rails application, developed by <a href="https://github.com/mfenner">Martin Fenner</a>, originally designed to collect and provide article level metrics for scientific publications at Public Library of Science. It is now used by many publishers, and there are installations of Lagotto targeting <a href="http://mdc.lagotto.io/">datasets</a> and <a href="http://software.lagotto.io/works">software</a>.</li>
-  <li>Discussion forum: <a href="http://discuss.lagotto.io/">http://discuss.lagotto.io/</a></li>
-</ul>
-
-<h2 id="depsy">Depsy</h2>
-
-<p><small><span class="label label-success">citations</span> <span class="label label-info">github</span></small></p>
-
-<ul>
-  <li>Link: <a href="http://depsy.org">http://depsy.org</a></li>
-  <li>This is a nascent venture by the <a href="https://impactstory.org/about">ImpactStory team</a> that seeks to uncover the impact of research software. As far as I can tell, they’ll collect usage via software downloads and citations in the literature.</li>
-</ul>
-
-<h2 id="web-site-analytics">Web Site Analytics</h2>
-
-<p><small><span class="label label-danger">page-views</span></small></p>
-
-<ul>
-  <li>If you happen to have a website for your project, collecting analytics is a way to gauge views of the landing page, and any help/tutorial pages you may have. A good easy way to do this is a deploy a basic site on your <code class="highlighter-rouge">gh-pages</code> branch of your GitHub repo, and use the easily integrated Google Analytics.</li>
-  <li>Whatever analytics you use, in my experience this mostly brings up links from google searches and blog posts that may mention your project</li>
-  <li>Google Analytics beacon (for README views): <a href="https://github.com/igrigorik/ga-beacon">https://github.com/igrigorik/ga-beacon</a>. I haven’t tried this yet, but seems promising.</li>
-</ul>
-
-<h2 id="auomated-tracking-ssnmp">Auomated tracking: SSNMP</h2>
-
-<p><small><span class="label label-success">citations</span> <span class="label label-info">github</span></small></p>
-
-<ul>
-  <li>Link: <a href="http://scisoft-net-map.isri.cmu.edu">http://scisoft-net-map.isri.cmu.edu</a></li>
-  <li>Scientific Software Network Map Project</li>
-  <li>This is a cool NSF funded project by Chris Bogart that tracks software usage via GitHub and citations in literature.</li>
-</ul>
-
-<h2 id="google-scholar">Google Scholar</h2>
-
-<p><small><span class="label label-success">citations</span></small></p>
-
-<ul>
-  <li>Link: <a href="https://scholar.google.com/">https://scholar.google.com/</a></li>
-  <li>Searching Google Scholar for software citations manually is fine at a small scale, but at a larger scale scraping is best. However, you’re not legally supposed to do this, and Google will shut you down.</li>
-  <li>Could try using g-scholar alerts as well, especially if new citations of your work are infrequent.</li>
-  <li>If you have institutional access to Scopus/Web of Science, you could search those, but I don’t push this as an option since it’s available to so few.</li>
-</ul>
-
-<h2 id="github">GitHub</h2>
-
-<p><small><span class="label label-info">github</span></small></p>
-
-<ul>
-  <li>Links: <a href="https://developer.github.com/v3/">https://developer.github.com/v3/</a></li>
-  <li>I keep a list of rOpenSci uses found in GitHub repos at <a href="https://discuss.ropensci.org/t/use-of-some-ropensci-packages-on-github/137">https://discuss.ropensci.org/t/use-of-some-ropensci-packages-on-github/137</a></li>
-  <li>GitHub does collect traffic data on each repo (clones, downloads, page views), but they are not exposed in the API. I’ve bugged them a bit about this - hopefully we’ll be able to get that dat in their API soon.</li>
-  <li>Bitbucket/Gitlab - don’t use them, but I assume they also provide some metrics via their APIs</li>
-</ul>
-
-<h2 id="other">Other</h2>
-
-<ul>
-  <li>Support forums: Whether you use UserVoice, Discourse, Google Groups, Gitter, etc., depending on your viewpoint, these interactions could be counted as metrics of software usage.</li>
-  <li>Emails: I personally get a lot of emails asking for help with software I maintain. I imagine this is true for most software developers. Counting these could be another metric of software usage, although I never have counted mine.</li>
-  <li>Social media: See Lagotto above, which tracks some social media outlets.</li>
-  <li>Code coverage: There are many options now for code coverage, integrated with each Travis-CI build. A good option is <a href="https://codecov.io">CodeCov</a>. CodeCov gives percentage test coverage, which one could use as one measure of code quality.</li>
-  <li>Reviews: There isn’t a lot of code review going on that I’m aware of. Even if there was, I suppose this would just be a logical TRUE/FALSE.</li>
-  <li>Cash money y’all: Grants/consulting income/etc. could be counted as a metric.</li>
-  <li>Users: If you require users to create an account or similar before getting your software, you have a sense of number of users and perhaps their demographics.</li>
-</ul>
-
-<h2 id="promising">Promising</h2>
-
-<p>Some software metrics things on the horizon that look interesting:</p>
-
-<ul>
-  <li><a href="https://geodynamics.org/cig/projects/saga/">Software Attribution for Geoscience Applications</a> (SAGA)</li>
-  <li>Crossref: They have <a href="https://github.com/CrossRef/rest-api-doc/blob/master/rest_api.md">a very nice API</a>, but they don’t yet provide citation counts - but <a href="https://github.com/CrossRef/rest-api-doc/issues/46">they may soon</a>.</li>
-  <li><a href="https://github.com/njsmith/sempervirens">njsmith/sempervirens</a> - a prototype for <em>gathering anonymous, opt-in usage data for open scientific software</em></li>
-  <li><a href="https://github.com/force11/force11-scwg">Force11 Software Citation Working Group</a> - <em>…produce a consolidated set of citation principles in order to encourage broad adoption of a consistent policy for software citation across disciplines and venues</em></li>
-</ul>
-
-<h2 id="missed">Missed?</h2>
-
-<p>I’m sure I missed things. Let me know.</p>
-
 
   </div>
   

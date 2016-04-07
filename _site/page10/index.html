@@ -61,6 +61,795 @@
   
   <div class="post">
     <h1>
+      <a href="/2015/01/elasticsearch/">
+        elastic - Elasticsearch from R
+      </a>
+    </h1>
+
+    <span class="post-date">29 Jan 2015</span>
+
+    <p>We’ve (ropensci) been working on an R client for interacting with <a href="http://www.elasticsearch.org/">Elasticsearch</a> for a while now, first commit was November 2013.</p>
+
+<p>Elasticsearch is a document database built on the JVM. <code class="highlighter-rouge">elastic</code> interacts with the Elasticsearch HTTP API, and includes functions for setting connection details to Elasticsearch instances, loading bulk data, searching for documents with both HTTP query variables and JSON based body requests. In addition, <code class="highlighter-rouge">elastic</code> provides functions for interacting with APIs for indices, documents, nodes, clusters, an interface to the cat API, and more.</p>
+
+<p>Here’s a few examples of what you can do.</p>
+
+<p>Note: <code class="highlighter-rouge">elastic</code> was just pushed to CRAN. It just got accepted, so binaries may not be available, try again soon, or install from Github, or install from source from CRAN like <code class="highlighter-rouge">install.packages("http://cran.r-project.org/src/contrib/elastic_0.3.0.tar.gz", repos=NULL, type="source")</code>.</p>
+
+<h2 id="installation">Installation</h2>
+
+<div class="highlighter-rouge"><pre class="highlight"><code><span class="n">install.packages</span><span class="p">(</span><span class="s2">"elastic"</span><span class="p">)</span>
+</code></pre>
+</div>
+
+<p>Or install development version:</p>
+
+<div class="highlighter-rouge"><pre class="highlight"><code><span class="n">install.packages</span><span class="p">(</span><span class="s2">"devtools"</span><span class="p">)</span>
+<span class="n">devtools</span><span class="o">::</span><span class="n">install_github</span><span class="p">(</span><span class="s2">"ropensci/elastic"</span><span class="p">)</span>
+</code></pre>
+</div>
+
+<p>Then load package</p>
+
+<div class="highlighter-rouge"><pre class="highlight"><code><span class="n">library</span><span class="p">(</span><span class="s2">"elastic"</span><span class="p">)</span>
+</code></pre>
+</div>
+
+<h2 id="install-elasticsearch">Install Elasticsearch</h2>
+
+<ul>
+  <li><a href="http://www.elasticsearch.org/guide/en/elasticsearch/reference/current/_installation.html">Elasticsearch installation help</a></li>
+</ul>
+
+<p><strong>Unix (linux/osx)</strong></p>
+
+<p>Replace <code class="highlighter-rouge">1.4.1</code> with the version you are working with.</p>
+
+<ul>
+  <li>Download zip or tar file from Elasticsearch <a href="http://www.elasticsearch.org/overview/elkdownloads/">see here for download</a>, e.g., <code class="highlighter-rouge">curl -L -O https://download.elasticsearch.org/elasticsearch/elasticsearch/elasticsearch-1.4.1.tar.gz</code></li>
+  <li>Uncompress it: <code class="highlighter-rouge">tar -xvf elasticsearch-1.4.1.tar.gz</code></li>
+  <li>Move it: <code class="highlighter-rouge">sudo mv /path/to/elasticsearch-1.4.1 /usr/local</code></li>
+  <li>Navigate to /usr/local: <code class="highlighter-rouge">cd /usr/local</code></li>
+  <li>Add shortcut: <code class="highlighter-rouge">sudo ln -s elasticsearch-1.4.1 elasticsearch</code></li>
+</ul>
+
+<p>On OSX, you can install via Homebrew: <code class="highlighter-rouge">brew install elasticsearch</code></p>
+
+<p><strong>Windows</strong></p>
+
+<p>Windows users can follow the above, but unzip the zip file instead of uncompressing the tar file.</p>
+
+<h2 id="start-elasticsearch">Start Elasticsearch</h2>
+
+<ul>
+  <li>Navigate to elasticsearch: <code class="highlighter-rouge">cd /usr/local/elasticsearch</code></li>
+  <li>Start elasticsearch: <code class="highlighter-rouge">bin/elasticsearch</code></li>
+</ul>
+
+<p>I create a little bash shortcut called <code class="highlighter-rouge">es</code> that does both of the above commands in one step (<code class="highlighter-rouge">cd /usr/local/elasticsearch &amp;&amp; bin/elasticsearch</code>).</p>
+
+<p><strong>Note:</strong> Windows users should run the <code class="highlighter-rouge">elasticsearch.bat</code> file</p>
+
+<h2 id="initialize-connection">Initialize connection</h2>
+
+<p>The function <code class="highlighter-rouge">connect()</code> is used before doing anything else to set the connection details to your remote or local elasticsearch store. The details created by <code class="highlighter-rouge">connect()</code> are written to your options for the current session, and are used by <code class="highlighter-rouge">elastic</code> functions.</p>
+
+<div class="highlighter-rouge"><pre class="highlight"><code><span class="n">connect</span><span class="p">()</span>
+</code></pre>
+</div>
+
+<p>On package load, your base url and port are set to <code class="highlighter-rouge">http://127.0.0.1</code> and <code class="highlighter-rouge">9200</code>, respectively. You can of course override these settings per session or for all sessions.</p>
+
+<h2 id="get-data">Get data</h2>
+
+<p>Elasticsearch has a bulk load API to load data in fast. The format is pretty weird though. It’s sort of JSON, but would pass no JSON linter. I include a few data sets in <code class="highlighter-rouge">elastic</code> so it’s easy to get up and running, and so when you run examples in this package they’ll actually run the same way (hopefully).</p>
+
+<h3 id="shakespeare-data">Shakespeare data</h3>
+
+<p>Elasticsearch provides some data on Shakespeare plays. I’ve provided a subset of this data in this package. Get the path for the file specific to your machine:</p>
+
+<div class="highlighter-rouge"><pre class="highlight"><code><span class="n">shakespeare</span> <span class="o">&lt;-</span> <span class="n">system.file</span><span class="p">(</span><span class="s2">"examples"</span><span class="p">,</span> <span class="s2">"shakespeare_data.json"</span><span class="p">,</span> <span class="n">package</span> <span class="o">=</span> <span class="s2">"elastic"</span><span class="p">)</span>
+</code></pre>
+</div>
+
+<p>Then load the data into Elasticsearch:</p>
+
+<div class="highlighter-rouge"><pre class="highlight"><code><span class="n">docs_bulk</span><span class="p">(</span><span class="n">shakespeare</span><span class="p">)</span>
+</code></pre>
+</div>
+
+<h3 id="public-library-of-science-plos-data">Public Library of Science (PLOS) data</h3>
+
+<p>A dataset inluded in the <code class="highlighter-rouge">elastic</code> package is metadata for PLOS scholarly articles.</p>
+
+<div class="highlighter-rouge"><pre class="highlight"><code><span class="n">plosdat</span> <span class="o">&lt;-</span> <span class="n">system.file</span><span class="p">(</span><span class="s2">"examples"</span><span class="p">,</span> <span class="s2">"plos_data.json"</span><span class="p">,</span> <span class="n">package</span> <span class="o">=</span> <span class="s2">"elastic"</span><span class="p">)</span>
+<span class="n">docs_bulk</span><span class="p">(</span><span class="n">plosdat</span><span class="p">)</span>
+</code></pre>
+</div>
+
+<h3 id="global-biodiversity-information-facility-gbif-data">Global Biodiversity Information Facility (GBIF) data</h3>
+
+<p>A dataset inluded in the <code class="highlighter-rouge">elastic</code> package is data for GBIF species occurrence records. Get the file path, then load:</p>
+
+<div class="highlighter-rouge"><pre class="highlight"><code><span class="n">gbifdat</span> <span class="o">&lt;-</span> <span class="n">system.file</span><span class="p">(</span><span class="s2">"examples"</span><span class="p">,</span> <span class="s2">"gbif_data.json"</span><span class="p">,</span> <span class="n">package</span> <span class="o">=</span> <span class="s2">"elastic"</span><span class="p">)</span>
+<span class="n">docs_bulk</span><span class="p">(</span><span class="n">gbifdat</span><span class="p">)</span>
+</code></pre>
+</div>
+
+<p>GBIF geo data with a coordinates element to allow <code class="highlighter-rouge">geo_shape</code> queries</p>
+
+<div class="highlighter-rouge"><pre class="highlight"><code><span class="n">gbifgeo</span> <span class="o">&lt;-</span> <span class="n">system.file</span><span class="p">(</span><span class="s2">"examples"</span><span class="p">,</span> <span class="s2">"gbif_geo.json"</span><span class="p">,</span> <span class="n">package</span> <span class="o">=</span> <span class="s2">"elastic"</span><span class="p">)</span>
+<span class="n">docs_bulk</span><span class="p">(</span><span class="n">gbifgeo</span><span class="p">)</span>
+</code></pre>
+</div>
+
+<h2 id="the-search-function">The Search function</h2>
+
+<p>The main interface to searching documents in your Elasticsearch store is the function <code class="highlighter-rouge">Search()</code>. I nearly always develop R software using all lowercase, but R has a function called <code class="highlighter-rouge">search()</code>, and I wanted to avoid collision with that function.</p>
+
+<p><code class="highlighter-rouge">Search()</code> is an interface to both the HTTP search API (in which queries are passed in the URI of the request, meaning queries have to be relatively simple), as well as the POST API, or the Query DSL, in which queries are passed in the body of the request (so can be much more complex).</p>
+
+<p>There are a huge amount of ways you can search Elasticsearch documents - this tutorial covers some of them, and highlights the ways in which you interact with the R outputs.</p>
+
+<h3 id="search-an-index">Search an index</h3>
+
+<div class="highlighter-rouge"><pre class="highlight"><code><span class="n">out</span> <span class="o">&lt;-</span> <span class="n">Search</span><span class="p">(</span><span class="n">index</span><span class="o">=</span><span class="s2">"shakespeare"</span><span class="p">)</span>
+<span class="n">out</span><span class="o">$</span><span class="n">hits</span><span class="o">$</span><span class="n">total</span>
+<span class="c1">#&gt; [1] 5000
+</span></code></pre>
+</div>
+
+<div class="highlighter-rouge"><pre class="highlight"><code><span class="n">out</span><span class="o">$</span><span class="n">hits</span><span class="o">$</span><span class="n">hits</span><span class="p">[[</span><span class="m">1</span><span class="p">]]</span>
+<span class="c1">#&gt; $`_index`
+#&gt; [1] "shakespeare"
+#&gt; 
+#&gt; $`_type`
+#&gt; [1] "line"
+#&gt; 
+#&gt; $`_id`
+#&gt; [1] "4"
+#&gt; 
+#&gt; $`_version`
+#&gt; [1] 1
+#&gt; 
+#&gt; $`_score`
+#&gt; [1] 1
+#&gt; 
+#&gt; $`_source`
+#&gt; $`_source`$line_id
+#&gt; [1] 5
+#&gt; 
+#&gt; $`_source`$play_name
+#&gt; [1] "Henry IV"
+#&gt; 
+#&gt; $`_source`$speech_number
+#&gt; [1] 1
+#&gt; 
+#&gt; $`_source`$line_number
+#&gt; [1] "1.1.2"
+#&gt; 
+#&gt; $`_source`$speaker
+#&gt; [1] "KING HENRY IV"
+#&gt; 
+#&gt; $`_source`$text_entry
+#&gt; [1] "Find we a time for frighted peace to pant,"
+</span></code></pre>
+</div>
+
+<h3 id="search-an-index-by-type">Search an index by type</h3>
+
+<div class="highlighter-rouge"><pre class="highlight"><code><span class="n">Search</span><span class="p">(</span><span class="n">index</span><span class="o">=</span><span class="s2">"shakespeare"</span><span class="p">,</span> <span class="n">type</span><span class="o">=</span><span class="s2">"act"</span><span class="p">)</span><span class="o">$</span><span class="n">hits</span><span class="o">$</span><span class="n">hits</span><span class="p">[[</span><span class="m">1</span><span class="p">]]</span>
+<span class="c1">#&gt; $`_index`
+#&gt; [1] "shakespeare"
+#&gt; 
+#&gt; $`_type`
+#&gt; [1] "act"
+#&gt; 
+#&gt; $`_id`
+#&gt; [1] "2227"
+#&gt; 
+#&gt; $`_version`
+#&gt; [1] 1
+#&gt; 
+#&gt; $`_score`
+#&gt; [1] 1
+#&gt; 
+#&gt; $`_source`
+#&gt; $`_source`$line_id
+#&gt; [1] 2228
+#&gt; 
+#&gt; $`_source`$play_name
+#&gt; [1] "Henry IV"
+#&gt; 
+#&gt; $`_source`$speech_number
+#&gt; [1] 81
+#&gt; 
+#&gt; $`_source`$line_number
+#&gt; [1] ""
+#&gt; 
+#&gt; $`_source`$speaker
+#&gt; [1] "FALSTAFF"
+#&gt; 
+#&gt; $`_source`$text_entry
+#&gt; [1] "ACT IV"
+</span></code></pre>
+</div>
+
+<h3 id="return-certain-fields">Return certain fields</h3>
+
+<div class="highlighter-rouge"><pre class="highlight"><code><span class="n">Search</span><span class="p">(</span><span class="n">index</span><span class="o">=</span><span class="s2">"shakespeare"</span><span class="p">,</span> <span class="n">fields</span><span class="o">=</span><span class="n">c</span><span class="p">(</span><span class="s1">'play_name'</span><span class="p">,</span><span class="s1">'speaker'</span><span class="p">))</span><span class="o">$</span><span class="n">hits</span><span class="o">$</span><span class="n">hits</span><span class="p">[[</span><span class="m">1</span><span class="p">]]</span>
+<span class="c1">#&gt; $`_index`
+#&gt; [1] "shakespeare"
+#&gt; 
+#&gt; $`_type`
+#&gt; [1] "line"
+#&gt; 
+#&gt; $`_id`
+#&gt; [1] "4"
+#&gt; 
+#&gt; $`_version`
+#&gt; [1] 1
+#&gt; 
+#&gt; $`_score`
+#&gt; [1] 1
+#&gt; 
+#&gt; $fields
+#&gt; $fields$speaker
+#&gt; $fields$speaker[[1]]
+#&gt; [1] "KING HENRY IV"
+#&gt; 
+#&gt; 
+#&gt; $fields$play_name
+#&gt; $fields$play_name[[1]]
+#&gt; [1] "Henry IV"
+</span></code></pre>
+</div>
+
+<h3 id="sorting">Sorting</h3>
+
+<div class="highlighter-rouge"><pre class="highlight"><code><span class="n">Search</span><span class="p">(</span><span class="n">index</span><span class="o">=</span><span class="s2">"shakespeare"</span><span class="p">,</span> <span class="n">type</span><span class="o">=</span><span class="s2">"act"</span><span class="p">,</span> <span class="n">sort</span><span class="o">=</span><span class="s2">"text_entry"</span><span class="p">)</span><span class="o">$</span><span class="n">hits</span><span class="o">$</span><span class="n">hits</span><span class="p">[</span><span class="m">1</span><span class="o">:</span><span class="m">2</span><span class="p">]</span>
+<span class="c1">#&gt; [[1]]
+#&gt; [[1]]$`_index`
+#&gt; [1] "shakespeare"
+#&gt; 
+#&gt; [[1]]$`_type`
+#&gt; [1] "act"
+#&gt; 
+#&gt; [[1]]$`_id`
+#&gt; [1] "2227"
+#&gt; 
+#&gt; [[1]]$`_version`
+#&gt; [1] 1
+#&gt; 
+#&gt; [[1]]$`_score`
+#&gt; NULL
+#&gt; 
+#&gt; [[1]]$`_source`
+#&gt; [[1]]$`_source`$line_id
+#&gt; [1] 2228
+#&gt; 
+#&gt; [[1]]$`_source`$play_name
+#&gt; [1] "Henry IV"
+#&gt; 
+#&gt; [[1]]$`_source`$speech_number
+#&gt; [1] 81
+#&gt; 
+#&gt; [[1]]$`_source`$line_number
+#&gt; [1] ""
+#&gt; 
+#&gt; [[1]]$`_source`$speaker
+#&gt; [1] "FALSTAFF"
+#&gt; 
+#&gt; [[1]]$`_source`$text_entry
+#&gt; [1] "ACT IV"
+#&gt; 
+#&gt; 
+#&gt; [[1]]$sort
+#&gt; [[1]]$sort[[1]]
+#&gt; [1] "act"
+#&gt; 
+#&gt; 
+#&gt; 
+#&gt; [[2]]
+#&gt; [[2]]$`_index`
+#&gt; [1] "shakespeare"
+#&gt; 
+#&gt; [[2]]$`_type`
+#&gt; [1] "act"
+#&gt; 
+#&gt; [[2]]$`_id`
+#&gt; [1] "2633"
+#&gt; 
+#&gt; [[2]]$`_version`
+#&gt; [1] 1
+#&gt; 
+#&gt; [[2]]$`_score`
+#&gt; NULL
+#&gt; 
+#&gt; [[2]]$`_source`
+#&gt; [[2]]$`_source`$line_id
+#&gt; [1] 2634
+#&gt; 
+#&gt; [[2]]$`_source`$play_name
+#&gt; [1] "Henry IV"
+#&gt; 
+#&gt; [[2]]$`_source`$speech_number
+#&gt; [1] 9
+#&gt; 
+#&gt; [[2]]$`_source`$line_number
+#&gt; [1] ""
+#&gt; 
+#&gt; [[2]]$`_source`$speaker
+#&gt; [1] "ARCHBISHOP OF YORK"
+#&gt; 
+#&gt; [[2]]$`_source`$text_entry
+#&gt; [1] "ACT V"
+#&gt; 
+#&gt; 
+#&gt; [[2]]$sort
+#&gt; [[2]]$sort[[1]]
+#&gt; [1] "act"
+</span></code></pre>
+</div>
+
+<h3 id="paging">Paging</h3>
+
+<div class="highlighter-rouge"><pre class="highlight"><code><span class="n">Search</span><span class="p">(</span><span class="n">index</span><span class="o">=</span><span class="s2">"shakespeare"</span><span class="p">,</span> <span class="n">size</span><span class="o">=</span><span class="m">1</span><span class="p">,</span> <span class="n">from</span><span class="o">=</span><span class="m">1</span><span class="p">,</span> <span class="n">fields</span><span class="o">=</span><span class="s1">'text_entry'</span><span class="p">)</span><span class="o">$</span><span class="n">hits</span>
+<span class="c1">#&gt; $total
+#&gt; [1] 5000
+#&gt; 
+#&gt; $max_score
+#&gt; [1] 1
+#&gt; 
+#&gt; $hits
+#&gt; $hits[[1]]
+#&gt; $hits[[1]]$`_index`
+#&gt; [1] "shakespeare"
+#&gt; 
+#&gt; $hits[[1]]$`_type`
+#&gt; [1] "line"
+#&gt; 
+#&gt; $hits[[1]]$`_id`
+#&gt; [1] "9"
+#&gt; 
+#&gt; $hits[[1]]$`_version`
+#&gt; [1] 1
+#&gt; 
+#&gt; $hits[[1]]$`_score`
+#&gt; [1] 1
+#&gt; 
+#&gt; $hits[[1]]$fields
+#&gt; $hits[[1]]$fields$text_entry
+#&gt; $hits[[1]]$fields$text_entry[[1]]
+#&gt; [1] "Nor more shall trenching war channel her fields,"
+</span></code></pre>
+</div>
+
+<h3 id="queries">Queries</h3>
+
+<p>Using the <code class="highlighter-rouge">q</code> parameter you can pass in a query, which gets passed in the URI of the query. This type of query is less powerful than the below query passed in the body of the request, using the <code class="highlighter-rouge">body</code> parameter.</p>
+
+<div class="highlighter-rouge"><pre class="highlight"><code><span class="n">Search</span><span class="p">(</span><span class="n">index</span><span class="o">=</span><span class="s2">"shakespeare"</span><span class="p">,</span> <span class="n">type</span><span class="o">=</span><span class="s2">"act"</span><span class="p">,</span> <span class="n">q</span><span class="o">=</span><span class="s2">"speaker:KING HENRY IV"</span><span class="p">)</span><span class="o">$</span><span class="n">hits</span><span class="o">$</span><span class="n">total</span>
+<span class="c1">#&gt; [1] 9
+</span></code></pre>
+</div>
+
+<h3 id="query-dsl-searches---queries-sent-in-the-body-of-the-request">Query DSL searches - queries sent in the body of the request</h3>
+
+<p>Pass in as an R list</p>
+
+<div class="highlighter-rouge"><pre class="highlight"><code><span class="n">aggs</span> <span class="o">&lt;-</span> <span class="n">list</span><span class="p">(</span><span class="n">aggs</span> <span class="o">=</span> <span class="n">list</span><span class="p">(</span><span class="n">stats</span> <span class="o">=</span> <span class="n">list</span><span class="p">(</span><span class="n">terms</span> <span class="o">=</span> <span class="n">list</span><span class="p">(</span><span class="n">field</span> <span class="o">=</span> <span class="s2">"text_entry"</span><span class="p">))))</span>
+<span class="n">Search</span><span class="p">(</span><span class="n">index</span><span class="o">=</span><span class="s2">"shakespeare"</span><span class="p">,</span> <span class="n">body</span><span class="o">=</span><span class="n">aggs</span><span class="p">)</span><span class="o">$</span><span class="n">hits</span><span class="o">$</span><span class="n">hits</span><span class="p">[[</span><span class="m">1</span><span class="p">]]</span>
+<span class="c1">#&gt; $`_index`
+#&gt; [1] "shakespeare"
+#&gt; 
+#&gt; $`_type`
+#&gt; [1] "line"
+#&gt; 
+#&gt; $`_id`
+#&gt; [1] "4"
+#&gt; 
+#&gt; $`_version`
+#&gt; [1] 1
+#&gt; 
+#&gt; $`_score`
+#&gt; [1] 1
+#&gt; 
+#&gt; $`_source`
+#&gt; $`_source`$line_id
+#&gt; [1] 5
+#&gt; 
+#&gt; $`_source`$play_name
+#&gt; [1] "Henry IV"
+#&gt; 
+#&gt; $`_source`$speech_number
+#&gt; [1] 1
+#&gt; 
+#&gt; $`_source`$line_number
+#&gt; [1] "1.1.2"
+#&gt; 
+#&gt; $`_source`$speaker
+#&gt; [1] "KING HENRY IV"
+#&gt; 
+#&gt; $`_source`$text_entry
+#&gt; [1] "Find we a time for frighted peace to pant,"
+</span></code></pre>
+</div>
+
+<p>Or pass in as json query with newlines, easy to read</p>
+
+<div class="highlighter-rouge"><pre class="highlight"><code><span class="n">aggs</span> <span class="o">&lt;-</span> <span class="s1">'{
+    "aggs": {
+        "stats" : {
+            "terms" : {
+                "field" : "text_entry"
+            }
+        }
+    }
+}'</span>
+<span class="n">Search</span><span class="p">(</span><span class="n">index</span><span class="o">=</span><span class="s2">"shakespeare"</span><span class="p">,</span> <span class="n">body</span><span class="o">=</span><span class="n">aggs</span><span class="p">)</span><span class="o">$</span><span class="n">hits</span><span class="o">$</span><span class="n">hits</span><span class="p">[[</span><span class="m">1</span><span class="p">]]</span>
+<span class="c1">#&gt; $`_index`
+#&gt; [1] "shakespeare"
+#&gt; 
+#&gt; $`_type`
+#&gt; [1] "line"
+#&gt; 
+#&gt; $`_id`
+#&gt; [1] "4"
+#&gt; 
+#&gt; $`_version`
+#&gt; [1] 1
+#&gt; 
+#&gt; $`_score`
+#&gt; [1] 1
+#&gt; 
+#&gt; $`_source`
+#&gt; $`_source`$line_id
+#&gt; [1] 5
+#&gt; 
+#&gt; $`_source`$play_name
+#&gt; [1] "Henry IV"
+#&gt; 
+#&gt; $`_source`$speech_number
+#&gt; [1] 1
+#&gt; 
+#&gt; $`_source`$line_number
+#&gt; [1] "1.1.2"
+#&gt; 
+#&gt; $`_source`$speaker
+#&gt; [1] "KING HENRY IV"
+#&gt; 
+#&gt; $`_source`$text_entry
+#&gt; [1] "Find we a time for frighted peace to pant,"
+</span></code></pre>
+</div>
+
+<p>Or pass in collapsed json string</p>
+
+<div class="highlighter-rouge"><pre class="highlight"><code><span class="n">aggs</span> <span class="o">&lt;-</span> <span class="s1">'{"aggs":{"stats":{"terms":{"field":"text_entry"}}}}'</span>
+<span class="n">Search</span><span class="p">(</span><span class="n">index</span><span class="o">=</span><span class="s2">"shakespeare"</span><span class="p">,</span> <span class="n">body</span><span class="o">=</span><span class="n">aggs</span><span class="p">)</span><span class="o">$</span><span class="n">hits</span><span class="o">$</span><span class="n">hits</span><span class="p">[[</span><span class="m">1</span><span class="p">]]</span>
+<span class="c1">#&gt; $`_index`
+#&gt; [1] "shakespeare"
+#&gt; 
+#&gt; $`_type`
+#&gt; [1] "line"
+#&gt; 
+#&gt; $`_id`
+#&gt; [1] "4"
+#&gt; 
+#&gt; $`_version`
+#&gt; [1] 1
+#&gt; 
+#&gt; $`_score`
+#&gt; [1] 1
+#&gt; 
+#&gt; $`_source`
+#&gt; $`_source`$line_id
+#&gt; [1] 5
+#&gt; 
+#&gt; $`_source`$play_name
+#&gt; [1] "Henry IV"
+#&gt; 
+#&gt; $`_source`$speech_number
+#&gt; [1] 1
+#&gt; 
+#&gt; $`_source`$line_number
+#&gt; [1] "1.1.2"
+#&gt; 
+#&gt; $`_source`$speaker
+#&gt; [1] "KING HENRY IV"
+#&gt; 
+#&gt; $`_source`$text_entry
+#&gt; [1] "Find we a time for frighted peace to pant,"
+</span></code></pre>
+</div>
+
+<h3 id="fuzzy-query">Fuzzy query</h3>
+
+<p>Fuzzy query on numerics</p>
+
+<div class="highlighter-rouge"><pre class="highlight"><code><span class="n">fuzzy</span> <span class="o">&lt;-</span> <span class="n">list</span><span class="p">(</span><span class="n">query</span> <span class="o">=</span> <span class="n">list</span><span class="p">(</span><span class="n">fuzzy</span> <span class="o">=</span> <span class="n">list</span><span class="p">(</span><span class="n">speech_number</span> <span class="o">=</span> <span class="m">7</span><span class="p">)))</span>
+<span class="n">Search</span><span class="p">(</span><span class="n">index</span><span class="o">=</span><span class="s2">"shakespeare"</span><span class="p">,</span> <span class="n">body</span><span class="o">=</span><span class="n">fuzzy</span><span class="p">)</span><span class="o">$</span><span class="n">hits</span><span class="o">$</span><span class="n">total</span>
+<span class="c1">#&gt; [1] 523
+</span></code></pre>
+</div>
+
+<div class="highlighter-rouge"><pre class="highlight"><code><span class="n">fuzzy</span> <span class="o">&lt;-</span> <span class="n">list</span><span class="p">(</span><span class="n">query</span> <span class="o">=</span> <span class="n">list</span><span class="p">(</span><span class="n">fuzzy</span> <span class="o">=</span> <span class="n">list</span><span class="p">(</span><span class="n">speech_number</span> <span class="o">=</span> <span class="n">list</span><span class="p">(</span><span class="n">value</span> <span class="o">=</span> <span class="m">7</span><span class="p">,</span> <span class="n">fuzziness</span> <span class="o">=</span> <span class="m">4</span><span class="p">))))</span>
+<span class="n">Search</span><span class="p">(</span><span class="n">index</span><span class="o">=</span><span class="s2">"shakespeare"</span><span class="p">,</span> <span class="n">body</span><span class="o">=</span><span class="n">fuzzy</span><span class="p">)</span><span class="o">$</span><span class="n">hits</span><span class="o">$</span><span class="n">total</span>
+<span class="c1">#&gt; [1] 1499
+</span></code></pre>
+</div>
+
+<h3 id="range-query">Range query</h3>
+
+<p>With numeric</p>
+
+<div class="highlighter-rouge"><pre class="highlight"><code><span class="n">body</span> <span class="o">&lt;-</span> <span class="n">list</span><span class="p">(</span><span class="n">query</span><span class="o">=</span><span class="n">list</span><span class="p">(</span><span class="n">range</span><span class="o">=</span><span class="n">list</span><span class="p">(</span><span class="n">decimalLongitude</span><span class="o">=</span><span class="n">list</span><span class="p">(</span><span class="n">gte</span><span class="o">=</span><span class="m">1</span><span class="p">,</span> <span class="n">lte</span><span class="o">=</span><span class="m">3</span><span class="p">))))</span>
+<span class="n">Search</span><span class="p">(</span><span class="s1">'gbif'</span><span class="p">,</span> <span class="n">body</span><span class="o">=</span><span class="n">body</span><span class="p">)</span><span class="o">$</span><span class="n">hits</span><span class="o">$</span><span class="n">total</span>
+<span class="c1">#&gt; [1] 24
+</span></code></pre>
+</div>
+
+<div class="highlighter-rouge"><pre class="highlight"><code><span class="n">body</span> <span class="o">&lt;-</span> <span class="n">list</span><span class="p">(</span><span class="n">query</span><span class="o">=</span><span class="n">list</span><span class="p">(</span><span class="n">range</span><span class="o">=</span><span class="n">list</span><span class="p">(</span><span class="n">decimalLongitude</span><span class="o">=</span><span class="n">list</span><span class="p">(</span><span class="n">gte</span><span class="o">=</span><span class="m">2.9</span><span class="p">,</span> <span class="n">lte</span><span class="o">=</span><span class="m">10</span><span class="p">))))</span>
+<span class="n">Search</span><span class="p">(</span><span class="s1">'gbif'</span><span class="p">,</span> <span class="n">body</span><span class="o">=</span><span class="n">body</span><span class="p">)</span><span class="o">$</span><span class="n">hits</span><span class="o">$</span><span class="n">total</span>
+<span class="c1">#&gt; [1] 166
+</span></code></pre>
+</div>
+
+<p>With dates</p>
+
+<div class="highlighter-rouge"><pre class="highlight"><code><span class="n">body</span> <span class="o">&lt;-</span> <span class="n">list</span><span class="p">(</span><span class="n">query</span><span class="o">=</span><span class="n">list</span><span class="p">(</span><span class="n">range</span><span class="o">=</span><span class="n">list</span><span class="p">(</span><span class="n">eventDate</span><span class="o">=</span><span class="n">list</span><span class="p">(</span><span class="n">gte</span><span class="o">=</span><span class="s2">"2012-01-01"</span><span class="p">,</span> <span class="n">lte</span><span class="o">=</span><span class="s2">"now"</span><span class="p">))))</span>
+<span class="n">Search</span><span class="p">(</span><span class="s1">'gbif'</span><span class="p">,</span> <span class="n">body</span><span class="o">=</span><span class="n">body</span><span class="p">)</span><span class="o">$</span><span class="n">hits</span><span class="o">$</span><span class="n">total</span>
+<span class="c1">#&gt; [1] 899
+</span></code></pre>
+</div>
+
+<div class="highlighter-rouge"><pre class="highlight"><code><span class="n">body</span> <span class="o">&lt;-</span> <span class="n">list</span><span class="p">(</span><span class="n">query</span><span class="o">=</span><span class="n">list</span><span class="p">(</span><span class="n">range</span><span class="o">=</span><span class="n">list</span><span class="p">(</span><span class="n">eventDate</span><span class="o">=</span><span class="n">list</span><span class="p">(</span><span class="n">gte</span><span class="o">=</span><span class="s2">"2014-01-01"</span><span class="p">,</span> <span class="n">lte</span><span class="o">=</span><span class="s2">"now"</span><span class="p">))))</span>
+<span class="n">Search</span><span class="p">(</span><span class="s1">'gbif'</span><span class="p">,</span> <span class="n">body</span><span class="o">=</span><span class="n">body</span><span class="p">)</span><span class="o">$</span><span class="n">hits</span><span class="o">$</span><span class="n">total</span>
+<span class="c1">#&gt; [1] 685
+</span></code></pre>
+</div>
+
+<h3 id="highlighting">Highlighting</h3>
+
+<div class="highlighter-rouge"><pre class="highlight"><code><span class="n">body</span> <span class="o">&lt;-</span> <span class="s1">'{
+ "query": {
+   "query_string": {
+     "query" : "cell"
+   }
+ },
+ "highlight": {
+   "fields": {
+     "title": {"number_of_fragments": 2}
+   }
+ }
+}'</span>
+<span class="n">out</span> <span class="o">&lt;-</span> <span class="n">Search</span><span class="p">(</span><span class="s1">'plos'</span><span class="p">,</span> <span class="s1">'article'</span><span class="p">,</span> <span class="n">body</span><span class="o">=</span><span class="n">body</span><span class="p">)</span>
+<span class="n">out</span><span class="o">$</span><span class="n">hits</span><span class="o">$</span><span class="n">total</span>
+<span class="c1">#&gt; [1] 57
+</span></code></pre>
+</div>
+
+<div class="highlighter-rouge"><pre class="highlight"><code><span class="n">sapply</span><span class="p">(</span><span class="n">out</span><span class="o">$</span><span class="n">hits</span><span class="o">$</span><span class="n">hits</span><span class="p">,</span> <span class="k">function</span><span class="p">(</span><span class="n">x</span><span class="p">)</span> <span class="n">x</span><span class="o">$</span><span class="n">highlight</span><span class="o">$</span><span class="n">title</span><span class="p">[[</span><span class="m">1</span><span class="p">]])[</span><span class="m">8</span><span class="o">:</span><span class="m">10</span><span class="p">]</span>
+<span class="c1">#&gt; [1] "c-FLIP Protects Eosinophils from TNF-α-Mediated &lt;em&gt;Cell&lt;/em&gt; Death In Vivo"                          
+#&gt; [2] "DUSP1 Is a Novel Target for Enhancing Pancreatic Cancer &lt;em&gt;Cell&lt;/em&gt; Sensitivity to Gemcitabine"     
+#&gt; [3] "Carbon Ion Radiation Inhibits Glioma and Endothelial &lt;em&gt;Cell&lt;/em&gt; Migration Induced by Secreted VEGF"
+</span></code></pre>
+</div>
+
+<h3 id="scrolling-search---instead-of-paging">Scrolling search - instead of paging</h3>
+
+<div class="highlighter-rouge"><pre class="highlight"><code><span class="n">Search</span><span class="p">(</span><span class="s1">'shakespeare'</span><span class="p">,</span> <span class="n">q</span><span class="o">=</span><span class="s2">"a*"</span><span class="p">)</span><span class="o">$</span><span class="n">hits</span><span class="o">$</span><span class="n">total</span>
+<span class="c1">#&gt; [1] 2747
+</span><span class="n">res</span> <span class="o">&lt;-</span> <span class="n">Search</span><span class="p">(</span><span class="n">index</span> <span class="o">=</span> <span class="s1">'shakespeare'</span><span class="p">,</span> <span class="n">q</span><span class="o">=</span><span class="s2">"a*"</span><span class="p">,</span> <span class="n">scroll</span><span class="o">=</span><span class="s2">"1m"</span><span class="p">)</span>
+<span class="n">res</span> <span class="o">&lt;-</span> <span class="n">Search</span><span class="p">(</span><span class="n">index</span> <span class="o">=</span> <span class="s1">'shakespeare'</span><span class="p">,</span> <span class="n">q</span><span class="o">=</span><span class="s2">"a*"</span><span class="p">,</span> <span class="n">scroll</span><span class="o">=</span><span class="s2">"1m"</span><span class="p">,</span> <span class="n">search_type</span> <span class="o">=</span> <span class="s2">"scan"</span><span class="p">)</span>
+<span class="n">length</span><span class="p">(</span><span class="n">scroll</span><span class="p">(</span><span class="n">scroll_id</span> <span class="o">=</span> <span class="n">res</span><span class="o">$</span><span class="sb">`_scroll_id`</span><span class="p">)</span><span class="o">$</span><span class="n">hits</span><span class="o">$</span><span class="n">hits</span><span class="p">)</span>
+<span class="c1">#&gt; [1] 50
+</span></code></pre>
+</div>
+
+<div class="highlighter-rouge"><pre class="highlight"><code><span class="n">res</span> <span class="o">&lt;-</span> <span class="n">Search</span><span class="p">(</span><span class="n">index</span> <span class="o">=</span> <span class="s1">'shakespeare'</span><span class="p">,</span> <span class="n">q</span><span class="o">=</span><span class="s2">"a*"</span><span class="p">,</span> <span class="n">scroll</span><span class="o">=</span><span class="s2">"5m"</span><span class="p">,</span> <span class="n">search_type</span> <span class="o">=</span> <span class="s2">"scan"</span><span class="p">)</span>
+<span class="n">out</span> <span class="o">&lt;-</span> <span class="n">list</span><span class="p">()</span>
+<span class="n">hits</span> <span class="o">&lt;-</span> <span class="m">1</span>
+<span class="k">while</span><span class="p">(</span><span class="n">hits</span> <span class="o">!=</span> <span class="m">0</span><span class="p">){</span>
+  <span class="n">res</span> <span class="o">&lt;-</span> <span class="n">scroll</span><span class="p">(</span><span class="n">scroll_id</span> <span class="o">=</span> <span class="n">res</span><span class="o">$</span><span class="sb">`_scroll_id`</span><span class="p">)</span>
+  <span class="n">hits</span> <span class="o">&lt;-</span> <span class="n">length</span><span class="p">(</span><span class="n">res</span><span class="o">$</span><span class="n">hits</span><span class="o">$</span><span class="n">hits</span><span class="p">)</span>
+  <span class="k">if</span><span class="p">(</span><span class="n">hits</span> <span class="o">&gt;</span> <span class="m">0</span><span class="p">)</span>
+    <span class="n">out</span> <span class="o">&lt;-</span> <span class="n">c</span><span class="p">(</span><span class="n">out</span><span class="p">,</span> <span class="n">res</span><span class="o">$</span><span class="n">hits</span><span class="o">$</span><span class="n">hits</span><span class="p">)</span>
+<span class="p">}</span>
+<span class="n">length</span><span class="p">(</span><span class="n">out</span><span class="p">)</span>
+<span class="c1">#&gt; [1] 2747
+</span></code></pre>
+</div>
+
+<p>Woohoo! Collected all 2747 documents in very little time.</p>
+
+<h2 id="the-cat-api">The cat API</h2>
+
+<p>List cat methods</p>
+
+<div class="highlighter-rouge"><pre class="highlight"><code><span class="n">cat_</span><span class="p">()</span>
+<span class="c1">#&gt; =^.^=
+#&gt; /_cat/allocation
+#&gt; /_cat/shards
+#&gt; /_cat/shards/{index}
+#&gt; /_cat/master
+#&gt; /_cat/nodes
+#&gt; /_cat/indices
+#&gt; /_cat/indices/{index}
+#&gt; /_cat/segments
+#&gt; /_cat/segments/{index}
+#&gt; /_cat/count
+#&gt; /_cat/count/{index}
+#&gt; /_cat/recovery
+#&gt; /_cat/recovery/{index}
+#&gt; /_cat/health
+#&gt; /_cat/pending_tasks
+#&gt; /_cat/aliases
+#&gt; /_cat/aliases/{alias}
+#&gt; /_cat/thread_pool
+#&gt; /_cat/plugins
+#&gt; /_cat/fielddata
+#&gt; /_cat/fielddata/{fields}
+</span></code></pre>
+</div>
+
+<p>Get aliases</p>
+
+<div class="highlighter-rouge"><pre class="highlight"><code><span class="n">cat_aliases</span><span class="p">()</span>
+<span class="c1">#&gt; things plos - - - 
+#&gt; stuff  plos - - -
+</span></code></pre>
+</div>
+
+<p>Get indices</p>
+
+<div class="highlighter-rouge"><pre class="highlight"><code><span class="n">cat_indices</span><span class="p">()</span>
+<span class="c1">#&gt; yellow open plosmore     5 1  1000  0   3.5mb   3.5mb 
+#&gt; yellow open leotheadfadf 5 1     0  0    575b    575b 
+#&gt; red    open alsothat     3 2                          
+#&gt; yellow open gbif         5 1   899  0     1mb     1mb 
+#&gt; yellow open gbifgeopoint 5 1     0  0    575b    575b 
+#&gt; yellow open gbifnewgeo   5 1     2  0   5.8kb   5.8kb 
+#&gt; yellow open plos         5 1  1202 39  14.2mb  14.2mb 
+#&gt; yellow open leothedog    5 1     0  0    575b    575b 
+#&gt; yellow open shakespeare  5 1  5000  0     1mb     1mb 
+#&gt; yellow open gbifgeo      5 1   600  0 861.9kb 861.9kb 
+#&gt; yellow open plosbigdata  5 1 20000  0  53.6mb  53.6mb 
+#&gt; yellow open mapuris      5 1    31  0  34.4kb  34.4kb 
+#&gt; yellow open leothelion   5 1     0  0    575b    575b
+</span></code></pre>
+</div>
+
+<p>Get nodes</p>
+
+<div class="highlighter-rouge"><pre class="highlight"><code><span class="n">cat_nodes</span><span class="p">()</span>
+<span class="c1">#&gt; Scotts-MacBook-Pro.local 192.168.1.104 6 79 3.44 d * Hellfire
+</span></code></pre>
+</div>
+
+<h2 id="work-with-indices">Work with indices</h2>
+
+<div class="highlighter-rouge"><pre class="highlight"><code><span class="n">out</span> <span class="o">&lt;-</span> <span class="n">index_get</span><span class="p">(</span><span class="n">index</span><span class="o">=</span><span class="s1">'shakespeare'</span><span class="p">)</span>
+<span class="n">names</span><span class="p">(</span><span class="n">out</span><span class="o">$</span><span class="n">shakespeare</span><span class="o">$</span><span class="n">mappings</span><span class="p">)</span>
+<span class="c1">#&gt; [1] "line"  "scene" "act"
+</span></code></pre>
+</div>
+
+<p>Check for index existence</p>
+
+<div class="highlighter-rouge"><pre class="highlight"><code><span class="n">index_exists</span><span class="p">(</span><span class="n">index</span><span class="o">=</span><span class="s1">'shakespeare'</span><span class="p">)</span>
+<span class="c1">#&gt; [1] TRUE
+</span></code></pre>
+</div>
+
+<p>Delete an index</p>
+
+<div class="highlighter-rouge"><pre class="highlight"><code><span class="n">index_delete</span><span class="p">(</span><span class="n">index</span><span class="o">=</span><span class="s1">'plos'</span><span class="p">)</span>
+<span class="c1">#&gt; $acknowledged
+#&gt; [1] TRUE
+</span></code></pre>
+</div>
+
+<p>Create an index</p>
+
+<div class="highlighter-rouge"><pre class="highlight"><code><span class="n">index_create</span><span class="p">(</span><span class="n">index</span><span class="o">=</span><span class="s1">'twitter'</span><span class="p">)</span>
+<span class="c1">#&gt; $acknowledged
+#&gt; [1] TRUE
+</span></code></pre>
+</div>
+
+<h2 id="work-with-documents">Work with documents</h2>
+
+<p>Get a document</p>
+
+<div class="highlighter-rouge"><pre class="highlight"><code><span class="n">docs_get</span><span class="p">(</span><span class="n">index</span><span class="o">=</span><span class="s1">'shakespeare'</span><span class="p">,</span> <span class="n">type</span><span class="o">=</span><span class="s1">'line'</span><span class="p">,</span> <span class="n">id</span><span class="o">=</span><span class="m">10</span><span class="p">)</span>
+<span class="c1">#&gt; $`_index`
+#&gt; [1] "shakespeare"
+#&gt; 
+#&gt; $`_type`
+#&gt; [1] "line"
+#&gt; 
+#&gt; $`_id`
+#&gt; [1] "10"
+#&gt; 
+#&gt; $`_version`
+#&gt; [1] 1
+#&gt; 
+#&gt; $found
+#&gt; [1] TRUE
+#&gt; 
+#&gt; $`_source`
+#&gt; $`_source`$line_id
+#&gt; [1] 11
+#&gt; 
+#&gt; $`_source`$play_name
+#&gt; [1] "Henry IV"
+#&gt; 
+#&gt; $`_source`$speech_number
+#&gt; [1] 1
+#&gt; 
+#&gt; $`_source`$line_number
+#&gt; [1] "1.1.8"
+#&gt; 
+#&gt; $`_source`$speaker
+#&gt; [1] "KING HENRY IV"
+#&gt; 
+#&gt; $`_source`$text_entry
+#&gt; [1] "Nor bruise her flowerets with the armed hoofs"
+</span></code></pre>
+</div>
+
+<p>Get certain fields</p>
+
+<div class="highlighter-rouge"><pre class="highlight"><code><span class="n">docs_get</span><span class="p">(</span><span class="n">index</span><span class="o">=</span><span class="s1">'shakespeare'</span><span class="p">,</span> <span class="n">type</span><span class="o">=</span><span class="s1">'line'</span><span class="p">,</span> <span class="n">id</span><span class="o">=</span><span class="m">10</span><span class="p">,</span> <span class="n">fields</span><span class="o">=</span><span class="n">c</span><span class="p">(</span><span class="s1">'play_name'</span><span class="p">,</span><span class="s1">'speaker'</span><span class="p">))</span>
+<span class="c1">#&gt; $`_index`
+#&gt; [1] "shakespeare"
+#&gt; 
+#&gt; $`_type`
+#&gt; [1] "line"
+#&gt; 
+#&gt; $`_id`
+#&gt; [1] "10"
+#&gt; 
+#&gt; $`_version`
+#&gt; [1] 1
+#&gt; 
+#&gt; $found
+#&gt; [1] TRUE
+#&gt; 
+#&gt; $fields
+#&gt; $fields$play_name
+#&gt; $fields$play_name[[1]]
+#&gt; [1] "Henry IV"
+#&gt; 
+#&gt; 
+#&gt; $fields$speaker
+#&gt; $fields$speaker[[1]]
+#&gt; [1] "KING HENRY IV"
+</span></code></pre>
+</div>
+
+<p>Test for existence of the document</p>
+
+<div class="highlighter-rouge"><pre class="highlight"><code><span class="n">docs_get</span><span class="p">(</span><span class="n">index</span><span class="o">=</span><span class="s1">'plos'</span><span class="p">,</span> <span class="n">type</span><span class="o">=</span><span class="s1">'article'</span><span class="p">,</span> <span class="n">id</span><span class="o">=</span><span class="m">1</span><span class="p">,</span> <span class="n">exists</span><span class="o">=</span><span class="n">TRUE</span><span class="p">)</span>
+<span class="c1">#&gt; [1] FALSE
+</span></code></pre>
+</div>
+
+<div class="highlighter-rouge"><pre class="highlight"><code><span class="n">docs_get</span><span class="p">(</span><span class="n">index</span><span class="o">=</span><span class="s1">'plos'</span><span class="p">,</span> <span class="n">type</span><span class="o">=</span><span class="s1">'article'</span><span class="p">,</span> <span class="n">id</span><span class="o">=</span><span class="m">123456</span><span class="p">,</span> <span class="n">exists</span><span class="o">=</span><span class="n">TRUE</span><span class="p">)</span>
+<span class="c1">#&gt; [1] FALSE
+</span></code></pre>
+</div>
+
+<h2 id="thats-it">Thats it</h2>
+
+<p>Let us know if you have any feedback!</p>
+
+  </div>
+  
+  <div class="post">
+    <h1>
       <a href="/2015/01/binomen/">
         binomen - taxonomic classes and parsing
       </a>
@@ -439,382 +1228,6 @@ head(mtcars)
 
 <p>There are more functions I didn’t highlight, and there are many methods that haven’t been implemented yet… in good time it will be done.</p>
 
-
-  </div>
-  
-  <div class="post">
-    <h1>
-      <a href="/2015/01/geojson-topojson-io/">
-        R I/O for geojson and topojson
-      </a>
-    </h1>
-
-    <span class="post-date">06 Jan 2015</span>
-
-    <p>At rOpenSci we’ve been working on an R package (<code class="highlighter-rouge">geojsonio</code>) to make converting R data in various formats to <a href="http://geojson.org/geojson-spec.html">geoJSON</a> and <a href="https://github.com/topojson/topojson-specification/blob/master/README.md">topoJSON</a>, and vice versa. We hope to do this one job very well, and handle all reasonable use cases.</p>
-
-<p>Functions in this package are organized first around what you’re working with or want to get, <code class="highlighter-rouge">geojson</code> or <code class="highlighter-rouge">topojson</code>, then convert to or read from various formats:</p>
-
-<ul>
-  <li><code class="highlighter-rouge">geojson_list()</code>/<code class="highlighter-rouge">topojson_list()</code> - convert to geojson/topojson as R list format</li>
-  <li><code class="highlighter-rouge">geojson_json()</code>/<code class="highlighter-rouge">topojson_json()</code> - convert to geojson/topojson as json</li>
-  <li><code class="highlighter-rouge">geojson_read()</code><code class="highlighter-rouge">topojson_read()</code> - read a geojson/topojson file from file path or URL</li>
-  <li><code class="highlighter-rouge">geojson_write()</code>/<code class="highlighter-rouge">topojson_write()</code> - write a geojson/topojson file locally</li>
-</ul>
-
-<p>Each of the above functions have methods for various objects/classes, including <code class="highlighter-rouge">numeric</code>, <code class="highlighter-rouge">data.frame</code>, <code class="highlighter-rouge">list</code>, <code class="highlighter-rouge">SpatialPolygons</code>, <code class="highlighter-rouge">SpatialPolygonsDataFrame</code>, <code class="highlighter-rouge">SpatialLines</code>, <code class="highlighter-rouge">SpatialLinesDataFrame</code>, <code class="highlighter-rouge">SpatialPoints</code>, <code class="highlighter-rouge">SpatialPointsDataFrame</code>.</p>
-
-<h2 id="install">Install</h2>
-
-<p>Install rgdal - in case you can’t get it installed from binary , here’s what works on a Mac.</p>
-
-<div class="highlighter-rouge"><pre class="highlight"><code><span class="n">install.packages</span><span class="p">(</span><span class="s2">"http://cran.r-project.org/src/contrib/rgdal_0.9-1.tar.gz"</span><span class="p">,</span> <span class="n">repos</span> <span class="o">=</span> <span class="n">NULL</span><span class="p">,</span> <span class="n">type</span><span class="o">=</span><span class="s2">"source"</span><span class="p">,</span> <span class="n">configure.args</span> <span class="o">=</span> <span class="s2">"--with-gdal-config=/Library/Frameworks/GDAL.framework/Versions/1.10/unix/bin/gdal-config --with-proj-include=/Library/Frameworks/PROJ.framework/unix/include --with-proj-lib=/Library/Frameworks/PROJ.framework/unix/lib"</span><span class="p">)</span>
-</code></pre>
-</div>
-
-<p>Install <code class="highlighter-rouge">geojsonio</code></p>
-
-<div class="highlighter-rouge"><pre class="highlight"><code><span class="n">install.packages</span><span class="p">(</span><span class="s2">"devtools"</span><span class="p">)</span>
-<span class="n">devtools</span><span class="o">::</span><span class="n">install_github</span><span class="p">(</span><span class="s2">"ropensci/geojsonio"</span><span class="p">)</span>
-</code></pre>
-</div>
-
-<div class="highlighter-rouge"><pre class="highlight"><code><span class="n">library</span><span class="p">(</span><span class="s2">"geojsonio"</span><span class="p">)</span>
-</code></pre>
-</div>
-
-<h2 id="geojson">GeoJSON</h2>
-
-<h3 id="convert-various-formats-to-geojson">Convert various formats to geojson</h3>
-
-<p>From a <code class="highlighter-rouge">numeric</code> vector of length 2, as json or list</p>
-
-<div class="highlighter-rouge"><pre class="highlight"><code><span class="n">geojson_json</span><span class="p">(</span><span class="n">c</span><span class="p">(</span><span class="m">32.45</span><span class="p">,</span><span class="m">-99.74</span><span class="p">))</span>
-<span class="c1">#&gt; {"type":"Point","geometry":{"type":"Point","coordinates":[32.45,-99.74]},"properties":{}}
-</span><span class="n">geojson_list</span><span class="p">(</span><span class="n">c</span><span class="p">(</span><span class="m">32.45</span><span class="p">,</span><span class="m">-99.74</span><span class="p">))</span>
-<span class="c1">#&gt; $type
-#&gt; [1] "Point"
-#&gt; 
-#&gt; $geometry
-#&gt; $geometry$type
-#&gt; [1] "Point"
-#&gt; 
-#&gt; $geometry$coordinates
-#&gt; [1]  32.45 -99.74
-#&gt; 
-#&gt; 
-#&gt; $properties
-#&gt; NULL
-#&gt; 
-#&gt; attr(,"class")
-#&gt; [1] "geo_list"
-#&gt; attr(,"from")
-#&gt; [1] "numeric"
-</span></code></pre>
-</div>
-
-<p>From a <code class="highlighter-rouge">data.frame</code></p>
-
-<div class="highlighter-rouge"><pre class="highlight"><code><span class="n">library</span><span class="p">(</span><span class="s1">'maps'</span><span class="p">)</span>
-<span class="n">data</span><span class="p">(</span><span class="n">us.cities</span><span class="p">)</span>
-<span class="n">geojson_json</span><span class="p">(</span><span class="n">us.cities</span><span class="p">[</span><span class="m">1</span><span class="o">:</span><span class="m">2</span><span class="p">,],</span> <span class="n">lat</span><span class="o">=</span><span class="s1">'lat'</span><span class="p">,</span> <span class="n">lon</span><span class="o">=</span><span class="s1">'long'</span><span class="p">)</span>
-<span class="c1">#&gt; {"type":"FeatureCollection","features":[{"type":"Feature","geometry":{"type":"Point","coordinates":[-99.74,32.45]},"properties":{"name":"Abilene TX","country.etc":"TX","pop":"113888","capital":"0"}},{"type":"Feature","geometry":{"type":"Point","coordinates":[-81.52,41.08]},"properties":{"name":"Akron OH","country.etc":"OH","pop":"206634","capital":"0"}}]}
-</span><span class="n">geojson_list</span><span class="p">(</span><span class="n">us.cities</span><span class="p">[</span><span class="m">1</span><span class="o">:</span><span class="m">2</span><span class="p">,],</span> <span class="n">lat</span><span class="o">=</span><span class="s1">'lat'</span><span class="p">,</span> <span class="n">lon</span><span class="o">=</span><span class="s1">'long'</span><span class="p">)</span>
-<span class="c1">#&gt; $type
-#&gt; [1] "FeatureCollection"
-#&gt; 
-#&gt; $features
-#&gt; $features[[1]]
-#&gt; $features[[1]]$type
-#&gt; [1] "Feature"
-#&gt; 
-#&gt; $features[[1]]$geometry
-#&gt; $features[[1]]$geometry$type
-#&gt; [1] "Point"
-#&gt; 
-#&gt; $features[[1]]$geometry$coordinates
-#&gt; [1] -99.74  32.45
-#&gt; 
-#&gt; 
-#&gt; $features[[1]]$properties
-#&gt; $features[[1]]$properties$name
-#&gt; [1] "Abilene TX"
-#&gt; 
-#&gt; $features[[1]]$properties$country.etc
-#&gt; [1] "TX"
-#&gt; 
-#&gt; $features[[1]]$properties$pop
-#&gt; [1] "113888"
-#&gt; 
-#&gt; $features[[1]]$properties$capital
-#&gt; [1] "0"
-#&gt; 
-#&gt; 
-#&gt; 
-#&gt; $features[[2]]
-#&gt; $features[[2]]$type
-#&gt; [1] "Feature"
-#&gt; 
-#&gt; $features[[2]]$geometry
-#&gt; $features[[2]]$geometry$type
-#&gt; [1] "Point"
-#&gt; 
-#&gt; $features[[2]]$geometry$coordinates
-#&gt; [1] -81.52  41.08
-#&gt; 
-#&gt; 
-#&gt; $features[[2]]$properties
-#&gt; $features[[2]]$properties$name
-#&gt; [1] "Akron OH"
-#&gt; 
-#&gt; $features[[2]]$properties$country.etc
-#&gt; [1] "OH"
-#&gt; 
-#&gt; $features[[2]]$properties$pop
-#&gt; [1] "206634"
-#&gt; 
-#&gt; $features[[2]]$properties$capital
-#&gt; [1] "0"
-#&gt; 
-#&gt; 
-#&gt; 
-#&gt; 
-#&gt; attr(,"class")
-#&gt; [1] "geo_list"
-#&gt; attr(,"from")
-#&gt; [1] "data.frame"
-</span></code></pre>
-</div>
-
-<p>From <code class="highlighter-rouge">SpatialPolygons</code> class</p>
-
-<div class="highlighter-rouge"><pre class="highlight"><code><span class="n">library</span><span class="p">(</span><span class="s1">'sp'</span><span class="p">)</span>
-<span class="n">poly1</span> <span class="o">&lt;-</span> <span class="n">Polygons</span><span class="p">(</span><span class="n">list</span><span class="p">(</span><span class="n">Polygon</span><span class="p">(</span><span class="n">cbind</span><span class="p">(</span><span class="n">c</span><span class="p">(</span><span class="m">-100</span><span class="p">,</span><span class="m">-90</span><span class="p">,</span><span class="m">-85</span><span class="p">,</span><span class="m">-100</span><span class="p">),</span>
-                                     <span class="n">c</span><span class="p">(</span><span class="m">40</span><span class="p">,</span><span class="m">50</span><span class="p">,</span><span class="m">45</span><span class="p">,</span><span class="m">40</span><span class="p">)))),</span> <span class="s2">"1"</span><span class="p">)</span>
-<span class="n">poly2</span> <span class="o">&lt;-</span> <span class="n">Polygons</span><span class="p">(</span><span class="n">list</span><span class="p">(</span><span class="n">Polygon</span><span class="p">(</span><span class="n">cbind</span><span class="p">(</span><span class="n">c</span><span class="p">(</span><span class="m">-90</span><span class="p">,</span><span class="m">-80</span><span class="p">,</span><span class="m">-75</span><span class="p">,</span><span class="m">-90</span><span class="p">),</span>
-                                     <span class="n">c</span><span class="p">(</span><span class="m">30</span><span class="p">,</span><span class="m">40</span><span class="p">,</span><span class="m">35</span><span class="p">,</span><span class="m">30</span><span class="p">)))),</span> <span class="s2">"2"</span><span class="p">)</span>
-<span class="n">sp_poly</span> <span class="o">&lt;-</span> <span class="n">SpatialPolygons</span><span class="p">(</span><span class="n">list</span><span class="p">(</span><span class="n">poly1</span><span class="p">,</span> <span class="n">poly2</span><span class="p">),</span> <span class="m">1</span><span class="o">:</span><span class="m">2</span><span class="p">)</span>
-</code></pre>
-</div>
-
-<p>to json</p>
-
-<div class="highlighter-rouge"><pre class="highlight"><code><span class="n">geojson_json</span><span class="p">(</span><span class="n">sp_poly</span><span class="p">)</span>
-<span class="c1">#&gt; {"type":"Polygon","bbox":[-100,-75,30,50],"coordinates":[[[-100,40],[-90,50],[-85,45],[-100,40]],[[-90,30],[-80,40],[-75,35],[-90,30]]],"properties":{}}
-</span></code></pre>
-</div>
-
-<p>to list</p>
-
-<div class="highlighter-rouge"><pre class="highlight"><code><span class="n">geojson_list</span><span class="p">(</span><span class="n">sp_poly</span><span class="p">)</span><span class="o">$</span><span class="n">coordinates</span><span class="p">[[</span><span class="m">1</span><span class="p">]]</span>
-<span class="c1">#&gt; [[1]]
-#&gt; [[1]][[1]]
-#&gt; [1] -100
-#&gt; 
-#&gt; [[1]][[2]]
-#&gt; [1] 40
-#&gt; 
-#&gt; 
-#&gt; [[2]]
-#&gt; [[2]][[1]]
-#&gt; [1] -90
-#&gt; 
-#&gt; [[2]][[2]]
-#&gt; [1] 50
-#&gt; 
-#&gt; 
-#&gt; [[3]]
-#&gt; [[3]][[1]]
-#&gt; [1] -85
-#&gt; 
-#&gt; [[3]][[2]]
-#&gt; [1] 45
-#&gt; 
-#&gt; 
-#&gt; [[4]]
-#&gt; [[4]][[1]]
-#&gt; [1] -100
-#&gt; 
-#&gt; [[4]][[2]]
-#&gt; [1] 40
-</span></code></pre>
-</div>
-
-<h3 id="write-geojson">Write geojson</h3>
-
-<div class="highlighter-rouge"><pre class="highlight"><code><span class="n">library</span><span class="p">(</span><span class="s1">'maps'</span><span class="p">)</span>
-<span class="n">data</span><span class="p">(</span><span class="n">us.cities</span><span class="p">)</span>
-<span class="n">geojson_write</span><span class="p">(</span><span class="n">us.cities</span><span class="p">[</span><span class="m">1</span><span class="o">:</span><span class="m">2</span><span class="p">,],</span> <span class="n">lat</span><span class="o">=</span><span class="s1">'lat'</span><span class="p">,</span> <span class="n">lon</span><span class="o">=</span><span class="s1">'long'</span><span class="p">)</span>
-<span class="c1">#&gt; &lt;geojson&gt;
-#&gt;   Path:       myfile.geojson
-#&gt;   From class: data.frame
-</span></code></pre>
-</div>
-
-<h3 id="read-geojson">Read geojson</h3>
-
-<div class="highlighter-rouge"><pre class="highlight"><code><span class="n">file</span> <span class="o">&lt;-</span> <span class="n">system.file</span><span class="p">(</span><span class="s2">"examples"</span><span class="p">,</span> <span class="s2">"california.geojson"</span><span class="p">,</span> <span class="n">package</span> <span class="o">=</span> <span class="s2">"geojsonio"</span><span class="p">)</span>
-<span class="n">out</span> <span class="o">&lt;-</span> <span class="n">geojson_read</span><span class="p">(</span><span class="n">file</span><span class="p">)</span>
-<span class="c1">#&gt; OGR data source with driver: GeoJSON 
-#&gt; Source: "/Users/sacmac/Library/R/3.1/library/geojsonio/examples/california.geojson", layer: "OGRGeoJSON"
-#&gt; with 1 features and 11 fields
-#&gt; Feature type: wkbMultiPolygon with 2 dimensions
-</span><span class="n">plot</span><span class="p">(</span><span class="n">out</span><span class="p">)</span>
-</code></pre>
-</div>
-
-<p><img src="/public/img/2015-01-06-geojson-topojson-io/unnamed-chunk-11-1.png" alt="plot of chunk unnamed-chunk-11" /></p>
-
-<h2 id="topojson">TopoJSON</h2>
-
-<h3 id="convert-to-topojson-with-node-topojson-client">Convert to TopoJSON with Node topojson client</h3>
-
-<p>For topojson you will need Mike Bostock’s command line client. Install it by doing</p>
-
-<div class="highlighter-rouge"><pre class="highlight"><code>sudo npm install -g topojson
-</code></pre>
-</div>
-
-<p>Download a zipped shape fileset, <a href="http://esp.cr.usgs.gov/data/little/querwisl.zip">this one</a> for distribution of <em>Quercus wislizeni</em>. Unzip the zip file to a folder. Then do (changing the path to your path)</p>
-
-<div class="highlighter-rouge"><pre class="highlight"><code><span class="n">topojson_write</span><span class="p">(</span><span class="n">shppath</span><span class="o">=</span><span class="s1">'~/Downloads/querwisl'</span><span class="p">,</span> <span class="n">path</span> <span class="o">=</span> <span class="s2">"~/Downloads"</span><span class="p">,</span> <span class="n">projection</span><span class="o">=</span><span class="s1">'albers'</span><span class="p">,</span> <span class="n">projargs</span><span class="o">=</span><span class="n">list</span><span class="p">(</span><span class="n">rotate</span><span class="o">=</span><span class="s1">'[60, -35, 0]'</span><span class="p">))</span>
-<span class="c1">#&gt; OGR data source with driver: ESRI Shapefile 
-#&gt; Source: "/Users/sacmac/Downloads/querwisl", layer: "querwisl"
-#&gt; with 35 features and 5 fields
-#&gt; Feature type: wkbPolygon with 2 dimensions
-</span></code></pre>
-</div>
-
-<p>Which prints progress on the conversion of the shape file. And prints the topojson CLI call, including the location of the output file, here <code class="highlighter-rouge">/Users/sacmac/querwisl.json</code></p>
-
-<div class="highlighter-rouge"><pre class="highlight"><code><span class="n">OGR</span> <span class="n">data</span> <span class="n">source</span> <span class="n">with</span> <span class="n">driver</span><span class="o">:</span> <span class="n">ESRI</span> <span class="n">Shapefile</span>
-<span class="n">Source</span><span class="o">:</span> <span class="s2">"/Users/sacmac/Downloads/querwisl"</span><span class="p">,</span> <span class="n">layer</span><span class="o">:</span> <span class="s2">"querwisl"</span>
-<span class="n">with</span> <span class="m">35</span> <span class="n">features</span> <span class="n">and</span> <span class="m">5</span> <span class="n">fields</span>
-<span class="n">Feature</span> <span class="n">type</span><span class="o">:</span> <span class="n">wkbPolygon</span> <span class="n">with</span> <span class="m">2</span> <span class="n">dimensions</span>
-<span class="n">topojson</span> <span class="o">-</span><span class="n">o</span> <span class="o">/</span><span class="n">Users</span><span class="o">/</span><span class="n">sacmac</span><span class="o">/</span><span class="n">querwisl.json</span> <span class="o">-</span><span class="n">q</span> <span class="m">1e4</span> <span class="o">-</span><span class="n">s</span> <span class="m">0</span> <span class="o">--</span><span class="n">shapefile</span><span class="o">-</span><span class="n">encoding</span> <span class="n">utf8</span> <span class="o">--</span><span class="n">projection</span> <span class="s1">'d3.geo.albers().rotate([60, -35, 0])'</span> <span class="o">--</span> <span class="o">/</span><span class="n">var</span><span class="o">/</span><span class="n">folders</span><span class="o">/</span><span class="n">gs</span><span class="o">/</span><span class="m">4</span><span class="n">khph0xs0436gmd2gdnwsg080000gn</span><span class="o">/</span><span class="n">T</span><span class="o">//</span><span class="n">Rtmp49APW7</span><span class="o">/</span><span class="n">querwisl.shp</span>
-
-<span class="n">bounds</span><span class="o">:</span> <span class="m">-403.2554825867553</span> <span class="m">401.27189387582916</span> <span class="m">-295.798050380061</span> <span class="m">585.4214768677039</span> <span class="p">(</span><span class="n">cartesian</span><span class="p">)</span>
-<span class="n">pre</span><span class="o">-</span><span class="n">quantization</span><span class="o">:</span> <span class="m">0.010746817902459677</span> <span class="m">0.018416799979185387</span>
-<span class="n">topology</span><span class="o">:</span> <span class="m">35</span> <span class="n">arcs</span><span class="p">,</span> <span class="m">2492</span> <span class="n">points</span>
-<span class="n">prune</span><span class="o">:</span> <span class="n">retained</span> <span class="m">35</span> <span class="o">/</span> <span class="m">35</span> <span class="n">arcs</span> <span class="p">(</span><span class="m">100</span><span class="o">%</span><span class="p">)</span>
-</code></pre>
-</div>
-
-<p>You can then use this topojson file wherever. We’ll add a function soon to automagically throw this file up as a Github gist to get an interactive map.</p>
-
-<h3 id="read-topojson">Read topojson</h3>
-
-<p>TopoJSON</p>
-
-<div class="highlighter-rouge"><pre class="highlight"><code><span class="n">url</span> <span class="o">&lt;-</span> <span class="s2">"https://raw.githubusercontent.com/shawnbot/d3-cartogram/master/data/us-states.topojson"</span>
-<span class="n">out</span> <span class="o">&lt;-</span> <span class="n">topojson_read</span><span class="p">(</span><span class="n">url</span><span class="p">)</span>
-<span class="c1">#&gt; OGR data source with driver: GeoJSON 
-#&gt; Source: "https://raw.githubusercontent.com/shawnbot/d3-cartogram/master/data/us-states.topojson", layer: "states"
-#&gt; with 51 features and 2 fields
-#&gt; Feature type: wkbPolygon with 2 dimensions
-</span><span class="n">plot</span><span class="p">(</span><span class="n">out</span><span class="p">)</span>
-</code></pre>
-</div>
-
-<p><img src="/public/img/2015-01-06-geojson-topojson-io/unnamed-chunk-14-1.png" alt="plot of chunk unnamed-chunk-14" /></p>
-
-<h2 id="use-case-play-with-us-states">Use case: Play with US states</h2>
-
-<p>Using data from <a href="https://github.com/glynnbird/usstatesgeojson">https://github.com/glynnbird/usstatesgeojson</a></p>
-
-<p>Get some geojson</p>
-
-<div class="highlighter-rouge"><pre class="highlight"><code><span class="n">library</span><span class="p">(</span><span class="s1">'httr'</span><span class="p">)</span>
-<span class="n">res</span> <span class="o">&lt;-</span> <span class="n">GET</span><span class="p">(</span><span class="s1">'https://api.github.com/repos/glynnbird/usstatesgeojson/contents'</span><span class="p">)</span>
-<span class="n">st_names</span> <span class="o">&lt;-</span> <span class="n">Filter</span><span class="p">(</span><span class="k">function</span><span class="p">(</span><span class="n">x</span><span class="p">)</span> <span class="n">grepl</span><span class="p">(</span><span class="s2">"\\.geojson"</span><span class="p">,</span> <span class="n">x</span><span class="p">),</span> <span class="n">sapply</span><span class="p">(</span><span class="n">content</span><span class="p">(</span><span class="n">res</span><span class="p">),</span> <span class="s2">"[["</span><span class="p">,</span> <span class="s2">"name"</span><span class="p">))</span>
-<span class="n">base</span> <span class="o">&lt;-</span> <span class="s1">'https://raw.githubusercontent.com/glynnbird/usstatesgeojson/master/'</span>
-<span class="n">st_files</span> <span class="o">&lt;-</span> <span class="n">paste0</span><span class="p">(</span><span class="n">base</span><span class="p">,</span> <span class="n">st_names</span><span class="p">)</span>
-</code></pre>
-</div>
-
-<p>Make a faceted plot</p>
-
-<div class="highlighter-rouge"><pre class="highlight"><code><span class="n">library</span><span class="p">(</span><span class="s1">'ggplot2'</span><span class="p">)</span>
-<span class="n">library</span><span class="p">(</span><span class="s1">'plyr'</span><span class="p">)</span>
-<span class="n">st_use</span> <span class="o">&lt;-</span> <span class="n">st_files</span><span class="p">[</span><span class="m">7</span><span class="o">:</span><span class="m">13</span><span class="p">]</span>
-<span class="n">geo</span> <span class="o">&lt;-</span> <span class="n">lapply</span><span class="p">(</span><span class="n">st_use</span><span class="p">,</span> <span class="n">geojson_read</span><span class="p">,</span> <span class="n">verbose</span> <span class="o">=</span> <span class="n">FALSE</span><span class="p">)</span>
-<span class="n">df</span> <span class="o">&lt;-</span> <span class="n">ldply</span><span class="p">(</span><span class="n">setNames</span><span class="p">(</span><span class="n">lapply</span><span class="p">(</span><span class="n">geo</span><span class="p">,</span> <span class="n">fortify</span><span class="p">),</span> <span class="n">gsub</span><span class="p">(</span><span class="s2">"\\.geojson"</span><span class="p">,</span> <span class="s2">""</span><span class="p">,</span> <span class="n">st_names</span><span class="p">[</span><span class="m">7</span><span class="o">:</span><span class="m">13</span><span class="p">])))</span>
-<span class="n">ggplot</span><span class="p">(</span><span class="n">df</span><span class="p">,</span> <span class="n">aes</span><span class="p">(</span><span class="n">long</span><span class="p">,</span> <span class="n">lat</span><span class="p">,</span> <span class="n">group</span> <span class="o">=</span> <span class="n">group</span><span class="p">))</span> <span class="o">+</span>
-  <span class="n">geom_polygon</span><span class="p">()</span> <span class="o">+</span>
-  <span class="n">facet_wrap</span><span class="p">(</span><span class="o">~</span> <span class="n">.id</span><span class="p">,</span> <span class="n">scales</span> <span class="o">=</span> <span class="s2">"free"</span><span class="p">)</span>
-</code></pre>
-</div>
-
-<p><img src="/public/img/2015-01-06-geojson-topojson-io/unnamed-chunk-16-1.png" alt="plot of chunk unnamed-chunk-16" /></p>
-
-<h2 id="maps">Maps</h2>
-
-<p>We’re also working on <code class="highlighter-rouge">map_gist()</code> - to push up a geojson or topojson file as a GitHub gist (renders as an interactive map). It still needs some work…</p>
-
-<h2 id="validate-geojson">Validate geojson</h2>
-
-<p><a href="http://geojsonlint.com/">geojsonlint.com</a> has a nice web interface you can use to make sure you’re geoJSON is in the right format. In addition, it provides a RESTful endpoint at <code class="highlighter-rouge">geojsonlint.com/validate</code> to validate geoJSON. 
-This was just added today in this package, and can be used from many data types.</p>
-
-<p>Good geoJSON</p>
-
-<div class="highlighter-rouge"><pre class="highlight"><code><span class="n">validate</span><span class="p">(</span><span class="s1">'{"type": "Point", "coordinates": [-100, 80]}'</span><span class="p">)</span>
-<span class="c1">#&gt; $status
-#&gt; [1] "ok"
-</span></code></pre>
-</div>
-
-<p>Bad geoJSON</p>
-
-<div class="highlighter-rouge"><pre class="highlight"><code><span class="n">validate</span><span class="p">(</span><span class="s1">'{"type": "Rhombus", "coordinates": [[1, 2], [3, 4], [5, 6]]}'</span><span class="p">)</span>
-<span class="c1">#&gt; $message
-#&gt; [1] "\"Rhombus\" is not a valid GeoJSON type."
-#&gt; 
-#&gt; $status
-#&gt; [1] "error"
-</span></code></pre>
-</div>
-
-<p>A file</p>
-
-<div class="highlighter-rouge"><pre class="highlight"><code><span class="n">file</span> <span class="o">&lt;-</span> <span class="n">system.file</span><span class="p">(</span><span class="s2">"examples"</span><span class="p">,</span> <span class="s2">"zillow_or.geojson"</span><span class="p">,</span> <span class="n">package</span> <span class="o">=</span> <span class="s2">"togeojson"</span><span class="p">)</span>
-<span class="n">validate</span><span class="p">(</span><span class="n">x</span> <span class="o">=</span> <span class="n">as.location</span><span class="p">(</span><span class="n">file</span><span class="p">))</span>
-<span class="c1">#&gt; $status
-#&gt; [1] "ok"
-</span></code></pre>
-</div>
-
-<p>A URL</p>
-
-<div class="highlighter-rouge"><pre class="highlight"><code><span class="n">url</span> <span class="o">&lt;-</span> <span class="s2">"https://raw.githubusercontent.com/glynnbird/usstatesgeojson/master/california.geojson"</span>
-<span class="n">validate</span><span class="p">(</span><span class="n">as.location</span><span class="p">(</span><span class="n">url</span><span class="p">))</span>
-<span class="c1">#&gt; $status
-#&gt; [1] "ok"
-</span></code></pre>
-</div>
-
-<p>From the output of <code class="highlighter-rouge">geojson_list()</code></p>
-
-<div class="highlighter-rouge"><pre class="highlight"><code><span class="n">library</span><span class="p">(</span><span class="s2">"maps"</span><span class="p">)</span>
-<span class="n">data</span><span class="p">(</span><span class="n">us.cities</span><span class="p">)</span>
-<span class="n">x</span> <span class="o">&lt;-</span> <span class="n">geojson_list</span><span class="p">(</span><span class="n">us.cities</span><span class="p">[</span><span class="m">1</span><span class="o">:</span><span class="m">2</span><span class="p">,],</span> <span class="n">lat</span><span class="o">=</span><span class="s1">'lat'</span><span class="p">,</span> <span class="n">lon</span><span class="o">=</span><span class="s1">'long'</span><span class="p">)</span>
-<span class="n">validate</span><span class="p">(</span><span class="n">x</span><span class="p">)</span>
-<span class="c1">#&gt; $status
-#&gt; [1] "ok"
-</span></code></pre>
-</div>
-
-<p>From SpatialPoints class</p>
-
-<div class="highlighter-rouge"><pre class="highlight"><code><span class="n">library</span><span class="p">(</span><span class="s2">"sp"</span><span class="p">)</span>
-<span class="n">a</span> <span class="o">&lt;-</span> <span class="n">c</span><span class="p">(</span><span class="m">1</span><span class="p">,</span><span class="m">2</span><span class="p">,</span><span class="m">3</span><span class="p">,</span><span class="m">4</span><span class="p">,</span><span class="m">5</span><span class="p">)</span>
-<span class="n">b</span> <span class="o">&lt;-</span> <span class="n">c</span><span class="p">(</span><span class="m">3</span><span class="p">,</span><span class="m">2</span><span class="p">,</span><span class="m">5</span><span class="p">,</span><span class="m">1</span><span class="p">,</span><span class="m">4</span><span class="p">)</span>
-<span class="n">x</span> <span class="o">&lt;-</span> <span class="n">SpatialPoints</span><span class="p">(</span><span class="n">cbind</span><span class="p">(</span><span class="n">a</span><span class="p">,</span><span class="n">b</span><span class="p">))</span>
-<span class="n">validate</span><span class="p">(</span><span class="n">x</span><span class="p">)</span>
-<span class="c1">#&gt; $status
-#&gt; [1] "ok"
-</span></code></pre>
-</div>
 
   </div>
   

@@ -61,6 +61,382 @@
   
   <div class="post">
     <h1>
+      <a href="/2015/01/geojson-topojson-io/">
+        R I/O for geojson and topojson
+      </a>
+    </h1>
+
+    <span class="post-date">06 Jan 2015</span>
+
+    <p>At rOpenSci we’ve been working on an R package (<code class="highlighter-rouge">geojsonio</code>) to make converting R data in various formats to <a href="http://geojson.org/geojson-spec.html">geoJSON</a> and <a href="https://github.com/topojson/topojson-specification/blob/master/README.md">topoJSON</a>, and vice versa. We hope to do this one job very well, and handle all reasonable use cases.</p>
+
+<p>Functions in this package are organized first around what you’re working with or want to get, <code class="highlighter-rouge">geojson</code> or <code class="highlighter-rouge">topojson</code>, then convert to or read from various formats:</p>
+
+<ul>
+  <li><code class="highlighter-rouge">geojson_list()</code>/<code class="highlighter-rouge">topojson_list()</code> - convert to geojson/topojson as R list format</li>
+  <li><code class="highlighter-rouge">geojson_json()</code>/<code class="highlighter-rouge">topojson_json()</code> - convert to geojson/topojson as json</li>
+  <li><code class="highlighter-rouge">geojson_read()</code><code class="highlighter-rouge">topojson_read()</code> - read a geojson/topojson file from file path or URL</li>
+  <li><code class="highlighter-rouge">geojson_write()</code>/<code class="highlighter-rouge">topojson_write()</code> - write a geojson/topojson file locally</li>
+</ul>
+
+<p>Each of the above functions have methods for various objects/classes, including <code class="highlighter-rouge">numeric</code>, <code class="highlighter-rouge">data.frame</code>, <code class="highlighter-rouge">list</code>, <code class="highlighter-rouge">SpatialPolygons</code>, <code class="highlighter-rouge">SpatialPolygonsDataFrame</code>, <code class="highlighter-rouge">SpatialLines</code>, <code class="highlighter-rouge">SpatialLinesDataFrame</code>, <code class="highlighter-rouge">SpatialPoints</code>, <code class="highlighter-rouge">SpatialPointsDataFrame</code>.</p>
+
+<h2 id="install">Install</h2>
+
+<p>Install rgdal - in case you can’t get it installed from binary , here’s what works on a Mac.</p>
+
+<div class="highlighter-rouge"><pre class="highlight"><code><span class="n">install.packages</span><span class="p">(</span><span class="s2">"http://cran.r-project.org/src/contrib/rgdal_0.9-1.tar.gz"</span><span class="p">,</span> <span class="n">repos</span> <span class="o">=</span> <span class="n">NULL</span><span class="p">,</span> <span class="n">type</span><span class="o">=</span><span class="s2">"source"</span><span class="p">,</span> <span class="n">configure.args</span> <span class="o">=</span> <span class="s2">"--with-gdal-config=/Library/Frameworks/GDAL.framework/Versions/1.10/unix/bin/gdal-config --with-proj-include=/Library/Frameworks/PROJ.framework/unix/include --with-proj-lib=/Library/Frameworks/PROJ.framework/unix/lib"</span><span class="p">)</span>
+</code></pre>
+</div>
+
+<p>Install <code class="highlighter-rouge">geojsonio</code></p>
+
+<div class="highlighter-rouge"><pre class="highlight"><code><span class="n">install.packages</span><span class="p">(</span><span class="s2">"devtools"</span><span class="p">)</span>
+<span class="n">devtools</span><span class="o">::</span><span class="n">install_github</span><span class="p">(</span><span class="s2">"ropensci/geojsonio"</span><span class="p">)</span>
+</code></pre>
+</div>
+
+<div class="highlighter-rouge"><pre class="highlight"><code><span class="n">library</span><span class="p">(</span><span class="s2">"geojsonio"</span><span class="p">)</span>
+</code></pre>
+</div>
+
+<h2 id="geojson">GeoJSON</h2>
+
+<h3 id="convert-various-formats-to-geojson">Convert various formats to geojson</h3>
+
+<p>From a <code class="highlighter-rouge">numeric</code> vector of length 2, as json or list</p>
+
+<div class="highlighter-rouge"><pre class="highlight"><code><span class="n">geojson_json</span><span class="p">(</span><span class="n">c</span><span class="p">(</span><span class="m">32.45</span><span class="p">,</span><span class="m">-99.74</span><span class="p">))</span>
+<span class="c1">#&gt; {"type":"Point","geometry":{"type":"Point","coordinates":[32.45,-99.74]},"properties":{}}
+</span><span class="n">geojson_list</span><span class="p">(</span><span class="n">c</span><span class="p">(</span><span class="m">32.45</span><span class="p">,</span><span class="m">-99.74</span><span class="p">))</span>
+<span class="c1">#&gt; $type
+#&gt; [1] "Point"
+#&gt; 
+#&gt; $geometry
+#&gt; $geometry$type
+#&gt; [1] "Point"
+#&gt; 
+#&gt; $geometry$coordinates
+#&gt; [1]  32.45 -99.74
+#&gt; 
+#&gt; 
+#&gt; $properties
+#&gt; NULL
+#&gt; 
+#&gt; attr(,"class")
+#&gt; [1] "geo_list"
+#&gt; attr(,"from")
+#&gt; [1] "numeric"
+</span></code></pre>
+</div>
+
+<p>From a <code class="highlighter-rouge">data.frame</code></p>
+
+<div class="highlighter-rouge"><pre class="highlight"><code><span class="n">library</span><span class="p">(</span><span class="s1">'maps'</span><span class="p">)</span>
+<span class="n">data</span><span class="p">(</span><span class="n">us.cities</span><span class="p">)</span>
+<span class="n">geojson_json</span><span class="p">(</span><span class="n">us.cities</span><span class="p">[</span><span class="m">1</span><span class="o">:</span><span class="m">2</span><span class="p">,],</span> <span class="n">lat</span><span class="o">=</span><span class="s1">'lat'</span><span class="p">,</span> <span class="n">lon</span><span class="o">=</span><span class="s1">'long'</span><span class="p">)</span>
+<span class="c1">#&gt; {"type":"FeatureCollection","features":[{"type":"Feature","geometry":{"type":"Point","coordinates":[-99.74,32.45]},"properties":{"name":"Abilene TX","country.etc":"TX","pop":"113888","capital":"0"}},{"type":"Feature","geometry":{"type":"Point","coordinates":[-81.52,41.08]},"properties":{"name":"Akron OH","country.etc":"OH","pop":"206634","capital":"0"}}]}
+</span><span class="n">geojson_list</span><span class="p">(</span><span class="n">us.cities</span><span class="p">[</span><span class="m">1</span><span class="o">:</span><span class="m">2</span><span class="p">,],</span> <span class="n">lat</span><span class="o">=</span><span class="s1">'lat'</span><span class="p">,</span> <span class="n">lon</span><span class="o">=</span><span class="s1">'long'</span><span class="p">)</span>
+<span class="c1">#&gt; $type
+#&gt; [1] "FeatureCollection"
+#&gt; 
+#&gt; $features
+#&gt; $features[[1]]
+#&gt; $features[[1]]$type
+#&gt; [1] "Feature"
+#&gt; 
+#&gt; $features[[1]]$geometry
+#&gt; $features[[1]]$geometry$type
+#&gt; [1] "Point"
+#&gt; 
+#&gt; $features[[1]]$geometry$coordinates
+#&gt; [1] -99.74  32.45
+#&gt; 
+#&gt; 
+#&gt; $features[[1]]$properties
+#&gt; $features[[1]]$properties$name
+#&gt; [1] "Abilene TX"
+#&gt; 
+#&gt; $features[[1]]$properties$country.etc
+#&gt; [1] "TX"
+#&gt; 
+#&gt; $features[[1]]$properties$pop
+#&gt; [1] "113888"
+#&gt; 
+#&gt; $features[[1]]$properties$capital
+#&gt; [1] "0"
+#&gt; 
+#&gt; 
+#&gt; 
+#&gt; $features[[2]]
+#&gt; $features[[2]]$type
+#&gt; [1] "Feature"
+#&gt; 
+#&gt; $features[[2]]$geometry
+#&gt; $features[[2]]$geometry$type
+#&gt; [1] "Point"
+#&gt; 
+#&gt; $features[[2]]$geometry$coordinates
+#&gt; [1] -81.52  41.08
+#&gt; 
+#&gt; 
+#&gt; $features[[2]]$properties
+#&gt; $features[[2]]$properties$name
+#&gt; [1] "Akron OH"
+#&gt; 
+#&gt; $features[[2]]$properties$country.etc
+#&gt; [1] "OH"
+#&gt; 
+#&gt; $features[[2]]$properties$pop
+#&gt; [1] "206634"
+#&gt; 
+#&gt; $features[[2]]$properties$capital
+#&gt; [1] "0"
+#&gt; 
+#&gt; 
+#&gt; 
+#&gt; 
+#&gt; attr(,"class")
+#&gt; [1] "geo_list"
+#&gt; attr(,"from")
+#&gt; [1] "data.frame"
+</span></code></pre>
+</div>
+
+<p>From <code class="highlighter-rouge">SpatialPolygons</code> class</p>
+
+<div class="highlighter-rouge"><pre class="highlight"><code><span class="n">library</span><span class="p">(</span><span class="s1">'sp'</span><span class="p">)</span>
+<span class="n">poly1</span> <span class="o">&lt;-</span> <span class="n">Polygons</span><span class="p">(</span><span class="n">list</span><span class="p">(</span><span class="n">Polygon</span><span class="p">(</span><span class="n">cbind</span><span class="p">(</span><span class="n">c</span><span class="p">(</span><span class="m">-100</span><span class="p">,</span><span class="m">-90</span><span class="p">,</span><span class="m">-85</span><span class="p">,</span><span class="m">-100</span><span class="p">),</span>
+                                     <span class="n">c</span><span class="p">(</span><span class="m">40</span><span class="p">,</span><span class="m">50</span><span class="p">,</span><span class="m">45</span><span class="p">,</span><span class="m">40</span><span class="p">)))),</span> <span class="s2">"1"</span><span class="p">)</span>
+<span class="n">poly2</span> <span class="o">&lt;-</span> <span class="n">Polygons</span><span class="p">(</span><span class="n">list</span><span class="p">(</span><span class="n">Polygon</span><span class="p">(</span><span class="n">cbind</span><span class="p">(</span><span class="n">c</span><span class="p">(</span><span class="m">-90</span><span class="p">,</span><span class="m">-80</span><span class="p">,</span><span class="m">-75</span><span class="p">,</span><span class="m">-90</span><span class="p">),</span>
+                                     <span class="n">c</span><span class="p">(</span><span class="m">30</span><span class="p">,</span><span class="m">40</span><span class="p">,</span><span class="m">35</span><span class="p">,</span><span class="m">30</span><span class="p">)))),</span> <span class="s2">"2"</span><span class="p">)</span>
+<span class="n">sp_poly</span> <span class="o">&lt;-</span> <span class="n">SpatialPolygons</span><span class="p">(</span><span class="n">list</span><span class="p">(</span><span class="n">poly1</span><span class="p">,</span> <span class="n">poly2</span><span class="p">),</span> <span class="m">1</span><span class="o">:</span><span class="m">2</span><span class="p">)</span>
+</code></pre>
+</div>
+
+<p>to json</p>
+
+<div class="highlighter-rouge"><pre class="highlight"><code><span class="n">geojson_json</span><span class="p">(</span><span class="n">sp_poly</span><span class="p">)</span>
+<span class="c1">#&gt; {"type":"Polygon","bbox":[-100,-75,30,50],"coordinates":[[[-100,40],[-90,50],[-85,45],[-100,40]],[[-90,30],[-80,40],[-75,35],[-90,30]]],"properties":{}}
+</span></code></pre>
+</div>
+
+<p>to list</p>
+
+<div class="highlighter-rouge"><pre class="highlight"><code><span class="n">geojson_list</span><span class="p">(</span><span class="n">sp_poly</span><span class="p">)</span><span class="o">$</span><span class="n">coordinates</span><span class="p">[[</span><span class="m">1</span><span class="p">]]</span>
+<span class="c1">#&gt; [[1]]
+#&gt; [[1]][[1]]
+#&gt; [1] -100
+#&gt; 
+#&gt; [[1]][[2]]
+#&gt; [1] 40
+#&gt; 
+#&gt; 
+#&gt; [[2]]
+#&gt; [[2]][[1]]
+#&gt; [1] -90
+#&gt; 
+#&gt; [[2]][[2]]
+#&gt; [1] 50
+#&gt; 
+#&gt; 
+#&gt; [[3]]
+#&gt; [[3]][[1]]
+#&gt; [1] -85
+#&gt; 
+#&gt; [[3]][[2]]
+#&gt; [1] 45
+#&gt; 
+#&gt; 
+#&gt; [[4]]
+#&gt; [[4]][[1]]
+#&gt; [1] -100
+#&gt; 
+#&gt; [[4]][[2]]
+#&gt; [1] 40
+</span></code></pre>
+</div>
+
+<h3 id="write-geojson">Write geojson</h3>
+
+<div class="highlighter-rouge"><pre class="highlight"><code><span class="n">library</span><span class="p">(</span><span class="s1">'maps'</span><span class="p">)</span>
+<span class="n">data</span><span class="p">(</span><span class="n">us.cities</span><span class="p">)</span>
+<span class="n">geojson_write</span><span class="p">(</span><span class="n">us.cities</span><span class="p">[</span><span class="m">1</span><span class="o">:</span><span class="m">2</span><span class="p">,],</span> <span class="n">lat</span><span class="o">=</span><span class="s1">'lat'</span><span class="p">,</span> <span class="n">lon</span><span class="o">=</span><span class="s1">'long'</span><span class="p">)</span>
+<span class="c1">#&gt; &lt;geojson&gt;
+#&gt;   Path:       myfile.geojson
+#&gt;   From class: data.frame
+</span></code></pre>
+</div>
+
+<h3 id="read-geojson">Read geojson</h3>
+
+<div class="highlighter-rouge"><pre class="highlight"><code><span class="n">file</span> <span class="o">&lt;-</span> <span class="n">system.file</span><span class="p">(</span><span class="s2">"examples"</span><span class="p">,</span> <span class="s2">"california.geojson"</span><span class="p">,</span> <span class="n">package</span> <span class="o">=</span> <span class="s2">"geojsonio"</span><span class="p">)</span>
+<span class="n">out</span> <span class="o">&lt;-</span> <span class="n">geojson_read</span><span class="p">(</span><span class="n">file</span><span class="p">)</span>
+<span class="c1">#&gt; OGR data source with driver: GeoJSON 
+#&gt; Source: "/Users/sacmac/Library/R/3.1/library/geojsonio/examples/california.geojson", layer: "OGRGeoJSON"
+#&gt; with 1 features and 11 fields
+#&gt; Feature type: wkbMultiPolygon with 2 dimensions
+</span><span class="n">plot</span><span class="p">(</span><span class="n">out</span><span class="p">)</span>
+</code></pre>
+</div>
+
+<p><img src="/public/img/2015-01-06-geojson-topojson-io/unnamed-chunk-11-1.png" alt="plot of chunk unnamed-chunk-11" /></p>
+
+<h2 id="topojson">TopoJSON</h2>
+
+<h3 id="convert-to-topojson-with-node-topojson-client">Convert to TopoJSON with Node topojson client</h3>
+
+<p>For topojson you will need Mike Bostock’s command line client. Install it by doing</p>
+
+<div class="highlighter-rouge"><pre class="highlight"><code>sudo npm install -g topojson
+</code></pre>
+</div>
+
+<p>Download a zipped shape fileset, <a href="http://esp.cr.usgs.gov/data/little/querwisl.zip">this one</a> for distribution of <em>Quercus wislizeni</em>. Unzip the zip file to a folder. Then do (changing the path to your path)</p>
+
+<div class="highlighter-rouge"><pre class="highlight"><code><span class="n">topojson_write</span><span class="p">(</span><span class="n">shppath</span><span class="o">=</span><span class="s1">'~/Downloads/querwisl'</span><span class="p">,</span> <span class="n">path</span> <span class="o">=</span> <span class="s2">"~/Downloads"</span><span class="p">,</span> <span class="n">projection</span><span class="o">=</span><span class="s1">'albers'</span><span class="p">,</span> <span class="n">projargs</span><span class="o">=</span><span class="n">list</span><span class="p">(</span><span class="n">rotate</span><span class="o">=</span><span class="s1">'[60, -35, 0]'</span><span class="p">))</span>
+<span class="c1">#&gt; OGR data source with driver: ESRI Shapefile 
+#&gt; Source: "/Users/sacmac/Downloads/querwisl", layer: "querwisl"
+#&gt; with 35 features and 5 fields
+#&gt; Feature type: wkbPolygon with 2 dimensions
+</span></code></pre>
+</div>
+
+<p>Which prints progress on the conversion of the shape file. And prints the topojson CLI call, including the location of the output file, here <code class="highlighter-rouge">/Users/sacmac/querwisl.json</code></p>
+
+<div class="highlighter-rouge"><pre class="highlight"><code><span class="n">OGR</span> <span class="n">data</span> <span class="n">source</span> <span class="n">with</span> <span class="n">driver</span><span class="o">:</span> <span class="n">ESRI</span> <span class="n">Shapefile</span>
+<span class="n">Source</span><span class="o">:</span> <span class="s2">"/Users/sacmac/Downloads/querwisl"</span><span class="p">,</span> <span class="n">layer</span><span class="o">:</span> <span class="s2">"querwisl"</span>
+<span class="n">with</span> <span class="m">35</span> <span class="n">features</span> <span class="n">and</span> <span class="m">5</span> <span class="n">fields</span>
+<span class="n">Feature</span> <span class="n">type</span><span class="o">:</span> <span class="n">wkbPolygon</span> <span class="n">with</span> <span class="m">2</span> <span class="n">dimensions</span>
+<span class="n">topojson</span> <span class="o">-</span><span class="n">o</span> <span class="o">/</span><span class="n">Users</span><span class="o">/</span><span class="n">sacmac</span><span class="o">/</span><span class="n">querwisl.json</span> <span class="o">-</span><span class="n">q</span> <span class="m">1e4</span> <span class="o">-</span><span class="n">s</span> <span class="m">0</span> <span class="o">--</span><span class="n">shapefile</span><span class="o">-</span><span class="n">encoding</span> <span class="n">utf8</span> <span class="o">--</span><span class="n">projection</span> <span class="s1">'d3.geo.albers().rotate([60, -35, 0])'</span> <span class="o">--</span> <span class="o">/</span><span class="n">var</span><span class="o">/</span><span class="n">folders</span><span class="o">/</span><span class="n">gs</span><span class="o">/</span><span class="m">4</span><span class="n">khph0xs0436gmd2gdnwsg080000gn</span><span class="o">/</span><span class="n">T</span><span class="o">//</span><span class="n">Rtmp49APW7</span><span class="o">/</span><span class="n">querwisl.shp</span>
+
+<span class="n">bounds</span><span class="o">:</span> <span class="m">-403.2554825867553</span> <span class="m">401.27189387582916</span> <span class="m">-295.798050380061</span> <span class="m">585.4214768677039</span> <span class="p">(</span><span class="n">cartesian</span><span class="p">)</span>
+<span class="n">pre</span><span class="o">-</span><span class="n">quantization</span><span class="o">:</span> <span class="m">0.010746817902459677</span> <span class="m">0.018416799979185387</span>
+<span class="n">topology</span><span class="o">:</span> <span class="m">35</span> <span class="n">arcs</span><span class="p">,</span> <span class="m">2492</span> <span class="n">points</span>
+<span class="n">prune</span><span class="o">:</span> <span class="n">retained</span> <span class="m">35</span> <span class="o">/</span> <span class="m">35</span> <span class="n">arcs</span> <span class="p">(</span><span class="m">100</span><span class="o">%</span><span class="p">)</span>
+</code></pre>
+</div>
+
+<p>You can then use this topojson file wherever. We’ll add a function soon to automagically throw this file up as a Github gist to get an interactive map.</p>
+
+<h3 id="read-topojson">Read topojson</h3>
+
+<p>TopoJSON</p>
+
+<div class="highlighter-rouge"><pre class="highlight"><code><span class="n">url</span> <span class="o">&lt;-</span> <span class="s2">"https://raw.githubusercontent.com/shawnbot/d3-cartogram/master/data/us-states.topojson"</span>
+<span class="n">out</span> <span class="o">&lt;-</span> <span class="n">topojson_read</span><span class="p">(</span><span class="n">url</span><span class="p">)</span>
+<span class="c1">#&gt; OGR data source with driver: GeoJSON 
+#&gt; Source: "https://raw.githubusercontent.com/shawnbot/d3-cartogram/master/data/us-states.topojson", layer: "states"
+#&gt; with 51 features and 2 fields
+#&gt; Feature type: wkbPolygon with 2 dimensions
+</span><span class="n">plot</span><span class="p">(</span><span class="n">out</span><span class="p">)</span>
+</code></pre>
+</div>
+
+<p><img src="/public/img/2015-01-06-geojson-topojson-io/unnamed-chunk-14-1.png" alt="plot of chunk unnamed-chunk-14" /></p>
+
+<h2 id="use-case-play-with-us-states">Use case: Play with US states</h2>
+
+<p>Using data from <a href="https://github.com/glynnbird/usstatesgeojson">https://github.com/glynnbird/usstatesgeojson</a></p>
+
+<p>Get some geojson</p>
+
+<div class="highlighter-rouge"><pre class="highlight"><code><span class="n">library</span><span class="p">(</span><span class="s1">'httr'</span><span class="p">)</span>
+<span class="n">res</span> <span class="o">&lt;-</span> <span class="n">GET</span><span class="p">(</span><span class="s1">'https://api.github.com/repos/glynnbird/usstatesgeojson/contents'</span><span class="p">)</span>
+<span class="n">st_names</span> <span class="o">&lt;-</span> <span class="n">Filter</span><span class="p">(</span><span class="k">function</span><span class="p">(</span><span class="n">x</span><span class="p">)</span> <span class="n">grepl</span><span class="p">(</span><span class="s2">"\\.geojson"</span><span class="p">,</span> <span class="n">x</span><span class="p">),</span> <span class="n">sapply</span><span class="p">(</span><span class="n">content</span><span class="p">(</span><span class="n">res</span><span class="p">),</span> <span class="s2">"[["</span><span class="p">,</span> <span class="s2">"name"</span><span class="p">))</span>
+<span class="n">base</span> <span class="o">&lt;-</span> <span class="s1">'https://raw.githubusercontent.com/glynnbird/usstatesgeojson/master/'</span>
+<span class="n">st_files</span> <span class="o">&lt;-</span> <span class="n">paste0</span><span class="p">(</span><span class="n">base</span><span class="p">,</span> <span class="n">st_names</span><span class="p">)</span>
+</code></pre>
+</div>
+
+<p>Make a faceted plot</p>
+
+<div class="highlighter-rouge"><pre class="highlight"><code><span class="n">library</span><span class="p">(</span><span class="s1">'ggplot2'</span><span class="p">)</span>
+<span class="n">library</span><span class="p">(</span><span class="s1">'plyr'</span><span class="p">)</span>
+<span class="n">st_use</span> <span class="o">&lt;-</span> <span class="n">st_files</span><span class="p">[</span><span class="m">7</span><span class="o">:</span><span class="m">13</span><span class="p">]</span>
+<span class="n">geo</span> <span class="o">&lt;-</span> <span class="n">lapply</span><span class="p">(</span><span class="n">st_use</span><span class="p">,</span> <span class="n">geojson_read</span><span class="p">,</span> <span class="n">verbose</span> <span class="o">=</span> <span class="n">FALSE</span><span class="p">)</span>
+<span class="n">df</span> <span class="o">&lt;-</span> <span class="n">ldply</span><span class="p">(</span><span class="n">setNames</span><span class="p">(</span><span class="n">lapply</span><span class="p">(</span><span class="n">geo</span><span class="p">,</span> <span class="n">fortify</span><span class="p">),</span> <span class="n">gsub</span><span class="p">(</span><span class="s2">"\\.geojson"</span><span class="p">,</span> <span class="s2">""</span><span class="p">,</span> <span class="n">st_names</span><span class="p">[</span><span class="m">7</span><span class="o">:</span><span class="m">13</span><span class="p">])))</span>
+<span class="n">ggplot</span><span class="p">(</span><span class="n">df</span><span class="p">,</span> <span class="n">aes</span><span class="p">(</span><span class="n">long</span><span class="p">,</span> <span class="n">lat</span><span class="p">,</span> <span class="n">group</span> <span class="o">=</span> <span class="n">group</span><span class="p">))</span> <span class="o">+</span>
+  <span class="n">geom_polygon</span><span class="p">()</span> <span class="o">+</span>
+  <span class="n">facet_wrap</span><span class="p">(</span><span class="o">~</span> <span class="n">.id</span><span class="p">,</span> <span class="n">scales</span> <span class="o">=</span> <span class="s2">"free"</span><span class="p">)</span>
+</code></pre>
+</div>
+
+<p><img src="/public/img/2015-01-06-geojson-topojson-io/unnamed-chunk-16-1.png" alt="plot of chunk unnamed-chunk-16" /></p>
+
+<h2 id="maps">Maps</h2>
+
+<p>We’re also working on <code class="highlighter-rouge">map_gist()</code> - to push up a geojson or topojson file as a GitHub gist (renders as an interactive map). It still needs some work…</p>
+
+<h2 id="validate-geojson">Validate geojson</h2>
+
+<p><a href="http://geojsonlint.com/">geojsonlint.com</a> has a nice web interface you can use to make sure you’re geoJSON is in the right format. In addition, it provides a RESTful endpoint at <code class="highlighter-rouge">geojsonlint.com/validate</code> to validate geoJSON. 
+This was just added today in this package, and can be used from many data types.</p>
+
+<p>Good geoJSON</p>
+
+<div class="highlighter-rouge"><pre class="highlight"><code><span class="n">validate</span><span class="p">(</span><span class="s1">'{"type": "Point", "coordinates": [-100, 80]}'</span><span class="p">)</span>
+<span class="c1">#&gt; $status
+#&gt; [1] "ok"
+</span></code></pre>
+</div>
+
+<p>Bad geoJSON</p>
+
+<div class="highlighter-rouge"><pre class="highlight"><code><span class="n">validate</span><span class="p">(</span><span class="s1">'{"type": "Rhombus", "coordinates": [[1, 2], [3, 4], [5, 6]]}'</span><span class="p">)</span>
+<span class="c1">#&gt; $message
+#&gt; [1] "\"Rhombus\" is not a valid GeoJSON type."
+#&gt; 
+#&gt; $status
+#&gt; [1] "error"
+</span></code></pre>
+</div>
+
+<p>A file</p>
+
+<div class="highlighter-rouge"><pre class="highlight"><code><span class="n">file</span> <span class="o">&lt;-</span> <span class="n">system.file</span><span class="p">(</span><span class="s2">"examples"</span><span class="p">,</span> <span class="s2">"zillow_or.geojson"</span><span class="p">,</span> <span class="n">package</span> <span class="o">=</span> <span class="s2">"togeojson"</span><span class="p">)</span>
+<span class="n">validate</span><span class="p">(</span><span class="n">x</span> <span class="o">=</span> <span class="n">as.location</span><span class="p">(</span><span class="n">file</span><span class="p">))</span>
+<span class="c1">#&gt; $status
+#&gt; [1] "ok"
+</span></code></pre>
+</div>
+
+<p>A URL</p>
+
+<div class="highlighter-rouge"><pre class="highlight"><code><span class="n">url</span> <span class="o">&lt;-</span> <span class="s2">"https://raw.githubusercontent.com/glynnbird/usstatesgeojson/master/california.geojson"</span>
+<span class="n">validate</span><span class="p">(</span><span class="n">as.location</span><span class="p">(</span><span class="n">url</span><span class="p">))</span>
+<span class="c1">#&gt; $status
+#&gt; [1] "ok"
+</span></code></pre>
+</div>
+
+<p>From the output of <code class="highlighter-rouge">geojson_list()</code></p>
+
+<div class="highlighter-rouge"><pre class="highlight"><code><span class="n">library</span><span class="p">(</span><span class="s2">"maps"</span><span class="p">)</span>
+<span class="n">data</span><span class="p">(</span><span class="n">us.cities</span><span class="p">)</span>
+<span class="n">x</span> <span class="o">&lt;-</span> <span class="n">geojson_list</span><span class="p">(</span><span class="n">us.cities</span><span class="p">[</span><span class="m">1</span><span class="o">:</span><span class="m">2</span><span class="p">,],</span> <span class="n">lat</span><span class="o">=</span><span class="s1">'lat'</span><span class="p">,</span> <span class="n">lon</span><span class="o">=</span><span class="s1">'long'</span><span class="p">)</span>
+<span class="n">validate</span><span class="p">(</span><span class="n">x</span><span class="p">)</span>
+<span class="c1">#&gt; $status
+#&gt; [1] "ok"
+</span></code></pre>
+</div>
+
+<p>From SpatialPoints class</p>
+
+<div class="highlighter-rouge"><pre class="highlight"><code><span class="n">library</span><span class="p">(</span><span class="s2">"sp"</span><span class="p">)</span>
+<span class="n">a</span> <span class="o">&lt;-</span> <span class="n">c</span><span class="p">(</span><span class="m">1</span><span class="p">,</span><span class="m">2</span><span class="p">,</span><span class="m">3</span><span class="p">,</span><span class="m">4</span><span class="p">,</span><span class="m">5</span><span class="p">)</span>
+<span class="n">b</span> <span class="o">&lt;-</span> <span class="n">c</span><span class="p">(</span><span class="m">3</span><span class="p">,</span><span class="m">2</span><span class="p">,</span><span class="m">5</span><span class="p">,</span><span class="m">1</span><span class="p">,</span><span class="m">4</span><span class="p">)</span>
+<span class="n">x</span> <span class="o">&lt;-</span> <span class="n">SpatialPoints</span><span class="p">(</span><span class="n">cbind</span><span class="p">(</span><span class="n">a</span><span class="p">,</span><span class="n">b</span><span class="p">))</span>
+<span class="n">validate</span><span class="p">(</span><span class="n">x</span><span class="p">)</span>
+<span class="c1">#&gt; $status
+#&gt; [1] "ok"
+</span></code></pre>
+</div>
+
+  </div>
+  
+  <div class="post">
+    <h1>
       <a href="/2015/01/gistr-github-gists/">
         gistr - R client for GitHub gists
       </a>
@@ -638,138 +1014,6 @@ x &lt;- letters
 <h2 id="more">More</h2>
 
 <p>For the other functions see https://github.com/sckott/pytaxize/blob/master/pytaxize/itis.py</p>
-
-  </div>
-  
-  <div class="post">
-    <h1>
-      <a href="/2014/12/museum-aamsf/">
-        Museum metadata - the Asian Art Museum of San Francisco
-      </a>
-    </h1>
-
-    <span class="post-date">10 Dec 2014</span>
-
-    <p>I was in San Francisco last week for an altmetrics conference at PLOS. While there, I visited the <a href="http://www.asianart.org/">Asian Art Museum</a>, just the <a href="http://www.asianart.org/exhibitions_index/roads-of-arabia">Roads of Arabia exhibition</a>.</p>
-
-<p>It was a great exhibit. While I was looking at the pieces, I read many labels, and thought, “hey, what if someone wants this metadata”?</p>
-
-<p>Since we have an R package in development for scraping museum metadata (called <a href="https://github.com/ropensci/musemeta">musemeta</a>), I just started some scraping code for this museum. Unfortunately, I don’t think the pieces from the Roads of Arabia exhibit are on their site, so no metadata to get. But they do have their main collection searchable online at <a href="http://www.asianart.org/collections/collection">http://www.asianart.org/collections/collection</a>. Examples follow.</p>
-
-<h2 id="installation">Installation</h2>
-
-<div class="highlighter-rouge"><pre class="highlight"><code><span class="n">install.packages</span><span class="p">(</span><span class="s2">"devtools"</span><span class="p">)</span>
-<span class="n">devtools</span><span class="o">::</span><span class="n">install_github</span><span class="p">(</span><span class="s2">"ropensci/musemeta"</span><span class="p">)</span>
-</code></pre>
-</div>
-
-<div class="highlighter-rouge"><pre class="highlight"><code><span class="n">library</span><span class="p">(</span><span class="s2">"musemeta"</span><span class="p">)</span>
-</code></pre>
-</div>
-
-<h2 id="get-metadata-for-a-single-object">Get metadata for a single object</h2>
-
-<p>You have to get the ID for the piece from their website, e.g., <code class="highlighter-rouge">11462</code> from the url <code class="highlighter-rouge">http://searchcollection.asianart.org/view/objects/asitem/nid/11462</code>. Once you have an ID you can pass it in ot the <code class="highlighter-rouge">aam()</code> function.</p>
-
-<div class="highlighter-rouge"><pre class="highlight"><code><span class="p">(</span><span class="n">out</span> <span class="o">&lt;-</span> <span class="n">aam</span><span class="p">(</span><span class="m">11462</span><span class="p">))</span>
-<span class="c1">#&gt; &lt;AAM metadata&gt; Molded plaque (tsha tsha)
-#&gt;   Object id: 1992.96
-#&gt;   Object name: Votive plaque
-#&gt;   Date: approx. 1992
-#&gt;   Artist: 
-#&gt;   Medium: Plaster mixed with resin and pigment
-#&gt;   Credit line: Gift of Robert Tevis
-#&gt;   On display?: no
-#&gt;   Collection: Decorative Arts
-#&gt;   Department: Himalayan Art
-#&gt;   Dimensions: 
-#&gt;   Label: Molded plaques (tsha tshas) are small sacred images, flat or
-#&gt;           three-dimensional, shaped out of clay in metal molds. The
-#&gt;           images are usually unbaked, and sometimes seeds, paper, or
-#&gt;           human ashes were mixed with the clay. Making tsha tshas is
-#&gt;           a meritorious act, and monasteries give them away to
-#&gt;           pilgrims. Some Tibetans carry tsha tshas inside the amulet
-#&gt;           boxes they wear or stuff them into larger images as part of
-#&gt;           the consecration of those images. In Bhutan tsha tshas are
-#&gt;           found in mani walls (a wall of stones carved with prayers)
-#&gt;           or piled up in caves.The practice of making such plaques
-#&gt;           began in India, and from there it spread to other countries
-#&gt;           in Asia with the introduction of Buddhism. Authentic tsha
-#&gt;           tshas are cast from clay. Modern examples , such as those
-#&gt;           made for the tourist trade in Tibet, are made of plaster
-#&gt;           and cast from ancient (1100-1200) molds and hand colored to
-#&gt;           give them the appearance of age.
-</span></code></pre>
-</div>
-
-<p>The output is printed for clarity, but you can dig into each element, like</p>
-
-<div class="highlighter-rouge"><pre class="highlight"><code><span class="n">out</span><span class="o">$</span><span class="n">label</span>
-<span class="c1">#&gt; [1] "Molded plaques (tsha tshas) are small sacred images, flat or three-dimensional, shaped out of clay in metal molds. The images are usually unbaked, and sometimes seeds, paper, or human ashes were mixed with the clay. Making tsha tshas is a meritorious act, and monasteries give them away to pilgrims. Some Tibetans carry tsha tshas inside the amulet boxes they wear or stuff them into larger images as part of the consecration of those images. In Bhutan tsha tshas are found in mani walls (a wall of stones carved with prayers) or piled up in caves.The practice of making such plaques began in India, and from there it spread to other countries in Asia with the introduction of Buddhism. Authentic tsha tshas are cast from clay. Modern examples , such as those made for the tourist trade in Tibet, are made of plaster and cast from ancient (1100-1200) molds and hand colored to give them the appearance of age."
-</span></code></pre>
-</div>
-
-<h2 id="get-metadata-for-many-objects">Get metadata for many objects</h2>
-
-<p>The <code class="highlighter-rouge">aam()</code> function is not vectorized, but you can easily get data for many IDs via <code class="highlighter-rouge">lapply</code> type functions, etc.</p>
-
-<div class="highlighter-rouge"><pre class="highlight"><code><span class="n">lapply</span><span class="p">(</span><span class="n">c</span><span class="p">(</span><span class="m">17150</span><span class="p">,</span><span class="m">17140</span><span class="p">,</span><span class="m">17144</span><span class="p">),</span> <span class="n">aam</span><span class="p">)</span>
-<span class="c1">#&gt; [[1]]
-#&gt; &lt;AAM metadata&gt; Boys sumo wrestling
-#&gt;   Object id: 2005.100.35
-#&gt;   Object name: Woodblock print
-#&gt;   Date: approx. 1769
-#&gt;   Artist: Suzuki HarunobuJapanese, 1724 - 1770
-#&gt;   Medium: Ink and colors on paper
-#&gt;   Credit line: Gift of the Grabhorn Ukiyo-e Collection
-#&gt;   On display?: no
-#&gt;   Collection: Prints And Drawings
-#&gt;   Department: Japanese Art
-#&gt;   Dimensions: H. 12 5/8 in x W. 5 3/4 in, H. 32.1 cm x W. 14.6 cm
-#&gt;   Label: 40 é木Ø春t信M 相'撲oVびÑSuzuki Harunobu, 1725?1770Boys sumo wrestling ( Sumō
-#&gt;           ?)c. 1769Woodblock print ( nishiki-e) Hosoban
-#&gt; 
-#&gt; [[2]]
-#&gt; &lt;AAM metadata&gt; Autumn Moon of Matsukaze
-#&gt;   Object id: 2005.100.25
-#&gt;   Object name: Woodblock print
-#&gt;   Date: 1768-1769
-#&gt;   Artist: Suzuki HarunobuJapanese, 1724 - 1770
-#&gt;   Medium: Ink and colors on paper
-#&gt;   Credit line: Gift of the Grabhorn Ukiyo-e Collection
-#&gt;   On display?: no
-#&gt;   Collection: Prints And Drawings
-#&gt;   Department: Japanese Art
-#&gt;   Dimensions: H. 12 1/2 in x W. 5 3/4 in, H. 31.7 cm x W. 14.6 cm
-#&gt;   Label: 30 é木Ø春t信M 『w流¬æ八"ª景i』x 「u松¼のÌ秋H月」vSuzuki Harunobu, 1725?1770"Autumn Moon of
-#&gt;           Matsukaze" (Matsukaze no shū ?)From Fashionable Eight Views
-#&gt;           of Noh Chants (Fū ?ū ?17681769Woodblock print
-#&gt;           (nishiki-e)Hosoban
-#&gt; 
-#&gt; [[3]]
-#&gt; &lt;AAM metadata&gt; Hunting for fireflies
-#&gt;   Object id: 2005.100.29
-#&gt;   Object name: Woodblock print
-#&gt;   Date: 1767-1768
-#&gt;   Artist: Suzuki HarunobuJapanese, 1724 - 1770
-#&gt;   Medium: Ink and colors on paper
-#&gt;   Credit line: Gift of the Grabhorn Ukiyo-e Collection
-#&gt;   On display?: no
-#&gt;   Collection: Prints And Drawings
-#&gt;   Department: Japanese Art
-#&gt;   Dimensions: H. 10 1/2 in x W. 8 in, H. 26.7 cm x W. 20.3 cm
-#&gt;   Label: 34 é木Ø春t信M u狩ëりèSuzuki Harunobu, 1725?1770Hunting for
-#&gt;           fireflies17671768Woodblock print ( nishiki-e) Chū ?
-</span></code></pre>
-</div>
-
-<h2 id="no-search-boo">No search, boo</h2>
-
-<p>Note that there is no search functionality yet for this source. Maybe someone can add that via pull requests :)</p>
-
-<h2 id="like-the-others">Like the others</h2>
-
-<p>The others sources in <code class="highlighter-rouge">musemeta</code> mostly work the same way as the above.</p>
 
   </div>
   

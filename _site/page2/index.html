@@ -61,6 +61,380 @@
   
   <div class="post">
     <h1>
+      <a href="/2016/03/scrubr/">
+        scrubr - clean species occurrence records
+      </a>
+    </h1>
+
+    <span class="post-date">04 Mar 2016</span>
+
+    <p><code class="highlighter-rouge">scrubr</code> is an R library for cleaning species occurrence records. It’s general purpose, and has the following approach:</p>
+
+<ul>
+  <li>We think using a piping workflow (<code class="highlighter-rouge">%&gt;%</code>) makes code easier to build up, and easier to understand. However, you don’t have to use pipes in this package.</li>
+  <li>All inputs and outputs are data.frame’s - which makes the above point easier</li>
+  <li>Records trimmed off due to various filters are retained as attributes, so can still be accessed for later inspection, but don’t get in the way of the data.frame that gets modified for downstream use</li>
+  <li>User interface vs. speed: This is the kind of package that surely can get faster. However, we’re focusing on the UI first, then make speed improvements down the road.</li>
+  <li>Since occurrence record datasets should all have columns with lat/long information, we automatically look for those columns for you. If identified, we use them, but you can supply lat/long column names manually as well.</li>
+</ul>
+
+<p>We have many packages that fetch species occurrence records from GBIF, iNaturalist, VertNet, iDigBio, Ecoengine, and more. <code class="highlighter-rouge">scrubr</code> fills a crucial missing niche as likely all uses of occurrence data requires cleaning of some kind. When using GBIF data via <code class="highlighter-rouge">rgbif</code>, that package has some utilities for cleaning data based on the issues returned with GBIF data - <code class="highlighter-rouge">scrubr</code> is a companion to do the rest of the cleaning.</p>
+
+<h2 id="scrubr-use-cases">scrubr use cases</h2>
+
+<h3 id="those-covered">Those covered</h3>
+
+<ul>
+  <li>Impossible lat/long values: e.g., latitude 75</li>
+  <li>Incomplete cases: one or the other of lat/long missing</li>
+  <li>Unlikely lat/long values: e.g., points at 0,0</li>
+  <li>Deduplication: try to identify duplicates, esp. when pulling data from multiple sources, e.g., can try to use occurrence IDs, if provided</li>
+  <li>Date based cleaning</li>
+  <li>Outside political boundary: User input to check for points in the wrong country, or points outside of a known country</li>
+  <li>Taxonomic name based cleaning: via <code class="highlighter-rouge">taxize</code> (one method so far)</li>
+</ul>
+
+<h3 id="to-be-covered">To be covered</h3>
+
+<ul>
+  <li>Political centroids: unlikely that occurrences fall exactly on these points, more likely a
+default position (Draft function started, but not exported, and commented out)</li>
+  <li>Herbaria/Museums: many specimens may have location of the collection they are housed in</li>
+  <li>Habitat type filtering: e.g., fish should not be on land; marine fish should not be in fresh water</li>
+  <li>Check for contextually wrong values: That is, if 99 out of 100 lat/long coordinates are within the continental US, but 1 is in China, then perhaps something is wrong with that one point</li>
+  <li>and many more…</li>
+</ul>
+
+<p>What else do you want included? <a href="https://github.com/ropenscilabs/scrubr/issues">Open an issue in the repo</a> to chat about use cases.</p>
+
+<h2 id="install">Install</h2>
+
+<p>From CRAN (binaries may not be up yet, but source is)</p>
+
+<div class="highlighter-rouge"><pre class="highlight"><code><span class="n">install.packages</span><span class="p">(</span><span class="s2">"scrubr"</span><span class="p">)</span>
+</code></pre>
+</div>
+
+<p>Or from GitHub</p>
+
+<div class="highlighter-rouge"><pre class="highlight"><code><span class="n">devtools</span><span class="o">::</span><span class="n">install_github</span><span class="p">(</span><span class="s2">"ropenscilabs/scrubr"</span><span class="p">)</span>
+</code></pre>
+</div>
+
+<div class="highlighter-rouge"><pre class="highlight"><code><span class="n">library</span><span class="p">(</span><span class="s2">"scrubr"</span><span class="p">)</span>
+</code></pre>
+</div>
+
+<h2 id="dframe">dframe</h2>
+
+<p><code class="highlighter-rouge">dframe()</code> is a tool to convert your data.frame to a compact <code class="highlighter-rouge">dplyr</code> like data.frame so that you can get a quick peek at your data each time you call a function - BUT, you don’t have to use it.</p>
+
+<p>Compare <code class="highlighter-rouge">mtcars</code></p>
+
+<div class="highlighter-rouge"><pre class="highlight"><code><span class="n">mtcars</span>
+<span class="c1">#&gt;                      mpg cyl  disp  hp drat    wt  qsec vs am gear carb
+#&gt; Mazda RX4           21.0   6 160.0 110 3.90 2.620 16.46  0  1    4    4
+#&gt; Mazda RX4 Wag       21.0   6 160.0 110 3.90 2.875 17.02  0  1    4    4
+#&gt; Datsun 710          22.8   4 108.0  93 3.85 2.320 18.61  1  1    4    1
+#&gt; Hornet 4 Drive      21.4   6 258.0 110 3.08 3.215 19.44  1  0    3    1
+#&gt; Hornet Sportabout   18.7   8 360.0 175 3.15 3.440 17.02  0  0    3    2
+#&gt; Valiant             18.1   6 225.0 105 2.76 3.460 20.22  1  0    3    1
+#&gt; Duster 360          14.3   8 360.0 245 3.21 3.570 15.84  0  0    3    4
+#&gt; Merc 240D           24.4   4 146.7  62 3.69 3.190 20.00  1  0    4    2
+#&gt; Merc 230            22.8   4 140.8  95 3.92 3.150 22.90  1  0    4    2
+#&gt; Merc 280            19.2   6 167.6 123 3.92 3.440 18.30  1  0    4    4
+#&gt; Merc 280C           17.8   6 167.6 123 3.92 3.440 18.90  1  0    4    4
+#&gt; Merc 450SE          16.4   8 275.8 180 3.07 4.070 17.40  0  0    3    3
+#&gt; Merc 450SL          17.3   8 275.8 180 3.07 3.730 17.60  0  0    3    3
+#&gt; Merc 450SLC         15.2   8 275.8 180 3.07 3.780 18.00  0  0    3    3
+#&gt; Cadillac Fleetwood  10.4   8 472.0 205 2.93 5.250 17.98  0  0    3    4
+#&gt; Lincoln Continental 10.4   8 460.0 215 3.00 5.424 17.82  0  0    3    4
+#&gt; Chrysler Imperial   14.7   8 440.0 230 3.23 5.345 17.42  0  0    3    4
+#&gt; Fiat 128            32.4   4  78.7  66 4.08 2.200 19.47  1  1    4    1
+#&gt; Honda Civic         30.4   4  75.7  52 4.93 1.615 18.52  1  1    4    2
+#&gt; Toyota Corolla      33.9   4  71.1  65 4.22 1.835 19.90  1  1    4    1
+#&gt; Toyota Corona       21.5   4 120.1  97 3.70 2.465 20.01  1  0    3    1
+#&gt; Dodge Challenger    15.5   8 318.0 150 2.76 3.520 16.87  0  0    3    2
+#&gt; AMC Javelin         15.2   8 304.0 150 3.15 3.435 17.30  0  0    3    2
+#&gt; Camaro Z28          13.3   8 350.0 245 3.73 3.840 15.41  0  0    3    4
+#&gt; Pontiac Firebird    19.2   8 400.0 175 3.08 3.845 17.05  0  0    3    2
+#&gt; Fiat X1-9           27.3   4  79.0  66 4.08 1.935 18.90  1  1    4    1
+#&gt; Porsche 914-2       26.0   4 120.3  91 4.43 2.140 16.70  0  1    5    2
+#&gt; Lotus Europa        30.4   4  95.1 113 3.77 1.513 16.90  1  1    5    2
+#&gt; Ford Pantera L      15.8   8 351.0 264 4.22 3.170 14.50  0  1    5    4
+#&gt; Ferrari Dino        19.7   6 145.0 175 3.62 2.770 15.50  0  1    5    6
+#&gt; Maserati Bora       15.0   8 301.0 335 3.54 3.570 14.60  0  1    5    8
+#&gt; Volvo 142E          21.4   4 121.0 109 4.11 2.780 18.60  1  1    4    2
+</span></code></pre>
+</div>
+
+<p>To</p>
+
+<div class="highlighter-rouge"><pre class="highlight"><code><span class="n">dframe</span><span class="p">(</span><span class="n">mtcars</span><span class="p">)</span>
+<span class="c1">#&gt; &lt;scrubr dframe&gt;
+#&gt; Size: 32 X 11
+#&gt; 
+#&gt; 
+#&gt;      mpg   cyl  disp    hp  drat    wt  qsec    vs    am  gear  carb
+#&gt;    (dbl) (dbl) (dbl) (dbl) (dbl) (dbl) (dbl) (dbl) (dbl) (dbl) (dbl)
+#&gt; 1   21.0     6 160.0   110  3.90 2.620 16.46     0     1     4     4
+#&gt; 2   21.0     6 160.0   110  3.90 2.875 17.02     0     1     4     4
+#&gt; 3   22.8     4 108.0    93  3.85 2.320 18.61     1     1     4     1
+#&gt; 4   21.4     6 258.0   110  3.08 3.215 19.44     1     0     3     1
+#&gt; 5   18.7     8 360.0   175  3.15 3.440 17.02     0     0     3     2
+#&gt; 6   18.1     6 225.0   105  2.76 3.460 20.22     1     0     3     1
+#&gt; 7   14.3     8 360.0   245  3.21 3.570 15.84     0     0     3     4
+#&gt; 8   24.4     4 146.7    62  3.69 3.190 20.00     1     0     4     2
+#&gt; 9   22.8     4 140.8    95  3.92 3.150 22.90     1     0     4     2
+#&gt; 10  19.2     6 167.6   123  3.92 3.440 18.30     1     0     4     4
+#&gt; ..   ...   ...   ...   ...   ...   ...   ...   ...   ...   ...   ...
+</span></code></pre>
+</div>
+
+<h2 id="coordinate-based-cleaning">Coordinate based cleaning</h2>
+
+<p>Load some sample data that comes with the package</p>
+
+<div class="highlighter-rouge"><pre class="highlight"><code><span class="n">data</span><span class="p">(</span><span class="s2">"sampledata1"</span><span class="p">)</span>
+</code></pre>
+</div>
+
+<p>Remove impossible coordinates (using sample data included in the pkg)</p>
+
+<div class="highlighter-rouge"><pre class="highlight"><code><span class="n">dframe</span><span class="p">(</span><span class="n">sample_data_1</span><span class="p">)</span> <span class="o">%&gt;%</span> <span class="n">coord_impossible</span><span class="p">()</span>
+<span class="c1">#&gt; &lt;scrubr dframe&gt;
+#&gt; Size: 1500 X 5
+#&gt; Lat/Lon vars: latitude/longitude
+#&gt; 
+#&gt;                name  longitude latitude                date        key
+#&gt;               (chr)      (dbl)    (dbl)              (time)      (int)
+#&gt; 1  Ursus americanus  -79.68283 38.36662 2015-01-14 16:36:45 1065590124
+#&gt; 2  Ursus americanus  -82.42028 35.73304 2015-01-13 00:25:39 1065588899
+#&gt; 3  Ursus americanus  -99.09625 23.66893 2015-02-20 23:00:00 1098894889
+#&gt; 4  Ursus americanus  -72.77432 43.94883 2015-02-13 16:16:41 1065611122
+#&gt; 5  Ursus americanus  -72.34617 43.86464 2015-03-01 20:20:45 1088908315
+#&gt; 6  Ursus americanus -108.53674 32.65219 2015-03-29 17:06:54 1088932238
+#&gt; 7  Ursus americanus -108.53691 32.65237 2015-03-29 17:12:50 1088932273
+#&gt; 8  Ursus americanus -123.82900 40.13240 2015-03-28 23:00:00 1132403409
+#&gt; 9  Ursus americanus  -78.25027 36.93018 2015-03-20 21:11:24 1088923534
+#&gt; 10 Ursus americanus  -76.78671 35.53079 2015-04-05 23:00:00 1088954559
+#&gt; ..              ...        ...      ...                 ...        ...
+</span></code></pre>
+</div>
+
+<p>Remove incomplete coordinates</p>
+
+<div class="highlighter-rouge"><pre class="highlight"><code><span class="n">dframe</span><span class="p">(</span><span class="n">sample_data_1</span><span class="p">)</span> <span class="o">%&gt;%</span> <span class="n">coord_incomplete</span><span class="p">()</span>
+<span class="c1">#&gt; &lt;scrubr dframe&gt;
+#&gt; Size: 1306 X 5
+#&gt; Lat/Lon vars: latitude/longitude
+#&gt; 
+#&gt;                name  longitude latitude                date        key
+#&gt;               (chr)      (dbl)    (dbl)              (time)      (int)
+#&gt; 1  Ursus americanus  -79.68283 38.36662 2015-01-14 16:36:45 1065590124
+#&gt; 2  Ursus americanus  -82.42028 35.73304 2015-01-13 00:25:39 1065588899
+#&gt; 3  Ursus americanus  -99.09625 23.66893 2015-02-20 23:00:00 1098894889
+#&gt; 4  Ursus americanus  -72.77432 43.94883 2015-02-13 16:16:41 1065611122
+#&gt; 5  Ursus americanus  -72.34617 43.86464 2015-03-01 20:20:45 1088908315
+#&gt; 6  Ursus americanus -108.53674 32.65219 2015-03-29 17:06:54 1088932238
+#&gt; 7  Ursus americanus -108.53691 32.65237 2015-03-29 17:12:50 1088932273
+#&gt; 8  Ursus americanus -123.82900 40.13240 2015-03-28 23:00:00 1132403409
+#&gt; 9  Ursus americanus  -78.25027 36.93018 2015-03-20 21:11:24 1088923534
+#&gt; 10 Ursus americanus  -76.78671 35.53079 2015-04-05 23:00:00 1088954559
+#&gt; ..              ...        ...      ...                 ...        ...
+</span></code></pre>
+</div>
+
+<p>Remove unlikely coordinates (e.g., those at 0,0)</p>
+
+<div class="highlighter-rouge"><pre class="highlight"><code><span class="n">dframe</span><span class="p">(</span><span class="n">sample_data_1</span><span class="p">)</span> <span class="o">%&gt;%</span> <span class="n">coord_unlikely</span><span class="p">()</span>
+<span class="c1">#&gt; &lt;scrubr dframe&gt;
+#&gt; Size: 1488 X 5
+#&gt; Lat/Lon vars: latitude/longitude
+#&gt; 
+#&gt;                name  longitude latitude                date        key
+#&gt;               (chr)      (dbl)    (dbl)              (time)      (int)
+#&gt; 1  Ursus americanus  -79.68283 38.36662 2015-01-14 16:36:45 1065590124
+#&gt; 2  Ursus americanus  -82.42028 35.73304 2015-01-13 00:25:39 1065588899
+#&gt; 3  Ursus americanus  -99.09625 23.66893 2015-02-20 23:00:00 1098894889
+#&gt; 4  Ursus americanus  -72.77432 43.94883 2015-02-13 16:16:41 1065611122
+#&gt; 5  Ursus americanus  -72.34617 43.86464 2015-03-01 20:20:45 1088908315
+#&gt; 6  Ursus americanus -108.53674 32.65219 2015-03-29 17:06:54 1088932238
+#&gt; 7  Ursus americanus -108.53691 32.65237 2015-03-29 17:12:50 1088932273
+#&gt; 8  Ursus americanus -123.82900 40.13240 2015-03-28 23:00:00 1132403409
+#&gt; 9  Ursus americanus  -78.25027 36.93018 2015-03-20 21:11:24 1088923534
+#&gt; 10 Ursus americanus  -76.78671 35.53079 2015-04-05 23:00:00 1088954559
+#&gt; ..              ...        ...      ...                 ...        ...
+</span></code></pre>
+</div>
+
+<p>Do all three</p>
+
+<div class="highlighter-rouge"><pre class="highlight"><code><span class="n">dframe</span><span class="p">(</span><span class="n">sample_data_1</span><span class="p">)</span> <span class="o">%&gt;%</span>
+  <span class="n">coord_impossible</span><span class="p">()</span> <span class="o">%&gt;%</span>
+  <span class="n">coord_incomplete</span><span class="p">()</span> <span class="o">%&gt;%</span>
+  <span class="n">coord_unlikely</span><span class="p">()</span>
+<span class="c1">#&gt; &lt;scrubr dframe&gt;
+#&gt; Size: 1294 X 5
+#&gt; Lat/Lon vars: latitude/longitude
+#&gt; 
+#&gt;                name  longitude latitude                date        key
+#&gt;               (chr)      (dbl)    (dbl)              (time)      (int)
+#&gt; 1  Ursus americanus  -79.68283 38.36662 2015-01-14 16:36:45 1065590124
+#&gt; 2  Ursus americanus  -82.42028 35.73304 2015-01-13 00:25:39 1065588899
+#&gt; 3  Ursus americanus  -99.09625 23.66893 2015-02-20 23:00:00 1098894889
+#&gt; 4  Ursus americanus  -72.77432 43.94883 2015-02-13 16:16:41 1065611122
+#&gt; 5  Ursus americanus  -72.34617 43.86464 2015-03-01 20:20:45 1088908315
+#&gt; 6  Ursus americanus -108.53674 32.65219 2015-03-29 17:06:54 1088932238
+#&gt; 7  Ursus americanus -108.53691 32.65237 2015-03-29 17:12:50 1088932273
+#&gt; 8  Ursus americanus -123.82900 40.13240 2015-03-28 23:00:00 1132403409
+#&gt; 9  Ursus americanus  -78.25027 36.93018 2015-03-20 21:11:24 1088923534
+#&gt; 10 Ursus americanus  -76.78671 35.53079 2015-04-05 23:00:00 1088954559
+#&gt; ..              ...        ...      ...                 ...        ...
+</span></code></pre>
+</div>
+
+<p>Do vs. don’t drop bad data</p>
+
+<div class="highlighter-rouge"><pre class="highlight"><code><span class="c1"># do
+</span><span class="n">dframe</span><span class="p">(</span><span class="n">sample_data_1</span><span class="p">)</span> <span class="o">%&gt;%</span> <span class="n">coord_incomplete</span><span class="p">(</span><span class="n">drop</span> <span class="o">=</span> <span class="n">TRUE</span><span class="p">)</span> <span class="o">%&gt;%</span> <span class="n">NROW</span>
+<span class="c1">#&gt; [1] 1306
+# don't
+</span><span class="n">dframe</span><span class="p">(</span><span class="n">sample_data_1</span><span class="p">)</span> <span class="o">%&gt;%</span> <span class="n">coord_incomplete</span><span class="p">(</span><span class="n">drop</span> <span class="o">=</span> <span class="n">FALSE</span><span class="p">)</span> <span class="o">%&gt;%</span> <span class="n">NROW</span>
+<span class="c1">#&gt; [1] 1500
+</span></code></pre>
+</div>
+
+<h2 id="deduplicate">Deduplicate</h2>
+
+<p>Get a smaller subset of a data.frame</p>
+
+<div class="highlighter-rouge"><pre class="highlight"><code><span class="n">smalldf</span> <span class="o">&lt;-</span> <span class="n">sample_data_1</span><span class="p">[</span><span class="m">1</span><span class="o">:</span><span class="m">20</span><span class="p">,</span> <span class="p">]</span>
+</code></pre>
+</div>
+
+<p>create a duplicate record</p>
+
+<div class="highlighter-rouge"><pre class="highlight"><code><span class="n">smalldf</span> <span class="o">&lt;-</span> <span class="n">rbind</span><span class="p">(</span><span class="n">smalldf</span><span class="p">,</span> <span class="n">smalldf</span><span class="p">[</span><span class="m">10</span><span class="p">,])</span>
+<span class="n">row.names</span><span class="p">(</span><span class="n">smalldf</span><span class="p">)</span> <span class="o">&lt;-</span> <span class="n">NULL</span>
+</code></pre>
+</div>
+
+<p>make it slightly different</p>
+
+<div class="highlighter-rouge"><pre class="highlight"><code><span class="n">smalldf</span><span class="p">[</span><span class="m">21</span><span class="p">,</span> <span class="s2">"key"</span><span class="p">]</span> <span class="o">&lt;-</span> <span class="m">1088954555</span>
+<span class="n">NROW</span><span class="p">(</span><span class="n">smalldf</span><span class="p">)</span>
+<span class="c1">#&gt; [1] 21
+</span></code></pre>
+</div>
+
+<p>It’s 21 rows, including 1 duplicate. Do the deduplication</p>
+
+<div class="highlighter-rouge"><pre class="highlight"><code><span class="p">(</span><span class="n">dp</span> <span class="o">&lt;-</span> <span class="n">dframe</span><span class="p">(</span><span class="n">smalldf</span><span class="p">)</span> <span class="o">%&gt;%</span> <span class="n">dedup</span><span class="p">())</span>
+<span class="c1">#&gt; &lt;scrubr dframe&gt;
+#&gt; Size: 20 X 5
+#&gt; 
+#&gt; 
+#&gt;                name  longitude latitude                date        key
+#&gt;               (chr)      (dbl)    (dbl)              (time)      (dbl)
+#&gt; 1  Ursus americanus  -79.68283 38.36662 2015-01-14 16:36:45 1065590124
+#&gt; 2  Ursus americanus  -82.42028 35.73304 2015-01-13 00:25:39 1065588899
+#&gt; 3  Ursus americanus  -99.09625 23.66893 2015-02-20 23:00:00 1098894889
+#&gt; 4  Ursus americanus  -72.77432 43.94883 2015-02-13 16:16:41 1065611122
+#&gt; 5  Ursus americanus  -72.34617 43.86464 2015-03-01 20:20:45 1088908315
+#&gt; 6  Ursus americanus -108.53674 32.65219 2015-03-29 17:06:54 1088932238
+#&gt; 7  Ursus americanus -108.53691 32.65237 2015-03-29 17:12:50 1088932273
+#&gt; 8  Ursus americanus -123.82900 40.13240 2015-03-28 23:00:00 1132403409
+#&gt; 9  Ursus americanus  -78.25027 36.93018 2015-03-20 21:11:24 1088923534
+#&gt; 10 Ursus americanus -103.30058 29.27042 2015-04-29 22:00:00 1088964797
+#&gt; ..              ...        ...      ...                 ...        ...
+</span></code></pre>
+</div>
+
+<p>Now its 20 rows, duplicate removed</p>
+
+<p>Here’s the duplicates</p>
+
+<div class="highlighter-rouge"><pre class="highlight"><code><span class="n">attr</span><span class="p">(</span><span class="n">dp</span><span class="p">,</span> <span class="s2">"dups"</span><span class="p">)</span>
+<span class="c1">#&gt; &lt;scrubr dframe&gt;
+#&gt; Size: 1 X 5
+#&gt; 
+#&gt; 
+#&gt;               name longitude latitude                date        key
+#&gt;              (chr)     (dbl)    (dbl)              (time)      (dbl)
+#&gt; 1 Ursus americanus -76.78671 35.53079 2015-04-05 23:00:00 1088954555
+</span></code></pre>
+</div>
+
+<h2 id="dates">Dates</h2>
+
+<p>Standardize/convert dates</p>
+
+<div class="highlighter-rouge"><pre class="highlight"><code><span class="n">df</span> <span class="o">&lt;-</span> <span class="n">sample_data_1</span>
+<span class="n">dframe</span><span class="p">(</span><span class="n">df</span><span class="p">)</span> <span class="o">%&gt;%</span> 
+  <span class="n">date_standardize</span><span class="p">(</span><span class="s2">"%d%b%Y"</span><span class="p">)</span>
+<span class="c1">#&gt; &lt;scrubr dframe&gt;
+#&gt; Size: 1500 X 5
+#&gt; 
+#&gt; 
+#&gt;                name  longitude latitude      date        key
+#&gt;               (chr)      (dbl)    (dbl)     (chr)      (int)
+#&gt; 1  Ursus americanus  -79.68283 38.36662 14Jan2015 1065590124
+#&gt; 2  Ursus americanus  -82.42028 35.73304 13Jan2015 1065588899
+#&gt; 3  Ursus americanus  -99.09625 23.66893 20Feb2015 1098894889
+#&gt; 4  Ursus americanus  -72.77432 43.94883 13Feb2015 1065611122
+#&gt; 5  Ursus americanus  -72.34617 43.86464 01Mar2015 1088908315
+#&gt; 6  Ursus americanus -108.53674 32.65219 29Mar2015 1088932238
+#&gt; 7  Ursus americanus -108.53691 32.65237 29Mar2015 1088932273
+#&gt; 8  Ursus americanus -123.82900 40.13240 28Mar2015 1132403409
+#&gt; 9  Ursus americanus  -78.25027 36.93018 20Mar2015 1088923534
+#&gt; 10 Ursus americanus  -76.78671 35.53079 05Apr2015 1088954559
+#&gt; ..              ...        ...      ...       ...        ...
+</span></code></pre>
+</div>
+
+<p>Drop records without dates</p>
+
+<div class="highlighter-rouge"><pre class="highlight"><code><span class="n">NROW</span><span class="p">(</span><span class="n">df</span><span class="p">)</span>
+<span class="c1">#&gt; [1] 1500
+</span><span class="n">NROW</span><span class="p">(</span><span class="n">dframe</span><span class="p">(</span><span class="n">df</span><span class="p">)</span> <span class="o">%&gt;%</span> <span class="n">date_missing</span><span class="p">())</span>
+<span class="c1">#&gt; [1] 1498
+</span></code></pre>
+</div>
+
+<p>Create date field from other fields</p>
+
+<div class="highlighter-rouge"><pre class="highlight"><code><span class="n">dframe</span><span class="p">(</span><span class="n">sample_data_2</span><span class="p">)</span> <span class="o">%&gt;%</span> 
+  <span class="n">date_create</span><span class="p">(</span><span class="n">year</span><span class="p">,</span> <span class="n">month</span><span class="p">,</span> <span class="n">day</span><span class="p">)</span>
+<span class="c1">#&gt; &lt;scrubr dframe&gt;
+#&gt; Size: 1500 X 8
+#&gt; 
+#&gt; 
+#&gt;                name  longitude latitude        key  year month   day
+#&gt;               (chr)      (dbl)    (dbl)      (int) (chr) (chr) (chr)
+#&gt; 1  Ursus americanus  -79.68283 38.36662 1065590124  2015    01    14
+#&gt; 2  Ursus americanus  -82.42028 35.73304 1065588899  2015    01    13
+#&gt; 3  Ursus americanus  -99.09625 23.66893 1098894889  2015    02    20
+#&gt; 4  Ursus americanus  -72.77432 43.94883 1065611122  2015    02    13
+#&gt; 5  Ursus americanus  -72.34617 43.86464 1088908315  2015    03    01
+#&gt; 6  Ursus americanus -108.53674 32.65219 1088932238  2015    03    29
+#&gt; 7  Ursus americanus -108.53691 32.65237 1088932273  2015    03    29
+#&gt; 8  Ursus americanus -123.82900 40.13240 1132403409  2015    03    28
+#&gt; 9  Ursus americanus  -78.25027 36.93018 1088923534  2015    03    20
+#&gt; 10 Ursus americanus  -76.78671 35.53079 1088954559  2015    04    05
+#&gt; ..              ...        ...      ...        ...   ...   ...   ...
+#&gt; Variables not shown: date (chr).
+</span></code></pre>
+</div>
+
+<h2 id="bugs-and-such">bugs and such</h2>
+
+<p>Report them in the <a href="https://github.com/ropenscilabs/scrubr/issues">scrubr issue tracker</a></p>
+
+  </div>
+  
+  <div class="post">
+    <h1>
       <a href="/2016/01/request-hello-world/">
         request - a high level HTTP client for R
       </a>
@@ -648,252 +1022,6 @@
 <h2 id="thoughts">Thoughts?</h2>
 
 <p>I’m really curious what people think of <code class="highlighter-rouge">binomen</code>. I’m not sure how useful this will be in the wild. Try it. Let me know. Thanks much :)</p>
-
-
-  </div>
-  
-  <div class="post">
-    <h1>
-      <a href="/2015/11/crossref-clients/">
-        Crossref programmatic clients
-      </a>
-    </h1>
-
-    <span class="post-date">30 Nov 2015</span>
-
-    <p>I gave two talks recently at the annual <a href="http://www.crossref.org/annualmeeting/agenda.html">Crossref meeting</a>, one of which was a somewhat technical overview of programmatic clients for Crossref APIs. Check out the talk <a href="https://crossref.wistia.com/medias/8rh0jm5eda">here</a>. I talked about the motivation for working with Crossref data by writing code/etc. rather than going the GUI route, then went over the various clients, with brief examples.</p>
-
-<p>We (rOpenSci) have been working on the R client <a href="https://github.com/ropensci/rcrossref">rcrossref</a> for a while now, but I’m also working on the Python and Ruby clients for Crossref. In addition, the Ruby client has a CLI client inside. The Javascript client is worked on independently by <a href="https://science.ai/">ScienceAI</a>.</p>
-
-<p>The R, Ruby, and Python clients are useable but not feature complete yet, and would benefit from lots of users surfacing bugs and highlighting nice to have features.</p>
-
-<p>The main Crossref API used in all the clients is documented at <a href="https://github.com/CrossRef/rest-api-doc/blob/master/rest_api.md">api.crossref.org</a>.</p>
-
-<p>I’ve tried to make the APIs similar-ish across clients. Functions in each client match the main Crossref search API (api.crossref.org) routes:</p>
-
-<ul>
-  <li><code class="highlighter-rouge">/works</code></li>
-  <li><code class="highlighter-rouge">/members</code></li>
-  <li><code class="highlighter-rouge">/funders</code></li>
-  <li><code class="highlighter-rouge">/journals</code></li>
-  <li><code class="highlighter-rouge">/types</code></li>
-  <li><code class="highlighter-rouge">/licenses</code></li>
-</ul>
-
-<p>Other methods in all three clients:</p>
-
-<ul>
-  <li>Get DOI minting agency
-    <ul>
-      <li>Uses api.crossref.org API</li>
-    </ul>
-  </li>
-  <li>Get random DOIs
-    <ul>
-      <li>Uses api.crossref.org API</li>
-    </ul>
-  </li>
-  <li>Content negotiation
-    <ul>
-      <li>Documented at <a href="http://www.crosscite.org/cn">http://www.crosscite.org/cn</a></li>
-    </ul>
-  </li>
-  <li>Get full text
-    <ul>
-      <li>other clients in each language will focus on this use case</li>
-    </ul>
-  </li>
-  <li>Get citation count
-    <ul>
-      <li>Uses service at <a href="http://www.crossref.org/openurl">http://www.crossref.org/openurl</a> - though this functionality may be in the api.crossref.org API at some point</li>
-    </ul>
-  </li>
-</ul>
-
-<p>The following shows how to install, and then examples from each client for a few use cases.</p>
-
-<h2 id="installation">Installation</h2>
-
-<h3 id="python">Python</h3>
-
-<div class="highlighter-rouge"><pre class="highlight"><code>pip install habanero
-</code></pre>
-</div>
-
-<h3 id="ruby">Ruby</h3>
-
-<div class="highlighter-rouge"><pre class="highlight"><code>gem install serrano
-</code></pre>
-</div>
-
-<h3 id="r">R</h3>
-
-<p>Inside R:</p>
-
-<div class="highlighter-rouge"><pre class="highlight"><code><span class="n">install.packages</span><span class="p">(</span><span class="s2">"rcrossref"</span><span class="p">)</span>
-</code></pre>
-</div>
-
-<h3 id="javascript">Javascript</h3>
-
-<div class="highlighter-rouge"><pre class="highlight"><code>npm install crossref
-</code></pre>
-</div>
-
-<p>I won’t do any examples with the js library, as I don’t maintain it.</p>
-
-<h2 id="use-case-get-orcid-ids-for-authors">Use case: get ORCID IDs for authors</h2>
-
-<p>Python</p>
-
-<div class="highlighter-rouge"><pre class="highlight"><code><span class="kn">from</span> <span class="nn">habanero</span> <span class="kn">import</span> <span class="n">Crossref</span>
-<span class="n">cr</span> <span class="o">=</span> <span class="n">Crossref</span><span class="p">()</span>
-<span class="n">res</span> <span class="o">=</span> <span class="n">cr</span><span class="o">.</span><span class="n">works</span><span class="p">(</span><span class="nb">filter</span> <span class="o">=</span> <span class="p">{</span><span class="s">'has_orcid'</span><span class="p">:</span> <span class="bp">True</span><span class="p">},</span> <span class="n">limit</span> <span class="o">=</span> <span class="mi">10</span><span class="p">)</span>
-<span class="n">res2</span> <span class="o">=</span> <span class="p">[</span> <span class="p">[</span> <span class="n">z</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s">'ORCID'</span><span class="p">)</span> <span class="k">for</span> <span class="n">z</span> <span class="ow">in</span> <span class="n">x</span><span class="p">[</span><span class="s">'author'</span><span class="p">]</span> <span class="p">]</span> <span class="k">for</span> <span class="n">x</span> <span class="ow">in</span> <span class="n">res</span><span class="o">.</span><span class="n">result</span><span class="p">[</span><span class="s">'message'</span><span class="p">][</span><span class="s">'items'</span><span class="p">]</span> <span class="p">]</span>
-<span class="nb">filter</span><span class="p">(</span><span class="bp">None</span><span class="p">,</span> <span class="nb">reduce</span><span class="p">(</span><span class="k">lambda</span> <span class="n">x</span><span class="p">,</span> <span class="n">y</span><span class="p">:</span> <span class="n">x</span><span class="o">+</span><span class="n">y</span><span class="p">,</span> <span class="n">res2</span><span class="p">))</span>
-</code></pre>
-</div>
-
-<div class="highlighter-rouge"><pre class="highlight"><code><span class="p">[</span><span class="s">u'http://orcid.org/0000-0003-4087-8021'</span><span class="p">,</span>
- <span class="s">u'http://orcid.org/0000-0002-2076-5452'</span><span class="p">,</span>
- <span class="s">u'http://orcid.org/0000-0003-4087-8021'</span><span class="p">,</span>
- <span class="s">u'http://orcid.org/0000-0002-2076-5452'</span><span class="p">,</span>
- <span class="s">u'http://orcid.org/0000-0003-1710-1580'</span><span class="p">,</span>
- <span class="s">u'http://orcid.org/0000-0003-1710-1580'</span><span class="p">,</span>
- <span class="s">u'http://orcid.org/0000-0003-4637-238X'</span><span class="p">,</span>
- <span class="s">u'http://orcid.org/0000-0003-4637-238X'</span><span class="p">,</span>
- <span class="s">u'http://orcid.org/0000-0003-4637-238X'</span><span class="p">,</span>
- <span class="s">u'http://orcid.org/0000-0003-4637-238X'</span><span class="p">,</span>
- <span class="s">u'http://orcid.org/0000-0003-4637-238X'</span><span class="p">,</span>
- <span class="s">u'http://orcid.org/0000-0003-2510-4271'</span><span class="p">]</span>
-</code></pre>
-</div>
-
-<p>Ruby</p>
-
-<div class="highlighter-rouge"><pre class="highlight"><code><span class="nb">require</span> <span class="s1">'serrano'</span>
-<span class="n">res</span> <span class="o">=</span> <span class="no">Serrano</span><span class="p">.</span><span class="nf">works</span><span class="p">(</span><span class="ss">filter: </span><span class="p">{</span><span class="s1">'has_orcid'</span><span class="p">:</span> <span class="kp">true</span><span class="p">},</span> <span class="ss">limit: </span><span class="mi">10</span><span class="p">)</span>
-<span class="n">res2</span> <span class="o">=</span> <span class="n">res</span><span class="p">[</span><span class="s1">'message'</span><span class="p">][</span><span class="s1">'items'</span><span class="p">].</span><span class="nf">collect</span> <span class="p">{</span> <span class="o">|</span><span class="n">x</span><span class="o">|</span> <span class="n">x</span><span class="p">[</span><span class="s1">'author'</span><span class="p">].</span><span class="nf">collect</span> <span class="p">{</span> <span class="o">|</span><span class="n">z</span><span class="o">|</span> <span class="n">z</span><span class="p">[</span><span class="s1">'ORCID'</span><span class="p">]</span> <span class="p">}</span> <span class="p">}</span>
-<span class="n">res2</span><span class="p">.</span><span class="nf">flatten</span><span class="p">.</span><span class="nf">compact</span>
-</code></pre>
-</div>
-
-<div class="highlighter-rouge"><pre class="highlight"><code><span class="o">=&gt;</span> <span class="p">[</span><span class="s2">"http://orcid.org/0000-0003-4087-8021"</span><span class="p">,</span>
- <span class="s2">"http://orcid.org/0000-0002-2076-5452"</span><span class="p">,</span>
- <span class="s2">"http://orcid.org/0000-0003-4087-8021"</span><span class="p">,</span>
- <span class="s2">"http://orcid.org/0000-0002-2076-5452"</span><span class="p">,</span>
- <span class="s2">"http://orcid.org/0000-0003-1710-1580"</span><span class="p">,</span>
- <span class="s2">"http://orcid.org/0000-0003-1710-1580"</span><span class="p">,</span>
- <span class="s2">"http://orcid.org/0000-0003-4637-238X"</span><span class="p">,</span>
- <span class="s2">"http://orcid.org/0000-0003-4637-238X"</span><span class="p">,</span>
- <span class="s2">"http://orcid.org/0000-0003-4637-238X"</span><span class="p">,</span>
- <span class="s2">"http://orcid.org/0000-0003-4637-238X"</span><span class="p">,</span>
- <span class="s2">"http://orcid.org/0000-0003-4637-238X"</span><span class="p">,</span>
- <span class="s2">"http://orcid.org/0000-0003-2510-4271"</span><span class="p">]</span>
-</code></pre>
-</div>
-
-<p>R</p>
-
-<div class="highlighter-rouge"><pre class="highlight"><code><span class="n">library</span><span class="p">(</span><span class="s2">"rcrossref"</span><span class="p">)</span>
-<span class="n">res</span> <span class="o">&lt;-</span> <span class="n">cr_works</span><span class="p">(</span><span class="n">filter</span><span class="o">=</span><span class="n">c</span><span class="p">(</span><span class="n">has_orcid</span><span class="o">=</span><span class="n">TRUE</span><span class="p">),</span> <span class="n">limit</span> <span class="o">=</span> <span class="m">10</span><span class="p">)</span>
-<span class="n">orcids</span> <span class="o">&lt;-</span> <span class="n">unlist</span><span class="p">(</span><span class="n">lapply</span><span class="p">(</span><span class="n">res</span><span class="o">$</span><span class="n">data</span><span class="o">$</span><span class="n">author</span><span class="p">,</span> <span class="k">function</span><span class="p">(</span><span class="n">z</span><span class="p">)</span> <span class="n">z</span><span class="o">$</span><span class="n">ORCID</span><span class="p">))</span>
-<span class="n">Filter</span><span class="p">(</span><span class="k">function</span><span class="p">(</span><span class="n">x</span><span class="p">)</span> <span class="o">!</span><span class="n">is.na</span><span class="p">(</span><span class="n">x</span><span class="p">),</span> <span class="n">orcids</span><span class="p">)</span>
-</code></pre>
-</div>
-
-<div class="highlighter-rouge"><pre class="highlight"><code> <span class="p">[</span><span class="m">1</span><span class="p">]</span> <span class="s2">"http://orcid.org/0000-0003-4087-8021"</span>
- <span class="p">[</span><span class="m">2</span><span class="p">]</span> <span class="s2">"http://orcid.org/0000-0002-2076-5452"</span>
- <span class="p">[</span><span class="m">3</span><span class="p">]</span> <span class="s2">"http://orcid.org/0000-0003-4087-8021"</span>
- <span class="p">[</span><span class="m">4</span><span class="p">]</span> <span class="s2">"http://orcid.org/0000-0002-2076-5452"</span>
- <span class="p">[</span><span class="m">5</span><span class="p">]</span> <span class="s2">"http://orcid.org/0000-0003-1710-1580"</span>
- <span class="p">[</span><span class="m">6</span><span class="p">]</span> <span class="s2">"http://orcid.org/0000-0003-1710-1580"</span>
- <span class="p">[</span><span class="m">7</span><span class="p">]</span> <span class="s2">"http://orcid.org/0000-0003-4637-238X"</span>
- <span class="p">[</span><span class="m">8</span><span class="p">]</span> <span class="s2">"http://orcid.org/0000-0003-4637-238X"</span>
- <span class="p">[</span><span class="m">9</span><span class="p">]</span> <span class="s2">"http://orcid.org/0000-0003-4637-238X"</span>
-<span class="p">[</span><span class="m">10</span><span class="p">]</span> <span class="s2">"http://orcid.org/0000-0003-4637-238X"</span>
-<span class="p">[</span><span class="m">11</span><span class="p">]</span> <span class="s2">"http://orcid.org/0000-0003-4637-238X"</span>
-<span class="p">[</span><span class="m">12</span><span class="p">]</span> <span class="s2">"http://orcid.org/0000-0003-2510-4271"</span>
-</code></pre>
-</div>
-
-<p>CLI</p>
-
-<div class="highlighter-rouge"><pre class="highlight"><code>serrano works --filter<span class="o">=</span>has_orcid:true --json --limit<span class="o">=</span>12 | jq <span class="s1">'.message.items[].author[].ORCID | select(. != null)'</span>
-</code></pre>
-</div>
-
-<div class="highlighter-rouge"><pre class="highlight"><code><span class="s2">"http://orcid.org/0000-0003-4087-8021"</span>
-<span class="s2">"http://orcid.org/0000-0002-2076-5452"</span>
-<span class="s2">"http://orcid.org/0000-0003-4087-8021"</span>
-<span class="s2">"http://orcid.org/0000-0002-2076-5452"</span>
-<span class="s2">"http://orcid.org/0000-0003-1710-1580"</span>
-<span class="s2">"http://orcid.org/0000-0003-1710-1580"</span>
-<span class="s2">"http://orcid.org/0000-0003-4637-238X"</span>
-<span class="s2">"http://orcid.org/0000-0003-4637-238X"</span>
-<span class="s2">"http://orcid.org/0000-0003-4637-238X"</span>
-<span class="s2">"http://orcid.org/0000-0003-4637-238X"</span>
-<span class="s2">"http://orcid.org/0000-0003-4637-238X"</span>
-<span class="s2">"http://orcid.org/0000-0003-2510-4271"</span>
-<span class="s2">"http://orcid.org/0000-0001-9408-8207"</span>
-<span class="s2">"http://orcid.org/0000-0002-2076-5452"</span>
-</code></pre>
-</div>
-
-<h2 id="use-case-content-negotation">Use case: content negotation</h2>
-
-<p>Python</p>
-
-<div class="highlighter-rouge"><pre class="highlight"><code><span class="kn">from</span> <span class="nn">habanero</span> <span class="kn">import</span> <span class="n">cn</span>
-<span class="n">cn</span><span class="o">.</span><span class="n">content_negotiation</span><span class="p">(</span><span class="n">ids</span> <span class="o">=</span> <span class="s">'10.1126/science.169.3946.635'</span><span class="p">,</span> <span class="n">format</span> <span class="o">=</span> <span class="s">"text"</span><span class="p">)</span>
-</code></pre>
-</div>
-
-<div class="highlighter-rouge"><pre class="highlight"><code><span class="s">u'Frank, H. S. (1970). The Structure of Ordinary Water: New data and interpretations are yielding new insights into this fascinating substance. Science, 169(3946), 635</span><span class="se">\xe2\x80\x93</span><span class="s">641. doi:10.1126/science.169.3946.635</span><span class="se">\n</span><span class="s">'</span>
-</code></pre>
-</div>
-
-<p>Ruby</p>
-
-<div class="highlighter-rouge"><pre class="highlight"><code><span class="nb">require</span> <span class="s1">'serrano'</span>
-<span class="no">Serrano</span><span class="p">.</span><span class="nf">content_negotiation</span><span class="p">(</span><span class="ss">ids: </span><span class="s1">'10.1126/science.169.3946.635'</span><span class="p">,</span> <span class="ss">format: </span><span class="s2">"text"</span><span class="p">)</span>
-</code></pre>
-</div>
-
-<div class="highlighter-rouge"><pre class="highlight"><code><span class="o">=&gt;</span> <span class="p">[</span><span class="s2">"Frank, H. S. (1970). The Structure of Ordinary Water: New data and interpretations are yielding new insights into this fascinating substance. Science, 169(3946), 635</span><span class="se">\xE2\x80\x93</span><span class="s2">641. doi:10.1126/science.169.3946.635</span><span class="se">\n</span><span class="s2">"</span><span class="p">]</span>
-</code></pre>
-</div>
-
-<p>R</p>
-
-<div class="highlighter-rouge"><pre class="highlight"><code><span class="n">library</span><span class="p">(</span><span class="s2">"rcrossref"</span><span class="p">)</span>
-<span class="n">cr_cn</span><span class="p">(</span><span class="n">dois</span><span class="o">=</span><span class="s2">"10.1126/science.169.3946.635"</span><span class="p">,</span> <span class="s2">"text"</span><span class="p">)</span>
-</code></pre>
-</div>
-
-<div class="highlighter-rouge"><pre class="highlight"><code><span class="p">[</span><span class="m">1</span><span class="p">]</span> <span class="s2">"Frank, H. S. (1970). The Structure of Ordinary Water: New data and interpretations are yielding new insights into this fascinating substance. Science, 169(3946), 635–641. doi:10.1126/science.169.3946.635"</span>
-</code></pre>
-</div>
-
-<p>CLI</p>
-
-<div class="highlighter-rouge"><pre class="highlight"><code>serrano contneg 10.1890/13-0590.1 --format<span class="o">=</span>text
-</code></pre>
-</div>
-
-<div class="highlighter-rouge"><pre class="highlight"><code>Murtaugh, P. A. <span class="o">(</span>2014<span class="o">)</span>.  In defense of P values . Ecology, 95<span class="o">(</span>3<span class="o">)</span>, 611–617. doi:10.1890/13-0590.1
-</code></pre>
-</div>
-
-<h2 id="more">More</h2>
-
-<p>There are definitely issues with data in the Crossref search API, some of which I cover in my talks. However, it is still the best place to go for scholarly metadata.</p>
-
-<p>Let us know of other use cases - there are others not covered here for brevity sake.</p>
-
-<p>There are lots of examples in the docs for each client. If you can think of any doc improvements file an issue.</p>
-
-<p>If you find any bugs, please do file an issue.</p>
 
 
   </div>

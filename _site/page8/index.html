@@ -61,6 +61,236 @@
   
   <div class="post">
     <h1>
+      <a href="/2015/03/couch-dataframes/">
+        PUT dataframes on your couch
+      </a>
+    </h1>
+
+    <span class="post-date">12 Mar 2015</span>
+
+    <p>It would be nice to easily push each row or column of a data.frame into CouchDB instead of having to prepare them yourself into JSON, then push in to couch. I recently added ability to push data.frame’s into couch using the normal <code class="highlighter-rouge">PUT /{db}</code> method, and added support for the couch bulk API.</p>
+
+<h2 id="install">Install</h2>
+
+<div class="highlighter-rouge"><pre class="highlight"><code><span class="n">install.packages</span><span class="p">(</span><span class="s2">"devtools"</span><span class="p">)</span>
+<span class="n">devtools</span><span class="o">::</span><span class="n">install_github</span><span class="p">(</span><span class="s2">"sckott/sofa"</span><span class="p">)</span>
+</code></pre>
+</div>
+
+<div class="highlighter-rouge"><pre class="highlight"><code><span class="n">library</span><span class="p">(</span><span class="s2">"sofa"</span><span class="p">)</span>
+</code></pre>
+</div>
+
+<h2 id="put-db">PUT /db</h2>
+
+<p>You can write directly from a data.frame, either by rows or columns. First, rows:</p>
+
+<div class="highlighter-rouge"><pre class="highlight"><code>#&gt; $ok
+#&gt; [1] TRUE
+</code></pre>
+</div>
+
+<p>Create a database</p>
+
+<div class="highlighter-rouge"><pre class="highlight"><code><span class="n">db_create</span><span class="p">(</span><span class="n">dbname</span><span class="o">=</span><span class="s2">"mtcarsdb"</span><span class="p">)</span>
+<span class="c1">#&gt; $ok
+#&gt; [1] TRUE
+</span></code></pre>
+</div>
+
+<div class="highlighter-rouge"><pre class="highlight"><code><span class="n">out</span> <span class="o">&lt;-</span> <span class="n">doc_create</span><span class="p">(</span><span class="n">mtcars</span><span class="p">,</span> <span class="n">dbname</span><span class="o">=</span><span class="s2">"mtcarsdb"</span><span class="p">,</span> <span class="n">how</span><span class="o">=</span><span class="s2">"rows"</span><span class="p">)</span>
+<span class="n">out</span><span class="p">[</span><span class="m">1</span><span class="o">:</span><span class="m">2</span><span class="p">]</span>
+<span class="c1">#&gt; $`Mazda RX4`
+#&gt; $`Mazda RX4`$ok
+#&gt; [1] TRUE
+#&gt; 
+#&gt; $`Mazda RX4`$id
+#&gt; [1] "0063109bfb1c15765854cbc9525c3a7a"
+#&gt; 
+#&gt; $`Mazda RX4`$rev
+#&gt; [1] "1-3946941c894a874697554e3e6d9bc176"
+#&gt; 
+#&gt; 
+#&gt; $`Mazda RX4 Wag`
+#&gt; $`Mazda RX4 Wag`$ok
+#&gt; [1] TRUE
+#&gt; 
+#&gt; $`Mazda RX4 Wag`$id
+#&gt; [1] "0063109bfb1c15765854cbc9525c461d"
+#&gt; 
+#&gt; $`Mazda RX4 Wag`$rev
+#&gt; [1] "1-273ff17a938cb956cba21051ab428b95"
+</span></code></pre>
+</div>
+
+<p>Then by columns</p>
+
+<div class="highlighter-rouge"><pre class="highlight"><code><span class="n">out</span> <span class="o">&lt;-</span> <span class="n">doc_create</span><span class="p">(</span><span class="n">mtcars</span><span class="p">,</span> <span class="n">dbname</span><span class="o">=</span><span class="s2">"mtcarsdb"</span><span class="p">,</span> <span class="n">how</span><span class="o">=</span><span class="s2">"columns"</span><span class="p">)</span>
+<span class="n">out</span><span class="p">[</span><span class="m">1</span><span class="o">:</span><span class="m">2</span><span class="p">]</span>
+<span class="c1">#&gt; $mpg
+#&gt; $mpg$ok
+#&gt; [1] TRUE
+#&gt; 
+#&gt; $mpg$id
+#&gt; [1] "0063109bfb1c15765854cbc9525d4f1f"
+#&gt; 
+#&gt; $mpg$rev
+#&gt; [1] "1-4b83d0ef53a28849a872d47ad03fef9a"
+#&gt; 
+#&gt; 
+#&gt; $cyl
+#&gt; $cyl$ok
+#&gt; [1] TRUE
+#&gt; 
+#&gt; $cyl$id
+#&gt; [1] "0063109bfb1c15765854cbc9525d57d3"
+#&gt; 
+#&gt; $cyl$rev
+#&gt; [1] "1-c21bfa5425c67743f0826fd4b44b0dbf"
+</span></code></pre>
+</div>
+
+<h2 id="bulk-api">Bulk API</h2>
+
+<p>The bulk API will/should be faster for larger data.frames</p>
+
+<div class="highlighter-rouge"><pre class="highlight"><code>#&gt; $ok
+#&gt; [1] TRUE
+</code></pre>
+</div>
+
+<p>We’ll use part of the diamonds dataset</p>
+
+<div class="highlighter-rouge"><pre class="highlight"><code><span class="n">library</span><span class="p">(</span><span class="s2">"ggplot2"</span><span class="p">)</span>
+<span class="n">dat</span> <span class="o">&lt;-</span> <span class="n">diamonds</span><span class="p">[</span><span class="m">1</span><span class="o">:</span><span class="m">20000</span><span class="p">,]</span>
+</code></pre>
+</div>
+
+<p>Create a database</p>
+
+<div class="highlighter-rouge"><pre class="highlight"><code><span class="n">db_create</span><span class="p">(</span><span class="n">dbname</span><span class="o">=</span><span class="s2">"bulktest"</span><span class="p">)</span>
+<span class="c1">#&gt; $ok
+#&gt; [1] TRUE
+</span></code></pre>
+</div>
+
+<p>Load by row (could instead do each column, see <code class="highlighter-rouge">how</code> parameter), printing the time it takes</p>
+
+<div class="highlighter-rouge"><pre class="highlight"><code><span class="n">system.time</span><span class="p">(</span><span class="n">out</span> <span class="o">&lt;-</span> <span class="n">bulk_create</span><span class="p">(</span><span class="n">dat</span><span class="p">,</span> <span class="n">dbname</span><span class="o">=</span><span class="s2">"bulktest"</span><span class="p">))</span>
+<span class="c1">#&gt;    user  system elapsed 
+#&gt;  16.832   6.039  24.432
+</span></code></pre>
+</div>
+
+<p>The returned data is the same as with <code class="highlighter-rouge">doc_create()</code></p>
+
+<div class="highlighter-rouge"><pre class="highlight"><code><span class="n">out</span><span class="p">[</span><span class="m">1</span><span class="o">:</span><span class="m">2</span><span class="p">]</span>
+<span class="c1">#&gt; [[1]]
+#&gt; [[1]]$ok
+#&gt; [1] TRUE
+#&gt; 
+#&gt; [[1]]$id
+#&gt; [1] "0063109bfb1c15765854cbc9525d8b8d"
+#&gt; 
+#&gt; [[1]]$rev
+#&gt; [1] "1-f407fe4935af7fd17c101f13d3c81679"
+#&gt; 
+#&gt; 
+#&gt; [[2]]
+#&gt; [[2]]$ok
+#&gt; [1] TRUE
+#&gt; 
+#&gt; [[2]]$id
+#&gt; [1] "0063109bfb1c15765854cbc9525d998b"
+#&gt; 
+#&gt; [[2]]$rev
+#&gt; [1] "1-cf8b9a9dcdc026052a663d6fef8a36fe"
+</span></code></pre>
+</div>
+
+<p>So that’s 20,000 rows in not that much time, not bad.</p>
+
+<h3 id="not-dataframes">not dataframes</h3>
+
+<p>You can also pass in lists or vectors of json as character strings, e.g.,</p>
+
+<p><em>lists</em></p>
+
+<div class="highlighter-rouge"><pre class="highlight"><code>#&gt; $ok
+#&gt; [1] TRUE
+</code></pre>
+</div>
+
+<div class="highlighter-rouge"><pre class="highlight"><code><span class="n">row.names</span><span class="p">(</span><span class="n">mtcars</span><span class="p">)</span> <span class="o">&lt;-</span> <span class="n">NULL</span> <span class="c1"># get rid of row.names
+</span><span class="n">lst</span> <span class="o">&lt;-</span> <span class="n">parse_df</span><span class="p">(</span><span class="n">mtcars</span><span class="p">,</span> <span class="n">tojson</span><span class="o">=</span><span class="n">FALSE</span><span class="p">)</span>
+<span class="n">db_create</span><span class="p">(</span><span class="n">dbname</span><span class="o">=</span><span class="s2">"bulkfromlist"</span><span class="p">)</span>
+<span class="c1">#&gt; $ok
+#&gt; [1] TRUE
+</span><span class="n">out</span> <span class="o">&lt;-</span> <span class="n">bulk_create</span><span class="p">(</span><span class="n">lst</span><span class="p">,</span> <span class="n">dbname</span><span class="o">=</span><span class="s2">"bulkfromlist"</span><span class="p">)</span>
+<span class="n">out</span><span class="p">[</span><span class="m">1</span><span class="o">:</span><span class="m">2</span><span class="p">]</span>
+<span class="c1">#&gt; [[1]]
+#&gt; [[1]]$ok
+#&gt; [1] TRUE
+#&gt; 
+#&gt; [[1]]$id
+#&gt; [1] "ba70c46d73707662b1e204a90fcd9bb8"
+#&gt; 
+#&gt; [[1]]$rev
+#&gt; [1] "1-3946941c894a874697554e3e6d9bc176"
+#&gt; 
+#&gt; 
+#&gt; [[2]]
+#&gt; [[2]]$ok
+#&gt; [1] TRUE
+#&gt; 
+#&gt; [[2]]$id
+#&gt; [1] "ba70c46d73707662b1e204a90fcda9f6"
+#&gt; 
+#&gt; [[2]]$rev
+#&gt; [1] "1-273ff17a938cb956cba21051ab428b95"
+</span></code></pre>
+</div>
+
+<p><em>json</em></p>
+
+<div class="highlighter-rouge"><pre class="highlight"><code>#&gt; $ok
+#&gt; [1] TRUE
+</code></pre>
+</div>
+
+<div class="highlighter-rouge"><pre class="highlight"><code><span class="n">strs</span> <span class="o">&lt;-</span> <span class="n">as.character</span><span class="p">(</span><span class="n">parse_df</span><span class="p">(</span><span class="n">mtcars</span><span class="p">,</span> <span class="s2">"columns"</span><span class="p">))</span>
+<span class="n">db_create</span><span class="p">(</span><span class="n">dbname</span><span class="o">=</span><span class="s2">"bulkfromchr"</span><span class="p">)</span>
+<span class="c1">#&gt; $ok
+#&gt; [1] TRUE
+</span><span class="n">out</span> <span class="o">&lt;-</span> <span class="n">bulk_create</span><span class="p">(</span><span class="n">strs</span><span class="p">,</span> <span class="n">dbname</span><span class="o">=</span><span class="s2">"bulkfromchr"</span><span class="p">)</span>
+<span class="n">out</span><span class="p">[</span><span class="m">1</span><span class="o">:</span><span class="m">2</span><span class="p">]</span>
+<span class="c1">#&gt; [[1]]
+#&gt; [[1]]$ok
+#&gt; [1] TRUE
+#&gt; 
+#&gt; [[1]]$id
+#&gt; [1] "ba70c46d73707662b1e204a90fce8c20"
+#&gt; 
+#&gt; [[1]]$rev
+#&gt; [1] "1-4b83d0ef53a28849a872d47ad03fef9a"
+#&gt; 
+#&gt; 
+#&gt; [[2]]
+#&gt; [[2]]$ok
+#&gt; [1] TRUE
+#&gt; 
+#&gt; [[2]]$id
+#&gt; [1] "ba70c46d73707662b1e204a90fce9bc1"
+#&gt; 
+#&gt; [[2]]$rev
+#&gt; [1] "1-c21bfa5425c67743f0826fd4b44b0dbf"
+</span></code></pre>
+</div>
+
+  </div>
+  
+  <div class="post">
+    <h1>
       <a href="/2015/03/csl-client/">
         csl - an R client for Citation Style Language data
       </a>
@@ -295,46 +525,6 @@
 }'
 </code></pre>
 </div>
-
-  </div>
-  
-  <div class="post">
-    <h1>
-      <a href="/2015/02/secure-elasticsearch/">
-        note to self, secure elasticsearch
-      </a>
-    </h1>
-
-    <span class="post-date">26 Feb 2015</span>
-
-    <p>Recently I spun up a box on a cloud hosting provider planning to make a tens of thousdands of queries to an Elasticsearch instance on the same box. I could have done this on my own machine, but didn’t want to take up compute resources.</p>
-
-<p>I installed R and Elasticsearch on the box, then went about doing my thang.</p>
-
-<p>A day later when things were still running, the hosting provider sent me a message that apparently my box had been serving up a DDoS attack.</p>
-
-<p>This was incredibly surprising, as I don’t even know how to do such a thing.</p>
-
-<p>After some digging it seems that the culprit was likely Elasticsearch, as a number of tutorials/blog posts state that Elaticsearch is insecure by default, so if it’s exposed on a public port, someone can hack in. I had only used Elasticsearch locally on my own machine, so I hadn’t thought about security. Here’s a few resources for security help:</p>
-
-<ul>
-  <li><a href="https://www.digitalocean.com/community/tutorials/how-to-install-elasticsearch-on-an-ubuntu-vps">DigitalOcean tutorial no. 1</a></li>
-  <li><a href="https://www.digitalocean.com/community/tutorials/elasticsearch-fluentd-and-kibana-open-source-log-search-and-visualization">DigitalOcean tutorial no. 2</a></li>
-  <li><a href="http://saskia-vola.com/install-secure-elasticsearch-1-x-digital-ocean/">Blog post on securing ES</a></li>
-  <li><a href="http://stackoverflow.com/questions/26006373/how-to-secure-a-digital-ocean-elasticsearch-cluster">SO answer on securing ES</a></li>
-</ul>
-
-<p>Trying to narrow down the various pieces of advice for securing Elasticsearch, here’s a list:</p>
-
-<ul>
-  <li>Use <code class="highlighter-rouge">iptables</code> (or rather <a href="http://en.wikipedia.org/wiki/Nftables">nftables</a>?) to firewall the box</li>
-  <li>Whitelist certain trusted IPs</li>
-  <li>Use the <a href="https://github.com/Asquera/elasticsearch-http-basic"><code class="highlighter-rouge">elasticsearch-http-basic</code></a> plugin, adds basic username/pwd login</li>
-  <li>Remove public access: use <code class="highlighter-rouge">network.bind_host: localhost</code> and <code class="highlighter-rouge">script.disable_dynamic: true</code> in the <code class="highlighter-rouge">elasticsearch.yml</code> config file <a href="https://www.digitalocean.com/community/tutorials/how-to-install-elasticsearch-on-an-ubuntu-vps">from</a></li>
-</ul>
-
-<p>Elasticsearch provides a new feature for security that’s built into Elasticsearch, <a href="http://www.elasticsearch.org/overview/shield/">Shield</a>, but I believe it’s only available to enterprise customers. Boo.</p>
-
 
   </div>
   
