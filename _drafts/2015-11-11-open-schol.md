@@ -32,7 +32,7 @@ They discussed three principles, and within each of the three principles they ou
 
 
 * __Mission consistent revenue__: We're lucky in that we've found funding from foundations that share our values. This is critical to our long-term success so that we can continue to fulfill our mission.
-* __Revenue based on services, not data__: Exactly! In software, this means make open source software, which we do - all open licensed, free to use from academic to non-profit to industry. Instead of value-added services, we offer assurance of quality and long-term maintenance, both hard to do in academic software given the short-term nature of grants.
+* __Revenue based on services, not data__: In software, this means make open source software, which we do - all open licensed, free to use from academic to non-profit to industry. Instead of value-added services, we offer assurance of quality and long-term maintenance, both hard to do in academic software given the short-term nature of grants.
 
 ### Insurance
 
@@ -40,7 +40,7 @@ They discussed three principles, and within each of the three principles they ou
 
 
 * Liberally licensed open source software goes a long way towards making sure that the software is owned by the community (even if proprietary derivatives are made).
-    * __Open source__: Bingo! Everything we do is open source. This is surprisingly not ubiquitous in academic software, due to a combination of some not bothering to add a license (essentially meaning it can't be re-used anywhere), or using a very restrictive license, either out of not considering the consequences or on purpose for competitive or monetary gain.
+    * __Open source__: Everything we do is open source. This is surprisingly not ubiquitous in academic software, due to a combination of some not bothering to add a license (essentially meaning it can't be re-used anywhere), or using a very restrictive license, either out of not considering the consequences or on purpose for competitive or monetary gain.
     * __Open data__: We're generally not a data provider, but if/when we do, we will provide free to use data. As an example, we do maintain a web API for the [Fishbase](http://www.fishbase.org/) dataset at [ropensci/fishbaseapi](https://github.com/ropensci/fishbaseapi/).
 
 ## rOpenSci as infrastructure?
@@ -59,6 +59,12 @@ We provide a number of services that places us more into the role of infrastruct
 * Openly licensed software that can be used in all settings (almost all our software is [MIT][mit] licensed)
 * Low level clients for many data science tools
 
+Bilder et al. state:
+
+> We have not addressed the question of how the community can determine when a service has become important enough to be regarded as infrastructure ...
+
+We can not determine whether rOpenSci is _important enough_ - perhaps that will become apparent when it happens.
+
 In some ways, rOpenSci could be considered to not be infrastructure. For example, we are specific to a single programming language. However, this could change in time as our focus changes. In addition, R is used widely across disciplines, making our community of users and contributors quite diverse.
 
 ## Centralization
@@ -67,9 +73,9 @@ In some ways, rOpenSci could be considered to not be infrastructure. For example
 
 This is a key point about the rOpenSci model. We do centralize software of a particular type that fits our mission. Because we centralize in terms of physical location in our GitHub account, we can:
 
-* Jump in to fix a problem quickly in case one of our community maintainers is away or unable to respond in a timely manner.
-* Maintain a certain level of software quality. Although we may not be there now with every package, we are trying hard to get there.
-* Enforce a community that is welcoming to all, that encourages less experienced contributors, and marginalized groups.
+* Jump in to fix a problem quickly in case one of our community maintainers is away or unable to respond in a timely manner. This is possible because we have admin rights on all repositories.
+* Maintain a certain level of software quality. Although all our repositories may not be at the highest level of quality now, we are trying hard to get there. Our review system is helping with this.
+* Enforce a community that is welcoming to all, that encourages less experienced contributors, and marginalized groups. This is also done in our events.
 
 We try to balance nurturing novice or inexperienced developers with ....(NOT DONE WITH THE THOUGHT YET)
 
