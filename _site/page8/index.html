@@ -61,6 +61,145 @@
   
   <div class="post">
     <h1>
+      <a href="/2015/03/faster-solr/">
+        Faster solr with csv
+      </a>
+    </h1>
+
+    <span class="post-date">20 Mar 2015</span>
+
+    <p>With the <a href="https://github.com/ropensci/solr/issues/47">help of user input</a>, I’ve tweaked <code class="highlighter-rouge">solr</code> just a bit to make things faster using default setings. I imagine the main interface for people using the <code class="highlighter-rouge">solr</code> R client is via <code class="highlighter-rouge">solr_search()</code>, which used to have <code class="highlighter-rouge">wt=json</code> by default. Changing this to <code class="highlighter-rouge">wt=csv</code> gives better performance. And it sorta makes sense to use csv, as the point of using an R client is probably do get data eventually into a data.frame, so it makes sense to go csv format (Already in tabular format) if it’s faster too.</p>
+
+<h2 id="install">Install</h2>
+
+<p>Install and load <code class="highlighter-rouge">solr</code></p>
+
+<div class="highlighter-rouge"><pre class="highlight"><code><span class="n">devtools</span><span class="o">::</span><span class="n">install_github</span><span class="p">(</span><span class="s2">"ropensci/solr"</span><span class="p">)</span>
+</code></pre>
+</div>
+
+<div class="highlighter-rouge"><pre class="highlight"><code><span class="n">library</span><span class="p">(</span><span class="s2">"solr"</span><span class="p">)</span>
+<span class="n">library</span><span class="p">(</span><span class="s2">"microbenchmark"</span><span class="p">)</span>
+</code></pre>
+</div>
+
+<h2 id="setup">Setup</h2>
+
+<p>Define base url and fields to return</p>
+
+<div class="highlighter-rouge"><pre class="highlight"><code><span class="n">url</span> <span class="o">&lt;-</span> <span class="s1">'http://api.plos.org/search'</span>
+<span class="n">fields</span> <span class="o">&lt;-</span> <span class="n">c</span><span class="p">(</span><span class="s1">'id'</span><span class="p">,</span><span class="s1">'cross_published_journal_name'</span><span class="p">,</span><span class="s1">'cross_published_journal_key'</span><span class="p">,</span>
+            <span class="s1">'cross_published_journal_eissn'</span><span class="p">,</span><span class="s1">'pmid'</span><span class="p">,</span><span class="s1">'pmcid'</span><span class="p">,</span><span class="s1">'publisher'</span><span class="p">,</span><span class="s1">'journal'</span><span class="p">,</span>
+            <span class="s1">'publication_date'</span><span class="p">,</span><span class="s1">'article_type'</span><span class="p">,</span><span class="s1">'article_type_facet'</span><span class="p">,</span><span class="s1">'author'</span><span class="p">,</span>
+            <span class="s1">'author_facet'</span><span class="p">,</span><span class="s1">'volume'</span><span class="p">,</span><span class="s1">'issue'</span><span class="p">,</span><span class="s1">'elocation_id'</span><span class="p">,</span><span class="s1">'author_display'</span><span class="p">,</span>
+            <span class="s1">'competing_interest'</span><span class="p">,</span><span class="s1">'copyright'</span><span class="p">)</span>
+</code></pre>
+</div>
+
+<h2 id="json">json</h2>
+
+<p>The previous default for <code class="highlighter-rouge">solr_search()</code> used <code class="highlighter-rouge">json</code></p>
+
+<div class="highlighter-rouge"><pre class="highlight"><code><span class="n">solr_search</span><span class="p">(</span><span class="n">q</span><span class="o">=</span><span class="s1">'*:*'</span><span class="p">,</span> <span class="n">rows</span><span class="o">=</span><span class="m">10</span><span class="p">,</span> <span class="n">fl</span><span class="o">=</span><span class="n">fields</span><span class="p">,</span> <span class="n">base</span><span class="o">=</span><span class="n">url</span><span class="p">,</span> <span class="n">wt</span> <span class="o">=</span> <span class="s2">"json"</span><span class="p">)</span>
+<span class="c1">#&gt; Source: local data frame [10 x 19]
+#&gt; 
+#&gt;                                                                    id
+#&gt; 1             10.1371/annotation/856f0890-9d85-4719-8e54-c27530ac94f4
+#&gt; 2       10.1371/annotation/856f0890-9d85-4719-8e54-c27530ac94f4/title
+#&gt; 3    10.1371/annotation/856f0890-9d85-4719-8e54-c27530ac94f4/abstract
+#&gt; 4  10.1371/annotation/856f0890-9d85-4719-8e54-c27530ac94f4/references
+#&gt; 5        10.1371/annotation/856f0890-9d85-4719-8e54-c27530ac94f4/body
+#&gt; 6             10.1371/annotation/8551e3d5-fdd5-413b-a253-170ba13b7525
+#&gt; 7       10.1371/annotation/8551e3d5-fdd5-413b-a253-170ba13b7525/title
+#&gt; 8    10.1371/annotation/8551e3d5-fdd5-413b-a253-170ba13b7525/abstract
+#&gt; 9  10.1371/annotation/8551e3d5-fdd5-413b-a253-170ba13b7525/references
+#&gt; 10       10.1371/annotation/8551e3d5-fdd5-413b-a253-170ba13b7525/body
+#&gt; Variables not shown: cross_published_journal_name (chr),
+#&gt;   cross_published_journal_key (chr), cross_published_journal_eissn (chr),
+#&gt;   pmid (chr), pmcid (chr), publisher (chr), journal (chr),
+#&gt;   publication_date (chr), article_type (chr), article_type_facet (chr),
+#&gt;   author (chr), author_facet (chr), volume (int), issue (int),
+#&gt;   elocation_id (chr), author_display (chr), competing_interest (chr),
+#&gt;   copyright (chr)
+</span></code></pre>
+</div>
+
+<h2 id="csv">csv</h2>
+
+<p>The default <code class="highlighter-rouge">wt</code> setting is now <code class="highlighter-rouge">csv</code></p>
+
+<div class="highlighter-rouge"><pre class="highlight"><code><span class="n">solr_search</span><span class="p">(</span><span class="n">q</span><span class="o">=</span><span class="s1">'*:*'</span><span class="p">,</span> <span class="n">rows</span><span class="o">=</span><span class="m">10</span><span class="p">,</span> <span class="n">fl</span><span class="o">=</span><span class="n">fields</span><span class="p">,</span> <span class="n">base</span><span class="o">=</span><span class="n">url</span><span class="p">,</span> <span class="n">wt</span> <span class="o">=</span> <span class="s2">"json"</span><span class="p">)</span>
+<span class="c1">#&gt; Source: local data frame [10 x 19]
+#&gt; 
+#&gt;                                                                    id
+#&gt; 1             10.1371/annotation/856f0890-9d85-4719-8e54-c27530ac94f4
+#&gt; 2       10.1371/annotation/856f0890-9d85-4719-8e54-c27530ac94f4/title
+#&gt; 3    10.1371/annotation/856f0890-9d85-4719-8e54-c27530ac94f4/abstract
+#&gt; 4  10.1371/annotation/856f0890-9d85-4719-8e54-c27530ac94f4/references
+#&gt; 5        10.1371/annotation/856f0890-9d85-4719-8e54-c27530ac94f4/body
+#&gt; 6             10.1371/annotation/8551e3d5-fdd5-413b-a253-170ba13b7525
+#&gt; 7       10.1371/annotation/8551e3d5-fdd5-413b-a253-170ba13b7525/title
+#&gt; 8    10.1371/annotation/8551e3d5-fdd5-413b-a253-170ba13b7525/abstract
+#&gt; 9  10.1371/annotation/8551e3d5-fdd5-413b-a253-170ba13b7525/references
+#&gt; 10       10.1371/annotation/8551e3d5-fdd5-413b-a253-170ba13b7525/body
+#&gt; Variables not shown: cross_published_journal_name (chr),
+#&gt;   cross_published_journal_key (chr), cross_published_journal_eissn (chr),
+#&gt;   pmid (chr), pmcid (chr), publisher (chr), journal (chr),
+#&gt;   publication_date (chr), article_type (chr), article_type_facet (chr),
+#&gt;   author (chr), author_facet (chr), volume (int), issue (int),
+#&gt;   elocation_id (chr), author_display (chr), competing_interest (chr),
+#&gt;   copyright (chr)
+</span></code></pre>
+</div>
+
+<h2 id="compare-times">Compare times</h2>
+
+<p>When parsing to a data.frame (which <code class="highlighter-rouge">solr_search()</code> does by default), csv is quite a bit faster.</p>
+
+<div class="highlighter-rouge"><pre class="highlight"><code><span class="n">microbenchmark</span><span class="p">(</span>
+  <span class="n">json</span> <span class="o">=</span> <span class="n">solr_search</span><span class="p">(</span><span class="n">q</span><span class="o">=</span><span class="s1">'*:*'</span><span class="p">,</span> <span class="n">rows</span><span class="o">=</span><span class="m">500</span><span class="p">,</span> <span class="n">fl</span><span class="o">=</span><span class="n">fields</span><span class="p">,</span> <span class="n">base</span><span class="o">=</span><span class="n">url</span><span class="p">,</span> <span class="n">wt</span> <span class="o">=</span> <span class="s2">"json"</span><span class="p">,</span> <span class="n">verbose</span> <span class="o">=</span> <span class="n">FALSE</span><span class="p">),</span>
+  <span class="n">csv</span> <span class="o">=</span> <span class="n">solr_search</span><span class="p">(</span><span class="n">q</span><span class="o">=</span><span class="s1">'*:*'</span><span class="p">,</span> <span class="n">rows</span><span class="o">=</span><span class="m">500</span><span class="p">,</span> <span class="n">fl</span><span class="o">=</span><span class="n">fields</span><span class="p">,</span> <span class="n">base</span><span class="o">=</span><span class="n">url</span><span class="p">,</span> <span class="n">wt</span> <span class="o">=</span> <span class="s2">"csv"</span><span class="p">,</span> <span class="n">verbose</span> <span class="o">=</span> <span class="n">FALSE</span><span class="p">),</span> 
+  <span class="n">times</span> <span class="o">=</span> <span class="m">20</span>
+<span class="p">)</span>
+<span class="c1">#&gt; Unit: milliseconds
+#&gt;  expr      min       lq      mean    median        uq       max neval cld
+#&gt;  json 965.7043 1013.014 1124.1229 1086.3225 1227.9054 1441.8332    20   b
+#&gt;   csv 509.6573  520.089  541.5784  532.4546  548.0303  723.7575    20  a
+</span></code></pre>
+</div>
+
+<h2 id="json-vs-xml-vs-csv">json vs xml vs csv</h2>
+
+<p>When getting raw data, csv is best, json next, then xml pulling up the rear.</p>
+
+<div class="highlighter-rouge"><pre class="highlight"><code><span class="n">microbenchmark</span><span class="p">(</span>
+  <span class="n">json</span> <span class="o">=</span> <span class="n">solr_search</span><span class="p">(</span><span class="n">q</span><span class="o">=</span><span class="s1">'*:*'</span><span class="p">,</span> <span class="n">rows</span><span class="o">=</span><span class="m">1000</span><span class="p">,</span> <span class="n">fl</span><span class="o">=</span><span class="n">fields</span><span class="p">,</span> <span class="n">base</span><span class="o">=</span><span class="n">url</span><span class="p">,</span> <span class="n">wt</span> <span class="o">=</span> <span class="s2">"json"</span><span class="p">,</span> <span class="n">verbose</span> <span class="o">=</span> <span class="n">FALSE</span><span class="p">,</span> <span class="n">raw</span> <span class="o">=</span> <span class="n">TRUE</span><span class="p">),</span>
+  <span class="n">csv</span> <span class="o">=</span> <span class="n">solr_search</span><span class="p">(</span><span class="n">q</span><span class="o">=</span><span class="s1">'*:*'</span><span class="p">,</span> <span class="n">rows</span><span class="o">=</span><span class="m">1000</span><span class="p">,</span> <span class="n">fl</span><span class="o">=</span><span class="n">fields</span><span class="p">,</span> <span class="n">base</span><span class="o">=</span><span class="n">url</span><span class="p">,</span> <span class="n">wt</span> <span class="o">=</span> <span class="s2">"csv"</span><span class="p">,</span> <span class="n">verbose</span> <span class="o">=</span> <span class="n">FALSE</span><span class="p">,</span> <span class="n">raw</span> <span class="o">=</span> <span class="n">TRUE</span><span class="p">),</span>
+  <span class="n">xml</span> <span class="o">=</span> <span class="n">solr_search</span><span class="p">(</span><span class="n">q</span><span class="o">=</span><span class="s1">'*:*'</span><span class="p">,</span> <span class="n">rows</span><span class="o">=</span><span class="m">1000</span><span class="p">,</span> <span class="n">fl</span><span class="o">=</span><span class="n">fields</span><span class="p">,</span> <span class="n">base</span><span class="o">=</span><span class="n">url</span><span class="p">,</span> <span class="n">wt</span> <span class="o">=</span> <span class="s2">"xml"</span><span class="p">,</span> <span class="n">verbose</span> <span class="o">=</span> <span class="n">FALSE</span><span class="p">,</span> <span class="n">raw</span> <span class="o">=</span> <span class="n">TRUE</span><span class="p">),</span>
+  <span class="n">times</span> <span class="o">=</span> <span class="m">10</span>
+<span class="p">)</span>
+<span class="c1">#&gt; Unit: milliseconds
+#&gt;  expr       min       lq      mean    median        uq       max neval cld
+#&gt;  json 1110.9515 1142.478 1198.9981 1169.0808 1195.5709 1518.7412    10  b 
+#&gt;   csv  801.6871  802.516  826.0655  819.1532  835.0512  873.4266    10 a  
+#&gt;   xml 1507.1111 1554.002 1618.5963 1617.5208 1671.0026 1740.4448    10   c
+</span></code></pre>
+</div>
+
+<h2 id="notes">Notes</h2>
+
+<p>Note that <code class="highlighter-rouge">wt=csv</code> is only available in <code class="highlighter-rouge">solr_search()</code> and <code class="highlighter-rouge">solr_all()</code> because csv writer 
+only returns the docs element in csv, dropping other elements, including facets, mlt, groups, 
+stats, etc.</p>
+
+<p>Also, note the http client used in <code class="highlighter-rouge">solr</code> is <code class="highlighter-rouge">httr</code>, which passes in a gzip compression header by default, so as long as the server serving up the Solr data has compression turned on, that’s all set.</p>
+
+<p>Another way I’ve sped things up is if you use <code class="highlighter-rouge">wt=json</code> then parse to a data.frame, it uses <code class="highlighter-rouge">dplyr</code> which sped things up considerably.</p>
+
+  </div>
+  
+  <div class="post">
+    <h1>
       <a href="/2015/03/couch-dataframes/">
         PUT dataframes on your couch
       </a>
@@ -472,59 +611,6 @@
 </span></code></pre>
 </div>
 
-
-  </div>
-  
-  <div class="post">
-    <h1>
-      <a href="/2015/02/elasticsearch-backup-restore/">
-        Elasticsearch backup and restore
-      </a>
-    </h1>
-
-    <span class="post-date">26 Feb 2015</span>
-
-    <h2 id="setup-backup">setup backup</h2>
-
-<div class="highlighter-rouge"><pre class="highlight"><code>curl -XPUT 'http://localhost:9200/_snapshot/my_backup/' -d '{
-    "type": "fs",
-    "settings": {
-        "location": "/Users/sacmac/esbackups/my_backup",
-        "compress": true
-    }
-}'
-</code></pre>
-</div>
-
-<h2 id="create-backup">create backup</h2>
-
-<div class="highlighter-rouge"><pre class="highlight"><code>http PUT "localhost:9200/_snapshot/my_backup/snapshot_2?wait_for_completion=true"
-</code></pre>
-</div>
-
-<h2 id="get-info-on-snapshot">get info on snapshot</h2>
-
-<div class="highlighter-rouge"><pre class="highlight"><code>http "localhost:9200/_snapshot/my_backup/snapshot_2"
-</code></pre>
-</div>
-
-<h2 id="restore">restore</h2>
-
-<div class="highlighter-rouge"><pre class="highlight"><code>curl -XPOST "localhost:9200/_snapshot/my_backup/snapshot_2/_restore"
-</code></pre>
-</div>
-
-<h2 id="partial-restore-including-various-options-that-can-be-used">partial restore, including various options that can be used</h2>
-
-<div class="highlighter-rouge"><pre class="highlight"><code>curl -XPOST "localhost:9200/_snapshot/my_backup/snapshot_2/_restore" -d '{
-    "indices": "index_1,index_2",
-    "ignore_unavailable": "true",
-    "include_global_state": false,
-    "rename_pattern": "index_(.+)",
-    "rename_replacement": "restored_index_$1"
-}'
-</code></pre>
-</div>
 
   </div>
   

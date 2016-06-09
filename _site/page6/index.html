@@ -61,6 +61,361 @@
   
   <div class="post">
     <h1>
+      <a href="/2015/06/rerddap/">
+        rerddap - General purpose R client for ERDDAP servers
+      </a>
+    </h1>
+
+    <span class="post-date">24 Jun 2015</span>
+
+    <p><a href="http://upwell.pfeg.noaa.gov/erddap/information.html">ERDDAP</a> is a data server that gives you a simple, consistent way to download subsets of gridded and tabular scientific datasets in common file formats and make graphs and maps.  Besides it’s own <a href="http://upwell.pfeg.noaa.gov/erddap/rest.html">RESTful interface</a>, much of which is designed based on <a href="https://en.wikipedia.org/wiki/OPeNDAP">OPeNDAP</a>, ERDDAP can act as an OPeNDAP server and as a <a href="https://en.wikipedia.org/wiki/Web_Map_Service">WMS</a> server for gridded data.</p>
+
+<p>ERDDAP is a powerful tool - in a world of heterogeneous data, it’s often hard to combine data and serve it through the same interface, with tools for querying/filtering/subsetting the data. That is exactly what ERDDAP does. Heterogeneous data sets often have some similarities, such as latitude/longitude data and usually a time component, but other variables vary widely.</p>
+
+<h2 id="netcdf">NetCDF</h2>
+
+<p><code class="highlighter-rouge">rerddap</code> supports <a href="https://en.wikipedia.org/wiki/NetCDF">NetCDF format</a>, and is the default when using the <code class="highlighter-rouge">griddap()</code> function. We use <code class="highlighter-rouge">ncdf</code> by default, but you can choose to use <code class="highlighter-rouge">ncdf4</code> instead.</p>
+
+<h2 id="caching">Caching</h2>
+
+<p>Data files downloaded are cached in a single hidden directory <code class="highlighter-rouge">~/.rerddap</code> on your machine. It’s hidden so that you don’t accidentally delete the data, but you can still easily delete the data if you like, open files, move them around, etc.</p>
+
+<p>When you use <code class="highlighter-rouge">griddap()</code> or <code class="highlighter-rouge">tabledap()</code> functions, we construct a <a href="https://en.wikipedia.org/wiki/MD5#MD5_hashes">MD5 hash</a> from the base URL, and any query parameters - this way each query is separately cached. Once we have the hash, we look in <code class="highlighter-rouge">~/.rerddap</code> for a matching hash. If there’s a match we use that file on disk - if no match, we make a http request for the data to the ERDDAP server you specify.</p>
+
+<h2 id="erddap-servers">ERDDAP servers</h2>
+
+<p>You can get a data.frame of ERDDAP servers using the function <code class="highlighter-rouge">servers()</code>. Most I think serve some kind of NOAA data, but there are a few that aren’t NOAA data. Here are a few:</p>
+
+<div class="highlighter-rouge"><pre class="highlight"><code><span class="n">head</span><span class="p">(</span><span class="n">servers</span><span class="p">())</span>
+<span class="c1">#&gt;                                                                                            name
+#&gt; 1                                                         Marine Domain Awareness (MDA) - Italy
+#&gt; 2                                                                    Marine Institute - Ireland
+#&gt; 3                                                      CoastWatch Caribbean/Gulf of Mexico Node
+#&gt; 4                                                                    CoastWatch West Coast Node
+#&gt; 5                    NOAA IOOS CeNCOOS (Central and Northern California Ocean Observing System)
+#&gt; 6 NOAA IOOS NERACOOS (Northeastern Regional Association of Coastal and Ocean Observing Systems)
+#&gt;                                        url
+#&gt; 1 https://bluehub.jrc.ec.europa.eu/erddap/
+#&gt; 2          http://erddap.marine.ie/erddap/
+#&gt; 3      http://cwcgom.aoml.noaa.gov/erddap/
+#&gt; 4  http://coastwatch.pfeg.noaa.gov/erddap/
+#&gt; 5    http://erddap.axiomalaska.com/erddap/
+#&gt; 6          http://www.neracoos.org/erddap/
+</span></code></pre>
+</div>
+
+<h2 id="install">Install</h2>
+
+<p>From CRAN</p>
+
+<div class="highlighter-rouge"><pre class="highlight"><code><span class="n">install.packages</span><span class="p">(</span><span class="s2">"rerddap"</span><span class="p">)</span>
+</code></pre>
+</div>
+
+<p>Or development version from GitHub</p>
+
+<div class="highlighter-rouge"><pre class="highlight"><code><span class="n">devtools</span><span class="o">::</span><span class="n">install_github</span><span class="p">(</span><span class="s2">"ropensci/rerddap"</span><span class="p">)</span>
+</code></pre>
+</div>
+
+<div class="highlighter-rouge"><pre class="highlight"><code><span class="n">library</span><span class="p">(</span><span class="s1">'rerddap'</span><span class="p">)</span>
+</code></pre>
+</div>
+
+<h2 id="search">Search</h2>
+
+<p>First, you likely want to search for data, specifying whether to search for either <code class="highlighter-rouge">griddadp</code> or <code class="highlighter-rouge">tabledap</code> datasets. The default is <code class="highlighter-rouge">griddap</code>.</p>
+
+<div class="highlighter-rouge"><pre class="highlight"><code><span class="n">ed_search</span><span class="p">(</span><span class="n">query</span> <span class="o">=</span> <span class="s1">'size'</span><span class="p">,</span> <span class="n">which</span> <span class="o">=</span> <span class="s2">"table"</span><span class="p">)</span>
+<span class="c1">#&gt; 11 results, showing first 20 
+#&gt;                                                                                         title
+#&gt; 1                                                                          CalCOFI Fish Sizes
+#&gt; 2                                                                        CalCOFI Larvae Sizes
+#&gt; 3                Channel Islands, Kelp Forest Monitoring, Size and Frequency, Natural Habitat
+#&gt; 4                                                         CalCOFI Larvae Counts Positive Tows
+#&gt; 5                                                                                CalCOFI Tows
+#&gt; 7                                                  OBIS - ARGOS Satellite Tracking of Animals
+#&gt; 8                                                     GLOBEC NEP MOCNESS Plankton (MOC1) Data
+#&gt; 9                                                 GLOBEC NEP Vertical Plankton Tow (VPT) Data
+#&gt; 10                            NWFSC Observer Fixed Gear Data, off West Coast of US, 2002-2006
+#&gt; 11                                 NWFSC Observer Trawl Data, off West Coast of US, 2002-2006
+#&gt; 12 AN EXPERIMENTAL DATASET: Underway Sea Surface Temperature and Salinity Aboard the Oleander
+#&gt;             dataset_id
+#&gt; 1     erdCalCOFIfshsiz
+#&gt; 2     erdCalCOFIlrvsiz
+#&gt; 3       erdCinpKfmSFNH
+#&gt; 4  erdCalCOFIlrvcntpos
+#&gt; 5       erdCalCOFItows
+#&gt; 7            aadcArgos
+#&gt; 8        erdGlobecMoc1
+#&gt; 9         erdGlobecVpt
+#&gt; 10  nwioosObsFixed2002
+#&gt; 11  nwioosObsTrawl2002
+#&gt; 12            nodcPJJU
+</span></code></pre>
+</div>
+
+<div class="highlighter-rouge"><pre class="highlight"><code><span class="n">ed_search</span><span class="p">(</span><span class="n">query</span> <span class="o">=</span> <span class="s1">'size'</span><span class="p">,</span> <span class="n">which</span> <span class="o">=</span> <span class="s2">"grid"</span><span class="p">)</span>
+<span class="c1">#&gt; 6 results, showing first 20 
+#&gt;                                                                                                   title
+#&gt; 6                                                       NOAA Global Coral Bleaching Monitoring Products
+#&gt; 13        USGS COAWST Forecast, US East Coast and Gulf of Mexico (Experimental) [time][eta_rho][xi_rho]
+#&gt; 14            USGS COAWST Forecast, US East Coast and Gulf of Mexico (Experimental) [time][eta_u][xi_u]
+#&gt; 15            USGS COAWST Forecast, US East Coast and Gulf of Mexico (Experimental) [time][eta_v][xi_v]
+#&gt; 16 USGS COAWST Forecast, US East Coast and Gulf of Mexico (Experimental) [time][s_rho][eta_rho][xi_rho]
+#&gt; 17  USGS COAWST Forecast, US East Coast and Gulf of Mexico (Experimental) [time][Nbed][eta_rho][xi_rho]
+#&gt;             dataset_id
+#&gt; 6             NOAA_DHW
+#&gt; 13 whoi_ed12_89ce_9592
+#&gt; 14 whoi_61c3_0b5d_cd61
+#&gt; 15 whoi_62d0_9d64_c8ff
+#&gt; 16 whoi_7dd7_db97_4bbe
+#&gt; 17 whoi_a4fb_2c9c_16a7
+</span></code></pre>
+</div>
+
+<p>This gives back dataset titles and identifiers - with which you should be able to get a sense for which dataset you may want to fetch.</p>
+
+<h2 id="information">Information</h2>
+
+<p>After searching you can get more information on a single dataset</p>
+
+<div class="highlighter-rouge"><pre class="highlight"><code><span class="n">info</span><span class="p">(</span><span class="s1">'whoi_62d0_9d64_c8ff'</span><span class="p">)</span>
+<span class="c1">#&gt; &lt;ERDDAP info&gt; whoi_62d0_9d64_c8ff 
+#&gt;  Dimensions (range):  
+#&gt;      time: (2012-06-25T01:00:00Z, 2015-06-24T00:00:00Z) 
+#&gt;      eta_v: (0, 334) 
+#&gt;      xi_v: (0, 895) 
+#&gt;  Variables:  
+#&gt;      bedload_Vsand_01: 
+#&gt;          Units: kilogram meter-1 s-1 
+#&gt;      bedload_Vsand_02: 
+#&gt;          Units: kilogram meter-1 s-1 
+</span><span class="k">...</span>
+</code></pre>
+</div>
+
+<p>Which is a simple S3 list but prints out pretty, so it’s easy to quickly scan the printed output and see what you need to see to proceed. That is, in the next step you want to get the dataset, and you’ll want to specify your search using some combination of values for latitude, longitude, and time.</p>
+
+<h2 id="griddap-gridded-data">griddap (gridded) data</h2>
+
+<p>First, get information on a dataset to see time range, lat/long range, and variables.</p>
+
+<div class="highlighter-rouge"><pre class="highlight"><code><span class="p">(</span><span class="n">out</span> <span class="o">&lt;-</span> <span class="n">info</span><span class="p">(</span><span class="s1">'noaa_esrl_027d_0fb5_5d38'</span><span class="p">))</span>
+<span class="c1">#&gt; &lt;ERDDAP info&gt; noaa_esrl_027d_0fb5_5d38 
+#&gt;  Dimensions (range):  
+#&gt;      time: (1850-01-01T00:00:00Z, 2014-05-01T00:00:00Z) 
+#&gt;      latitude: (87.5, -87.5) 
+#&gt;      longitude: (-177.5, 177.5) 
+#&gt;  Variables:  
+#&gt;      air: 
+#&gt;          Range: -20.9, 19.5 
+#&gt;          Units: degC
+</span></code></pre>
+</div>
+
+<p>Then query for gridded data using the <code class="highlighter-rouge">griddap()</code> function</p>
+
+<div class="highlighter-rouge"><pre class="highlight"><code><span class="p">(</span><span class="n">res</span> <span class="o">&lt;-</span> <span class="n">griddap</span><span class="p">(</span><span class="n">out</span><span class="p">,</span>
+  <span class="n">time</span> <span class="o">=</span> <span class="n">c</span><span class="p">(</span><span class="s1">'2012-01-01'</span><span class="p">,</span> <span class="s1">'2012-01-30'</span><span class="p">),</span>
+  <span class="n">latitude</span> <span class="o">=</span> <span class="n">c</span><span class="p">(</span><span class="m">21</span><span class="p">,</span> <span class="m">10</span><span class="p">),</span>
+  <span class="n">longitude</span> <span class="o">=</span> <span class="n">c</span><span class="p">(</span><span class="m">-80</span><span class="p">,</span> <span class="m">-70</span><span class="p">)</span>
+<span class="p">))</span>
+<span class="c1">#&gt; &lt;ERDDAP griddap&gt; noaa_esrl_027d_0fb5_5d38
+#&gt;    Path: [~/.rerddap/648ed11e8b911b65e39eb63c8df339df.nc]
+#&gt;    Last updated: [2015-05-09 08:31:10]
+#&gt;    File size:    [0 mb]
+#&gt;    Dimensions (dims/vars):   [3 X 1]
+#&gt;    Dim names: time, latitude, longitude
+#&gt;    Variable names: CRUTEM3: Surface Air Temperature Monthly Anomaly
+#&gt;    data.frame (rows/columns):   [18 X 4]
+#&gt;                    time latitude longitude  air
+#&gt; 1  2012-01-01T00:00:00Z     22.5     -77.5   NA
+#&gt; 2  2012-01-01T00:00:00Z     22.5     -77.5   NA
+#&gt; 3  2012-01-01T00:00:00Z     22.5     -77.5   NA
+#&gt; 4  2012-01-01T00:00:00Z     22.5     -77.5 -0.1
+#&gt; 5  2012-01-01T00:00:00Z     22.5     -77.5   NA
+#&gt; 6  2012-01-01T00:00:00Z     22.5     -77.5 -0.2
+#&gt; 7  2012-01-01T00:00:00Z     17.5     -72.5  0.2
+#&gt; 8  2012-01-01T00:00:00Z     17.5     -72.5   NA
+#&gt; 9  2012-01-01T00:00:00Z     17.5     -72.5  0.3
+#&gt; 10 2012-02-01T00:00:00Z     17.5     -72.5   NA
+#&gt; ..                  ...      ...       ...  ...
+</span></code></pre>
+</div>
+
+<p>The output of <code class="highlighter-rouge">griddap()</code> is a list that you can explore further. Get the summary</p>
+
+<div class="highlighter-rouge"><pre class="highlight"><code><span class="n">res</span><span class="o">$</span><span class="n">summary</span>
+<span class="c1">#&gt; [1] "file ~/.rerddap/648ed11e8b911b65e39eb63c8df339df.nc has 3 dimensions:"
+#&gt; [1] "time   Size: 2"
+#&gt; [1] "latitude   Size: 3"
+#&gt; [1] "longitude   Size: 3"
+#&gt; [1] "------------------------"
+#&gt; [1] "file ~/.rerddap/648ed11e8b911b65e39eb63c8df339df.nc has 1 variables:"
+#&gt; [1] "float air[longitude,latitude,time]  Longname:CRUTEM3: Surface Air Temperature Monthly Anomaly Missval:-9.96920996838687e+36"
+</span></code></pre>
+</div>
+
+<p>Or get the dimension variables (just the names of the variables for brevity here)</p>
+
+<div class="highlighter-rouge"><pre class="highlight"><code><span class="n">names</span><span class="p">(</span><span class="n">res</span><span class="o">$</span><span class="n">summary</span><span class="o">$</span><span class="n">dim</span><span class="p">)</span>
+<span class="c1">#&gt; [1] "time"      "latitude"  "longitude"
+</span></code></pre>
+</div>
+
+<p>Get the data.frame (beware: you may want to just look at the <code class="highlighter-rouge">head</code> of the data.frame if large)</p>
+
+<div class="highlighter-rouge"><pre class="highlight"><code><span class="n">res</span><span class="o">$</span><span class="n">data</span>
+<span class="c1">#&gt;                    time latitude longitude   air
+#&gt; 1  2012-01-01T00:00:00Z     22.5     -77.5    NA
+#&gt; 2  2012-01-01T00:00:00Z     22.5     -77.5    NA
+#&gt; 3  2012-01-01T00:00:00Z     22.5     -77.5    NA
+#&gt; 4  2012-01-01T00:00:00Z     22.5     -77.5 -0.10
+#&gt; 5  2012-01-01T00:00:00Z     22.5     -77.5    NA
+#&gt; 6  2012-01-01T00:00:00Z     22.5     -77.5 -0.20
+#&gt; 7  2012-01-01T00:00:00Z     17.5     -72.5  0.20
+#&gt; 8  2012-01-01T00:00:00Z     17.5     -72.5    NA
+#&gt; 9  2012-01-01T00:00:00Z     17.5     -72.5  0.30
+#&gt; 10 2012-02-01T00:00:00Z     17.5     -72.5    NA
+#&gt; 11 2012-02-01T00:00:00Z     17.5     -72.5    NA
+#&gt; 12 2012-02-01T00:00:00Z     17.5     -72.5    NA
+#&gt; 13 2012-02-01T00:00:00Z     12.5     -67.5  0.40
+#&gt; 14 2012-02-01T00:00:00Z     12.5     -67.5    NA
+#&gt; 15 2012-02-01T00:00:00Z     12.5     -67.5  0.20
+#&gt; 16 2012-02-01T00:00:00Z     12.5     -67.5  0.00
+#&gt; 17 2012-02-01T00:00:00Z     12.5     -67.5    NA
+#&gt; 18 2012-02-01T00:00:00Z     12.5     -67.5  0.32
+</span></code></pre>
+</div>
+
+<p>You can actually still explore the original netcdf summary object, e.g.,</p>
+
+<div class="highlighter-rouge"><pre class="highlight"><code><span class="n">res</span><span class="o">$</span><span class="n">summary</span><span class="o">$</span><span class="n">dim</span><span class="o">$</span><span class="n">time</span>
+<span class="c1">#&gt; $name
+#&gt; [1] "time"
+#&gt; 
+#&gt; $len
+#&gt; [1] 2
+#&gt; 
+#&gt; $unlim
+#&gt; [1] FALSE
+#&gt; 
+#&gt; $id
+#&gt; [1] 1
+#&gt; 
+#&gt; $dimvarid
+#&gt; [1] 1
+#&gt; 
+#&gt; $units
+#&gt; [1] "seconds since 1970-01-01T00:00:00Z"
+#&gt; 
+#&gt; $vals
+#&gt; [1] 1325376000 1328054400
+#&gt; 
+#&gt; $create_dimvar
+#&gt; [1] TRUE
+#&gt; 
+#&gt; attr(,"class")
+#&gt; [1] "dim.ncdf"
+</span></code></pre>
+</div>
+
+<h2 id="tabledap-tabular-data">tabledap (tabular) data</h2>
+
+<p><code class="highlighter-rouge">tabledap</code> is data that is not gridded by lat/lon/time. In addition, the query interface is a bit different. Notice that you can do less than, more than, equal to type queries, but they are specified as character strings.</p>
+
+<div class="highlighter-rouge"><pre class="highlight"><code><span class="p">(</span><span class="n">out</span> <span class="o">&lt;-</span> <span class="n">info</span><span class="p">(</span><span class="s1">'erdCalCOFIfshsiz'</span><span class="p">))</span>
+<span class="c1">#&gt; &lt;ERDDAP info&gt; erdCalCOFIfshsiz 
+#&gt;  Variables:  
+#&gt;      calcofi_species_code: 
+#&gt;          Range: 19, 1550 
+#&gt;      common_name: 
+#&gt;      cruise: 
+#&gt;      fish_1000m3: 
+#&gt;          Units: Fish per 1,000 cubic meters of water sampled 
+#&gt;      fish_count: 
+#&gt;      fish_size: 
+</span><span class="k">...</span>
+</code></pre>
+</div>
+
+<div class="highlighter-rouge"><pre class="highlight"><code><span class="p">(</span><span class="n">dat</span> <span class="o">&lt;-</span> <span class="n">tabledap</span><span class="p">(</span><span class="n">out</span><span class="p">,</span> <span class="s1">'time&gt;=2001-07-07'</span><span class="p">,</span> <span class="s1">'time&lt;=2001-07-10'</span><span class="p">,</span> 
+                 <span class="n">fields</span> <span class="o">=</span> <span class="n">c</span><span class="p">(</span><span class="s1">'longitude'</span><span class="p">,</span> <span class="s1">'latitude'</span><span class="p">,</span> <span class="s1">'fish_size'</span><span class="p">,</span> <span class="s1">'itis_tsn'</span><span class="p">,</span> <span class="s1">'scientific_name'</span><span class="p">)))</span>
+<span class="c1">#&gt; &lt;ERDDAP tabledap&gt; erdCalCOFIfshsiz
+#&gt;    Path: [~/.rerddap/f013f9ee09bdb4184928d533e575e948.csv]
+#&gt;    Last updated: [2015-05-09 08:31:21]
+#&gt;    File size:    [0.03 mb]
+#&gt;    Dimensions:   [558 X 5]
+#&gt; 
+#&gt;     longitude  latitude fish_size itis_tsn       scientific_name
+#&gt; 2     -118.26    33.255      22.9   623745 Nannobrachium ritteri
+#&gt; 3     -118.26    33.255      22.9   623745 Nannobrachium ritteri
+#&gt; 4  -118.10667 32.738335      31.5   623625  Lipolagus ochotensis
+#&gt; 5  -118.10667 32.738335      48.3   623625  Lipolagus ochotensis
+#&gt; 6  -118.10667 32.738335      15.5   162221 Argyropelecus sladeni
+#&gt; 7  -118.10667 32.738335      16.3   162221 Argyropelecus sladeni
+#&gt; 8  -118.10667 32.738335      17.8   162221 Argyropelecus sladeni
+#&gt; 9  -118.10667 32.738335      18.2   162221 Argyropelecus sladeni
+#&gt; 10 -118.10667 32.738335      19.2   162221 Argyropelecus sladeni
+#&gt; 11 -118.10667 32.738335      20.0   162221 Argyropelecus sladeni
+#&gt; ..        ...       ...       ...      ...                   ...
+</span></code></pre>
+</div>
+
+<p>Since both <code class="highlighter-rouge">griddap()</code> and <code class="highlighter-rouge">tabledap()</code> give back data.frame’s, it’s easy to do downstream manipulation. For example, we can use <code class="highlighter-rouge">dplyr</code> to filter, summarize, group, and sort:</p>
+
+<div class="highlighter-rouge"><pre class="highlight"><code><span class="n">library</span><span class="p">(</span><span class="s2">"dplyr"</span><span class="p">)</span>
+<span class="n">dat</span><span class="o">$</span><span class="n">fish_size</span> <span class="o">&lt;-</span> <span class="n">as.numeric</span><span class="p">(</span><span class="n">dat</span><span class="o">$</span><span class="n">fish_size</span><span class="p">)</span>
+<span class="n">df</span> <span class="o">&lt;-</span> <span class="n">tbl_df</span><span class="p">(</span><span class="n">dat</span><span class="p">)</span> <span class="o">%&gt;%</span> 
+  <span class="n">filter</span><span class="p">(</span><span class="n">fish_size</span> <span class="o">&gt;</span> <span class="m">30</span><span class="p">)</span> <span class="o">%&gt;%</span> 
+  <span class="n">group_by</span><span class="p">(</span><span class="n">scientific_name</span><span class="p">)</span> <span class="o">%&gt;%</span> 
+  <span class="n">summarise</span><span class="p">(</span><span class="n">mean_size</span> <span class="o">=</span> <span class="n">mean</span><span class="p">(</span><span class="n">fish_size</span><span class="p">))</span> <span class="o">%&gt;%</span> 
+  <span class="n">arrange</span><span class="p">(</span><span class="n">desc</span><span class="p">(</span><span class="n">mean_size</span><span class="p">))</span>
+<span class="n">df</span>
+<span class="c1">#&gt; Source: local data frame [20 x 2]
+#&gt; 
+#&gt;                 scientific_name mean_size
+#&gt; 1       Idiacanthus antrostomus 253.00000
+#&gt; 2            Stomias atriventer 189.25000
+#&gt; 3            Lestidiops ringens  98.70000
+#&gt; 4     Tarletonbeania crenularis  56.50000
+#&gt; 5      Ceratoscopelus townsendi  53.70000
+#&gt; 6     Stenobrachius leucopsarus  47.74538
+#&gt; 7               Sardinops sagax  47.00000
+#&gt; 8         Nannobrachium ritteri  43.30250
+#&gt; 9         Bathylagoides wesethi  43.09167
+#&gt; 10         Vinciguerria lucetia  42.00000
+#&gt; 11       Cyclothone acclinidens  40.80000
+#&gt; 12         Lipolagus ochotensis  39.72500
+#&gt; 13        Leuroglossus stilbius  38.35385
+#&gt; 14        Triphoturus mexicanus  38.21342
+#&gt; 15                Diaphus theta  37.88571
+#&gt; 16       Trachipterus altivelis  37.70000
+#&gt; 17 Symbolophorus californiensis  37.66000
+#&gt; 18         Nannobrachium regale  37.50000
+#&gt; 19         Merluccius productus  36.61333
+#&gt; 20        Argyropelecus sladeni  32.43333
+</span></code></pre>
+</div>
+
+<p>Then make a cute little plot</p>
+
+<div class="highlighter-rouge"><pre class="highlight"><code><span class="n">library</span><span class="p">(</span><span class="s2">"ggplot2"</span><span class="p">)</span>
+<span class="n">ggplot</span><span class="p">(</span><span class="n">df</span><span class="p">,</span> <span class="n">aes</span><span class="p">(</span><span class="n">reorder</span><span class="p">(</span><span class="n">scientific_name</span><span class="p">,</span> <span class="n">mean_size</span><span class="p">),</span> <span class="n">mean_size</span><span class="p">))</span> <span class="o">+</span>
+  <span class="n">geom_bar</span><span class="p">(</span><span class="n">stat</span> <span class="o">=</span> <span class="s2">"identity"</span><span class="p">)</span> <span class="o">+</span>
+  <span class="n">coord_flip</span><span class="p">()</span> <span class="o">+</span> 
+  <span class="n">theme_grey</span><span class="p">(</span><span class="n">base_size</span> <span class="o">=</span> <span class="m">20</span><span class="p">)</span> <span class="o">+</span>
+  <span class="n">labs</span><span class="p">(</span><span class="n">y</span> <span class="o">=</span> <span class="s2">"Mean Size"</span><span class="p">,</span> <span class="n">x</span> <span class="o">=</span> <span class="s2">"Species"</span><span class="p">)</span>
+</code></pre>
+</div>
+
+<p><img src="/public/img/2015-06-24-rerddap/unnamed-chunk-19-1.png" alt="plot of chunk unnamed-chunk-19" /></p>
+
+  </div>
+  
+  <div class="post">
+    <h1>
       <a href="/2015/06/idigbio-in-spocc/">
         iDigBio - a new data source in spocc
       </a>
@@ -399,464 +754,6 @@ have no lat/long data, some have no address data.</p>
   <li>Surely there are many datasets that won’t work in <code class="highlighter-rouge">oa_combine()</code> - gotta go through many more.</li>
   <li>An easy viz function wrapping <code class="highlighter-rouge">leaflet</code></li>
   <li>Since you can get a lot of spatial data quickly, easy way to visualize big data, maybe marker clusters?</li>
-</ul>
-
-  </div>
-  
-  <div class="post">
-    <h1>
-      <a href="/2015/05/mow-the-lawn/">
-        lawn - a new package to do geospatial analysis
-      </a>
-    </h1>
-
-    <span class="post-date">18 May 2015</span>
-
-    <p><code class="highlighter-rouge">lawn</code> is an R wrapper for the Javascript library <a href="http://turfjs.org/">turf.js</a> for advanced geospatial analysis. In addition, we have a few functions to interface with the <a href="https://github.com/mapbox/geojson-random">geojson-random</a> Javascript library.</p>
-
-<p><code class="highlighter-rouge">lawn</code> includes traditional spatial operations, helper functions for creating GeoJSON data, and data classification and statistics tools.</p>
-
-<p>There is an additional helper function (see <code class="highlighter-rouge">view()</code>) in this package to help visualize data with interactive maps via the <code class="highlighter-rouge">leaflet</code> package (<a href="https://github.com/rstudio/leaflet">https://github.com/rstudio/leaflet</a>). Note that <code class="highlighter-rouge">leaflet</code> is not required to install <code class="highlighter-rouge">lawn</code> - it’s in Suggests, not Imports or Depends.</p>
-
-<p>Use cases for this package include (but not limited to, obs.) the following (all below assumes GeoJSON format):</p>
-
-<ul>
-  <li>Create random spatial data.</li>
-  <li>Convert among spatial data types (e.g. <code class="highlighter-rouge">Polygon</code> to <code class="highlighter-rouge">FeatureCollection</code>)</li>
-  <li>Transform objects, including merging many, simplifying, calculating hulls, etc.</li>
-  <li>Measuring objects</li>
-  <li>Performing interpolation of objects</li>
-  <li>Aggregating data (aka properties) associated with objects</li>
-</ul>
-
-<h2 id="install">Install</h2>
-
-<p>Stable <code class="highlighter-rouge">lawn</code> version from CRAN - this should fetch <code class="highlighter-rouge">leaflet</code>, which is not on CRAN, but in a <code class="highlighter-rouge">drat</code> repo (let me know if it doesn’t)</p>
-
-<div class="highlighter-rouge"><pre class="highlight"><code><span class="n">install.packages</span><span class="p">(</span><span class="s2">"lawn"</span><span class="p">)</span>
-</code></pre>
-</div>
-
-<p>Or, the development version from Github</p>
-
-<div class="highlighter-rouge"><pre class="highlight"><code><span class="n">devtools</span><span class="o">::</span><span class="n">install_github</span><span class="p">(</span><span class="s2">"ropensci/lawn"</span><span class="p">)</span>
-</code></pre>
-</div>
-
-<div class="highlighter-rouge"><pre class="highlight"><code><span class="n">library</span><span class="p">(</span><span class="s2">"lawn"</span><span class="p">)</span>
-</code></pre>
-</div>
-
-<h2 id="view">view</h2>
-
-<p><code class="highlighter-rouge">lawn</code> includes a tiny helper function for visualizing geojson. For examples below, we’ll make liberal use of the <code class="highlighter-rouge">lawn::view()</code> function to visualize what it is the heck we’re doing. mkay, lets roll…</p>
-
-<p>We’ve tried to make <code class="highlighter-rouge">view()</code> work with as many inputs as possible, from class <code class="highlighter-rouge">character</code> containing
-json to the class <code class="highlighter-rouge">json</code> from the <code class="highlighter-rouge">jsonlite</code> package, to the class <code class="highlighter-rouge">list</code> to all of the GeoJSON outputs
-from functions in <code class="highlighter-rouge">lawn</code>.</p>
-
-<div class="highlighter-rouge"><pre class="highlight"><code><span class="n">view</span><span class="p">(</span><span class="n">lawn_data</span><span class="o">$</span><span class="n">points_average</span><span class="p">)</span>
-</code></pre>
-</div>
-
-<p><img src="/public/img/2015-05-18-mow-the-lawn/map1.png" alt="map1" /></p>
-
-<p>Here, we sample at random two points from the same dataset just viewed.</p>
-
-<div class="highlighter-rouge"><pre class="highlight"><code><span class="n">lawn_sample</span><span class="p">(</span><span class="n">lawn_data</span><span class="o">$</span><span class="n">points_average</span><span class="p">,</span> <span class="m">2</span><span class="p">)</span> <span class="o">%&gt;%</span> <span class="n">view</span><span class="p">()</span>
-</code></pre>
-</div>
-
-<p><img src="/public/img/2015-05-18-mow-the-lawn/map2.png" alt="map2" /></p>
-
-<h2 id="make-some-geojson-data">Make some geojson data</h2>
-
-<p>Point</p>
-
-<div class="highlighter-rouge"><pre class="highlight"><code><span class="n">lawn_point</span><span class="p">(</span><span class="n">c</span><span class="p">(</span><span class="m">-74.5</span><span class="p">,</span> <span class="m">40</span><span class="p">))</span>
-<span class="c1">#&gt; $type
-#&gt; [1] "Feature"
-#&gt; 
-#&gt; $geometry
-#&gt; $geometry$type
-#&gt; [1] "Point"
-#&gt; 
-#&gt; $geometry$coordinates
-#&gt; [1] -74.5  40.0
-#&gt; 
-#&gt; 
-#&gt; $properties
-#&gt; named list()
-#&gt; 
-#&gt; attr(,"class")
-#&gt; [1] "point"
-</span></code></pre>
-</div>
-
-<div class="highlighter-rouge"><pre class="highlight"><code><span class="n">lawn_point</span><span class="p">(</span><span class="n">c</span><span class="p">(</span><span class="m">-74.5</span><span class="p">,</span> <span class="m">40</span><span class="p">))</span> <span class="o">%&gt;%</span> <span class="n">view</span>
-</code></pre>
-</div>
-
-<p><img src="/public/img/2015-05-18-mow-the-lawn/point.png" alt="point" /></p>
-
-<p>Polygon</p>
-
-<div class="highlighter-rouge"><pre class="highlight"><code><span class="n">rings</span> <span class="o">&lt;-</span> <span class="n">list</span><span class="p">(</span><span class="n">list</span><span class="p">(</span>
-  <span class="n">c</span><span class="p">(</span><span class="m">-2.275543</span><span class="p">,</span> <span class="m">53.464547</span><span class="p">),</span>
-  <span class="n">c</span><span class="p">(</span><span class="m">-2.275543</span><span class="p">,</span> <span class="m">53.489271</span><span class="p">),</span>
-  <span class="n">c</span><span class="p">(</span><span class="m">-2.215118</span><span class="p">,</span> <span class="m">53.489271</span><span class="p">),</span>
-  <span class="n">c</span><span class="p">(</span><span class="m">-2.215118</span><span class="p">,</span> <span class="m">53.464547</span><span class="p">),</span>
-  <span class="n">c</span><span class="p">(</span><span class="m">-2.275543</span><span class="p">,</span> <span class="m">53.464547</span><span class="p">)</span>
-<span class="p">))</span>
-<span class="n">lawn_polygon</span><span class="p">(</span><span class="n">rings</span><span class="p">)</span>
-<span class="c1">#&gt; $type
-#&gt; [1] "Feature"
-#&gt; 
-#&gt; $geometry
-#&gt; $geometry$type
-#&gt; [1] "Polygon"
-#&gt; 
-#&gt; $geometry$coordinates
-#&gt; , , 1
-#&gt; 
-#&gt;           [,1]      [,2]      [,3]      [,4]      [,5]
-#&gt; [1,] -2.275543 -2.275543 -2.215118 -2.215118 -2.275543
-#&gt; 
-#&gt; , , 2
-#&gt; 
-#&gt;          [,1]     [,2]     [,3]     [,4]     [,5]
-#&gt; [1,] 53.46455 53.48927 53.48927 53.46455 53.46455
-#&gt; 
-#&gt; 
-#&gt; 
-#&gt; $properties
-#&gt; named list()
-#&gt; 
-#&gt; attr(,"class")
-#&gt; [1] "polygon"
-</span></code></pre>
-</div>
-
-<div class="highlighter-rouge"><pre class="highlight"><code><span class="n">lawn_polygon</span><span class="p">(</span><span class="n">rings</span><span class="p">)</span> <span class="o">%&gt;%</span> <span class="n">view</span>
-</code></pre>
-</div>
-
-<p><img src="/public/img/2015-05-18-mow-the-lawn/polygon.png" alt="polygon" /></p>
-
-<p>Random set of points</p>
-
-<div class="highlighter-rouge"><pre class="highlight"><code><span class="n">lawn_random</span><span class="p">(</span><span class="n">n</span> <span class="o">=</span> <span class="m">2</span><span class="p">)</span>
-<span class="c1">#&gt; $type
-#&gt; [1] "FeatureCollection"
-#&gt; 
-#&gt; $features
-#&gt;      type geometry.type  geometry.coordinates
-#&gt; 1 Feature         Point -137.46327, -63.46154
-#&gt; 2 Feature         Point  -110.68426, 83.10533
-#&gt; 
-#&gt; attr(,"class")
-#&gt; [1] "featurecollection"
-</span></code></pre>
-</div>
-
-<div class="highlighter-rouge"><pre class="highlight"><code><span class="n">lawn_random</span><span class="p">(</span><span class="n">n</span> <span class="o">=</span> <span class="m">5</span><span class="p">)</span> <span class="o">%&gt;%</span> <span class="n">view</span>
-</code></pre>
-</div>
-
-<p><img src="/public/img/2015-05-18-mow-the-lawn/lawn_random.png" alt="rand1" /></p>
-
-<p>Or, use a different Javascript library (<a href="https://github.com/mapbox/geojson-random">geojson-random</a>) to create random features.</p>
-
-<p>Positions</p>
-
-<div class="highlighter-rouge"><pre class="highlight"><code><span class="n">gr_position</span><span class="p">()</span>
-<span class="c1">#&gt; [1] -179.77996   45.99018
-</span></code></pre>
-</div>
-
-<p>Points</p>
-
-<div class="highlighter-rouge"><pre class="highlight"><code><span class="n">gr_point</span><span class="p">(</span><span class="m">2</span><span class="p">)</span>
-<span class="c1">#&gt; $type
-#&gt; [1] "FeatureCollection"
-#&gt; 
-#&gt; $features
-#&gt;      type geometry.type geometry.coordinates
-#&gt; 1 Feature         Point   5.83895, -27.77218
-#&gt; 2 Feature         Point   78.50177, 14.95840
-#&gt; 
-#&gt; attr(,"class")
-#&gt; [1] "featurecollection"
-</span></code></pre>
-</div>
-
-<div class="highlighter-rouge"><pre class="highlight"><code><span class="n">gr_point</span><span class="p">(</span><span class="m">2</span><span class="p">)</span> <span class="o">%&gt;%</span> <span class="n">view</span>
-</code></pre>
-</div>
-
-<p><img src="/public/img/2015-05-18-mow-the-lawn/geojsonrandom_points.png" alt="rand2" /></p>
-
-<p>Polygons</p>
-
-<div class="highlighter-rouge"><pre class="highlight"><code><span class="n">gr_polygon</span><span class="p">(</span><span class="n">n</span> <span class="o">=</span> <span class="m">1</span><span class="p">,</span> <span class="n">vertices</span> <span class="o">=</span> <span class="m">5</span><span class="p">,</span> <span class="n">max_radial_length</span> <span class="o">=</span> <span class="m">5</span><span class="p">)</span>
-<span class="c1">#&gt; $type
-#&gt; [1] "FeatureCollection"
-#&gt; 
-#&gt; $features
-#&gt;      type geometry.type
-#&gt; 1 Feature       Polygon
-#&gt;                                                                                                           geometry.coordinates
-#&gt; 1 67.58827, 67.68551, 67.00091, 66.70156, 65.72578, 67.58827, -42.11340, -42.69850, -43.54866, -42.42758, -41.76731, -42.11340
-#&gt; 
-#&gt; attr(,"class")
-#&gt; [1] "featurecollection"
-</span></code></pre>
-</div>
-
-<div class="highlighter-rouge"><pre class="highlight"><code><span class="n">gr_polygon</span><span class="p">(</span><span class="n">n</span> <span class="o">=</span> <span class="m">1</span><span class="p">,</span> <span class="n">vertices</span> <span class="o">=</span> <span class="m">5</span><span class="p">,</span> <span class="n">max_radial_length</span> <span class="o">=</span> <span class="m">5</span><span class="p">)</span> <span class="o">%&gt;%</span> <span class="n">view</span>
-</code></pre>
-</div>
-
-<p><img src="/public/img/2015-05-18-mow-the-lawn/geojsonrandom_polygons.png" alt="rand3" /></p>
-
-<h2 id="count">count</h2>
-
-<p>Count number of points within polygons, appends a new field to properties (see the <code class="highlighter-rouge">count</code> field)</p>
-
-<div class="highlighter-rouge"><pre class="highlight"><code><span class="n">lawn_count</span><span class="p">(</span><span class="n">polygons</span> <span class="o">=</span> <span class="n">lawn_data</span><span class="o">$</span><span class="n">polygons_count</span><span class="p">,</span> <span class="n">points</span> <span class="o">=</span> <span class="n">lawn_data</span><span class="o">$</span><span class="n">points_count</span><span class="p">)</span>
-<span class="c1">#&gt; $type
-#&gt; [1] "FeatureCollection"
-#&gt; 
-#&gt; $features
-#&gt;      type pt_count geometry.type
-#&gt; 1 Feature        2       Polygon
-#&gt; 2 Feature        0       Polygon
-#&gt;                                                                                           geometry.coordinates
-#&gt; 1 -112.07239, -112.07239, -112.02810, -112.02810, -112.07239, 46.58659, 46.61761, 46.61761, 46.58659, 46.58659
-#&gt; 2 -112.02398, -112.02398, -111.96613, -111.96613, -112.02398, 46.57043, 46.61502, 46.61502, 46.57043, 46.57043
-#&gt; 
-#&gt; attr(,"class")
-#&gt; [1] "featurecollection"
-</span></code></pre>
-</div>
-
-<h2 id="distance">distance</h2>
-
-<p>Define two points</p>
-
-<div class="highlighter-rouge"><pre class="highlight"><code><span class="n">from</span> <span class="o">&lt;-</span> <span class="s1">'{
- "type": "Feature",
- "properties": {},
- "geometry": {
-   "type": "Point",
-   "coordinates": [-75.343, 39.984]
- }
-}'</span>
-<span class="n">to</span> <span class="o">&lt;-</span> <span class="s1">'{
-  "type": "Feature",
-  "properties": {},
-  "geometry": {
-    "type": "Point",
-    "coordinates": [-75.534, 39.123]
-  }
-}'</span>
-</code></pre>
-</div>
-
-<p>Calculate distance, default units is kilometers (default output: <code class="highlighter-rouge">km</code>)</p>
-
-<div class="highlighter-rouge"><pre class="highlight"><code><span class="n">lawn_distance</span><span class="p">(</span><span class="n">from</span><span class="p">,</span> <span class="n">to</span><span class="p">)</span>
-<span class="c1">#&gt; [1] 97.15958
-</span></code></pre>
-</div>
-
-<h2 id="sample-from-a-featurecollection">sample from a FeatureCollection</h2>
-
-<div class="highlighter-rouge"><pre class="highlight"><code><span class="n">dat</span> <span class="o">&lt;-</span> <span class="n">lawn_data</span><span class="o">$</span><span class="n">points_average</span>
-<span class="n">cat</span><span class="p">(</span><span class="n">dat</span><span class="p">)</span>
-<span class="c1">#&gt; {
-#&gt;   "type": "FeatureCollection",
-#&gt;   "features": [
-#&gt;     {
-#&gt;       "type": "Feature",
-#&gt;       "properties": {
-#&gt;         "population": 200
-#&gt;       },
-#&gt;       "geometry": {
-#&gt;         "type": "Point",
-</span><span class="k">...</span>
-</code></pre>
-</div>
-
-<p>Sample 2 points at random</p>
-
-<div class="highlighter-rouge"><pre class="highlight"><code><span class="n">lawn_sample</span><span class="p">(</span><span class="n">dat</span><span class="p">,</span> <span class="m">2</span><span class="p">)</span>
-<span class="c1">#&gt; $type
-#&gt; [1] "FeatureCollection"
-#&gt; 
-#&gt; $features
-#&gt;      type population geometry.type geometry.coordinates
-#&gt; 1 Feature        200         Point   10.80643, 59.90891
-#&gt; 2 Feature        600         Point   10.71579, 59.90478
-#&gt; 
-#&gt; attr(,"class")
-#&gt; [1] "featurecollection"
-</span></code></pre>
-</div>
-
-<h2 id="extent">extent</h2>
-
-<p>Calculates the extent of all input features in a FeatureCollection, and returns a bounding box.</p>
-
-<div class="highlighter-rouge"><pre class="highlight"><code><span class="n">lawn_extent</span><span class="p">(</span><span class="n">lawn_data</span><span class="o">$</span><span class="n">points_average</span><span class="p">)</span>
-<span class="c1">#&gt; [1] 10.71579 59.90478 10.80643 59.93162
-</span></code></pre>
-</div>
-
-<h2 id="buffer">buffer</h2>
-
-<p>Calculates a buffer for input features for a given radius.</p>
-
-<div class="highlighter-rouge"><pre class="highlight"><code><span class="n">dat</span> <span class="o">&lt;-</span> <span class="s1">'{
- "type": "Feature",
- "properties": {},
- "geometry": {
-     "type": "Polygon",
-     "coordinates": [[
-       [-112.072391,46.586591],
-       [-112.072391,46.61761],
-       [-112.028102,46.61761],
-       [-112.028102,46.586591],
-       [-112.072391,46.586591]
-     ]]
-   }
-}'</span>
-<span class="n">view</span><span class="p">(</span><span class="n">dat</span><span class="p">)</span>
-</code></pre>
-</div>
-
-<p><img src="/public/img/2015-05-18-mow-the-lawn/buffer1.png" alt="buffer1" /></p>
-
-<div class="highlighter-rouge"><pre class="highlight"><code><span class="n">lawn_buffer</span><span class="p">(</span><span class="n">dat</span><span class="p">,</span> <span class="m">1</span><span class="p">,</span> <span class="s2">"miles"</span><span class="p">)</span> <span class="o">%&gt;%</span> <span class="n">view</span>
-</code></pre>
-</div>
-
-<p><img src="/public/img/2015-05-18-mow-the-lawn/buffer2.png" alt="buffer2" /></p>
-
-<h2 id="union-polygons-together">Union polygons together</h2>
-
-<div class="highlighter-rouge"><pre class="highlight"><code><span class="n">poly1</span> <span class="o">&lt;-</span> <span class="s1">'{
- "type": "Feature",
- "properties": {
-   "fill": "#0f0"
- },
- "geometry": {
-   "type": "Polygon",
-   "coordinates": [[
-     [-122.801742, 45.48565],
-     [-122.801742, 45.60491],
-     [-122.584762, 45.60491],
-     [-122.584762, 45.48565],
-     [-122.801742, 45.48565]
-    ]]
- }
-}'</span>
-
-<span class="n">poly2</span> <span class="o">&lt;-</span> <span class="s1">'{
- "type": "Feature",
- "properties": {
-   "fill": "#00f"
- },
- "geometry": {
-   "type": "Polygon",
-   "coordinates": [[
-     [-122.520217, 45.535693],
-     [-122.64038, 45.553967],
-     [-122.720031, 45.526554],
-     [-122.669906, 45.507309],
-     [-122.723464, 45.446643],
-     [-122.532577, 45.408574],
-     [-122.487258, 45.477466],
-     [-122.520217, 45.535693]
-     ]]
- }
-}'</span>
-<span class="n">view</span><span class="p">(</span><span class="n">poly1</span><span class="p">)</span>
-</code></pre>
-</div>
-
-<p><img src="/public/img/2015-05-18-mow-the-lawn/union1.png" alt="union1" /></p>
-
-<div class="highlighter-rouge"><pre class="highlight"><code><span class="n">view</span><span class="p">(</span><span class="n">poly2</span><span class="p">)</span>
-</code></pre>
-</div>
-
-<p><img src="/public/img/2015-05-18-mow-the-lawn/union2.png" alt="union2" /></p>
-
-<p>Visualize union-ed polygons</p>
-
-<div class="highlighter-rouge"><pre class="highlight"><code><span class="n">lawn_union</span><span class="p">(</span><span class="n">poly1</span><span class="p">,</span> <span class="n">poly2</span><span class="p">)</span> <span class="o">%&gt;%</span> <span class="n">view</span>
-</code></pre>
-</div>
-
-<p><img src="/public/img/2015-05-18-mow-the-lawn/union3.png" alt="union3" /></p>
-
-<p>See also <code class="highlighter-rouge">lawn_merge()</code> and <code class="highlighter-rouge">lawn_intersect()</code>.</p>
-
-<h2 id="lint-input-geojson">lint input geojson</h2>
-
-<p>For most functions, you can lint your input geojson data to make sure it is proper geojson. We use 
-the javascript library <a href="https://github.com/mapbox/geojsonhint">geojsonhint</a>. See the <code class="highlighter-rouge">lint</code> parameter.</p>
-
-<p>Good GeoJSON</p>
-
-<div class="highlighter-rouge"><pre class="highlight"><code><span class="n">dat</span> <span class="o">&lt;-</span> <span class="s1">'{
-  "type": "FeatureCollection",
-  "features": [
-    {
-      "type": "Feature",
-      "properties": {
-        "population": 200
-      },
-      "geometry": {
-        "type": "Point",
-        "coordinates": [10.724029, 59.926807]
-      }
-    }
-  ]
-}'</span>
-<span class="n">lawn_extent</span><span class="p">(</span><span class="n">dat</span><span class="p">)</span>
-<span class="c1">#&gt; [1] 10.72403 59.92681 10.72403 59.92681
-</span></code></pre>
-</div>
-
-<p>Bad GeoJSON</p>
-
-<div class="highlighter-rouge"><pre class="highlight"><code><span class="n">dat</span> <span class="o">&lt;-</span> <span class="s1">'{
-  "type": "FeatureCollection",
-  "features": [
-    {
-      "type": "Feature",
-      "properties": {
-        "population": 200
-      },
-      "geometry": {
-        "type": "Point"
-      }
-    }
-  ]
-}'</span>
-<span class="n">lawn_extent</span><span class="p">(</span><span class="n">dat</span><span class="p">,</span> <span class="n">lint</span> <span class="o">=</span> <span class="n">TRUE</span><span class="p">)</span>
-
-<span class="c1">#&gt; Error: Line 1 - "coordinates" property required
-</span></code></pre>
-</div>
-
-<h2 id="to-do">To do</h2>
-
-<ul>
-  <li>As Turf.js changes, we’ll update <code class="highlighter-rouge">lawn</code></li>
-  <li>Performance improvements. We realize that this package is slower than the C based <code class="highlighter-rouge">rgdal</code>/<code class="highlighter-rouge">rgeos</code> - we are looking into ways to increaes performance to get closer to the performance of those packages.</li>
 </ul>
 
   </div>

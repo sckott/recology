@@ -61,6 +61,140 @@
   
   <div class="post">
     <h1>
+      <a href="/2016/03/hey-there/">
+        heythere - a robot to automate GitHub issue comments
+      </a>
+    </h1>
+
+    <span class="post-date">24 Mar 2016</span>
+
+    <p>GitHub issues are great for humans to correspond over software, or any other project. At rOpenSci we use an issue based software review system (<a href="https://github.com/ropensci/onboarding">ropensci/onboarding</a>). Software authors and reviewers go back and forth on the software, making a better product in the end.</p>
+
+<p>We have a relatively small number of pieces of software under review at any one time compared to e.g., scientific journals - however, even with the small number, we as organizers, and authors and reviewers can forget things. For example:</p>
+
+<ul>
+  <li>an organizer can forget to remind a reviewer to get a review in</li>
+  <li>a reviewer can forget about a review, and may benefit from a friendly reminder</li>
+  <li>an author may forget about updating software based on the review</li>
+</ul>
+
+<p>As we are managing more package submissions through our system, automated things done by machine, or robot, will be increasingly helpful to keep the system moving smoothly.</p>
+
+<p>A big red flag with automated systems is the annoyance factor. We can try to be smart about this and only remind people when it’s really needed.</p>
+
+<p>I’ve been working on a thing for a while now, it’s called <code class="highlighter-rouge">heythere</code>. It’s a Ruby application that is currently set up to run on Heroku, though you could run it anywhere you want. It’s running right now once per day to check to see if it should send any reminders to organizers, authors, reviewers.</p>
+
+<p><code class="highlighter-rouge">heythere</code> on GitHub: <a href="https://github.com/ropenscilabs/heythere">ropenscilabs/heythere</a></p>
+
+<h2 id="how-it-works">How it works</h2>
+
+<p><code class="highlighter-rouge">heythere</code> is controlled through a series of environment variables that controls GitHub authentication, the first day post reviewer assignment when a reminder should be sent, how many days after reviews are submitted to ask if the author needs any help, and more. Check out the <a href="https://github.com/ropenscilabs/heythere">repo</a> for all the env var options.</p>
+
+<p>The Ruby app can be run via a rake task from the command line, or triggered with a scheduler on something like Heroku.</p>
+
+<p>When the app runs, we look for environment variables that you set. If we don’t find them we use sensible defaults.</p>
+
+<p>Using the env vars, we grab the issues for the repository you chose, limit to a subset of your choosing based on a series of labels, then compare dates on comments compared to your env vars, and either skip or send of comments on issues.</p>
+
+<p>We use <a href="https://github.com/octokit/octokit.rb">ockokit</a> under the hood to work with GitHub issues.</p>
+
+<h2 id="how-to-use-it">How to use it</h2>
+
+<h3 id="clone">clone</h3>
+
+<div class="highlighter-rouge"><pre class="highlight"><code>git clone git@github.com:ropenscilabs/heythere.git
+cd heythere
+</code></pre>
+</div>
+
+<h3 id="setup">setup</h3>
+
+<p>Change the repo in <code class="highlighter-rouge">Rakefile</code> to whatever your repository is.</p>
+
+<div class="highlighter-rouge"><pre class="highlight"><code>Heythere.hey_there(repo = 'ropensci/onboarding')
+</code></pre>
+</div>
+
+<p>Create the app (use a different name, of course)</p>
+
+<div class="highlighter-rouge"><pre class="highlight"><code>heroku apps:create ropensci-hey-there
+</code></pre>
+</div>
+
+<p>Add the repository that you are targeting:</p>
+
+<div class="highlighter-rouge"><pre class="highlight"><code>heroku config:add HEYTHERE_REPOSITORY=&lt;github-repository&gt; (like `owner/repo`)
+</code></pre>
+</div>
+
+<p>Create a GitHub personal access token just for this application. You’ll need to set a env var for your username and the token. We read these in the app.</p>
+
+<div class="highlighter-rouge"><pre class="highlight"><code>heroku config:add GITHUB_USERNAME=&lt;github-user&gt;
+heroku config:add GITHUB_PAT_OCTOKIT=&lt;github-pat-for-octokit&gt;
+</code></pre>
+</div>
+
+<p>Optionally, set env vars for various options. You don’t have to set these - we’ll use defaults</p>
+
+<div class="highlighter-rouge"><pre class="highlight"><code>heroku config:add HEYTHERE_PRE_DEADLINE_DAYS=&lt;number-of-days-integer&gt;
+heroku config:add HEYTHERE_DEADLINE_DAYS=&lt;number-of-days-integer&gt;
+heroku config:add HEYTHERE_POST_DEADLINE_EVERY_DAYS=&lt;number-of-days-integer&gt;
+heroku config:add HEYTHERE_POST_REVIEW_IN_DAYS=&lt;number-of-days-integer&gt;
+heroku config:add HEYTHERE_POST_REVIEW_TOGGLE=&lt;boolean&gt;
+heroku config:add HEYTHERE_BOT_NICKNAME=&lt;string&gt;
+</code></pre>
+</div>
+
+<p>Also save all these env vars in your <code class="highlighter-rouge">.bash_profile</code>, <code class="highlighter-rouge">.zshrc</code>, or similar so you can run the app locally. E.g. with entries like <code class="highlighter-rouge">export HEYTHERE_PRE_DEADLINE_DAYS=15</code></p>
+
+<p>You can see all your Heroku config vars using <code class="highlighter-rouge">heroku config</code> or use <code class="highlighter-rouge">rake envs</code></p>
+
+<p>Push your app to Heroku</p>
+
+<div class="highlighter-rouge"><pre class="highlight"><code>git push heroku master
+</code></pre>
+</div>
+
+<p>Add the scheduler to your heroku app</p>
+
+<div class="highlighter-rouge"><pre class="highlight"><code>heroku addons:create scheduler:standard
+heroku addons:open scheduler
+</code></pre>
+</div>
+
+<p>Add the task <code class="highlighter-rouge">rake hey</code> to your heroku scheduler and set to whatever schedule you want.</p>
+
+<h3 id="usage">usage</h3>
+
+<p>If you have your repo in an env var as above, run the rake task <code class="highlighter-rouge">hey</code></p>
+
+<div class="highlighter-rouge"><pre class="highlight"><code>rake hey
+</code></pre>
+</div>
+
+<p>If not, then pass the repo to <code class="highlighter-rouge">hey</code> like</p>
+
+<div class="highlighter-rouge"><pre class="highlight"><code>rake hey repo=owner/repo
+</code></pre>
+</div>
+
+<h3 id="what-does-it-look-like">what does it look like?</h3>
+
+<p>This is what a comment looks like in a thread</p>
+
+<p><img src="/public/img/2016-03-24-hey-there/testhey.png" alt="assertr_img" /></p>
+
+<p>You could set up a different GitHub account as your robot so it’s clearly not coming from a real person.</p>
+
+<h2 id="feedback">feedback</h2>
+
+<p>I’ll continue to improve <code class="highlighter-rouge">heythere</code> as we get feedback on its use in <code class="highlighter-rouge">ropensci/onboarding</code>. Would also love any feedback from you, internet. Thanks!</p>
+
+
+  </div>
+  
+  <div class="post">
+    <h1>
       <a href="/2016/03/scrubr/">
         scrubr - clean species occurrence records
       </a>
@@ -688,341 +822,6 @@ default position (Draft function started, but not exported, and commented out)</
   <li>Rate limit - a rate limit helper will add info to a set of many requests - still in early design stages <a href="https://github.com/sckott/request/issues/5">sckott/request#5</a></li>
   <li>Caching - a caching helper - may use in the background the in development <a href="https://github.com/ropensci/vcr">vcr R client</a> when on CRAN or perhaps <a href="https://github.com/richfitz/storr">storr</a>  <a href="https://github.com/sckott/request/issues/4">sckott/request#4</a></li>
 </ul>
-
-  </div>
-  
-  <div class="post">
-    <h1>
-      <a href="/2015/12/binomen-taxonomy-tools/">
-        binomen - Tools for slicing and dicing taxonomic names
-      </a>
-    </h1>
-
-    <span class="post-date">08 Dec 2015</span>
-
-    <p>The first version of <code class="highlighter-rouge">binomen</code> is now up on <a href="https://cran.rstudio.com/web/packages/binomen">CRAN</a>. It provides various taxonomic classes for defining a single taxon, multiple taxa, and a taxonomic data.frame. It is designed as a companion to <a href="https://github.com/ropensci/taxize">taxize</a>, where you can get taxonomic data on taxonomic names from the web.</p>
-
-<p>The classes (S3):</p>
-
-<ul>
-  <li><code class="highlighter-rouge">taxon</code></li>
-  <li><code class="highlighter-rouge">taxonref</code></li>
-  <li><code class="highlighter-rouge">taxonrefs</code></li>
-  <li><code class="highlighter-rouge">binomial</code></li>
-  <li><code class="highlighter-rouge">grouping</code> (i.e., classification - used different term to avoid conflict with classification in <code class="highlighter-rouge">taxize</code>)</li>
-</ul>
-
-<p>For example, the <code class="highlighter-rouge">binomial</code> class is defined by a genus, epithet, authority, and optional full species name and canonical version.</p>
-
-<div class="highlighter-rouge"><pre class="highlight"><code><span class="n">binomial</span><span class="p">(</span><span class="s2">"Poa"</span><span class="p">,</span> <span class="s2">"annua"</span><span class="p">,</span> <span class="n">authority</span><span class="o">=</span><span class="s2">"L."</span><span class="p">)</span>
-</code></pre>
-</div>
-
-<div class="highlighter-rouge"><pre class="highlight"><code><span class="o">&lt;</span><span class="n">binomial</span><span class="o">&gt;</span>
-  <span class="n">genus</span><span class="o">:</span> <span class="n">Poa</span>
-  <span class="n">epithet</span><span class="o">:</span> <span class="n">annua</span>
-  <span class="n">canonical</span><span class="o">:</span>
-  <span class="n">species</span><span class="o">:</span>
-  <span class="n">authority</span><span class="o">:</span> <span class="n">L.</span>
-</code></pre>
-</div>
-
-<p>The package has a suite of functions to work on these taxonomic classes:</p>
-
-<ul>
-  <li><code class="highlighter-rouge">gethier()</code> - get hierarchy from a <code class="highlighter-rouge">taxon</code> class</li>
-  <li><code class="highlighter-rouge">scatter()</code> - make each row in taxonomic data.frame (<code class="highlighter-rouge">taxondf</code>) a separate <code class="highlighter-rouge">taxon</code> object within a single <code class="highlighter-rouge">taxa</code> object</li>
-  <li><code class="highlighter-rouge">assemble()</code> - make a <code class="highlighter-rouge">taxa</code> object into a <code class="highlighter-rouge">taxondf</code> data.frame</li>
-  <li><code class="highlighter-rouge">pick()</code> - pick out one or more taxonomic groups</li>
-  <li><code class="highlighter-rouge">pop()</code> - pop out (drop) one or more taxonomic groups</li>
-  <li><code class="highlighter-rouge">span()</code> - pick a range between two taxonomic groups (inclusive)</li>
-  <li><code class="highlighter-rouge">strain()</code> - filter by taxonomic groups, like dplyr’s filter</li>
-  <li><code class="highlighter-rouge">name()</code> - get the taxon name for each <code class="highlighter-rouge">taxonref</code> object</li>
-  <li><code class="highlighter-rouge">uri()</code> - get the reference uri for each <code class="highlighter-rouge">taxonref</code> object</li>
-  <li><code class="highlighter-rouge">rank()</code> - get the taxonomic rank for each <code class="highlighter-rouge">taxonref</code> object</li>
-  <li><code class="highlighter-rouge">id()</code> - get the reference uri for each <code class="highlighter-rouge">taxonref</code> object</li>
-</ul>
-
-<p>The approach in this package I suppose is sort of like <code class="highlighter-rouge">split-apply-combine</code> from <code class="highlighter-rouge">plyr</code>/<code class="highlighter-rouge">dplyr</code>, whereas this is aims to make it easy to do with taxonomic names.</p>
-
-<h2 id="install">Install</h2>
-
-<p>For examples below, you’ll need the development version:</p>
-
-<div class="highlighter-rouge"><pre class="highlight"><code><span class="n">install.packages</span><span class="p">(</span><span class="s2">"binomen"</span><span class="p">)</span>
-</code></pre>
-</div>
-
-<div class="highlighter-rouge"><pre class="highlight"><code><span class="n">library</span><span class="p">(</span><span class="s2">"binomen"</span><span class="p">)</span>
-</code></pre>
-</div>
-
-<h2 id="make-a-taxon">Make a taxon</h2>
-
-<p>Make a taxon object</p>
-
-<div class="highlighter-rouge"><pre class="highlight"><code><span class="p">(</span><span class="n">obj</span> <span class="o">&lt;-</span> <span class="n">make_taxon</span><span class="p">(</span><span class="n">genus</span><span class="o">=</span><span class="s2">"Poa"</span><span class="p">,</span> <span class="n">epithet</span><span class="o">=</span><span class="s2">"annua"</span><span class="p">,</span> <span class="n">authority</span><span class="o">=</span><span class="s2">"L."</span><span class="p">,</span>
-  <span class="n">family</span><span class="o">=</span><span class="s1">'Poaceae'</span><span class="p">,</span> <span class="n">clazz</span><span class="o">=</span><span class="s1">'Poales'</span><span class="p">,</span> <span class="n">kingdom</span><span class="o">=</span><span class="s1">'Plantae'</span><span class="p">,</span> <span class="n">variety</span><span class="o">=</span><span class="s1">'annua'</span><span class="p">))</span>
-<span class="c1">#&gt; &lt;taxon&gt;
-#&gt;   binomial: Poa annua
-#&gt;   grouping: 
-#&gt;     kingdom: Plantae
-#&gt;     clazz: Poales
-#&gt;     family: Poaceae
-#&gt;     genus: Poa
-#&gt;     species: Poa annua
-#&gt;     variety: annua
-</span></code></pre>
-</div>
-
-<p>Index to various parts of the object</p>
-
-<p>The binomial</p>
-
-<div class="highlighter-rouge"><pre class="highlight"><code><span class="n">obj</span><span class="o">$</span><span class="n">binomial</span>
-<span class="c1">#&gt; &lt;binomial&gt;
-#&gt;   genus: Poa
-#&gt;   epithet: annua
-#&gt;   canonical: Poa annua
-#&gt;   species: Poa annua L.
-#&gt;   authority: L.
-</span></code></pre>
-</div>
-
-<p>The authority</p>
-
-<div class="highlighter-rouge"><pre class="highlight"><code><span class="n">obj</span><span class="o">$</span><span class="n">binomial</span><span class="o">$</span><span class="n">authority</span>
-<span class="c1">#&gt; [1] "L."
-</span></code></pre>
-</div>
-
-<p>The classification</p>
-
-<div class="highlighter-rouge"><pre class="highlight"><code><span class="n">obj</span><span class="o">$</span><span class="n">grouping</span>
-<span class="c1">#&gt; &lt;grouping&gt;
-#&gt;   kingdom: Plantae
-#&gt;   clazz: Poales
-#&gt;   family: Poaceae
-#&gt;   genus: Poa
-#&gt;   species: Poa annua
-#&gt;   variety: annua
-</span></code></pre>
-</div>
-
-<p>The family</p>
-
-<div class="highlighter-rouge"><pre class="highlight"><code><span class="n">obj</span><span class="o">$</span><span class="n">grouping</span><span class="o">$</span><span class="n">family</span>
-<span class="c1">#&gt; &lt;taxonref&gt;
-#&gt;   rank: family
-#&gt;   name: Poaceae
-#&gt;   id: none
-#&gt;   uri: none
-</span></code></pre>
-</div>
-
-<h2 id="subset-taxon-objects">Subset taxon objects</h2>
-
-<p>Get one or more ranks via <code class="highlighter-rouge">pick()</code></p>
-
-<div class="highlighter-rouge"><pre class="highlight"><code><span class="n">obj</span> <span class="o">%&gt;%</span> <span class="n">pick</span><span class="p">(</span><span class="n">family</span><span class="p">)</span>
-<span class="c1">#&gt; &lt;taxon&gt;
-#&gt;   binomial: Poa annua
-#&gt;   grouping: 
-#&gt;     family: Poaceae
-</span><span class="n">obj</span> <span class="o">%&gt;%</span> <span class="n">pick</span><span class="p">(</span><span class="n">family</span><span class="p">,</span> <span class="n">genus</span><span class="p">)</span>
-<span class="c1">#&gt; &lt;taxon&gt;
-#&gt;   binomial: Poa annua
-#&gt;   grouping: 
-#&gt;     family: Poaceae
-#&gt;     genus: Poa
-</span></code></pre>
-</div>
-
-<p>Drop one or more ranks via <code class="highlighter-rouge">pop()</code></p>
-
-<div class="highlighter-rouge"><pre class="highlight"><code><span class="n">obj</span> <span class="o">%&gt;%</span> <span class="n">pop</span><span class="p">(</span><span class="n">family</span><span class="p">)</span>
-<span class="c1">#&gt; &lt;taxon&gt;
-#&gt;   binomial: Poa annua
-#&gt;   grouping: 
-#&gt;     kingdom: Plantae
-#&gt;     clazz: Poales
-#&gt;     genus: Poa
-#&gt;     species: Poa annua
-#&gt;     variety: annua
-</span><span class="n">obj</span> <span class="o">%&gt;%</span> <span class="n">pop</span><span class="p">(</span><span class="n">family</span><span class="p">,</span> <span class="n">genus</span><span class="p">)</span>
-<span class="c1">#&gt; &lt;taxon&gt;
-#&gt;   binomial: Poa annua
-#&gt;   grouping: 
-#&gt;     kingdom: Plantae
-#&gt;     clazz: Poales
-#&gt;     species: Poa annua
-#&gt;     variety: annua
-</span></code></pre>
-</div>
-
-<p>Get a range of ranks via <code class="highlighter-rouge">span()</code></p>
-
-<div class="highlighter-rouge"><pre class="highlight"><code><span class="n">obj</span> <span class="o">%&gt;%</span> <span class="n">span</span><span class="p">(</span><span class="n">kingdom</span><span class="p">,</span> <span class="n">family</span><span class="p">)</span>
-<span class="c1">#&gt; &lt;taxon&gt;
-#&gt;   binomial: Poa annua
-#&gt;   grouping: 
-#&gt;     kingdom: Plantae
-#&gt;     clazz: Poales
-#&gt;     family: Poaceae
-</span></code></pre>
-</div>
-
-<p>Extract classification as a <code class="highlighter-rouge">data.frame</code></p>
-
-<div class="highlighter-rouge"><pre class="highlight"><code><span class="n">gethier</span><span class="p">(</span><span class="n">obj</span><span class="p">)</span>
-<span class="c1">#&gt;      rank      name
-#&gt; 1 kingdom   Plantae
-#&gt; 2   clazz    Poales
-#&gt; 3  family   Poaceae
-#&gt; 4   genus       Poa
-#&gt; 5 species Poa annua
-#&gt; 6 variety     annua
-</span></code></pre>
-</div>
-
-<h2 id="taxonomic-dataframes">Taxonomic data.frame’s</h2>
-
-<p>Make one</p>
-
-<div class="highlighter-rouge"><pre class="highlight"><code><span class="n">df</span> <span class="o">&lt;-</span> <span class="n">data.frame</span><span class="p">(</span><span class="n">order</span> <span class="o">=</span> <span class="n">c</span><span class="p">(</span><span class="s1">'Asterales'</span><span class="p">,</span><span class="s1">'Asterales'</span><span class="p">,</span><span class="s1">'Fagales'</span><span class="p">,</span><span class="s1">'Poales'</span><span class="p">,</span><span class="s1">'Poales'</span><span class="p">,</span><span class="s1">'Poales'</span><span class="p">),</span>
-  <span class="n">family</span> <span class="o">=</span> <span class="n">c</span><span class="p">(</span><span class="s1">'Asteraceae'</span><span class="p">,</span><span class="s1">'Asteraceae'</span><span class="p">,</span><span class="s1">'Fagaceae'</span><span class="p">,</span><span class="s1">'Poaceae'</span><span class="p">,</span><span class="s1">'Poaceae'</span><span class="p">,</span><span class="s1">'Poaceae'</span><span class="p">),</span>
-  <span class="n">genus</span> <span class="o">=</span> <span class="n">c</span><span class="p">(</span><span class="s1">'Helianthus'</span><span class="p">,</span><span class="s1">'Helianthus'</span><span class="p">,</span><span class="s1">'Quercus'</span><span class="p">,</span><span class="s1">'Poa'</span><span class="p">,</span><span class="s1">'Festuca'</span><span class="p">,</span><span class="s1">'Holodiscus'</span><span class="p">),</span>
-  <span class="n">stringsAsFactors</span> <span class="o">=</span> <span class="n">FALSE</span><span class="p">)</span>
-<span class="p">(</span><span class="n">df2</span> <span class="o">&lt;-</span> <span class="n">taxon_df</span><span class="p">(</span><span class="n">df</span><span class="p">))</span>
-<span class="c1">#&gt;       order     family      genus
-#&gt; 1 Asterales Asteraceae Helianthus
-#&gt; 2 Asterales Asteraceae Helianthus
-#&gt; 3   Fagales   Fagaceae    Quercus
-#&gt; 4    Poales    Poaceae        Poa
-#&gt; 5    Poales    Poaceae    Festuca
-#&gt; 6    Poales    Poaceae Holodiscus
-</span></code></pre>
-</div>
-
-<p>Parse - get rank order via <code class="highlighter-rouge">pick()</code></p>
-
-<div class="highlighter-rouge"><pre class="highlight"><code><span class="n">df2</span> <span class="o">%&gt;%</span> <span class="n">pick</span><span class="p">(</span><span class="n">order</span><span class="p">)</span>
-<span class="c1">#&gt;       order
-#&gt; 1 Asterales
-#&gt; 2 Asterales
-#&gt; 3   Fagales
-#&gt; 4    Poales
-#&gt; 5    Poales
-#&gt; 6    Poales
-</span></code></pre>
-</div>
-
-<p>get ranks order, family, and genus via <code class="highlighter-rouge">pick()</code></p>
-
-<div class="highlighter-rouge"><pre class="highlight"><code><span class="n">df2</span> <span class="o">%&gt;%</span> <span class="n">pick</span><span class="p">(</span><span class="n">order</span><span class="p">,</span> <span class="n">family</span><span class="p">,</span> <span class="n">genus</span><span class="p">)</span>
-<span class="c1">#&gt;       order     family      genus
-#&gt; 1 Asterales Asteraceae Helianthus
-#&gt; 2 Asterales Asteraceae Helianthus
-#&gt; 3   Fagales   Fagaceae    Quercus
-#&gt; 4    Poales    Poaceae        Poa
-#&gt; 5    Poales    Poaceae    Festuca
-#&gt; 6    Poales    Poaceae Holodiscus
-</span></code></pre>
-</div>
-
-<p>get range of names via <code class="highlighter-rouge">span()</code>, from rank <code class="highlighter-rouge">X</code> to rank <code class="highlighter-rouge">Y</code></p>
-
-<div class="highlighter-rouge"><pre class="highlight"><code><span class="n">df2</span> <span class="o">%&gt;%</span> <span class="n">span</span><span class="p">(</span><span class="n">family</span><span class="p">,</span> <span class="n">genus</span><span class="p">)</span>
-<span class="c1">#&gt;       family      genus
-#&gt; 1 Asteraceae Helianthus
-#&gt; 2 Asteraceae Helianthus
-#&gt; 3   Fagaceae    Quercus
-#&gt; 4    Poaceae        Poa
-#&gt; 5    Poaceae    Festuca
-#&gt; 6    Poaceae Holodiscus
-</span></code></pre>
-</div>
-
-<p>Separate each row into a <code class="highlighter-rouge">taxon</code> class (many <code class="highlighter-rouge">taxon</code> objects are a <code class="highlighter-rouge">taxa</code> class)</p>
-
-<div class="highlighter-rouge"><pre class="highlight"><code><span class="n">scatter</span><span class="p">(</span><span class="n">df2</span><span class="p">)</span>
-<span class="c1">#&gt; [[1]]
-#&gt; &lt;taxon&gt;
-#&gt;   binomial: Helianthus none
-#&gt;   grouping: 
-#&gt;     order: Asterales
-#&gt;     family: Asteraceae
-#&gt;     genus: Helianthus
-#&gt;     species: Helianthus none
-#&gt; 
-#&gt; [[2]]
-#&gt; &lt;taxon&gt;
-#&gt;   binomial: Helianthus none
-#&gt;   grouping: 
-#&gt;     order: Asterales
-#&gt;     family: Asteraceae
-#&gt;     genus: Helianthus
-#&gt;     species: Helianthus none
-#&gt; 
-#&gt; [[3]]
-#&gt; &lt;taxon&gt;
-#&gt;   binomial: Quercus none
-#&gt;   grouping: 
-#&gt;     order: Fagales
-#&gt;     family: Fagaceae
-#&gt;     genus: Quercus
-#&gt;     species: Quercus none
-#&gt; 
-#&gt; [[4]]
-#&gt; &lt;taxon&gt;
-#&gt;   binomial: Poa none
-#&gt;   grouping: 
-#&gt;     order: Poales
-#&gt;     family: Poaceae
-#&gt;     genus: Poa
-#&gt;     species: Poa none
-#&gt; 
-#&gt; [[5]]
-#&gt; &lt;taxon&gt;
-#&gt;   binomial: Festuca none
-#&gt;   grouping: 
-#&gt;     order: Poales
-#&gt;     family: Poaceae
-#&gt;     genus: Festuca
-#&gt;     species: Festuca none
-#&gt; 
-#&gt; [[6]]
-#&gt; &lt;taxon&gt;
-#&gt;   binomial: Holodiscus none
-#&gt;   grouping: 
-#&gt;     order: Poales
-#&gt;     family: Poaceae
-#&gt;     genus: Holodiscus
-#&gt;     species: Holodiscus none
-#&gt; 
-#&gt; attr(,"class")
-#&gt; [1] "taxa"
-</span></code></pre>
-</div>
-
-<p>And you can re-assemble a data.frame from the output of <code class="highlighter-rouge">scatter()</code> with <code class="highlighter-rouge">assemble()</code></p>
-
-<div class="highlighter-rouge"><pre class="highlight"><code><span class="n">out</span> <span class="o">&lt;-</span> <span class="n">scatter</span><span class="p">(</span><span class="n">df2</span><span class="p">)</span>
-<span class="n">assemble</span><span class="p">(</span><span class="n">out</span><span class="p">)</span>
-<span class="c1">#&gt;       order     family      genus         species
-#&gt; 1 Asterales Asteraceae Helianthus Helianthus none
-#&gt; 2 Asterales Asteraceae Helianthus Helianthus none
-#&gt; 3   Fagales   Fagaceae    Quercus    Quercus none
-#&gt; 4    Poales    Poaceae        Poa        Poa none
-#&gt; 5    Poales    Poaceae    Festuca    Festuca none
-#&gt; 6    Poales    Poaceae Holodiscus Holodiscus none
-</span></code></pre>
-</div>
-
-<h2 id="thoughts">Thoughts?</h2>
-
-<p>I’m really curious what people think of <code class="highlighter-rouge">binomen</code>. I’m not sure how useful this will be in the wild. Try it. Let me know. Thanks much :)</p>
-
 
   </div>
   
