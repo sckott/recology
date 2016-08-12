@@ -61,6 +61,579 @@
   
   <div class="post">
     <h1>
+      <a href="/2015/07/weather-data-with-rnoaa/">
+        rnoaa - Weather data in R
+      </a>
+    </h1>
+
+    <span class="post-date">07 Jul 2015</span>
+
+    NOAA provides a lot of weather data, across many different websites under different project names. The R package `rnoaa` accesses many of these, including:
+
+* NOAA NCDC climate data, using the [NCDC API version 2](http://www.ncdc.noaa.gov/cdo-web/webservices/v2)
+* [GHCND FTP data](ftp://ftp.ncdc.noaa.gov/pub/data/ghcn/daily/)
+* [ISD FTP data](ftp://ftp.ncdc.noaa.gov/pub/data/noaa/)
+* Severe weather data docs are at [http://www.ncdc.noaa.gov/swdiws/](http://www.ncdc.noaa.gov/swdiws/)
+* [Sea ice data](ftp://sidads.colorado.edu/DATASETS/NOAA/G02135/shapefiles)
+* [NOAA buoy data](http://www.ndbc.noaa.gov/)
+* Tornadoes! Data from the [NOAA Storm Prediction Center](http://www.spc.noaa.gov/gis/svrgis/)
+* HOMR - Historical Observing Metadata Repository - from [NOAA NCDC](http://www.ncdc.noaa.gov/homr/api)
+* Storm data - from the [International Best Track Archive for Climate Stewardship (IBTrACS)](http://www.ncdc.noaa.gov/ibtracs/index.php?name=wmo-data)
+
+`rnoaa` used to provide access to [ERDDAP servers](http://upwell.pfeg.noaa.gov/erddap/index.html), but a separate package [rerddap](https://github.com/ropensci/rerddap) focuses on just those data sources.
+
+We focus on getting you the data, so there's very little in `rnoaa` for visualizing, statistics, etc.
+
+## Installation
+
+The newest version should be on CRAN in the next few days. In the meantime, let's install from GitHub
+
+
+```r
+devtools::install_github("ropensci/rnoaa")
+```
+
+
+```r
+library("rnoaa")
+```
+
+There's an example using the `lawn`, `sp`, and `dplyr` packages. If you want to try those, install like
+
+
+```r
+install.packages(c("lawn", "dplyr", "sp"))
+```
+
+## NCDC
+
+* NCDC = National Climatic Data Center
+* Data comes from a RESTful API described at [http://www.ncdc.noaa.gov/cdo-web/webservices/v2](http://www.ncdc.noaa.gov/cdo-web/webservices/v2)
+
+This web service requires an API key - get one at [http://www.ncdc.noaa.gov/cdo-web/token](http://www.ncdc.noaa.gov/cdo-web/token) if you don't already have one. NCDC provides access to many different datasets: 
+
+<table>
+<thead>
+<tr class="header">
+<th align="left">Dataset</th>
+<th align="left">Description</th>
+<th align="left">Start date</th>
+<th align="left">End date</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td align="left">ANNUAL</td>
+<td align="left">Annual Summaries</td>
+<td align="left">1831-02-01</td>
+<td align="left">2013-11-01</td>
+</tr>
+<tr class="even">
+<td align="left">GHCND</td>
+<td align="left">Daily Summaries</td>
+<td align="left">1763-01-01</td>
+<td align="left">2014-03-15</td>
+</tr>
+<tr class="odd">
+<td align="left">GHCNDMS</td>
+<td align="left">Monthly Summaries</td>
+<td align="left">1763-01-01</td>
+<td align="left">2014-01-01</td>
+</tr>
+<tr class="even">
+<td align="left">NORMAL_ANN</td>
+<td align="left">Normals Annual/Seasonal</td>
+<td align="left">2010-01-01</td>
+<td align="left">2010-01-01</td>
+</tr>
+<tr class="odd">
+<td align="left">NORMAL_DLY</td>
+<td align="left">Normals Daily</td>
+<td align="left">2010-01-01</td>
+<td align="left">2010-12-31</td>
+</tr>
+<tr class="even">
+<td align="left">NORMAL_HLY</td>
+<td align="left">Normals Hourly</td>
+<td align="left">2010-01-01</td>
+<td align="left">2010-12-31</td>
+</tr>
+<tr class="odd">
+<td align="left">NORMAL_MLY</td>
+<td align="left">Normals Monthly</td>
+<td align="left">2010-01-01</td>
+<td align="left">2010-12-01</td>
+</tr>
+<tr class="even">
+<td align="left">PRECIP_15</td>
+<td align="left">Precipitation 15 Minute</td>
+<td align="left">1970-05-12</td>
+<td align="left">2013-03-01</td>
+</tr>
+<tr class="odd">
+<td align="left">PRECIP_HLY</td>
+<td align="left">Precipitation Hourly</td>
+<td align="left">1900-01-01</td>
+<td align="left">2013-03-01</td>
+</tr>
+<tr class="even">
+<td align="left">NEXRAD2</td>
+<td align="left">Nexrad Level II</td>
+<td align="left">1991-06-05</td>
+<td align="left">2014-03-14</td>
+</tr>
+<tr class="odd">
+<td align="left">NEXRAD3</td>
+<td align="left">Nexrad Level III</td>
+<td align="left">1994-05-20</td>
+<td align="left">2014-03-11</td>
+</tr>
+</tbody>
+</table>
+
+The main function to get data from NCDC is `ncdc()`. `datasetid`, `startdate`, and `enddate` are required parameters. A quick example, here getting data from the GHCND dataset, from a particular station, and from Oct 1st 2013 to Dec 12th 2013:
+
+
+```r
+ncdc(datasetid = 'GHCND', stationid = 'GHCND:USW00014895', startdate = '2013-10-01',
+   enddate = '2013-12-01')
+#> $meta
+#> $meta$totalCount
+#> [1] 697
+#> 
+#> $meta$pageCount
+#> [1] 25
+#> 
+#> $meta$offset
+#> [1] 1
+#> 
+#> 
+#> $data
+#> Source: local data frame [25 x 8]
+#> 
+#>                   date datatype           station value fl_m fl_q fl_so
+#> 1  2013-10-01T00:00:00     AWND GHCND:USW00014895    29               W
+#> 2  2013-10-01T00:00:00     PRCP GHCND:USW00014895     0               W
+#> 3  2013-10-01T00:00:00     SNOW GHCND:USW00014895     0               W
+#> 4  2013-10-01T00:00:00     SNWD GHCND:USW00014895     0               W
+#> 5  2013-10-01T00:00:00     TAVG GHCND:USW00014895   179    H          S
+#> 6  2013-10-01T00:00:00     TMAX GHCND:USW00014895   250               W
+#> 7  2013-10-01T00:00:00     TMIN GHCND:USW00014895   133               W
+#> 8  2013-10-01T00:00:00     WDF2 GHCND:USW00014895   210               W
+#> 9  2013-10-01T00:00:00     WDF5 GHCND:USW00014895   230               W
+#> 10 2013-10-01T00:00:00     WSF2 GHCND:USW00014895    76               W
+#> ..                 ...      ...               ...   ...  ...  ...   ...
+#> Variables not shown: fl_t (chr)
+#> 
+#> attr(,"class")
+#> [1] "ncdc_data"
+```
+
+You probably won't know what station you want data from off hand though, so you can first search for  stations, in this example using a bounding box that defines a rectangular area near Seattle
+
+
+```r
+library("lawn")
+lawn_bbox_polygon(c(-122.2047, 47.5204, -122.1065, 47.6139)) %>% view
+```
+
+![lawnplot](/public/img/2015-07-07-weather-data-with-rnoaa/lawnplot.png)
+
+We'll search within that bounding box for weather stations.
+
+
+```r
+ncdc_stations(extent = c(47.5204, -122.2047, 47.6139, -122.1065))
+#> $meta
+#> $meta$totalCount
+#> [1] 9
+#> 
+#> $meta$pageCount
+#> [1] 25
+#> 
+#> $meta$offset
+#> [1] 1
+#> 
+#> 
+#> $data
+#> Source: local data frame [9 x 9]
+#> 
+#>   elevation    mindate    maxdate latitude                         name
+#> 1     199.6 2008-06-01 2015-06-29  47.5503      EASTGATE 1.7 SSW, WA US
+#> 2     240.8 2010-05-01 2015-07-05  47.5604       EASTGATE 1.1 SW, WA US
+#> 3      85.6 2008-07-01 2015-07-05  47.5916        BELLEVUE 0.8 S, WA US
+#> 4     104.2 2008-06-01 2015-07-05  47.5211 NEWPORT HILLS 1.9 SSE, WA US
+#> 5      58.5 2008-08-01 2009-04-12  47.6138      BELLEVUE 2.3 ENE, WA US
+#> 6     199.9 2008-06-01 2009-11-22  47.5465   NEWPORT HILLS 1.4 E, WA US
+#> 7      27.1 2008-07-01 2015-07-05  47.6046        BELLEVUE 1.8 W, WA US
+#> 8     159.4 2008-11-01 2015-07-05  47.5694      BELLEVUE 2.3 SSE, WA US
+#> 9      82.3 2008-12-01 2010-09-17  47.6095       BELLEVUE 0.6 NE, WA US
+#> Variables not shown: datacoverage (dbl), id (chr), elevationUnit (chr),
+#>   longitude (dbl)
+#> 
+#> attr(,"class")
+#> [1] "ncdc_stations"
+```
+
+And there are 9 found. We could then use their station ids (e.g., `GHCND:US1WAKG0024`) to search for data using `ncdc()`, or search for what kind of data that station has with `ncdc_datasets()`, or other functions.
+
+## GHCND
+
+* GHCND = Global Historical Climatology Network Daily (Data)
+* Data comes from an FTP server
+
+
+```r
+library("dplyr")
+dat <- ghcnd(stationid = "AGE00147704")
+dat$data %>%
+  filter(element == "PRCP", year == 1909)
+#>            id year month element VALUE1 MFLAG1 QFLAG1 SFLAG1 VALUE2 MFLAG2
+#> 1 AGE00147704 1909    11    PRCP  -9999     NA                -9999     NA
+#> 2 AGE00147704 1909    12    PRCP     23     NA             E      0     NA
+#>   QFLAG2 SFLAG2 VALUE3 MFLAG3 QFLAG3 SFLAG3 VALUE4 MFLAG4 QFLAG4 SFLAG4
+#> 1                -9999     NA                -9999     NA              
+#> 2             E      0     NA             E      0     NA             E
+#>   VALUE5 MFLAG5 QFLAG5 SFLAG5 VALUE6 MFLAG6 QFLAG6 SFLAG6 VALUE7 MFLAG7
+#> 1  -9999     NA                -9999     NA                -9999     NA
+#> 2      0     NA             E      0     NA             E      0     NA
+#>   QFLAG7 SFLAG7 VALUE8 MFLAG8 QFLAG8 SFLAG8 VALUE9 MFLAG9 QFLAG9 SFLAG9
+#> 1     NA         -9999     NA                -9999     NA              
+#> 2     NA      E    250     NA             E     75     NA             E
+#>   VALUE10 MFLAG10 QFLAG10 SFLAG10 VALUE11 MFLAG11 QFLAG11 SFLAG11 VALUE12
+#> 1   -9999      NA                   -9999      NA                   -9999
+#> 2     131      NA               E       0      NA               E       0
+#>   MFLAG12 QFLAG12 SFLAG12 VALUE13 MFLAG13 QFLAG13 SFLAG13 VALUE14 MFLAG14
+#> 1      NA                   -9999      NA                   -9999      NA
+#> 2      NA               E       0      NA               E       0      NA
+#>   QFLAG14 SFLAG14 VALUE15 MFLAG15 QFLAG15 SFLAG15 VALUE16 MFLAG16 QFLAG16
+#> 1                   -9999      NA                   -9999      NA        
+#> 2               E       0      NA               E       0      NA        
+#>   SFLAG16 VALUE17 MFLAG17 QFLAG17 SFLAG17 VALUE18 MFLAG18 QFLAG18 SFLAG18
+#> 1           -9999      NA                   -9999      NA                
+#> 2       E       0      NA               E       0      NA               E
+#>   VALUE19 MFLAG19 QFLAG19 SFLAG19 VALUE20 MFLAG20 QFLAG20 SFLAG20 VALUE21
+#> 1   -9999      NA      NA           -9999      NA      NA           -9999
+#> 2       0      NA      NA       E       0      NA      NA       E       0
+#>   MFLAG21 QFLAG21 SFLAG21 VALUE22 MFLAG22 QFLAG22 SFLAG22 VALUE23 MFLAG23
+#> 1      NA                   -9999      NA                      22      NA
+#> 2      NA               E       0      NA               E       0      NA
+#>   QFLAG23 SFLAG23 VALUE24 MFLAG24 QFLAG24 SFLAG24 VALUE25 MFLAG25 QFLAG25
+#> 1      NA       E       9      NA      NA       E       5      NA      NA
+#> 2      NA       E       0      NA      NA       E       0      NA      NA
+#>   SFLAG25 VALUE26 MFLAG26 QFLAG26 SFLAG26 VALUE27 MFLAG27 QFLAG27 SFLAG27
+#> 1       E       0      NA               E      86      NA      NA       E
+#> 2       E       0      NA               E       0      NA      NA       E
+#>   VALUE28 MFLAG28 QFLAG28 SFLAG28 VALUE29 MFLAG29 QFLAG29 SFLAG29 VALUE30
+#> 1       0      NA      NA       E      28      NA      NA       E       0
+#> 2       0      NA      NA       E       0      NA      NA       E       0
+#>   MFLAG30 QFLAG30 SFLAG30 VALUE31 MFLAG31 QFLAG31 SFLAG31
+#> 1      NA               E   -9999      NA      NA        
+#> 2      NA               E      57      NA      NA       E
+```
+
+You can also get to datasets by searching by station id, date min, date max, and variable. E.g.
+
+
+```r
+ghcnd_search("AGE00147704", var = "PRCP")
+#> $prcp
+#> Source: local data frame [9,803 x 6]
+#> 
+#>             id  prcp       date mflag qflag sflag
+#> 1  AGE00147704 -9999 1909-11-01    NA            
+#> 2  AGE00147704    23 1909-12-01    NA           E
+#> 3  AGE00147704    81 1910-01-01    NA           E
+#> 4  AGE00147704     0 1910-02-01    NA           E
+#> 5  AGE00147704    18 1910-03-01    NA           E
+#> 6  AGE00147704     0 1910-04-01    NA           E
+#> 7  AGE00147704   223 1910-05-01    NA           E
+#> 8  AGE00147704     0 1910-06-01    NA           E
+#> 9  AGE00147704     0 1910-07-01    NA           E
+#> 10 AGE00147704     0 1910-08-01    NA           E
+#> ..         ...   ...        ...   ...   ...   ...
+```
+
+## ISD
+
+* ISD = Integrated Surface Database
+* Data comes from an FTP server
+
+You'll likely first want to run `isd_stations()` to get list of stations
+
+
+```r
+stations <- isd_stations()
+head(stations)
+#>   usaf  wban station_name ctry state icao lat lon elev_m    begin      end
+#> 1 7005 99999   CWOS 07005                  NA  NA     NA 20120127 20120127
+#> 2 7011 99999   CWOS 07011                  NA  NA     NA 20111025 20121129
+#> 3 7018 99999   WXPOD 7018                   0   0   7018 20110309 20130730
+#> 4 7025 99999   CWOS 07025                  NA  NA     NA 20120127 20120127
+#> 5 7026 99999   WXPOD 7026   AF              0   0   7026 20120713 20141120
+#> 6 7034 99999   CWOS 07034                  NA  NA     NA 20121024 20121106
+```
+
+Then get data from particular stations, like
+
+
+```r
+(res <- isd(usaf = "011490", wban = "99999", year = 1986))
+#> <ISD Data>
+#> Size: 1328 X 85
+#> 
+#>    total_chars usaf_station wban_station     date time date_flag latitude
+#> 1           50        11490        99999 19860101    0         4    66267
+#> 2          123        11490        99999 19860101  600         4    66267
+#> 3           50        11490        99999 19860101 1200         4    66267
+#> 4           94        11490        99999 19860101 1800         4    66267
+#> 5           50        11490        99999 19860102    0         4    66267
+#> 6          123        11490        99999 19860102  600         4    66267
+#> 7           50        11490        99999 19860102 1200         4    66267
+#> 8           94        11490        99999 19860102 1800         4    66267
+#> 9           50        11490        99999 19860103    0         4    66267
+#> 10         123        11490        99999 19860103  600         4    66267
+#> ..         ...          ...          ...      ...  ...       ...      ...
+#> Variables not shown: longitude (int), type_code (chr), elevation (int),
+#>      call_letter (int), quality (chr), wind_direction (int),
+#>      wind_direction_quality (int), wind_code (chr), wind_speed (int),
+#>      wind_speed_quality (int), ceiling_height (int),
+#>      ceiling_height_quality (int), ceiling_height_determination (chr),
+#>      ceiling_height_cavok (chr), visibility_distance (int),
+#>      visibility_distance_quality (int), visibility_code (chr),
+#>      visibility_code_quality (int), temperature (int), temperature_quality
+#>      (int), temperature_dewpoint (int), temperature_dewpoint_quality
+#>      (int), air_pressure (int), air_pressure_quality (int),
+#>      AG1.precipitation (chr), AG1.discrepancy (int), AG1.est_water_depth
+#>      (int), GF1.sky_condition (chr), GF1.coverage (int),
+#>      GF1.opaque_coverage (int), GF1.coverage_quality (int),
+#>      GF1.lowest_cover (int), GF1.lowest_cover_quality (int),
+#>      GF1.low_cloud_genus (int), GF1.low_cloud_genus_quality (int),
+#>      GF1.lowest_cloud_base_height (int),
+#>      GF1.lowest_cloud_base_height_quality (int), GF1.mid_cloud_genus
+#>      (int), GF1.mid_cloud_genus_quality (int), GF1.high_cloud_genus (int),
+#>      GF1.high_cloud_genus_quality (int), MD1.atmospheric_change (chr),
+#>      MD1.tendency (int), MD1.tendency_quality (int), MD1.three_hr (int),
+#>      MD1.three_hr_quality (int), MD1.twentyfour_hr (int),
+#>      MD1.twentyfour_hr_quality (int), REM.remarks (chr), REM.identifier
+#>      (chr), REM.length_quantity (int), REM.comment (chr), KA1.extreme_temp
+#>      (chr), KA1.period_quantity (int), KA1.max_min (chr), KA1.temp (int),
+#>      KA1.temp_quality (int), AY1.manual_occurrence (chr),
+#>      AY1.condition_code (int), AY1.condition_quality (int), AY1.period
+#>      (int), AY1.period_quality (int), AY2.manual_occurrence (chr),
+#>      AY2.condition_code (int), AY2.condition_quality (int), AY2.period
+#>      (int), AY2.period_quality (int), MW1.first_weather_reported (chr),
+#>      MW1.condition (int), MW1.condition_quality (int),
+#>      EQD.observation_identifier (chr), EQD.observation_text (int),
+#>      EQD.reason_code (int), EQD.parameter (chr),
+#>      EQD.observation_identifier.1 (chr), EQD.observation_text.1 (int),
+#>      EQD.reason_code.1 (int), EQD.parameter.1 (chr)
+```
+
+## Severe weather
+
+* SWDI = Severe Weather Data Inventory
+* From the SWDI site
+
+> The Severe Weather Data Inventory (SWDI) is an integrated database of severe weather records for the United States. The records in SWDI come from a variety of sources in the NCDC archive. 
+
+The `swdi()` function allows you to get data in xml, csv, shp, or kmz format. You can get data from many different datasets:
+
+* nx3tvs NEXRAD Level-3 Tornado Vortex Signatures (point)
+* nx3meso NEXRAD Level-3 Mesocyclone Signatures (point)
+* nx3hail NEXRAD Level-3 Hail Signatures (point)
+* nx3structure NEXRAD Level-3 Storm Cell Structure Information (point)
+* plsr Preliminary Local Storm Reports (point)
+* warn Severe Thunderstorm, Tornado, Flash Flood and Special Marine warnings (polygon)
+* nldn Lightning strikes from Vaisala (.gov and .mil ONLY) (point)
+
+An example: Get all `plsr` within the bounding box (-91,30,-90,31)
+
+
+```r
+swdi(dataset = 'plsr', startdate = '20060505', enddate = '20060510',
+bbox = c(-91, 30, -90, 31))
+#> $meta
+#> $meta$totalCount
+#> numeric(0)
+#> 
+#> $meta$totalTimeInSeconds
+#> [1] 0
+#> 
+#> 
+#> $data
+#> Source: local data frame [5 x 8]
+#> 
+#>                  ztime     id        event magnitude            city
+#> 1 2006-05-09T02:20:00Z 427540         HAIL         1    5 E KENTWOOD
+#> 2 2006-05-09T02:40:00Z 427536         HAIL         1    MOUNT HERMAN
+#> 3 2006-05-09T02:40:00Z 427537 TSTM WND DMG     -9999    MOUNT HERMAN
+#> 4 2006-05-09T03:00:00Z 427199         HAIL         0     FRANKLINTON
+#> 5 2006-05-09T03:17:00Z 427200      TORNADO     -9999 5 S FRANKLINTON
+#> Variables not shown: county (chr), state (chr), source (chr)
+#> 
+#> $shape
+#>                  shape
+#> 1 POINT (-90.43 30.93)
+#> 2  POINT (-90.3 30.96)
+#> 3  POINT (-90.3 30.96)
+#> 4 POINT (-90.14 30.85)
+#> 5 POINT (-90.14 30.78)
+#> 
+#> attr(,"class")
+#> [1] "swdi"
+```
+
+## Sea ice
+
+The `seaice()` function simply grabs shape files that describe sea ice cover at the Northa and South poles, and can be useful for examining change through time in sea ice cover, among other things. 
+
+An example: Plot sea ice cover for April 1990 for the North pole.
+
+
+```r
+urls <- seaiceeurls(mo = 'Apr', pole = 'N', yr = 1990)
+out <- seaice(urls)
+
+library('ggplot2')
+ggplot(out, aes(long, lat, group = group)) +
+   geom_polygon(fill = "steelblue") +
+   theme_ice()
+```
+
+![plot of chunk unnamed-chunk-13](/public/img/2015-07-07-weather-data-with-rnoaa/unnamed-chunk-13-1.png) 
+
+## Buoys
+
+* Get NOAA buoy data from the National Buoy Data Center
+
+Using buoy data requires the `ncdf` package. Make sure you have that installed, like `install.packages("ncdf")`. `buoy()` and `buoys()` will fail if you don't have `ncdf` installed. 
+
+`buoys()` - Get available buoys given a dataset name
+
+
+```r
+head(buoys(dataset = 'cwind'))
+#>      id
+#> 1 41001
+#> 2 41002
+#> 3 41004
+#> 4 41006
+#> 5 41008
+#> 6 41009
+#>                                                                       url
+#> 1 http://dods.ndbc.noaa.gov/thredds/catalog/data/cwind/41001/catalog.html
+#> 2 http://dods.ndbc.noaa.gov/thredds/catalog/data/cwind/41002/catalog.html
+#> 3 http://dods.ndbc.noaa.gov/thredds/catalog/data/cwind/41004/catalog.html
+#> 4 http://dods.ndbc.noaa.gov/thredds/catalog/data/cwind/41006/catalog.html
+#> 5 http://dods.ndbc.noaa.gov/thredds/catalog/data/cwind/41008/catalog.html
+#> 6 http://dods.ndbc.noaa.gov/thredds/catalog/data/cwind/41009/catalog.html
+```
+
+`buoy()` - Get data for a buoy - if no year or datatype specified, we get the first file
+
+
+```r
+buoy(dataset = 'cwind', buoyid = 46085)
+#> Dimensions (rows/cols): [33486 X 5] 
+#> 2 variables: [wind_dir, wind_spd] 
+#> 
+#>                    time latitude longitude wind_dir wind_spd
+#> 1  2007-05-05T02:00:00Z   55.855  -142.559      331      2.8
+#> 2  2007-05-05T02:10:00Z   55.855  -142.559      328      2.6
+#> 3  2007-05-05T02:20:00Z   55.855  -142.559      329      2.2
+#> 4  2007-05-05T02:30:00Z   55.855  -142.559      356      2.1
+#> 5  2007-05-05T02:40:00Z   55.855  -142.559      360      1.5
+#> 6  2007-05-05T02:50:00Z   55.855  -142.559       10      1.9
+#> 7  2007-05-05T03:00:00Z   55.855  -142.559       10      2.2
+#> 8  2007-05-05T03:10:00Z   55.855  -142.559       14      2.2
+#> 9  2007-05-05T03:20:00Z   55.855  -142.559       16      2.1
+#> 10 2007-05-05T03:30:00Z   55.855  -142.559       22      1.6
+#> ..                  ...      ...       ...      ...      ...
+```
+
+## Tornadoes
+
+The function `tornadoes()` gets tornado data from [http://www.spc.noaa.gov/gis/svrgis/](http://www.spc.noaa.gov/gis/svrgis/).
+
+
+```r
+shp <- tornadoes()
+library('sp')
+plot(shp)
+```
+
+![tornadoes](/public/img/2015-07-07-weather-data-with-rnoaa/tornadoes.png)
+
+## Historical Observing Metadata Repository
+
+* HOMR = Historical Observing Metadata Repository
+* Data from RESTful API at [http://www.ncdc.noaa.gov/homr/api](http://www.ncdc.noaa.gov/homr/api)
+
+`homr_definitions()` gets you definitions and metadata for datasets
+
+
+```r
+head(homr_definitions())
+#> Source: local data frame [6 x 7]
+#> 
+#>   defType  abbr                fullName    displayName
+#> 1     ids GHCND        GHCND IDENTIFIER       GHCND ID
+#> 2     ids  COOP             COOP NUMBER        COOP ID
+#> 3     ids  WBAN             WBAN NUMBER        WBAN ID
+#> 4     ids   FAA FAA LOCATION IDENTIFIER         FAA ID
+#> 5     ids  ICAO                 ICAO ID        ICAO ID
+#> 6     ids TRANS          TRANSMITTAL ID Transmittal ID
+#> Variables not shown: description (chr), cssaName (chr), ghcndName (chr)
+```
+
+`homr()` gets you metadata for stations given query parameters. In this example, search for data for the state of Delaware
+
+
+```r
+res <- homr(state = 'DE')
+names(res) # the stations
+#>  [1] "10001871" "10100162" "10100164" "10100166" "20004155" "20004158"
+#>  [7] "20004160" "20004162" "20004163" "20004168" "20004171" "20004176"
+#> [13] "20004178" "20004179" "20004180" "20004182" "20004184" "20004185"
+#> [19] "30001831" "30017384" "30020917" "30021161" "30021998" "30022674"
+#> [25] "30026770" "30027455" "30032423" "30032685" "30034222" "30039554"
+#> [31] "30043742" "30046662" "30046814" "30051475" "30057217" "30063570"
+#> [37] "30064900" "30065901" "30067636" "30069663" "30075067" "30077378"
+#> [43] "30077857" "30077923" "30077988" "30079088" "30079240" "30082430"
+#> [49] "30084216" "30084262" "30084537" "30084796" "30094582" "30094639"
+#> [55] "30094664" "30094670" "30094683" "30094730" "30094806" "30094830"
+#> [61] "30094917" "30094931" "30094936" "30094991"
+```
+
+You can index to each one to get more data
+
+## Storms
+
+* Data from: International Best Track Archive for Climate Stewardship (IBTrACS)
+* Data comes from an FTP server
+
+Flat files (csv's) are served up as well as shp files. In this example, plot storm data for the year 1940
+
+
+```r
+(res3 <- storm_shp(year = 1940))
+#> <NOAA Storm Shp Files>
+#> Path: ~/.rnoaa/storms/year/Year.1940.ibtracs_all_points.v03r06.shp
+#> Basin: <NA>
+#> Storm: <NA>
+#> Year: 1940
+#> Type: points
+res3shp <- storm_shp_read(res3)
+sp::plot(res3shp)
+```
+
+![plot of chunk unnamed-chunk-19](/public/img/2015-07-07-weather-data-with-rnoaa/unnamed-chunk-19-1.png) 
+
+  </div>
+  
+  <div class="post">
+    <h1>
       <a href="/2015/06/rerddap/">
         rerddap - General purpose R client for ERDDAP servers
       </a>
@@ -68,349 +641,370 @@
 
     <span class="post-date">24 Jun 2015</span>
 
-    <p><a href="http://upwell.pfeg.noaa.gov/erddap/information.html">ERDDAP</a> is a data server that gives you a simple, consistent way to download subsets of gridded and tabular scientific datasets in common file formats and make graphs and maps.  Besides it’s own <a href="http://upwell.pfeg.noaa.gov/erddap/rest.html">RESTful interface</a>, much of which is designed based on <a href="https://en.wikipedia.org/wiki/OPeNDAP">OPeNDAP</a>, ERDDAP can act as an OPeNDAP server and as a <a href="https://en.wikipedia.org/wiki/Web_Map_Service">WMS</a> server for gridded data.</p>
+    [ERDDAP](http://upwell.pfeg.noaa.gov/erddap/information.html) is a data server that gives you a simple, consistent way to download subsets of gridded and tabular scientific datasets in common file formats and make graphs and maps.  Besides it’s own [RESTful interface](http://upwell.pfeg.noaa.gov/erddap/rest.html), much of which is designed based on [OPeNDAP](https://en.wikipedia.org/wiki/OPeNDAP), ERDDAP can act as an OPeNDAP server and as a [WMS](https://en.wikipedia.org/wiki/Web_Map_Service) server for gridded data.
 
-<p>ERDDAP is a powerful tool - in a world of heterogeneous data, it’s often hard to combine data and serve it through the same interface, with tools for querying/filtering/subsetting the data. That is exactly what ERDDAP does. Heterogeneous data sets often have some similarities, such as latitude/longitude data and usually a time component, but other variables vary widely.</p>
+ERDDAP is a powerful tool - in a world of heterogeneous data, it's often hard to combine data and serve it through the same interface, with tools for querying/filtering/subsetting the data. That is exactly what ERDDAP does. Heterogeneous data sets often have some similarities, such as latitude/longitude data and usually a time component, but other variables vary widely.
 
-<h2 id="netcdf">NetCDF</h2>
+## NetCDF
 
-<p><code class="highlighter-rouge">rerddap</code> supports <a href="https://en.wikipedia.org/wiki/NetCDF">NetCDF format</a>, and is the default when using the <code class="highlighter-rouge">griddap()</code> function. We use <code class="highlighter-rouge">ncdf</code> by default, but you can choose to use <code class="highlighter-rouge">ncdf4</code> instead.</p>
+`rerddap` supports [NetCDF format](https://en.wikipedia.org/wiki/NetCDF), and is the default when using the `griddap()` function. We use `ncdf` by default, but you can choose to use `ncdf4` instead.
 
-<h2 id="caching">Caching</h2>
+## Caching
 
-<p>Data files downloaded are cached in a single hidden directory <code class="highlighter-rouge">~/.rerddap</code> on your machine. It’s hidden so that you don’t accidentally delete the data, but you can still easily delete the data if you like, open files, move them around, etc.</p>
+Data files downloaded are cached in a single hidden directory `~/.rerddap` on your machine. It's hidden so that you don't accidentally delete the data, but you can still easily delete the data if you like, open files, move them around, etc.
 
-<p>When you use <code class="highlighter-rouge">griddap()</code> or <code class="highlighter-rouge">tabledap()</code> functions, we construct a <a href="https://en.wikipedia.org/wiki/MD5#MD5_hashes">MD5 hash</a> from the base URL, and any query parameters - this way each query is separately cached. Once we have the hash, we look in <code class="highlighter-rouge">~/.rerddap</code> for a matching hash. If there’s a match we use that file on disk - if no match, we make a http request for the data to the ERDDAP server you specify.</p>
+When you use `griddap()` or `tabledap()` functions, we construct a [MD5 hash](https://en.wikipedia.org/wiki/MD5#MD5_hashes) from the base URL, and any query parameters - this way each query is separately cached. Once we have the hash, we look in `~/.rerddap` for a matching hash. If there's a match we use that file on disk - if no match, we make a http request for the data to the ERDDAP server you specify.
 
-<h2 id="erddap-servers">ERDDAP servers</h2>
+## ERDDAP servers
 
-<p>You can get a data.frame of ERDDAP servers using the function <code class="highlighter-rouge">servers()</code>. Most I think serve some kind of NOAA data, but there are a few that aren’t NOAA data. Here are a few:</p>
+You can get a data.frame of ERDDAP servers using the function `servers()`. Most I think serve some kind of NOAA data, but there are a few that aren't NOAA data. Here are a few:
 
-<div class="language-r highlighter-rouge"><pre class="highlight"><code><span class="n">head</span><span class="p">(</span><span class="n">servers</span><span class="p">())</span><span class="w">
-</span><span class="c1">#&gt;                                                                                            name
-#&gt; 1                                                         Marine Domain Awareness (MDA) - Italy
-#&gt; 2                                                                    Marine Institute - Ireland
-#&gt; 3                                                      CoastWatch Caribbean/Gulf of Mexico Node
-#&gt; 4                                                                    CoastWatch West Coast Node
-#&gt; 5                    NOAA IOOS CeNCOOS (Central and Northern California Ocean Observing System)
-#&gt; 6 NOAA IOOS NERACOOS (Northeastern Regional Association of Coastal and Ocean Observing Systems)
-#&gt;                                        url
-#&gt; 1 https://bluehub.jrc.ec.europa.eu/erddap/
-#&gt; 2          http://erddap.marine.ie/erddap/
-#&gt; 3      http://cwcgom.aoml.noaa.gov/erddap/
-#&gt; 4  http://coastwatch.pfeg.noaa.gov/erddap/
-#&gt; 5    http://erddap.axiomalaska.com/erddap/
-#&gt; 6          http://www.neracoos.org/erddap/
-</span></code></pre>
-</div>
 
-<h2 id="install">Install</h2>
 
-<p>From CRAN</p>
 
-<div class="language-r highlighter-rouge"><pre class="highlight"><code><span class="n">install.packages</span><span class="p">(</span><span class="s2">"rerddap"</span><span class="p">)</span><span class="w">
-</span></code></pre>
-</div>
 
-<p>Or development version from GitHub</p>
+```r
+head(servers())
+#>                                                                                            name
+#> 1                                                         Marine Domain Awareness (MDA) - Italy
+#> 2                                                                    Marine Institute - Ireland
+#> 3                                                      CoastWatch Caribbean/Gulf of Mexico Node
+#> 4                                                                    CoastWatch West Coast Node
+#> 5                    NOAA IOOS CeNCOOS (Central and Northern California Ocean Observing System)
+#> 6 NOAA IOOS NERACOOS (Northeastern Regional Association of Coastal and Ocean Observing Systems)
+#>                                        url
+#> 1 https://bluehub.jrc.ec.europa.eu/erddap/
+#> 2          http://erddap.marine.ie/erddap/
+#> 3      http://cwcgom.aoml.noaa.gov/erddap/
+#> 4  http://coastwatch.pfeg.noaa.gov/erddap/
+#> 5    http://erddap.axiomalaska.com/erddap/
+#> 6          http://www.neracoos.org/erddap/
+```
 
-<div class="language-r highlighter-rouge"><pre class="highlight"><code><span class="n">devtools</span><span class="o">::</span><span class="n">install_github</span><span class="p">(</span><span class="s2">"ropensci/rerddap"</span><span class="p">)</span><span class="w">
-</span></code></pre>
-</div>
 
-<div class="language-r highlighter-rouge"><pre class="highlight"><code><span class="n">library</span><span class="p">(</span><span class="s1">'rerddap'</span><span class="p">)</span><span class="w">
-</span></code></pre>
-</div>
+## Install
 
-<h2 id="search">Search</h2>
+From CRAN
 
-<p>First, you likely want to search for data, specifying whether to search for either <code class="highlighter-rouge">griddadp</code> or <code class="highlighter-rouge">tabledap</code> datasets. The default is <code class="highlighter-rouge">griddap</code>.</p>
 
-<div class="language-r highlighter-rouge"><pre class="highlight"><code><span class="n">ed_search</span><span class="p">(</span><span class="n">query</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s1">'size'</span><span class="p">,</span><span class="w"> </span><span class="n">which</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"table"</span><span class="p">)</span><span class="w">
-</span><span class="c1">#&gt; 11 results, showing first 20 
-#&gt;                                                                                         title
-#&gt; 1                                                                          CalCOFI Fish Sizes
-#&gt; 2                                                                        CalCOFI Larvae Sizes
-#&gt; 3                Channel Islands, Kelp Forest Monitoring, Size and Frequency, Natural Habitat
-#&gt; 4                                                         CalCOFI Larvae Counts Positive Tows
-#&gt; 5                                                                                CalCOFI Tows
-#&gt; 7                                                  OBIS - ARGOS Satellite Tracking of Animals
-#&gt; 8                                                     GLOBEC NEP MOCNESS Plankton (MOC1) Data
-#&gt; 9                                                 GLOBEC NEP Vertical Plankton Tow (VPT) Data
-#&gt; 10                            NWFSC Observer Fixed Gear Data, off West Coast of US, 2002-2006
-#&gt; 11                                 NWFSC Observer Trawl Data, off West Coast of US, 2002-2006
-#&gt; 12 AN EXPERIMENTAL DATASET: Underway Sea Surface Temperature and Salinity Aboard the Oleander
-#&gt;             dataset_id
-#&gt; 1     erdCalCOFIfshsiz
-#&gt; 2     erdCalCOFIlrvsiz
-#&gt; 3       erdCinpKfmSFNH
-#&gt; 4  erdCalCOFIlrvcntpos
-#&gt; 5       erdCalCOFItows
-#&gt; 7            aadcArgos
-#&gt; 8        erdGlobecMoc1
-#&gt; 9         erdGlobecVpt
-#&gt; 10  nwioosObsFixed2002
-#&gt; 11  nwioosObsTrawl2002
-#&gt; 12            nodcPJJU
-</span></code></pre>
-</div>
+```r
+install.packages("rerddap")
+```
 
-<div class="language-r highlighter-rouge"><pre class="highlight"><code><span class="n">ed_search</span><span class="p">(</span><span class="n">query</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s1">'size'</span><span class="p">,</span><span class="w"> </span><span class="n">which</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"grid"</span><span class="p">)</span><span class="w">
-</span><span class="c1">#&gt; 6 results, showing first 20 
-#&gt;                                                                                                   title
-#&gt; 6                                                       NOAA Global Coral Bleaching Monitoring Products
-#&gt; 13        USGS COAWST Forecast, US East Coast and Gulf of Mexico (Experimental) [time][eta_rho][xi_rho]
-#&gt; 14            USGS COAWST Forecast, US East Coast and Gulf of Mexico (Experimental) [time][eta_u][xi_u]
-#&gt; 15            USGS COAWST Forecast, US East Coast and Gulf of Mexico (Experimental) [time][eta_v][xi_v]
-#&gt; 16 USGS COAWST Forecast, US East Coast and Gulf of Mexico (Experimental) [time][s_rho][eta_rho][xi_rho]
-#&gt; 17  USGS COAWST Forecast, US East Coast and Gulf of Mexico (Experimental) [time][Nbed][eta_rho][xi_rho]
-#&gt;             dataset_id
-#&gt; 6             NOAA_DHW
-#&gt; 13 whoi_ed12_89ce_9592
-#&gt; 14 whoi_61c3_0b5d_cd61
-#&gt; 15 whoi_62d0_9d64_c8ff
-#&gt; 16 whoi_7dd7_db97_4bbe
-#&gt; 17 whoi_a4fb_2c9c_16a7
-</span></code></pre>
-</div>
+Or development version from GitHub
 
-<p>This gives back dataset titles and identifiers - with which you should be able to get a sense for which dataset you may want to fetch.</p>
 
-<h2 id="information">Information</h2>
+```r
+devtools::install_github("ropensci/rerddap")
+```
 
-<p>After searching you can get more information on a single dataset</p>
 
-<div class="language-r highlighter-rouge"><pre class="highlight"><code><span class="n">info</span><span class="p">(</span><span class="s1">'whoi_62d0_9d64_c8ff'</span><span class="p">)</span><span class="w">
-</span><span class="c1">#&gt; &lt;ERDDAP info&gt; whoi_62d0_9d64_c8ff 
-#&gt;  Dimensions (range):  
-#&gt;      time: (2012-06-25T01:00:00Z, 2015-06-24T00:00:00Z) 
-#&gt;      eta_v: (0, 334) 
-#&gt;      xi_v: (0, 895) 
-#&gt;  Variables:  
-#&gt;      bedload_Vsand_01: 
-#&gt;          Units: kilogram meter-1 s-1 
-#&gt;      bedload_Vsand_02: 
-#&gt;          Units: kilogram meter-1 s-1 
-</span><span class="n">...</span><span class="w">
-</span></code></pre>
-</div>
+```r
+library('rerddap')
+```
 
-<p>Which is a simple S3 list but prints out pretty, so it’s easy to quickly scan the printed output and see what you need to see to proceed. That is, in the next step you want to get the dataset, and you’ll want to specify your search using some combination of values for latitude, longitude, and time.</p>
+## Search
 
-<h2 id="griddap-gridded-data">griddap (gridded) data</h2>
+First, you likely want to search for data, specifying whether to search for either `griddadp` or `tabledap` datasets. The default is `griddap`. 
 
-<p>First, get information on a dataset to see time range, lat/long range, and variables.</p>
 
-<div class="language-r highlighter-rouge"><pre class="highlight"><code><span class="p">(</span><span class="n">out</span><span class="w"> </span><span class="o">&lt;-</span><span class="w"> </span><span class="n">info</span><span class="p">(</span><span class="s1">'noaa_esrl_027d_0fb5_5d38'</span><span class="p">))</span><span class="w">
-</span><span class="c1">#&gt; &lt;ERDDAP info&gt; noaa_esrl_027d_0fb5_5d38 
-#&gt;  Dimensions (range):  
-#&gt;      time: (1850-01-01T00:00:00Z, 2014-05-01T00:00:00Z) 
-#&gt;      latitude: (87.5, -87.5) 
-#&gt;      longitude: (-177.5, 177.5) 
-#&gt;  Variables:  
-#&gt;      air: 
-#&gt;          Range: -20.9, 19.5 
-#&gt;          Units: degC
-</span></code></pre>
-</div>
+```r
+ed_search(query = 'size', which = "table")
+#> 11 results, showing first 20 
+#>                                                                                         title
+#> 1                                                                          CalCOFI Fish Sizes
+#> 2                                                                        CalCOFI Larvae Sizes
+#> 3                Channel Islands, Kelp Forest Monitoring, Size and Frequency, Natural Habitat
+#> 4                                                         CalCOFI Larvae Counts Positive Tows
+#> 5                                                                                CalCOFI Tows
+#> 7                                                  OBIS - ARGOS Satellite Tracking of Animals
+#> 8                                                     GLOBEC NEP MOCNESS Plankton (MOC1) Data
+#> 9                                                 GLOBEC NEP Vertical Plankton Tow (VPT) Data
+#> 10                            NWFSC Observer Fixed Gear Data, off West Coast of US, 2002-2006
+#> 11                                 NWFSC Observer Trawl Data, off West Coast of US, 2002-2006
+#> 12 AN EXPERIMENTAL DATASET: Underway Sea Surface Temperature and Salinity Aboard the Oleander
+#>             dataset_id
+#> 1     erdCalCOFIfshsiz
+#> 2     erdCalCOFIlrvsiz
+#> 3       erdCinpKfmSFNH
+#> 4  erdCalCOFIlrvcntpos
+#> 5       erdCalCOFItows
+#> 7            aadcArgos
+#> 8        erdGlobecMoc1
+#> 9         erdGlobecVpt
+#> 10  nwioosObsFixed2002
+#> 11  nwioosObsTrawl2002
+#> 12            nodcPJJU
+```
 
-<p>Then query for gridded data using the <code class="highlighter-rouge">griddap()</code> function</p>
 
-<div class="language-r highlighter-rouge"><pre class="highlight"><code><span class="p">(</span><span class="n">res</span><span class="w"> </span><span class="o">&lt;-</span><span class="w"> </span><span class="n">griddap</span><span class="p">(</span><span class="n">out</span><span class="p">,</span><span class="w">
-  </span><span class="n">time</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nf">c</span><span class="p">(</span><span class="s1">'2012-01-01'</span><span class="p">,</span><span class="w"> </span><span class="s1">'2012-01-30'</span><span class="p">),</span><span class="w">
-  </span><span class="n">latitude</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nf">c</span><span class="p">(</span><span class="m">21</span><span class="p">,</span><span class="w"> </span><span class="m">10</span><span class="p">),</span><span class="w">
-  </span><span class="n">longitude</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nf">c</span><span class="p">(</span><span class="m">-80</span><span class="p">,</span><span class="w"> </span><span class="m">-70</span><span class="p">)</span><span class="w">
-</span><span class="p">))</span><span class="w">
-</span><span class="c1">#&gt; &lt;ERDDAP griddap&gt; noaa_esrl_027d_0fb5_5d38
-#&gt;    Path: [~/.rerddap/648ed11e8b911b65e39eb63c8df339df.nc]
-#&gt;    Last updated: [2015-05-09 08:31:10]
-#&gt;    File size:    [0 mb]
-#&gt;    Dimensions (dims/vars):   [3 X 1]
-#&gt;    Dim names: time, latitude, longitude
-#&gt;    Variable names: CRUTEM3: Surface Air Temperature Monthly Anomaly
-#&gt;    data.frame (rows/columns):   [18 X 4]
-#&gt;                    time latitude longitude  air
-#&gt; 1  2012-01-01T00:00:00Z     22.5     -77.5   NA
-#&gt; 2  2012-01-01T00:00:00Z     22.5     -77.5   NA
-#&gt; 3  2012-01-01T00:00:00Z     22.5     -77.5   NA
-#&gt; 4  2012-01-01T00:00:00Z     22.5     -77.5 -0.1
-#&gt; 5  2012-01-01T00:00:00Z     22.5     -77.5   NA
-#&gt; 6  2012-01-01T00:00:00Z     22.5     -77.5 -0.2
-#&gt; 7  2012-01-01T00:00:00Z     17.5     -72.5  0.2
-#&gt; 8  2012-01-01T00:00:00Z     17.5     -72.5   NA
-#&gt; 9  2012-01-01T00:00:00Z     17.5     -72.5  0.3
-#&gt; 10 2012-02-01T00:00:00Z     17.5     -72.5   NA
-#&gt; ..                  ...      ...       ...  ...
-</span></code></pre>
-</div>
+```r
+ed_search(query = 'size', which = "grid")
+#> 6 results, showing first 20 
+#>                                                                                                   title
+#> 6                                                       NOAA Global Coral Bleaching Monitoring Products
+#> 13        USGS COAWST Forecast, US East Coast and Gulf of Mexico (Experimental) [time][eta_rho][xi_rho]
+#> 14            USGS COAWST Forecast, US East Coast and Gulf of Mexico (Experimental) [time][eta_u][xi_u]
+#> 15            USGS COAWST Forecast, US East Coast and Gulf of Mexico (Experimental) [time][eta_v][xi_v]
+#> 16 USGS COAWST Forecast, US East Coast and Gulf of Mexico (Experimental) [time][s_rho][eta_rho][xi_rho]
+#> 17  USGS COAWST Forecast, US East Coast and Gulf of Mexico (Experimental) [time][Nbed][eta_rho][xi_rho]
+#>             dataset_id
+#> 6             NOAA_DHW
+#> 13 whoi_ed12_89ce_9592
+#> 14 whoi_61c3_0b5d_cd61
+#> 15 whoi_62d0_9d64_c8ff
+#> 16 whoi_7dd7_db97_4bbe
+#> 17 whoi_a4fb_2c9c_16a7
+```
 
-<p>The output of <code class="highlighter-rouge">griddap()</code> is a list that you can explore further. Get the summary</p>
+This gives back dataset titles and identifiers - with which you should be able to get a sense for which dataset you may want to fetch. 
 
-<div class="language-r highlighter-rouge"><pre class="highlight"><code><span class="n">res</span><span class="o">$</span><span class="n">summary</span><span class="w">
-</span><span class="c1">#&gt; [1] "file ~/.rerddap/648ed11e8b911b65e39eb63c8df339df.nc has 3 dimensions:"
-#&gt; [1] "time   Size: 2"
-#&gt; [1] "latitude   Size: 3"
-#&gt; [1] "longitude   Size: 3"
-#&gt; [1] "------------------------"
-#&gt; [1] "file ~/.rerddap/648ed11e8b911b65e39eb63c8df339df.nc has 1 variables:"
-#&gt; [1] "float air[longitude,latitude,time]  Longname:CRUTEM3: Surface Air Temperature Monthly Anomaly Missval:-9.96920996838687e+36"
-</span></code></pre>
-</div>
+## Information
 
-<p>Or get the dimension variables (just the names of the variables for brevity here)</p>
+After searching you can get more information on a single dataset
 
-<div class="language-r highlighter-rouge"><pre class="highlight"><code><span class="nf">names</span><span class="p">(</span><span class="n">res</span><span class="o">$</span><span class="n">summary</span><span class="o">$</span><span class="n">dim</span><span class="p">)</span><span class="w">
-</span><span class="c1">#&gt; [1] "time"      "latitude"  "longitude"
-</span></code></pre>
-</div>
 
-<p>Get the data.frame (beware: you may want to just look at the <code class="highlighter-rouge">head</code> of the data.frame if large)</p>
+```r
+info('whoi_62d0_9d64_c8ff')
+#> <ERDDAP info> whoi_62d0_9d64_c8ff 
+#>  Dimensions (range):  
+#>      time: (2012-06-25T01:00:00Z, 2015-06-24T00:00:00Z) 
+#>      eta_v: (0, 334) 
+#>      xi_v: (0, 895) 
+#>  Variables:  
+#>      bedload_Vsand_01: 
+#>          Units: kilogram meter-1 s-1 
+#>      bedload_Vsand_02: 
+#>          Units: kilogram meter-1 s-1 
+...
+```
 
-<div class="language-r highlighter-rouge"><pre class="highlight"><code><span class="n">res</span><span class="o">$</span><span class="n">data</span><span class="w">
-</span><span class="c1">#&gt;                    time latitude longitude   air
-#&gt; 1  2012-01-01T00:00:00Z     22.5     -77.5    NA
-#&gt; 2  2012-01-01T00:00:00Z     22.5     -77.5    NA
-#&gt; 3  2012-01-01T00:00:00Z     22.5     -77.5    NA
-#&gt; 4  2012-01-01T00:00:00Z     22.5     -77.5 -0.10
-#&gt; 5  2012-01-01T00:00:00Z     22.5     -77.5    NA
-#&gt; 6  2012-01-01T00:00:00Z     22.5     -77.5 -0.20
-#&gt; 7  2012-01-01T00:00:00Z     17.5     -72.5  0.20
-#&gt; 8  2012-01-01T00:00:00Z     17.5     -72.5    NA
-#&gt; 9  2012-01-01T00:00:00Z     17.5     -72.5  0.30
-#&gt; 10 2012-02-01T00:00:00Z     17.5     -72.5    NA
-#&gt; 11 2012-02-01T00:00:00Z     17.5     -72.5    NA
-#&gt; 12 2012-02-01T00:00:00Z     17.5     -72.5    NA
-#&gt; 13 2012-02-01T00:00:00Z     12.5     -67.5  0.40
-#&gt; 14 2012-02-01T00:00:00Z     12.5     -67.5    NA
-#&gt; 15 2012-02-01T00:00:00Z     12.5     -67.5  0.20
-#&gt; 16 2012-02-01T00:00:00Z     12.5     -67.5  0.00
-#&gt; 17 2012-02-01T00:00:00Z     12.5     -67.5    NA
-#&gt; 18 2012-02-01T00:00:00Z     12.5     -67.5  0.32
-</span></code></pre>
-</div>
+Which is a simple S3 list but prints out pretty, so it's easy to quickly scan the printed output and see what you need to see to proceed. That is, in the next step you want to get the dataset, and you'll want to specify your search using some combination of values for latitude, longitude, and time. 
 
-<p>You can actually still explore the original netcdf summary object, e.g.,</p>
+## griddap (gridded) data
 
-<div class="language-r highlighter-rouge"><pre class="highlight"><code><span class="n">res</span><span class="o">$</span><span class="n">summary</span><span class="o">$</span><span class="n">dim</span><span class="o">$</span><span class="n">time</span><span class="w">
-</span><span class="c1">#&gt; $name
-#&gt; [1] "time"
-#&gt; 
-#&gt; $len
-#&gt; [1] 2
-#&gt; 
-#&gt; $unlim
-#&gt; [1] FALSE
-#&gt; 
-#&gt; $id
-#&gt; [1] 1
-#&gt; 
-#&gt; $dimvarid
-#&gt; [1] 1
-#&gt; 
-#&gt; $units
-#&gt; [1] "seconds since 1970-01-01T00:00:00Z"
-#&gt; 
-#&gt; $vals
-#&gt; [1] 1325376000 1328054400
-#&gt; 
-#&gt; $create_dimvar
-#&gt; [1] TRUE
-#&gt; 
-#&gt; attr(,"class")
-#&gt; [1] "dim.ncdf"
-</span></code></pre>
-</div>
+First, get information on a dataset to see time range, lat/long range, and variables.
 
-<h2 id="tabledap-tabular-data">tabledap (tabular) data</h2>
 
-<p><code class="highlighter-rouge">tabledap</code> is data that is not gridded by lat/lon/time. In addition, the query interface is a bit different. Notice that you can do less than, more than, equal to type queries, but they are specified as character strings.</p>
+```r
+(out <- info('noaa_esrl_027d_0fb5_5d38'))
+#> <ERDDAP info> noaa_esrl_027d_0fb5_5d38 
+#>  Dimensions (range):  
+#>      time: (1850-01-01T00:00:00Z, 2014-05-01T00:00:00Z) 
+#>      latitude: (87.5, -87.5) 
+#>      longitude: (-177.5, 177.5) 
+#>  Variables:  
+#>      air: 
+#>          Range: -20.9, 19.5 
+#>          Units: degC
+```
 
-<div class="language-r highlighter-rouge"><pre class="highlight"><code><span class="p">(</span><span class="n">out</span><span class="w"> </span><span class="o">&lt;-</span><span class="w"> </span><span class="n">info</span><span class="p">(</span><span class="s1">'erdCalCOFIfshsiz'</span><span class="p">))</span><span class="w">
-</span><span class="c1">#&gt; &lt;ERDDAP info&gt; erdCalCOFIfshsiz 
-#&gt;  Variables:  
-#&gt;      calcofi_species_code: 
-#&gt;          Range: 19, 1550 
-#&gt;      common_name: 
-#&gt;      cruise: 
-#&gt;      fish_1000m3: 
-#&gt;          Units: Fish per 1,000 cubic meters of water sampled 
-#&gt;      fish_count: 
-#&gt;      fish_size: 
-</span><span class="n">...</span><span class="w">
-</span></code></pre>
-</div>
+Then query for gridded data using the `griddap()` function
 
-<div class="language-r highlighter-rouge"><pre class="highlight"><code><span class="p">(</span><span class="n">dat</span><span class="w"> </span><span class="o">&lt;-</span><span class="w"> </span><span class="n">tabledap</span><span class="p">(</span><span class="n">out</span><span class="p">,</span><span class="w"> </span><span class="s1">'time&gt;=2001-07-07'</span><span class="p">,</span><span class="w"> </span><span class="s1">'time&lt;=2001-07-10'</span><span class="p">,</span><span class="w"> 
-                 </span><span class="n">fields</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nf">c</span><span class="p">(</span><span class="s1">'longitude'</span><span class="p">,</span><span class="w"> </span><span class="s1">'latitude'</span><span class="p">,</span><span class="w"> </span><span class="s1">'fish_size'</span><span class="p">,</span><span class="w"> </span><span class="s1">'itis_tsn'</span><span class="p">,</span><span class="w"> </span><span class="s1">'scientific_name'</span><span class="p">)))</span><span class="w">
-</span><span class="c1">#&gt; &lt;ERDDAP tabledap&gt; erdCalCOFIfshsiz
-#&gt;    Path: [~/.rerddap/f013f9ee09bdb4184928d533e575e948.csv]
-#&gt;    Last updated: [2015-05-09 08:31:21]
-#&gt;    File size:    [0.03 mb]
-#&gt;    Dimensions:   [558 X 5]
-#&gt; 
-#&gt;     longitude  latitude fish_size itis_tsn       scientific_name
-#&gt; 2     -118.26    33.255      22.9   623745 Nannobrachium ritteri
-#&gt; 3     -118.26    33.255      22.9   623745 Nannobrachium ritteri
-#&gt; 4  -118.10667 32.738335      31.5   623625  Lipolagus ochotensis
-#&gt; 5  -118.10667 32.738335      48.3   623625  Lipolagus ochotensis
-#&gt; 6  -118.10667 32.738335      15.5   162221 Argyropelecus sladeni
-#&gt; 7  -118.10667 32.738335      16.3   162221 Argyropelecus sladeni
-#&gt; 8  -118.10667 32.738335      17.8   162221 Argyropelecus sladeni
-#&gt; 9  -118.10667 32.738335      18.2   162221 Argyropelecus sladeni
-#&gt; 10 -118.10667 32.738335      19.2   162221 Argyropelecus sladeni
-#&gt; 11 -118.10667 32.738335      20.0   162221 Argyropelecus sladeni
-#&gt; ..        ...       ...       ...      ...                   ...
-</span></code></pre>
-</div>
 
-<p>Since both <code class="highlighter-rouge">griddap()</code> and <code class="highlighter-rouge">tabledap()</code> give back data.frame’s, it’s easy to do downstream manipulation. For example, we can use <code class="highlighter-rouge">dplyr</code> to filter, summarize, group, and sort:</p>
+```r
+(res <- griddap(out,
+  time = c('2012-01-01', '2012-01-30'),
+  latitude = c(21, 10),
+  longitude = c(-80, -70)
+))
+#> <ERDDAP griddap> noaa_esrl_027d_0fb5_5d38
+#>    Path: [~/.rerddap/648ed11e8b911b65e39eb63c8df339df.nc]
+#>    Last updated: [2015-05-09 08:31:10]
+#>    File size:    [0 mb]
+#>    Dimensions (dims/vars):   [3 X 1]
+#>    Dim names: time, latitude, longitude
+#>    Variable names: CRUTEM3: Surface Air Temperature Monthly Anomaly
+#>    data.frame (rows/columns):   [18 X 4]
+#>                    time latitude longitude  air
+#> 1  2012-01-01T00:00:00Z     22.5     -77.5   NA
+#> 2  2012-01-01T00:00:00Z     22.5     -77.5   NA
+#> 3  2012-01-01T00:00:00Z     22.5     -77.5   NA
+#> 4  2012-01-01T00:00:00Z     22.5     -77.5 -0.1
+#> 5  2012-01-01T00:00:00Z     22.5     -77.5   NA
+#> 6  2012-01-01T00:00:00Z     22.5     -77.5 -0.2
+#> 7  2012-01-01T00:00:00Z     17.5     -72.5  0.2
+#> 8  2012-01-01T00:00:00Z     17.5     -72.5   NA
+#> 9  2012-01-01T00:00:00Z     17.5     -72.5  0.3
+#> 10 2012-02-01T00:00:00Z     17.5     -72.5   NA
+#> ..                  ...      ...       ...  ...
+```
 
-<div class="language-r highlighter-rouge"><pre class="highlight"><code><span class="n">library</span><span class="p">(</span><span class="s2">"dplyr"</span><span class="p">)</span><span class="w">
-</span><span class="n">dat</span><span class="o">$</span><span class="n">fish_size</span><span class="w"> </span><span class="o">&lt;-</span><span class="w"> </span><span class="nf">as.numeric</span><span class="p">(</span><span class="n">dat</span><span class="o">$</span><span class="n">fish_size</span><span class="p">)</span><span class="w">
-</span><span class="n">df</span><span class="w"> </span><span class="o">&lt;-</span><span class="w"> </span><span class="n">tbl_df</span><span class="p">(</span><span class="n">dat</span><span class="p">)</span><span class="w"> </span><span class="o">%&gt;%</span><span class="w"> 
-  </span><span class="n">filter</span><span class="p">(</span><span class="n">fish_size</span><span class="w"> </span><span class="o">&gt;</span><span class="w"> </span><span class="m">30</span><span class="p">)</span><span class="w"> </span><span class="o">%&gt;%</span><span class="w"> 
-  </span><span class="n">group_by</span><span class="p">(</span><span class="n">scientific_name</span><span class="p">)</span><span class="w"> </span><span class="o">%&gt;%</span><span class="w"> 
-  </span><span class="n">summarise</span><span class="p">(</span><span class="n">mean_size</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">mean</span><span class="p">(</span><span class="n">fish_size</span><span class="p">))</span><span class="w"> </span><span class="o">%&gt;%</span><span class="w"> 
-  </span><span class="n">arrange</span><span class="p">(</span><span class="n">desc</span><span class="p">(</span><span class="n">mean_size</span><span class="p">))</span><span class="w">
-</span><span class="n">df</span><span class="w">
-</span><span class="c1">#&gt; Source: local data frame [20 x 2]
-#&gt; 
-#&gt;                 scientific_name mean_size
-#&gt; 1       Idiacanthus antrostomus 253.00000
-#&gt; 2            Stomias atriventer 189.25000
-#&gt; 3            Lestidiops ringens  98.70000
-#&gt; 4     Tarletonbeania crenularis  56.50000
-#&gt; 5      Ceratoscopelus townsendi  53.70000
-#&gt; 6     Stenobrachius leucopsarus  47.74538
-#&gt; 7               Sardinops sagax  47.00000
-#&gt; 8         Nannobrachium ritteri  43.30250
-#&gt; 9         Bathylagoides wesethi  43.09167
-#&gt; 10         Vinciguerria lucetia  42.00000
-#&gt; 11       Cyclothone acclinidens  40.80000
-#&gt; 12         Lipolagus ochotensis  39.72500
-#&gt; 13        Leuroglossus stilbius  38.35385
-#&gt; 14        Triphoturus mexicanus  38.21342
-#&gt; 15                Diaphus theta  37.88571
-#&gt; 16       Trachipterus altivelis  37.70000
-#&gt; 17 Symbolophorus californiensis  37.66000
-#&gt; 18         Nannobrachium regale  37.50000
-#&gt; 19         Merluccius productus  36.61333
-#&gt; 20        Argyropelecus sladeni  32.43333
-</span></code></pre>
-</div>
+The output of `griddap()` is a list that you can explore further. Get the summary
 
-<p>Then make a cute little plot</p>
 
-<div class="language-r highlighter-rouge"><pre class="highlight"><code><span class="n">library</span><span class="p">(</span><span class="s2">"ggplot2"</span><span class="p">)</span><span class="w">
-</span><span class="n">ggplot</span><span class="p">(</span><span class="n">df</span><span class="p">,</span><span class="w"> </span><span class="n">aes</span><span class="p">(</span><span class="n">reorder</span><span class="p">(</span><span class="n">scientific_name</span><span class="p">,</span><span class="w"> </span><span class="n">mean_size</span><span class="p">),</span><span class="w"> </span><span class="n">mean_size</span><span class="p">))</span><span class="w"> </span><span class="o">+</span><span class="w">
-  </span><span class="n">geom_bar</span><span class="p">(</span><span class="n">stat</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"identity"</span><span class="p">)</span><span class="w"> </span><span class="o">+</span><span class="w">
-  </span><span class="n">coord_flip</span><span class="p">()</span><span class="w"> </span><span class="o">+</span><span class="w"> 
-  </span><span class="n">theme_grey</span><span class="p">(</span><span class="n">base_size</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="m">20</span><span class="p">)</span><span class="w"> </span><span class="o">+</span><span class="w">
-  </span><span class="n">labs</span><span class="p">(</span><span class="n">y</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"Mean Size"</span><span class="p">,</span><span class="w"> </span><span class="n">x</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"Species"</span><span class="p">)</span><span class="w">
-</span></code></pre>
-</div>
+```r
+res$summary
+#> [1] "file ~/.rerddap/648ed11e8b911b65e39eb63c8df339df.nc has 3 dimensions:"
+#> [1] "time   Size: 2"
+#> [1] "latitude   Size: 3"
+#> [1] "longitude   Size: 3"
+#> [1] "------------------------"
+#> [1] "file ~/.rerddap/648ed11e8b911b65e39eb63c8df339df.nc has 1 variables:"
+#> [1] "float air[longitude,latitude,time]  Longname:CRUTEM3: Surface Air Temperature Monthly Anomaly Missval:-9.96920996838687e+36"
+```
 
-<p><img src="/public/img/2015-06-24-rerddap/unnamed-chunk-19-1.png" alt="plot of chunk unnamed-chunk-19" /></p>
+Or get the dimension variables (just the names of the variables for brevity here)
+
+
+```r
+names(res$summary$dim)
+#> [1] "time"      "latitude"  "longitude"
+```
+
+Get the data.frame (beware: you may want to just look at the `head` of the data.frame if large)
+
+
+```r
+res$data
+#>                    time latitude longitude   air
+#> 1  2012-01-01T00:00:00Z     22.5     -77.5    NA
+#> 2  2012-01-01T00:00:00Z     22.5     -77.5    NA
+#> 3  2012-01-01T00:00:00Z     22.5     -77.5    NA
+#> 4  2012-01-01T00:00:00Z     22.5     -77.5 -0.10
+#> 5  2012-01-01T00:00:00Z     22.5     -77.5    NA
+#> 6  2012-01-01T00:00:00Z     22.5     -77.5 -0.20
+#> 7  2012-01-01T00:00:00Z     17.5     -72.5  0.20
+#> 8  2012-01-01T00:00:00Z     17.5     -72.5    NA
+#> 9  2012-01-01T00:00:00Z     17.5     -72.5  0.30
+#> 10 2012-02-01T00:00:00Z     17.5     -72.5    NA
+#> 11 2012-02-01T00:00:00Z     17.5     -72.5    NA
+#> 12 2012-02-01T00:00:00Z     17.5     -72.5    NA
+#> 13 2012-02-01T00:00:00Z     12.5     -67.5  0.40
+#> 14 2012-02-01T00:00:00Z     12.5     -67.5    NA
+#> 15 2012-02-01T00:00:00Z     12.5     -67.5  0.20
+#> 16 2012-02-01T00:00:00Z     12.5     -67.5  0.00
+#> 17 2012-02-01T00:00:00Z     12.5     -67.5    NA
+#> 18 2012-02-01T00:00:00Z     12.5     -67.5  0.32
+```
+
+You can actually still explore the original netcdf summary object, e.g., 
+
+
+```r
+res$summary$dim$time
+#> $name
+#> [1] "time"
+#> 
+#> $len
+#> [1] 2
+#> 
+#> $unlim
+#> [1] FALSE
+#> 
+#> $id
+#> [1] 1
+#> 
+#> $dimvarid
+#> [1] 1
+#> 
+#> $units
+#> [1] "seconds since 1970-01-01T00:00:00Z"
+#> 
+#> $vals
+#> [1] 1325376000 1328054400
+#> 
+#> $create_dimvar
+#> [1] TRUE
+#> 
+#> attr(,"class")
+#> [1] "dim.ncdf"
+```
+
+## tabledap (tabular) data
+
+`tabledap` is data that is not gridded by lat/lon/time. In addition, the query interface is a bit different. Notice that you can do less than, more than, equal to type queries, but they are specified as character strings. 
+
+
+```r
+(out <- info('erdCalCOFIfshsiz'))
+#> <ERDDAP info> erdCalCOFIfshsiz 
+#>  Variables:  
+#>      calcofi_species_code: 
+#>          Range: 19, 1550 
+#>      common_name: 
+#>      cruise: 
+#>      fish_1000m3: 
+#>          Units: Fish per 1,000 cubic meters of water sampled 
+#>      fish_count: 
+#>      fish_size: 
+...
+```
+
+
+```r
+(dat <- tabledap(out, 'time>=2001-07-07', 'time<=2001-07-10', 
+                 fields = c('longitude', 'latitude', 'fish_size', 'itis_tsn', 'scientific_name')))
+#> <ERDDAP tabledap> erdCalCOFIfshsiz
+#>    Path: [~/.rerddap/f013f9ee09bdb4184928d533e575e948.csv]
+#>    Last updated: [2015-05-09 08:31:21]
+#>    File size:    [0.03 mb]
+#>    Dimensions:   [558 X 5]
+#> 
+#>     longitude  latitude fish_size itis_tsn       scientific_name
+#> 2     -118.26    33.255      22.9   623745 Nannobrachium ritteri
+#> 3     -118.26    33.255      22.9   623745 Nannobrachium ritteri
+#> 4  -118.10667 32.738335      31.5   623625  Lipolagus ochotensis
+#> 5  -118.10667 32.738335      48.3   623625  Lipolagus ochotensis
+#> 6  -118.10667 32.738335      15.5   162221 Argyropelecus sladeni
+#> 7  -118.10667 32.738335      16.3   162221 Argyropelecus sladeni
+#> 8  -118.10667 32.738335      17.8   162221 Argyropelecus sladeni
+#> 9  -118.10667 32.738335      18.2   162221 Argyropelecus sladeni
+#> 10 -118.10667 32.738335      19.2   162221 Argyropelecus sladeni
+#> 11 -118.10667 32.738335      20.0   162221 Argyropelecus sladeni
+#> ..        ...       ...       ...      ...                   ...
+```
+
+Since both `griddap()` and `tabledap()` give back data.frame's, it's easy to do downstream manipulation. For example, we can use `dplyr` to filter, summarize, group, and sort:
+
+
+```r
+library("dplyr")
+dat$fish_size <- as.numeric(dat$fish_size)
+df <- tbl_df(dat) %>% 
+  filter(fish_size > 30) %>% 
+  group_by(scientific_name) %>% 
+  summarise(mean_size = mean(fish_size)) %>% 
+  arrange(desc(mean_size))
+df
+#> Source: local data frame [20 x 2]
+#> 
+#>                 scientific_name mean_size
+#> 1       Idiacanthus antrostomus 253.00000
+#> 2            Stomias atriventer 189.25000
+#> 3            Lestidiops ringens  98.70000
+#> 4     Tarletonbeania crenularis  56.50000
+#> 5      Ceratoscopelus townsendi  53.70000
+#> 6     Stenobrachius leucopsarus  47.74538
+#> 7               Sardinops sagax  47.00000
+#> 8         Nannobrachium ritteri  43.30250
+#> 9         Bathylagoides wesethi  43.09167
+#> 10         Vinciguerria lucetia  42.00000
+#> 11       Cyclothone acclinidens  40.80000
+#> 12         Lipolagus ochotensis  39.72500
+#> 13        Leuroglossus stilbius  38.35385
+#> 14        Triphoturus mexicanus  38.21342
+#> 15                Diaphus theta  37.88571
+#> 16       Trachipterus altivelis  37.70000
+#> 17 Symbolophorus californiensis  37.66000
+#> 18         Nannobrachium regale  37.50000
+#> 19         Merluccius productus  36.61333
+#> 20        Argyropelecus sladeni  32.43333
+```
+
+Then make a cute little plot
+
+
+```r
+library("ggplot2")
+ggplot(df, aes(reorder(scientific_name, mean_size), mean_size)) +
+  geom_bar(stat = "identity") +
+  coord_flip() + 
+  theme_grey(base_size = 20) +
+  labs(y = "Mean Size", x = "Species")
+```
+
+![plot of chunk unnamed-chunk-19](/public/img/2015-06-24-rerddap/unnamed-chunk-19-1.png) 
 
   </div>
   
@@ -423,338 +1017,151 @@
 
     <span class="post-date">08 Jun 2015</span>
 
-    <p><a href="https://www.idigbio.org/">iDigBio</a>, or <em>Integrated Digitized Biocollections</em>, collects and provides access to species occurrence data, and associated metadata (e.g., images of specimens, when provided). They collect data from <a href="https://www.idigbio.org/portal/publishers">a lot of different providers</a>. They have a nice web interface for searching, check out <a href="https://www.idigbio.org/portal/search">idigbio.org/portal/search</a>.</p>
+    [iDigBio](https://www.idigbio.org/), or _Integrated Digitized Biocollections_, collects and provides access to species occurrence data, and associated metadata (e.g., images of specimens, when provided). They collect data from [a lot of different providers](https://www.idigbio.org/portal/publishers). They have a nice web interface for searching, check out [idigbio.org/portal/search](https://www.idigbio.org/portal/search). 
 
-<p><code class="highlighter-rouge">spocc</code> is a package we’ve been working on at <a href="http://ropensci.org/">rOpenSci</a> for a while now - it is a one stop shop for retrieving species ocurrence data. As new sources of species occurrence data come to our attention, and are available via a RESTful API, we incorporate them into <code class="highlighter-rouge">spocc</code>.</p>
+`spocc` is a package we've been working on at [rOpenSci](http://ropensci.org/) for a while now - it is a one stop shop for retrieving species ocurrence data. As new sources of species occurrence data come to our attention, and are available via a RESTful API, we incorporate them into `spocc`. 
 
-<p>I attended last week a <a href="https://github.com/idigbio-api-hackathon/HackathonCentral/">hackathon put on by iDigBio</a>. One of the projects I worked on was integrating iDigBio into <code class="highlighter-rouge">spocc</code>.</p>
+I attended last week a [hackathon put on by iDigBio](https://github.com/idigbio-api-hackathon/HackathonCentral/). One of the projects I worked on was integrating iDigBio into `spocc`.  
 
-<p>With the addition of iDigBio, we now have in <code class="highlighter-rouge">spocc</code>:</p>
+With the addition of iDigBio, we now have in `spocc`:
 
-<ul>
-  <li><a href="http://www.gbif.org/">GBIF</a></li>
-  <li><a href="http://www.inaturalist.org/">iNaturalist</a></li>
-  <li><a href="http://bison.usgs.ornl.gov/">USGS Bison</a></li>
-  <li><a href="http://ebird.org/content/ebird/">eBird</a></li>
-  <li><a href="https://ecoengine.berkeley.edu/">Ecoengine</a></li>
-  <li><a href="http://vertnet.org/">Vertnet</a></li>
-  <li><a href="https://www.idigbio.org/">iDigBio</a></li>
-</ul>
+* [GBIF](http://www.gbif.org/)
+* [iNaturalist](http://www.inaturalist.org/)
+* [USGS Bison](http://bison.usgs.ornl.gov/)
+* [eBird](http://ebird.org/content/ebird/)
+* [Ecoengine](https://ecoengine.berkeley.edu/)
+* [Vertnet](http://vertnet.org/)
+* [iDigBio](https://www.idigbio.org/)
 
-<p>The following is a quick demo of getting iDigBio data in <code class="highlighter-rouge">spocc</code></p>
+The following is a quick demo of getting iDigBio data in `spocc`
 
-<h2 id="install">Install</h2>
+## Install
 
-<p>Get updated versions of <code class="highlighter-rouge">rgbif</code> and <code class="highlighter-rouge">ridigbio</code> first. And get <code class="highlighter-rouge">leaflet</code> to make an interactive map.</p>
+Get updated versions of `rgbif` and `ridigbio` first. And get `leaflet` to make an interactive map.
 
-<div class="language-r highlighter-rouge"><pre class="highlight"><code><span class="n">devtools</span><span class="o">::</span><span class="n">install_github</span><span class="p">(</span><span class="s2">"ropensci/rgbif"</span><span class="p">,</span><span class="w"> </span><span class="s2">"iDigBio/ridigbio"</span><span class="p">,</span><span class="w"> </span><span class="s2">"rstudio/leaflet"</span><span class="p">)</span><span class="w">
-</span><span class="n">devtools</span><span class="o">::</span><span class="n">install_github</span><span class="p">(</span><span class="s2">"ropensci/spocc"</span><span class="p">)</span><span class="w">
-</span></code></pre>
-</div>
 
-<div class="language-r highlighter-rouge"><pre class="highlight"><code><span class="n">library</span><span class="p">(</span><span class="s2">"spocc"</span><span class="p">)</span><span class="w">
-</span></code></pre>
-</div>
+```r
+devtools::install_github("ropensci/rgbif", "iDigBio/ridigbio", "rstudio/leaflet")
+devtools::install_github("ropensci/spocc")
+```
 
-<h2 id="use-ridigbio---the-r-client-for-idigbio">Use ridigbio - the R client for iDigBio</h2>
 
-<div class="language-r highlighter-rouge"><pre class="highlight"><code><span class="n">library</span><span class="p">(</span><span class="s2">"ridigbio"</span><span class="p">)</span><span class="w">
-</span><span class="n">idig_search_records</span><span class="p">(</span><span class="n">rq</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nf">list</span><span class="p">(</span><span class="n">genus</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"acer"</span><span class="p">),</span><span class="w"> </span><span class="n">limit</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="m">5</span><span class="p">)</span><span class="w">
-</span><span class="c1">#&gt;                                   uuid
-#&gt; 1 00041678-5df1-4a23-ba78-8c12f60af369
-#&gt; 2 00072caf-0f24-447f-b68e-a20299f6afc7
-#&gt; 3 000a6b9b-0bbd-46f6-82cb-848c30c46313
-#&gt; 4 001d05e0-9c86-466d-957d-e73e2ce64fbe
-#&gt; 5 0022a2da-bc97-4bef-b2a5-b8a9944fc677
-#&gt;                                    occurrenceid catalognumber      family
-#&gt; 1 urn:uuid:b275f928-5c0d-4832-ae82-fde363d8fde1          &lt;NA&gt; sapindaceae
-#&gt; 2          40428b90-27a5-11e3-8d47-005056be0003   lsu00049997   aceraceae
-#&gt; 3          02ca5aae-d8ab-492f-af10-e005b96c2295        191243 sapindaceae
-#&gt; 4                     urn:catalog:cas:ds:679715      ds679715 sapindaceae
-#&gt; 5          b12bd651-2c6b-11e3-b3b8-180373cac83e         41898 sapindaceae
-#&gt;   genus  scientificname       country stateprovince geopoint.lat
-#&gt; 1  acer     acer rubrum united states      illinois         &lt;NA&gt;
-#&gt; 2  acer    acer negundo united states     louisiana         &lt;NA&gt;
-#&gt; 3  acer            &lt;NA&gt; united states      new york         &lt;NA&gt;
-#&gt; 4  acer acer circinatum united states    california      41.8714
-#&gt; 5  acer     acer rubrum united states      maryland   39.4197222
-#&gt;   geopoint.lon             datecollected           collector
-#&gt; 1         &lt;NA&gt; 1967-06-25T00:00:00+00:00     john e. ebinger
-#&gt; 2         &lt;NA&gt; 1991-04-19T00:00:00+00:00     alan w. lievens
-#&gt; 3         &lt;NA&gt;                      &lt;NA&gt; stephen f. hilfiker
-#&gt; 4    -123.8503 1930-10-27T00:00:00+00:00        carl b. wolf
-#&gt; 5  -77.1227778 1980-04-29T00:00:00+00:00         doweary, d.
-</span></code></pre>
-</div>
+```r
+library("spocc")
+```
 
-<h2 id="use-spocc">Use spocc</h2>
+## Use ridigbio - the R client for iDigBio
 
-<h3 id="scientific-name-search">Scientific name search</h3>
 
-<p>Same search as above with <code class="highlighter-rouge">ridigbio</code></p>
+```r
+library("ridigbio")
+idig_search_records(rq = list(genus = "acer"), limit = 5)
+#>                                   uuid
+#> 1 00041678-5df1-4a23-ba78-8c12f60af369
+#> 2 00072caf-0f24-447f-b68e-a20299f6afc7
+#> 3 000a6b9b-0bbd-46f6-82cb-848c30c46313
+#> 4 001d05e0-9c86-466d-957d-e73e2ce64fbe
+#> 5 0022a2da-bc97-4bef-b2a5-b8a9944fc677
+#>                                    occurrenceid catalognumber      family
+#> 1 urn:uuid:b275f928-5c0d-4832-ae82-fde363d8fde1          <NA> sapindaceae
+#> 2          40428b90-27a5-11e3-8d47-005056be0003   lsu00049997   aceraceae
+#> 3          02ca5aae-d8ab-492f-af10-e005b96c2295        191243 sapindaceae
+#> 4                     urn:catalog:cas:ds:679715      ds679715 sapindaceae
+#> 5          b12bd651-2c6b-11e3-b3b8-180373cac83e         41898 sapindaceae
+#>   genus  scientificname       country stateprovince geopoint.lat
+#> 1  acer     acer rubrum united states      illinois         <NA>
+#> 2  acer    acer negundo united states     louisiana         <NA>
+#> 3  acer            <NA> united states      new york         <NA>
+#> 4  acer acer circinatum united states    california      41.8714
+#> 5  acer     acer rubrum united states      maryland   39.4197222
+#>   geopoint.lon             datecollected           collector
+#> 1         <NA> 1967-06-25T00:00:00+00:00     john e. ebinger
+#> 2         <NA> 1991-04-19T00:00:00+00:00     alan w. lievens
+#> 3         <NA>                      <NA> stephen f. hilfiker
+#> 4    -123.8503 1930-10-27T00:00:00+00:00        carl b. wolf
+#> 5  -77.1227778 1980-04-29T00:00:00+00:00         doweary, d.
+```
 
-<div class="language-r highlighter-rouge"><pre class="highlight"><code><span class="n">occ</span><span class="p">(</span><span class="n">query</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"Acer"</span><span class="p">,</span><span class="w"> </span><span class="n">from</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"idigbio"</span><span class="p">,</span><span class="w"> </span><span class="n">limit</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="m">5</span><span class="p">)</span><span class="w">
-</span><span class="c1">#&gt; Searched: idigbio
-#&gt; Occurrences - Found: 379, Returned: 5
-#&gt; Search type: Scientific
-#&gt;   idigbio: Acer (5)
-</span></code></pre>
-</div>
+## Use spocc
 
-<h3 id="geographic-search">Geographic search</h3>
+### Scientific name search
 
-<p>iDigBio uses Elasticsearch syntax to define a geographic search, but all you need to do is give a numeric vector of length 4 defining a bounding box, and you’re good to go.</p>
+Same search as above with `ridigbio`
 
-<div class="language-r highlighter-rouge"><pre class="highlight"><code><span class="n">bounds</span><span class="w"> </span><span class="o">&lt;-</span><span class="w"> </span><span class="nf">c</span><span class="p">(</span><span class="m">-120</span><span class="p">,</span><span class="w"> </span><span class="m">40</span><span class="p">,</span><span class="w"> </span><span class="m">-100</span><span class="p">,</span><span class="w"> </span><span class="m">45</span><span class="p">)</span><span class="w">
-</span><span class="n">occ</span><span class="p">(</span><span class="n">from</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"idigbio"</span><span class="p">,</span><span class="w"> </span><span class="n">geometry</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">bounds</span><span class="p">,</span><span class="w"> </span><span class="n">limit</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="m">10</span><span class="p">)</span><span class="w">
-</span><span class="c1">#&gt; Searched: idigbio
-#&gt; Occurrences - Found: 346,737, Returned: 10
-#&gt; Search type: Geometry
-</span></code></pre>
-</div>
 
-<h3 id="w-or-wo-coordinates">W/ or W/O Coordinates</h3>
+```r
+occ(query = "Acer", from = "idigbio", limit = 5)
+#> Searched: idigbio
+#> Occurrences - Found: 379, Returned: 5
+#> Search type: Scientific
+#>   idigbio: Acer (5)
+```
 
-<p>Don’t pass <code class="highlighter-rouge">has_coords</code> (gives data w/ and w/o coordinates data)</p>
+### Geographic search
 
-<div class="language-r highlighter-rouge"><pre class="highlight"><code><span class="n">occ</span><span class="p">(</span><span class="n">query</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"Acer"</span><span class="p">,</span><span class="w"> </span><span class="n">from</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"idigbio"</span><span class="p">,</span><span class="w"> </span><span class="n">limit</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="m">5</span><span class="p">)</span><span class="w">
-</span><span class="c1">#&gt; Searched: idigbio
-#&gt; Occurrences - Found: 379, Returned: 5
-#&gt; Search type: Scientific
-#&gt;   idigbio: Acer (5)
-</span></code></pre>
-</div>
+iDigBio uses Elasticsearch syntax to define a geographic search, but all you need to do is give a numeric vector of length 4 defining a bounding box, and you're good to go. 
 
-<p>Only records with coordinates data</p>
 
-<div class="language-r highlighter-rouge"><pre class="highlight"><code><span class="n">occ</span><span class="p">(</span><span class="n">query</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"Acer"</span><span class="p">,</span><span class="w"> </span><span class="n">from</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"idigbio"</span><span class="p">,</span><span class="w"> </span><span class="n">limit</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="m">5</span><span class="p">,</span><span class="w"> </span><span class="n">has_coords</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="kc">TRUE</span><span class="p">)</span><span class="w">
-</span><span class="c1">#&gt; Searched: idigbio
-#&gt; Occurrences - Found: 16, Returned: 5
-#&gt; Search type: Scientific
-#&gt;   idigbio: Acer (5)
-</span></code></pre>
-</div>
+```r
+bounds <- c(-120, 40, -100, 45)
+occ(from = "idigbio", geometry = bounds, limit = 10)
+#> Searched: idigbio
+#> Occurrences - Found: 346,737, Returned: 10
+#> Search type: Geometry
+```
 
-<p>Only records without coordinates data</p>
+### W/ or W/O Coordinates
 
-<div class="language-r highlighter-rouge"><pre class="highlight"><code><span class="n">occ</span><span class="p">(</span><span class="n">query</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"Acer"</span><span class="p">,</span><span class="w"> </span><span class="n">from</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"idigbio"</span><span class="p">,</span><span class="w"> </span><span class="n">limit</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="m">5</span><span class="p">,</span><span class="w"> </span><span class="n">has_coords</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="kc">FALSE</span><span class="p">)</span><span class="w">
-</span><span class="c1">#&gt; Searched: idigbio
-#&gt; Occurrences - Found: 363, Returned: 5
-#&gt; Search type: Scientific
-#&gt;   idigbio: Acer (5)
-</span></code></pre>
-</div>
+Don't pass `has_coords` (gives data w/ and w/o coordinates data)
 
-<h3 id="make-an-interactive-map">Make an interactive map</h3>
 
-<div class="language-r highlighter-rouge"><pre class="highlight"><code><span class="n">library</span><span class="p">(</span><span class="s2">"leaflet"</span><span class="p">)</span><span class="w">
-</span><span class="n">bounds</span><span class="w"> </span><span class="o">&lt;-</span><span class="w"> </span><span class="nf">c</span><span class="p">(</span><span class="m">-120</span><span class="p">,</span><span class="w"> </span><span class="m">40</span><span class="p">,</span><span class="w"> </span><span class="m">-100</span><span class="p">,</span><span class="w"> </span><span class="m">45</span><span class="p">)</span><span class="w">
-</span><span class="n">leaflet</span><span class="p">(</span><span class="n">data</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">dat</span><span class="p">)</span><span class="w"> </span><span class="o">%&gt;%</span><span class="w"> 
-  </span><span class="n">addTiles</span><span class="p">()</span><span class="w"> </span><span class="o">%&gt;%</span><span class="w">
-  </span><span class="n">addMarkers</span><span class="p">(</span><span class="o">~</span><span class="n">longitude</span><span class="p">,</span><span class="w"> </span><span class="o">~</span><span class="n">latitude</span><span class="p">,</span><span class="w"> </span><span class="n">popup</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="o">~</span><span class="n">name</span><span class="p">)</span><span class="w"> </span><span class="o">%&gt;%</span><span class="w"> 
-  </span><span class="n">addRectangles</span><span class="p">(</span><span class="w">
-    </span><span class="n">lng1</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">bounds</span><span class="p">[</span><span class="m">1</span><span class="p">],</span><span class="w"> </span><span class="n">lat1</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">bounds</span><span class="p">[</span><span class="m">4</span><span class="p">],</span><span class="w">
-    </span><span class="n">lng2</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">bounds</span><span class="p">[</span><span class="m">3</span><span class="p">],</span><span class="w"> </span><span class="n">lat2</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">bounds</span><span class="p">[</span><span class="m">2</span><span class="p">],</span><span class="w">
-    </span><span class="n">fillColor</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"transparent"</span><span class="w">
-  </span><span class="p">)</span><span class="w">
-</span></code></pre>
-</div>
+```r
+occ(query = "Acer", from = "idigbio", limit = 5)
+#> Searched: idigbio
+#> Occurrences - Found: 379, Returned: 5
+#> Search type: Scientific
+#>   idigbio: Acer (5)
+```
 
-<p><img src="/public/img/2015-06-08-idigbio-in-spocc/plot.png" alt="image" /></p>
+Only records with coordinates data
 
-  </div>
-  
-  <div class="post">
-    <h1>
-      <a href="/2015/05/openadds/">
-        openadds - open addresses client
-      </a>
-    </h1>
 
-    <span class="post-date">18 May 2015</span>
+```r
+occ(query = "Acer", from = "idigbio", limit = 5, has_coords = TRUE)
+#> Searched: idigbio
+#> Occurrences - Found: 16, Returned: 5
+#> Search type: Scientific
+#>   idigbio: Acer (5)
+```
 
-    <p><code class="highlighter-rouge">openadds</code> talks to <a href="http://openaddresses.io/">Openaddresses.io</a>. a run down of its things:</p>
+Only records without coordinates data
 
-<h2 id="install">Install</h2>
 
-<div class="language-r highlighter-rouge"><pre class="highlight"><code><span class="n">devtools</span><span class="o">::</span><span class="n">install_github</span><span class="p">(</span><span class="s2">"sckott/openadds"</span><span class="p">)</span><span class="w">
-</span></code></pre>
-</div>
+```r
+occ(query = "Acer", from = "idigbio", limit = 5, has_coords = FALSE)
+#> Searched: idigbio
+#> Occurrences - Found: 363, Returned: 5
+#> Search type: Scientific
+#>   idigbio: Acer (5)
+```
 
-<div class="language-r highlighter-rouge"><pre class="highlight"><code><span class="n">library</span><span class="p">(</span><span class="s2">"openadds"</span><span class="p">)</span><span class="w">
-</span></code></pre>
-</div>
+### Make an interactive map
 
-<h2 id="list-datasets">List datasets</h2>
 
-<p>Scrapes links to datasets from the openaddresses site</p>
+```r
+library("leaflet")
+bounds <- c(-120, 40, -100, 45)
+leaflet(data = dat) %>% 
+  addTiles() %>%
+  addMarkers(~longitude, ~latitude, popup = ~name) %>% 
+  addRectangles(
+    lng1 = bounds[1], lat1 = bounds[4],
+    lng2 = bounds[3], lat2 = bounds[2],
+    fillColor = "transparent"
+  )
+```
 
-<div class="language-r highlighter-rouge"><pre class="highlight"><code><span class="n">dat</span><span class="w"> </span><span class="o">&lt;-</span><span class="w"> </span><span class="n">oa_list</span><span class="p">()</span><span class="w">
-</span><span class="n">dat</span><span class="p">[</span><span class="m">2</span><span class="o">:</span><span class="m">6</span><span class="p">]</span><span class="w">
-</span><span class="c1">#&gt; [1] "http://data.openaddresses.io.s3.amazonaws.com/20150511/au-tas-launceston.csv"   
-#&gt; [2] "http://s3.amazonaws.com/data.openaddresses.io/20141127/au-victoria.zip"         
-#&gt; [3] "http://data.openaddresses.io.s3.amazonaws.com/20150511/be-flanders.zip"         
-#&gt; [4] "http://data.openaddresses.io.s3.amazonaws.com/20150417/ca-ab-calgary.zip"       
-#&gt; [5] "http://data.openaddresses.io.s3.amazonaws.com/20150511/ca-ab-grande_prairie.zip"
-</span></code></pre>
-</div>
-
-<h2 id="search-for-datasets">Search for datasets</h2>
-
-<p>Uses <code class="highlighter-rouge">oa_list()</code> internally, then searches through columns requested.</p>
-
-<div class="language-r highlighter-rouge"><pre class="highlight"><code><span class="n">oa_search</span><span class="p">(</span><span class="n">country</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"us"</span><span class="p">,</span><span class="w"> </span><span class="n">state</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"ca"</span><span class="p">)</span><span class="w">
-</span><span class="c1">#&gt; Source: local data frame [68 x 5]
-#&gt; 
-#&gt;    country state             city  ext
-#&gt; 1       us    ca san_mateo_county .zip
-#&gt; 2       us    ca   alameda_county .zip
-#&gt; 3       us    ca   alameda_county .zip
-#&gt; 4       us    ca           amador .zip
-#&gt; 5       us    ca           amador .zip
-#&gt; 6       us    ca      bakersfield .zip
-#&gt; 7       us    ca      bakersfield .zip
-#&gt; 8       us    ca         berkeley .zip
-#&gt; 9       us    ca         berkeley .zip
-#&gt; 10      us    ca     butte_county .zip
-#&gt; ..     ...   ...              ...  ...
-#&gt; Variables not shown: url (chr)
-</span></code></pre>
-</div>
-
-<h2 id="get-data">Get data</h2>
-
-<p>Passing in a URL</p>
-
-<div class="language-r highlighter-rouge"><pre class="highlight"><code><span class="p">(</span><span class="n">out1</span><span class="w"> </span><span class="o">&lt;-</span><span class="w"> </span><span class="n">oa_get</span><span class="p">(</span><span class="n">dat</span><span class="p">[</span><span class="m">5</span><span class="p">]))</span><span class="w">
-</span><span class="c1">#&gt; &lt;Openaddresses data&gt; ~/.openadds/ca-ab-calgary.zip
-#&gt; Dimensions [350962, 13]
-#&gt; 
-#&gt;    OBJECTID ADDRESS_TY                 ADDRESS    STREET_NAM STREET_TYP
-#&gt; 0    757023     Parcel  249 SAGE MEADOWS CI NW  SAGE MEADOWS         CI
-#&gt; 1    757022     Parcel           2506 17 ST SE            17         ST
-#&gt; 2    757021     Parcel     305 EVANSPARK GD NW     EVANSPARK         GD
-#&gt; 3    757020     Parcel     321 EVANSPARK GD NW     EVANSPARK         GD
-#&gt; 4    757019     Parcel   204 EVANSBROOKE LD NW   EVANSBROOKE         LD
-#&gt; 5    757018     Parcel   200 EVANSBROOKE LD NW   EVANSBROOKE         LD
-#&gt; 6    757017     Parcel 219 HIDDEN VALLEY LD NW HIDDEN VALLEY         LD
-#&gt; 7    757016     Parcel 211 HIDDEN VALLEY LD NW HIDDEN VALLEY         LD
-#&gt; 8    757015     Parcel 364 HIDDEN VALLEY LD NW HIDDEN VALLEY         LD
-#&gt; 9    757014     Parcel 348 HIDDEN VALLEY LD NW HIDDEN VALLEY         LD
-#&gt; ..      ...        ...                     ...           ...        ...
-#&gt; Variables not shown: STREET_QUA (fctr), HOUSE_NUMB (int), HOUSE_ALPH
-#&gt;      (fctr), SUITE_NUMB (int), SUITE_ALPH (fctr), LONGITUDE (dbl),
-#&gt;      LATITUDE (dbl), COMM_NAME (fctr)
-</span></code></pre>
-</div>
-
-<p>First getting URL for dataset through <code class="highlighter-rouge">as_openadd()</code>, then passing to <code class="highlighter-rouge">oa_get()</code></p>
-
-<div class="language-r highlighter-rouge"><pre class="highlight"><code><span class="p">(</span><span class="n">x</span><span class="w"> </span><span class="o">&lt;-</span><span class="w"> </span><span class="n">as_openadd</span><span class="p">(</span><span class="s2">"us"</span><span class="p">,</span><span class="w"> </span><span class="s2">"nm"</span><span class="p">,</span><span class="w"> </span><span class="s2">"hidalgo"</span><span class="p">))</span><span class="w">
-</span><span class="c1">#&gt; &lt;&lt;OpenAddreses&gt;&gt; 
-#&gt;   &lt;&lt;country&gt;&gt; us
-#&gt;   &lt;&lt;state&gt;&gt; nm
-#&gt;   &lt;&lt;city&gt;&gt; hidalgo
-#&gt;   &lt;&lt;extension&gt;&gt; .csv
-</span></code></pre>
-</div>
-
-<div class="language-r highlighter-rouge"><pre class="highlight"><code><span class="n">oa_get</span><span class="p">(</span><span class="n">x</span><span class="p">)</span><span class="w">
-</span><span class="c1">#&gt; &lt;Openaddresses data&gt; ~/.openadds/us-nm-hidalgo.csv
-#&gt; Dimensions [170659, 37]
-#&gt; 
-#&gt;    OBJECTID Shape ADD_NUM ADD_SUF PRE_MOD PRE_DIR PRE_TYPE         ST_NAME
-#&gt; 1         1    NA     422                       S                      2ND
-#&gt; 2         2    NA    1413                       S                      4TH
-#&gt; 3         3    NA     412                       E                 CHAMPION
-#&gt; 4         4    NA     110                       E                   SAMANO
-#&gt; 5         5    NA    2608                       W          FREDDY GONZALEZ
-#&gt; 6         6    NA    2604                       W          FREDDY GONZALEZ
-#&gt; 7         7    NA    1123                       W                      FAY
-#&gt; 8         8    NA     417                       S                      2ND
-#&gt; 9         9    NA    4551                       E                    TEXAS
-#&gt; 10       10    NA     810                                        DRIFTWOOD
-#&gt; ..      ...   ...     ...     ...     ...     ...      ...             ...
-#&gt; Variables not shown: ST_TYPE (chr), POS_DIR (chr), POS_MOD (chr), ESN
-#&gt;      (int), MSAG_COMM (chr), PARCEL_ID (chr), PLACE_TYPE (chr), LANDMARK
-#&gt;      (chr), BUILDING (chr), UNIT (chr), ROOM (chr), FLOOR (int), LOC_NOTES
-#&gt;      (chr), ST_ALIAS (chr), FULL_ADDR (chr), ZIP (chr), POSTAL_COM (chr),
-#&gt;      MUNICIPAL (chr), COUNTY (chr), STATE (chr), SOURCE (chr), REGION
-#&gt;      (chr), EXCH (chr), LAT (dbl), LONG (dbl), PICTURE (chr), OA:x (dbl),
-#&gt;      OA:y (dbl), OA:geom (chr)
-</span></code></pre>
-</div>
-
-<h2 id="combine-multiple-datasets">Combine multiple datasets</h2>
-
-<p><code class="highlighter-rouge">combine</code> attemps to guess lat/long and address columns, but definitely more work to do to make 
-this work for most cases. Lat/long and address columns vary among every dataset - some datasets
-have no lat/long data, some have no address data.</p>
-
-<div class="language-r highlighter-rouge"><pre class="highlight"><code><span class="n">out2</span><span class="w"> </span><span class="o">&lt;-</span><span class="w"> </span><span class="n">oa_get</span><span class="p">(</span><span class="n">dat</span><span class="p">[</span><span class="m">32</span><span class="p">])</span><span class="w">
-</span><span class="p">(</span><span class="n">alldat</span><span class="w"> </span><span class="o">&lt;-</span><span class="w"> </span><span class="n">oa_combine</span><span class="p">(</span><span class="n">out1</span><span class="p">,</span><span class="w"> </span><span class="n">out2</span><span class="p">))</span><span class="w">
-</span><span class="c1">#&gt; Source: local data frame [418,623 x 4]
-#&gt; 
-#&gt;          lon      lat                 address           dataset
-#&gt; 1  -114.1303 51.17188  249 SAGE MEADOWS CI NW ca-ab-calgary.zip
-#&gt; 2  -114.0190 51.03168           2506 17 ST SE ca-ab-calgary.zip
-#&gt; 3  -114.1175 51.17497     305 EVANSPARK GD NW ca-ab-calgary.zip
-#&gt; 4  -114.1175 51.17461     321 EVANSPARK GD NW ca-ab-calgary.zip
-#&gt; 5  -114.1212 51.16268   204 EVANSBROOKE LD NW ca-ab-calgary.zip
-#&gt; 6  -114.1213 51.16264   200 EVANSBROOKE LD NW ca-ab-calgary.zip
-#&gt; 7  -114.1107 51.14784 219 HIDDEN VALLEY LD NW ca-ab-calgary.zip
-#&gt; 8  -114.1108 51.14768 211 HIDDEN VALLEY LD NW ca-ab-calgary.zip
-#&gt; 9  -114.1121 51.14780 364 HIDDEN VALLEY LD NW ca-ab-calgary.zip
-#&gt; 10 -114.1117 51.14800 348 HIDDEN VALLEY LD NW ca-ab-calgary.zip
-#&gt; ..       ...      ...                     ...               ...
-</span></code></pre>
-</div>
-
-<h2 id="map-data">Map data</h2>
-
-<p>Get some data</p>
-
-<div class="language-r highlighter-rouge"><pre class="highlight"><code><span class="p">(</span><span class="n">out</span><span class="w"> </span><span class="o">&lt;-</span><span class="w"> </span><span class="n">oa_get</span><span class="p">(</span><span class="n">dat</span><span class="p">[</span><span class="m">400</span><span class="p">]))</span><span class="w">
-</span><span class="c1">#&gt; &lt;Openaddresses data&gt; ~/.openadds/us-ca-sonoma_county.zip
-#&gt; Dimensions [217243, 5]
-#&gt; 
-#&gt;          LON      LAT  NUMBER          STREET POSTCODE
-#&gt; 1  -122.5327 38.29779 3771  A       Cory Lane       NA
-#&gt; 2  -122.5422 38.30354   18752 White Oak Drive       NA
-#&gt; 3  -122.5412 38.30327   18749 White Oak Drive       NA
-#&gt; 4  -122.3997 38.26122    3552       Napa Road       NA
-#&gt; 5  -122.5425 38.30404    3998 White Oak Court       NA
-#&gt; 6  -122.5429 38.30434    4026 White Oak Court       NA
-#&gt; 7  -122.5430 38.30505    4039 White Oak Court       NA
-#&gt; 8  -122.5417 38.30504    4017 White Oak Court       NA
-#&gt; 9  -122.5409 38.30436   18702 White Oak Drive       NA
-#&gt; 10 -122.5403 38.30392   18684 White Oak Drive       NA
-#&gt; ..       ...      ...     ...             ...      ...
-</span></code></pre>
-</div>
-
-<p>Make an interactive map (not all data)</p>
-
-<div class="language-r highlighter-rouge"><pre class="highlight"><code><span class="n">library</span><span class="p">(</span><span class="s2">"leaflet"</span><span class="p">)</span><span class="w">
-
-</span><span class="n">x</span><span class="w"> </span><span class="o">&lt;-</span><span class="w"> </span><span class="n">oa_get</span><span class="p">(</span><span class="n">oa_search</span><span class="p">(</span><span class="n">country</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"us"</span><span class="p">,</span><span class="w"> </span><span class="n">city</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"boulder"</span><span class="p">)[</span><span class="m">1</span><span class="p">,]</span><span class="o">$</span><span class="n">url</span><span class="p">)</span><span class="w">
-</span><span class="n">y</span><span class="w"> </span><span class="o">&lt;-</span><span class="w"> </span><span class="n">oa_get</span><span class="p">(</span><span class="n">oa_search</span><span class="p">(</span><span class="n">country</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"us"</span><span class="p">,</span><span class="w"> </span><span class="n">city</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"gunnison"</span><span class="p">)[</span><span class="m">1</span><span class="p">,]</span><span class="o">$</span><span class="n">url</span><span class="p">)</span><span class="w">
-</span><span class="n">oa_combine</span><span class="p">(</span><span class="n">x</span><span class="p">,</span><span class="w"> </span><span class="n">y</span><span class="p">)</span><span class="w"> </span><span class="o">%&gt;%</span><span class="w"> 
-  </span><span class="n">leaflet</span><span class="p">()</span><span class="w"> </span><span class="o">%&gt;%</span><span class="w">
-  </span><span class="n">addTiles</span><span class="p">()</span><span class="w"> </span><span class="o">%&gt;%</span><span class="w">
-  </span><span class="n">addCircles</span><span class="p">(</span><span class="n">lat</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="o">~</span><span class="n">lat</span><span class="p">,</span><span class="w"> </span><span class="n">lng</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="o">~</span><span class="n">lon</span><span class="p">,</span><span class="w"> </span><span class="n">popup</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="o">~</span><span class="n">address</span><span class="p">)</span><span class="w">
-</span></code></pre>
-</div>
-
-<p><img src="/public/img/2015-05-18-openadds/map.png" alt="image" /></p>
-
-<h2 id="to-do">To do</h2>
-
-<ul>
-  <li>Surely there are many datasets that won’t work in <code class="highlighter-rouge">oa_combine()</code> - gotta go through many more.</li>
-  <li>An easy viz function wrapping <code class="highlighter-rouge">leaflet</code></li>
-  <li>Since you can get a lot of spatial data quickly, easy way to visualize big data, maybe marker clusters?</li>
-</ul>
+![image](/public/img/2015-06-08-idigbio-in-spocc/plot.png)
 
   </div>
   

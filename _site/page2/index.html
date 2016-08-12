@@ -61,6 +61,112 @@
   
   <div class="post">
     <h1>
+      <a href="/2016/03/genbank-ids/">
+        GenBank IDs API - get, match, swap id types
+      </a>
+    </h1>
+
+    <span class="post-date">29 Mar 2016</span>
+
+    GenBank IDs, accession numbers and GI identifiers, are the two types of identifiers for entries in GenBank. (see [this page](http://www.ncbi.nlm.nih.gov/Sitemap/sequenceIDs.html) for why there are two types of identifiers). Actually, [recent news](http://www.ncbi.nlm.nih.gov/news/03-02-2016-phase-out-of-GI-numbers/) from NCBI is that GI identifiers will be phased out by September this year, which affects what I'll talk about below.
+
+There are a lot of sequences in GenBank. Sometimes you have identifiers and you want to check if they exist in GenBank, or want to get one type from another (accession from GI, or vice versa; although GI phase out will make this use case no longer needed), or just get a bunch of identifiers for software testing purposes perhaps.
+
+Currently, the ENTREZ web services aren't super performant or easy to use for the above use cases. Thus, I've built out a RESTful API for these use cases, called [gbids][gbids].
+
+`gbids` on GitHub: [sckott/gbids][gbids]
+
+Here's the tech stack:
+
+* API: Ruby/Sinatra
+* Storage: MySQL
+* Caching: Redis
+  * each key cached for 3 hours
+* Server: Caddy
+  * https
+* Authentication: none
+
+Will soon have a cron job update when new dump is available every Sunday, but for now we're about a month behind the current dump of identifiers. If usage of the API picks up, I'll know it's worth maintaining and make sure data is up to date.
+
+The base url is [https://gbids.xyz](https://gbids.xyz).
+
+Here's a rundown of the API routes:
+
+* `/` re-routes to `/heartbeat`
+* `/heartbeat` - list routes
+* `/acc` - `GET` - list accession ids
+* `/acc/:id,:id,...` - `GET` - submit many accession numbers, get back boolean (match or no match)
+* `/acc` - `POST`
+* `/gi` - `GET` - list gi numbers
+* `/gi/:id,:id,...` - `GET` - submit many gi numbers, get back boolean (match or no match)
+* `/gi` - `POST`
+* `/acc2gi/:id,:id,...` - `GET` - get gi numbers from accession numbers
+* `/acc2gi` - `POST`
+* `/gi2acc/:id,:id,...` - `GET` - get accession numbers from gi numbers
+* `/gi2acc` - `POST`
+
+Of course after GI identifiers are phased out, all `gi` routes will be removed.
+
+The API docs are at [recology.info/gbidsdocs](http://recology.info/gbidsdocs) - let me know if you have any feedback on those.
+
+I also have a status page up at [recology.info/gbidsstatus](http://recology.info/gbidsstatus/) - it's not automated, I have to update the status manually, but I do update that page whenever I'm doing maintenance and the API will be down, or if it goes down due to any other reason.
+
+## examples
+
+Request to list accession identifiers, limit to 5
+
+```
+curl 'https://gbids.xyz/acc?limit=5' | jq .
+{
+  "matched": 692006925,
+  "returned": 5,
+  "data": [
+    "A00002",
+    "A00003",
+    "X17276",
+    "X60065",
+    "CAA42669"
+  ],
+  "error": null
+}
+```
+
+Request to match accession identifiers, some exist, while some do not
+
+```
+curl 'https://gbids.xyz/acc/AACY024124486,AACY024124483,asdfd,asdf,AACY024124476' | jq .
+{
+  "matched": 3,
+  "returned": 5,
+  "data": {
+    "AACY024124486": true,
+    "AACY024124483": true,
+    "asdfd": false,
+    "asdf": false,
+    "AACY024124476": true
+  },
+  "error": null
+}
+```
+
+## to do
+
+I think it'd probably be worth adding routes for getting accession from taxonomy id and vice versa since that's something that is currently not very easy. We could use the dumped accession2taxid data from ftp://ftp.ncbi.nih.gov/pub/taxonomy/accession2taxid/
+
+## feedback!
+
+If you think this could be potentially useful, do try it out and send any feedback. I watch logs from the API, so I'm hoping for an increase in usage so I know people find it useful.
+
+Since servers aren't free, costs add up, and if I don't see usage pick up I'll discontinue the service at some point. So do use it!
+
+And if anyone can offer free servers, I'd gladly take advantage of that. I've applied for AWS research grant, but won't hear back for a few months.
+
+[gbids]: https://github.com/sckott/gbids
+
+  </div>
+  
+  <div class="post">
+    <h1>
       <a href="/2016/03/hey-there/">
         heythere - a robot to automate GitHub issue comments
       </a>
@@ -68,127 +174,129 @@
 
     <span class="post-date">24 Mar 2016</span>
 
-    <p>GitHub issues are great for humans to correspond over software, or any other project. At rOpenSci we use an issue based software review system (<a href="https://github.com/ropensci/onboarding">ropensci/onboarding</a>). Software authors and reviewers go back and forth on the software, making a better product in the end.</p>
+    GitHub issues are great for humans to correspond over software, or any other project. At rOpenSci we use an issue based software review system ([ropensci/onboarding](https://github.com/ropensci/onboarding)). Software authors and reviewers go back and forth on the software, making a better product in the end.
 
-<p>We have a relatively small number of pieces of software under review at any one time compared to e.g., scientific journals - however, even with the small number, we as organizers, and authors and reviewers can forget things. For example:</p>
+We have a relatively small number of pieces of software under review at any one time compared to e.g., scientific journals - however, even with the small number, we as organizers, and authors and reviewers can forget things. For example:
 
-<ul>
-  <li>an organizer can forget to remind a reviewer to get a review in</li>
-  <li>a reviewer can forget about a review, and may benefit from a friendly reminder</li>
-  <li>an author may forget about updating software based on the review</li>
-</ul>
+* an organizer can forget to remind a reviewer to get a review in
+* a reviewer can forget about a review, and may benefit from a friendly reminder
+* an author may forget about updating software based on the review
 
-<p>As we are managing more package submissions through our system, automated things done by machine, or robot, will be increasingly helpful to keep the system moving smoothly.</p>
+As we are managing more package submissions through our system, automated things done by machine, or robot, will be increasingly helpful to keep the system moving smoothly.
 
-<p>A big red flag with automated systems is the annoyance factor. We can try to be smart about this and only remind people when it’s really needed.</p>
+A big red flag with automated systems is the annoyance factor. We can try to be smart about this and only remind people when it's really needed.
 
-<p>I’ve been working on a thing for a while now, it’s called <code class="highlighter-rouge">heythere</code>. It’s a Ruby application that is currently set up to run on Heroku, though you could run it anywhere you want. It’s running right now once per day to check to see if it should send any reminders to organizers, authors, reviewers.</p>
+I've been working on a thing for a while now, it's called `heythere`. It's a Ruby application that is currently set up to run on Heroku, though you could run it anywhere you want. It's running right now once per day to check to see if it should send any reminders to organizers, authors, reviewers.
 
-<p><code class="highlighter-rouge">heythere</code> on GitHub: <a href="https://github.com/ropenscilabs/heythere">ropenscilabs/heythere</a></p>
+`heythere` on GitHub: [ropenscilabs/heythere][ht]
 
-<h2 id="how-it-works">How it works</h2>
+## How it works
 
-<p><code class="highlighter-rouge">heythere</code> is controlled through a series of environment variables that controls GitHub authentication, the first day post reviewer assignment when a reminder should be sent, how many days after reviews are submitted to ask if the author needs any help, and more. Check out the <a href="https://github.com/ropenscilabs/heythere">repo</a> for all the env var options.</p>
+`heythere` is controlled through a series of environment variables that controls GitHub authentication, the first day post reviewer assignment when a reminder should be sent, how many days after reviews are submitted to ask if the author needs any help, and more. Check out the [repo][ht] for all the env var options.
 
-<p>The Ruby app can be run via a rake task from the command line, or triggered with a scheduler on something like Heroku.</p>
+The Ruby app can be run via a rake task from the command line, or triggered with a scheduler on something like Heroku.
 
-<p>When the app runs, we look for environment variables that you set. If we don’t find them we use sensible defaults.</p>
+When the app runs, we look for environment variables that you set. If we don't find them we use sensible defaults.
 
-<p>Using the env vars, we grab the issues for the repository you chose, limit to a subset of your choosing based on a series of labels, then compare dates on comments compared to your env vars, and either skip or send of comments on issues.</p>
+Using the env vars, we grab the issues for the repository you chose, limit to a subset of your choosing based on a series of labels, then compare dates on comments compared to your env vars, and either skip or send of comments on issues.
 
-<p>We use <a href="https://github.com/octokit/octokit.rb">ockokit</a> under the hood to work with GitHub issues.</p>
+We use [ockokit](https://github.com/octokit/octokit.rb) under the hood to work with GitHub issues.
 
-<h2 id="how-to-use-it">How to use it</h2>
+## How to use it
 
-<h3 id="clone">clone</h3>
+### clone
 
-<div class="highlighter-rouge"><pre class="highlight"><code>git clone git@github.com:ropenscilabs/heythere.git
+```
+git clone git@github.com:ropenscilabs/heythere.git
 cd heythere
-</code></pre>
-</div>
+```
 
-<h3 id="setup">setup</h3>
+### setup
 
-<p>Change the repo in <code class="highlighter-rouge">Rakefile</code> to whatever your repository is.</p>
+Change the repo in `Rakefile` to whatever your repository is.
 
-<div class="highlighter-rouge"><pre class="highlight"><code>Heythere.hey_there(repo = 'ropensci/onboarding')
-</code></pre>
-</div>
+```
+Heythere.hey_there(repo = 'ropensci/onboarding')
+```
 
-<p>Create the app (use a different name, of course)</p>
+Create the app (use a different name, of course)
 
-<div class="highlighter-rouge"><pre class="highlight"><code>heroku apps:create ropensci-hey-there
-</code></pre>
-</div>
+```
+heroku apps:create ropensci-hey-there
+```
 
-<p>Add the repository that you are targeting:</p>
+Add the repository that you are targeting:
 
-<div class="highlighter-rouge"><pre class="highlight"><code>heroku config:add HEYTHERE_REPOSITORY=&lt;github-repository&gt; (like `owner/repo`)
-</code></pre>
-</div>
+```
+heroku config:add HEYTHERE_REPOSITORY=<github-repository> (like `owner/repo`)
+```
 
-<p>Create a GitHub personal access token just for this application. You’ll need to set a env var for your username and the token. We read these in the app.</p>
+Create a GitHub personal access token just for this application. You'll need to set a env var for your username and the token. We read these in the app.
 
-<div class="highlighter-rouge"><pre class="highlight"><code>heroku config:add GITHUB_USERNAME=&lt;github-user&gt;
-heroku config:add GITHUB_PAT_OCTOKIT=&lt;github-pat-for-octokit&gt;
-</code></pre>
-</div>
+```
+heroku config:add GITHUB_USERNAME=<github-user>
+heroku config:add GITHUB_PAT_OCTOKIT=<github-pat-for-octokit>
+```
 
-<p>Optionally, set env vars for various options. You don’t have to set these - we’ll use defaults</p>
+Optionally, set env vars for various options. You don't have to set these - we'll use defaults
 
-<div class="highlighter-rouge"><pre class="highlight"><code>heroku config:add HEYTHERE_PRE_DEADLINE_DAYS=&lt;number-of-days-integer&gt;
-heroku config:add HEYTHERE_DEADLINE_DAYS=&lt;number-of-days-integer&gt;
-heroku config:add HEYTHERE_POST_DEADLINE_EVERY_DAYS=&lt;number-of-days-integer&gt;
-heroku config:add HEYTHERE_POST_REVIEW_IN_DAYS=&lt;number-of-days-integer&gt;
-heroku config:add HEYTHERE_POST_REVIEW_TOGGLE=&lt;boolean&gt;
-heroku config:add HEYTHERE_BOT_NICKNAME=&lt;string&gt;
-</code></pre>
-</div>
+```
+heroku config:add HEYTHERE_PRE_DEADLINE_DAYS=<number-of-days-integer>
+heroku config:add HEYTHERE_DEADLINE_DAYS=<number-of-days-integer>
+heroku config:add HEYTHERE_POST_DEADLINE_EVERY_DAYS=<number-of-days-integer>
+heroku config:add HEYTHERE_POST_REVIEW_IN_DAYS=<number-of-days-integer>
+heroku config:add HEYTHERE_POST_REVIEW_TOGGLE=<boolean>
+heroku config:add HEYTHERE_BOT_NICKNAME=<string>
+```
 
-<p>Also save all these env vars in your <code class="highlighter-rouge">.bash_profile</code>, <code class="highlighter-rouge">.zshrc</code>, or similar so you can run the app locally. E.g. with entries like <code class="highlighter-rouge">export HEYTHERE_PRE_DEADLINE_DAYS=15</code></p>
+Also save all these env vars in your `.bash_profile`, `.zshrc`, or similar so you can run the app locally. E.g. with entries like `export HEYTHERE_PRE_DEADLINE_DAYS=15`
 
-<p>You can see all your Heroku config vars using <code class="highlighter-rouge">heroku config</code> or use <code class="highlighter-rouge">rake envs</code></p>
+You can see all your Heroku config vars using `heroku config` or use `rake envs`
 
-<p>Push your app to Heroku</p>
+Push your app to Heroku
 
-<div class="highlighter-rouge"><pre class="highlight"><code>git push heroku master
-</code></pre>
-</div>
+```
+git push heroku master
+```
 
-<p>Add the scheduler to your heroku app</p>
+Add the scheduler to your heroku app
 
-<div class="highlighter-rouge"><pre class="highlight"><code>heroku addons:create scheduler:standard
+```
+heroku addons:create scheduler:standard
 heroku addons:open scheduler
-</code></pre>
-</div>
+```
 
-<p>Add the task <code class="highlighter-rouge">rake hey</code> to your heroku scheduler and set to whatever schedule you want.</p>
+Add the task ```rake hey``` to your heroku scheduler and set to whatever schedule you want.
 
-<h3 id="usage">usage</h3>
 
-<p>If you have your repo in an env var as above, run the rake task <code class="highlighter-rouge">hey</code></p>
+### usage
 
-<div class="highlighter-rouge"><pre class="highlight"><code>rake hey
-</code></pre>
-</div>
+If you have your repo in an env var as above, run the rake task `hey`
 
-<p>If not, then pass the repo to <code class="highlighter-rouge">hey</code> like</p>
+```
+rake hey
+```
 
-<div class="highlighter-rouge"><pre class="highlight"><code>rake hey repo=owner/repo
-</code></pre>
-</div>
+If not, then pass the repo to `hey` like
 
-<h3 id="what-does-it-look-like">what does it look like?</h3>
+```
+rake hey repo=owner/repo
+```
 
-<p>This is what a comment looks like in a thread</p>
+### what does it look like?
 
-<p><img src="/public/img/2016-03-24-hey-there/testhey.png" alt="assertr_img" /></p>
+This is what a comment looks like in a thread
 
-<p>You could set up a different GitHub account as your robot so it’s clearly not coming from a real person.</p>
+![assertr_img](/public/img/2016-03-24-hey-there/testhey.png)
 
-<h2 id="feedback">feedback</h2>
+You could set up a different GitHub account as your robot so it's clearly not coming from a real person.
 
-<p>I’ll continue to improve <code class="highlighter-rouge">heythere</code> as we get feedback on its use in <code class="highlighter-rouge">ropensci/onboarding</code>. Would also love any feedback from you, internet. Thanks!</p>
+
+## feedback
+
+I'll continue to improve `heythere` as we get feedback on its use in `ropensci/onboarding`. Would also love any feedback from you, internet. Thanks!
+
+[ht]: https://github.com/ropenscilabs/heythere
 
 
   </div>
@@ -202,626 +310,383 @@ heroku addons:open scheduler
 
     <span class="post-date">04 Mar 2016</span>
 
-    <p><code class="highlighter-rouge">scrubr</code> is an R library for cleaning species occurrence records. It’s general purpose, and has the following approach:</p>
+    `scrubr` is an R library for cleaning species occurrence records. It's general purpose, and has the following approach:
 
-<ul>
-  <li>We think using a piping workflow (<code class="highlighter-rouge">%&gt;%</code>) makes code easier to build up, and easier to understand. However, you don’t have to use pipes in this package.</li>
-  <li>All inputs and outputs are data.frame’s - which makes the above point easier</li>
-  <li>Records trimmed off due to various filters are retained as attributes, so can still be accessed for later inspection, but don’t get in the way of the data.frame that gets modified for downstream use</li>
-  <li>User interface vs. speed: This is the kind of package that surely can get faster. However, we’re focusing on the UI first, then make speed improvements down the road.</li>
-  <li>Since occurrence record datasets should all have columns with lat/long information, we automatically look for those columns for you. If identified, we use them, but you can supply lat/long column names manually as well.</li>
-</ul>
+* We think using a piping workflow (`%>%`) makes code easier to build up, and easier to understand. However, you don't have to use pipes in this package.
+* All inputs and outputs are data.frame's - which makes the above point easier
+* Records trimmed off due to various filters are retained as attributes, so can still be accessed for later inspection, but don't get in the way of the data.frame that gets modified for downstream use
+* User interface vs. speed: This is the kind of package that surely can get faster. However, we're focusing on the UI first, then make speed improvements down the road. 
+* Since occurrence record datasets should all have columns with lat/long information, we automatically look for those columns for you. If identified, we use them, but you can supply lat/long column names manually as well.
 
-<p>We have many packages that fetch species occurrence records from GBIF, iNaturalist, VertNet, iDigBio, Ecoengine, and more. <code class="highlighter-rouge">scrubr</code> fills a crucial missing niche as likely all uses of occurrence data requires cleaning of some kind. When using GBIF data via <code class="highlighter-rouge">rgbif</code>, that package has some utilities for cleaning data based on the issues returned with GBIF data - <code class="highlighter-rouge">scrubr</code> is a companion to do the rest of the cleaning.</p>
+We have many packages that fetch species occurrence records from GBIF, iNaturalist, VertNet, iDigBio, Ecoengine, and more. `scrubr` fills a crucial missing niche as likely all uses of occurrence data requires cleaning of some kind. When using GBIF data via `rgbif`, that package has some utilities for cleaning data based on the issues returned with GBIF data - `scrubr` is a companion to do the rest of the cleaning.
 
-<h2 id="scrubr-use-cases">scrubr use cases</h2>
+## scrubr use cases
 
-<h3 id="those-covered">Those covered</h3>
+### Those covered
 
-<ul>
-  <li>Impossible lat/long values: e.g., latitude 75</li>
-  <li>Incomplete cases: one or the other of lat/long missing</li>
-  <li>Unlikely lat/long values: e.g., points at 0,0</li>
-  <li>Deduplication: try to identify duplicates, esp. when pulling data from multiple sources, e.g., can try to use occurrence IDs, if provided</li>
-  <li>Date based cleaning</li>
-  <li>Outside political boundary: User input to check for points in the wrong country, or points outside of a known country</li>
-  <li>Taxonomic name based cleaning: via <code class="highlighter-rouge">taxize</code> (one method so far)</li>
-</ul>
+- Impossible lat/long values: e.g., latitude 75
+- Incomplete cases: one or the other of lat/long missing
+- Unlikely lat/long values: e.g., points at 0,0
+- Deduplication: try to identify duplicates, esp. when pulling data from multiple sources, e.g., can try to use occurrence IDs, if provided
+- Date based cleaning
+- Outside political boundary: User input to check for points in the wrong country, or points outside of a known country
+- Taxonomic name based cleaning: via `taxize` (one method so far)
 
-<h3 id="to-be-covered">To be covered</h3>
+### To be covered
 
-<ul>
-  <li>Political centroids: unlikely that occurrences fall exactly on these points, more likely a
-default position (Draft function started, but not exported, and commented out)</li>
-  <li>Herbaria/Museums: many specimens may have location of the collection they are housed in</li>
-  <li>Habitat type filtering: e.g., fish should not be on land; marine fish should not be in fresh water</li>
-  <li>Check for contextually wrong values: That is, if 99 out of 100 lat/long coordinates are within the continental US, but 1 is in China, then perhaps something is wrong with that one point</li>
-  <li>and many more…</li>
-</ul>
+* Political centroids: unlikely that occurrences fall exactly on these points, more likely a
+default position (Draft function started, but not exported, and commented out)
+* Herbaria/Museums: many specimens may have location of the collection they are housed in
+* Habitat type filtering: e.g., fish should not be on land; marine fish should not be in fresh water
+* Check for contextually wrong values: That is, if 99 out of 100 lat/long coordinates are within the continental US, but 1 is in China, then perhaps something is wrong with that one point
+* and many more...
 
-<p>What else do you want included? <a href="https://github.com/ropenscilabs/scrubr/issues">Open an issue in the repo</a> to chat about use cases.</p>
+What else do you want included? [Open an issue in the repo](https://github.com/ropenscilabs/scrubr/issues) to chat about use cases.
 
-<h2 id="install">Install</h2>
 
-<p>From CRAN (binaries may not be up yet, but source is)</p>
+## Install
 
-<div class="language-r highlighter-rouge"><pre class="highlight"><code><span class="n">install.packages</span><span class="p">(</span><span class="s2">"scrubr"</span><span class="p">)</span><span class="w">
-</span></code></pre>
-</div>
+From CRAN (binaries may not be up yet, but source is)
 
-<p>Or from GitHub</p>
 
-<div class="language-r highlighter-rouge"><pre class="highlight"><code><span class="n">devtools</span><span class="o">::</span><span class="n">install_github</span><span class="p">(</span><span class="s2">"ropenscilabs/scrubr"</span><span class="p">)</span><span class="w">
-</span></code></pre>
-</div>
+```r
+install.packages("scrubr")
+```
 
-<div class="language-r highlighter-rouge"><pre class="highlight"><code><span class="n">library</span><span class="p">(</span><span class="s2">"scrubr"</span><span class="p">)</span><span class="w">
-</span></code></pre>
-</div>
+Or from GitHub
 
-<h2 id="dframe">dframe</h2>
 
-<p><code class="highlighter-rouge">dframe()</code> is a tool to convert your data.frame to a compact <code class="highlighter-rouge">dplyr</code> like data.frame so that you can get a quick peek at your data each time you call a function - BUT, you don’t have to use it.</p>
+```r
+devtools::install_github("ropenscilabs/scrubr")
+```
 
-<p>Compare <code class="highlighter-rouge">mtcars</code></p>
 
-<div class="language-r highlighter-rouge"><pre class="highlight"><code><span class="n">mtcars</span><span class="w">
-</span><span class="c1">#&gt;                      mpg cyl  disp  hp drat    wt  qsec vs am gear carb
-#&gt; Mazda RX4           21.0   6 160.0 110 3.90 2.620 16.46  0  1    4    4
-#&gt; Mazda RX4 Wag       21.0   6 160.0 110 3.90 2.875 17.02  0  1    4    4
-#&gt; Datsun 710          22.8   4 108.0  93 3.85 2.320 18.61  1  1    4    1
-#&gt; Hornet 4 Drive      21.4   6 258.0 110 3.08 3.215 19.44  1  0    3    1
-#&gt; Hornet Sportabout   18.7   8 360.0 175 3.15 3.440 17.02  0  0    3    2
-#&gt; Valiant             18.1   6 225.0 105 2.76 3.460 20.22  1  0    3    1
-#&gt; Duster 360          14.3   8 360.0 245 3.21 3.570 15.84  0  0    3    4
-#&gt; Merc 240D           24.4   4 146.7  62 3.69 3.190 20.00  1  0    4    2
-#&gt; Merc 230            22.8   4 140.8  95 3.92 3.150 22.90  1  0    4    2
-#&gt; Merc 280            19.2   6 167.6 123 3.92 3.440 18.30  1  0    4    4
-#&gt; Merc 280C           17.8   6 167.6 123 3.92 3.440 18.90  1  0    4    4
-#&gt; Merc 450SE          16.4   8 275.8 180 3.07 4.070 17.40  0  0    3    3
-#&gt; Merc 450SL          17.3   8 275.8 180 3.07 3.730 17.60  0  0    3    3
-#&gt; Merc 450SLC         15.2   8 275.8 180 3.07 3.780 18.00  0  0    3    3
-#&gt; Cadillac Fleetwood  10.4   8 472.0 205 2.93 5.250 17.98  0  0    3    4
-#&gt; Lincoln Continental 10.4   8 460.0 215 3.00 5.424 17.82  0  0    3    4
-#&gt; Chrysler Imperial   14.7   8 440.0 230 3.23 5.345 17.42  0  0    3    4
-#&gt; Fiat 128            32.4   4  78.7  66 4.08 2.200 19.47  1  1    4    1
-#&gt; Honda Civic         30.4   4  75.7  52 4.93 1.615 18.52  1  1    4    2
-#&gt; Toyota Corolla      33.9   4  71.1  65 4.22 1.835 19.90  1  1    4    1
-#&gt; Toyota Corona       21.5   4 120.1  97 3.70 2.465 20.01  1  0    3    1
-#&gt; Dodge Challenger    15.5   8 318.0 150 2.76 3.520 16.87  0  0    3    2
-#&gt; AMC Javelin         15.2   8 304.0 150 3.15 3.435 17.30  0  0    3    2
-#&gt; Camaro Z28          13.3   8 350.0 245 3.73 3.840 15.41  0  0    3    4
-#&gt; Pontiac Firebird    19.2   8 400.0 175 3.08 3.845 17.05  0  0    3    2
-#&gt; Fiat X1-9           27.3   4  79.0  66 4.08 1.935 18.90  1  1    4    1
-#&gt; Porsche 914-2       26.0   4 120.3  91 4.43 2.140 16.70  0  1    5    2
-#&gt; Lotus Europa        30.4   4  95.1 113 3.77 1.513 16.90  1  1    5    2
-#&gt; Ford Pantera L      15.8   8 351.0 264 4.22 3.170 14.50  0  1    5    4
-#&gt; Ferrari Dino        19.7   6 145.0 175 3.62 2.770 15.50  0  1    5    6
-#&gt; Maserati Bora       15.0   8 301.0 335 3.54 3.570 14.60  0  1    5    8
-#&gt; Volvo 142E          21.4   4 121.0 109 4.11 2.780 18.60  1  1    4    2
-</span></code></pre>
-</div>
+```r
+library("scrubr")
+```
 
-<p>To</p>
+## dframe
 
-<div class="language-r highlighter-rouge"><pre class="highlight"><code><span class="n">dframe</span><span class="p">(</span><span class="n">mtcars</span><span class="p">)</span><span class="w">
-</span><span class="c1">#&gt; &lt;scrubr dframe&gt;
-#&gt; Size: 32 X 11
-#&gt; 
-#&gt; 
-#&gt;      mpg   cyl  disp    hp  drat    wt  qsec    vs    am  gear  carb
-#&gt;    (dbl) (dbl) (dbl) (dbl) (dbl) (dbl) (dbl) (dbl) (dbl) (dbl) (dbl)
-#&gt; 1   21.0     6 160.0   110  3.90 2.620 16.46     0     1     4     4
-#&gt; 2   21.0     6 160.0   110  3.90 2.875 17.02     0     1     4     4
-#&gt; 3   22.8     4 108.0    93  3.85 2.320 18.61     1     1     4     1
-#&gt; 4   21.4     6 258.0   110  3.08 3.215 19.44     1     0     3     1
-#&gt; 5   18.7     8 360.0   175  3.15 3.440 17.02     0     0     3     2
-#&gt; 6   18.1     6 225.0   105  2.76 3.460 20.22     1     0     3     1
-#&gt; 7   14.3     8 360.0   245  3.21 3.570 15.84     0     0     3     4
-#&gt; 8   24.4     4 146.7    62  3.69 3.190 20.00     1     0     4     2
-#&gt; 9   22.8     4 140.8    95  3.92 3.150 22.90     1     0     4     2
-#&gt; 10  19.2     6 167.6   123  3.92 3.440 18.30     1     0     4     4
-#&gt; ..   ...   ...   ...   ...   ...   ...   ...   ...   ...   ...   ...
-</span></code></pre>
-</div>
+`dframe()` is a tool to convert your data.frame to a compact `dplyr` like data.frame so that you can get a quick peek at your data each time you call a function - BUT, you don't have to use it.
 
-<h2 id="coordinate-based-cleaning">Coordinate based cleaning</h2>
+Compare `mtcars`
 
-<p>Load some sample data that comes with the package</p>
 
-<div class="language-r highlighter-rouge"><pre class="highlight"><code><span class="n">data</span><span class="p">(</span><span class="s2">"sampledata1"</span><span class="p">)</span><span class="w">
-</span></code></pre>
-</div>
+```r
+mtcars
+#>                      mpg cyl  disp  hp drat    wt  qsec vs am gear carb
+#> Mazda RX4           21.0   6 160.0 110 3.90 2.620 16.46  0  1    4    4
+#> Mazda RX4 Wag       21.0   6 160.0 110 3.90 2.875 17.02  0  1    4    4
+#> Datsun 710          22.8   4 108.0  93 3.85 2.320 18.61  1  1    4    1
+#> Hornet 4 Drive      21.4   6 258.0 110 3.08 3.215 19.44  1  0    3    1
+#> Hornet Sportabout   18.7   8 360.0 175 3.15 3.440 17.02  0  0    3    2
+#> Valiant             18.1   6 225.0 105 2.76 3.460 20.22  1  0    3    1
+#> Duster 360          14.3   8 360.0 245 3.21 3.570 15.84  0  0    3    4
+#> Merc 240D           24.4   4 146.7  62 3.69 3.190 20.00  1  0    4    2
+#> Merc 230            22.8   4 140.8  95 3.92 3.150 22.90  1  0    4    2
+#> Merc 280            19.2   6 167.6 123 3.92 3.440 18.30  1  0    4    4
+#> Merc 280C           17.8   6 167.6 123 3.92 3.440 18.90  1  0    4    4
+#> Merc 450SE          16.4   8 275.8 180 3.07 4.070 17.40  0  0    3    3
+#> Merc 450SL          17.3   8 275.8 180 3.07 3.730 17.60  0  0    3    3
+#> Merc 450SLC         15.2   8 275.8 180 3.07 3.780 18.00  0  0    3    3
+#> Cadillac Fleetwood  10.4   8 472.0 205 2.93 5.250 17.98  0  0    3    4
+#> Lincoln Continental 10.4   8 460.0 215 3.00 5.424 17.82  0  0    3    4
+#> Chrysler Imperial   14.7   8 440.0 230 3.23 5.345 17.42  0  0    3    4
+#> Fiat 128            32.4   4  78.7  66 4.08 2.200 19.47  1  1    4    1
+#> Honda Civic         30.4   4  75.7  52 4.93 1.615 18.52  1  1    4    2
+#> Toyota Corolla      33.9   4  71.1  65 4.22 1.835 19.90  1  1    4    1
+#> Toyota Corona       21.5   4 120.1  97 3.70 2.465 20.01  1  0    3    1
+#> Dodge Challenger    15.5   8 318.0 150 2.76 3.520 16.87  0  0    3    2
+#> AMC Javelin         15.2   8 304.0 150 3.15 3.435 17.30  0  0    3    2
+#> Camaro Z28          13.3   8 350.0 245 3.73 3.840 15.41  0  0    3    4
+#> Pontiac Firebird    19.2   8 400.0 175 3.08 3.845 17.05  0  0    3    2
+#> Fiat X1-9           27.3   4  79.0  66 4.08 1.935 18.90  1  1    4    1
+#> Porsche 914-2       26.0   4 120.3  91 4.43 2.140 16.70  0  1    5    2
+#> Lotus Europa        30.4   4  95.1 113 3.77 1.513 16.90  1  1    5    2
+#> Ford Pantera L      15.8   8 351.0 264 4.22 3.170 14.50  0  1    5    4
+#> Ferrari Dino        19.7   6 145.0 175 3.62 2.770 15.50  0  1    5    6
+#> Maserati Bora       15.0   8 301.0 335 3.54 3.570 14.60  0  1    5    8
+#> Volvo 142E          21.4   4 121.0 109 4.11 2.780 18.60  1  1    4    2
+```
 
-<p>Remove impossible coordinates (using sample data included in the pkg)</p>
+To
 
-<div class="language-r highlighter-rouge"><pre class="highlight"><code><span class="n">dframe</span><span class="p">(</span><span class="n">sample_data_1</span><span class="p">)</span><span class="w"> </span><span class="o">%&gt;%</span><span class="w"> </span><span class="n">coord_impossible</span><span class="p">()</span><span class="w">
-</span><span class="c1">#&gt; &lt;scrubr dframe&gt;
-#&gt; Size: 1500 X 5
-#&gt; Lat/Lon vars: latitude/longitude
-#&gt; 
-#&gt;                name  longitude latitude                date        key
-#&gt;               (chr)      (dbl)    (dbl)              (time)      (int)
-#&gt; 1  Ursus americanus  -79.68283 38.36662 2015-01-14 16:36:45 1065590124
-#&gt; 2  Ursus americanus  -82.42028 35.73304 2015-01-13 00:25:39 1065588899
-#&gt; 3  Ursus americanus  -99.09625 23.66893 2015-02-20 23:00:00 1098894889
-#&gt; 4  Ursus americanus  -72.77432 43.94883 2015-02-13 16:16:41 1065611122
-#&gt; 5  Ursus americanus  -72.34617 43.86464 2015-03-01 20:20:45 1088908315
-#&gt; 6  Ursus americanus -108.53674 32.65219 2015-03-29 17:06:54 1088932238
-#&gt; 7  Ursus americanus -108.53691 32.65237 2015-03-29 17:12:50 1088932273
-#&gt; 8  Ursus americanus -123.82900 40.13240 2015-03-28 23:00:00 1132403409
-#&gt; 9  Ursus americanus  -78.25027 36.93018 2015-03-20 21:11:24 1088923534
-#&gt; 10 Ursus americanus  -76.78671 35.53079 2015-04-05 23:00:00 1088954559
-#&gt; ..              ...        ...      ...                 ...        ...
-</span></code></pre>
-</div>
 
-<p>Remove incomplete coordinates</p>
+```r
+dframe(mtcars)
+#> <scrubr dframe>
+#> Size: 32 X 11
+#> 
+#> 
+#>      mpg   cyl  disp    hp  drat    wt  qsec    vs    am  gear  carb
+#>    (dbl) (dbl) (dbl) (dbl) (dbl) (dbl) (dbl) (dbl) (dbl) (dbl) (dbl)
+#> 1   21.0     6 160.0   110  3.90 2.620 16.46     0     1     4     4
+#> 2   21.0     6 160.0   110  3.90 2.875 17.02     0     1     4     4
+#> 3   22.8     4 108.0    93  3.85 2.320 18.61     1     1     4     1
+#> 4   21.4     6 258.0   110  3.08 3.215 19.44     1     0     3     1
+#> 5   18.7     8 360.0   175  3.15 3.440 17.02     0     0     3     2
+#> 6   18.1     6 225.0   105  2.76 3.460 20.22     1     0     3     1
+#> 7   14.3     8 360.0   245  3.21 3.570 15.84     0     0     3     4
+#> 8   24.4     4 146.7    62  3.69 3.190 20.00     1     0     4     2
+#> 9   22.8     4 140.8    95  3.92 3.150 22.90     1     0     4     2
+#> 10  19.2     6 167.6   123  3.92 3.440 18.30     1     0     4     4
+#> ..   ...   ...   ...   ...   ...   ...   ...   ...   ...   ...   ...
+```
 
-<div class="language-r highlighter-rouge"><pre class="highlight"><code><span class="n">dframe</span><span class="p">(</span><span class="n">sample_data_1</span><span class="p">)</span><span class="w"> </span><span class="o">%&gt;%</span><span class="w"> </span><span class="n">coord_incomplete</span><span class="p">()</span><span class="w">
-</span><span class="c1">#&gt; &lt;scrubr dframe&gt;
-#&gt; Size: 1306 X 5
-#&gt; Lat/Lon vars: latitude/longitude
-#&gt; 
-#&gt;                name  longitude latitude                date        key
-#&gt;               (chr)      (dbl)    (dbl)              (time)      (int)
-#&gt; 1  Ursus americanus  -79.68283 38.36662 2015-01-14 16:36:45 1065590124
-#&gt; 2  Ursus americanus  -82.42028 35.73304 2015-01-13 00:25:39 1065588899
-#&gt; 3  Ursus americanus  -99.09625 23.66893 2015-02-20 23:00:00 1098894889
-#&gt; 4  Ursus americanus  -72.77432 43.94883 2015-02-13 16:16:41 1065611122
-#&gt; 5  Ursus americanus  -72.34617 43.86464 2015-03-01 20:20:45 1088908315
-#&gt; 6  Ursus americanus -108.53674 32.65219 2015-03-29 17:06:54 1088932238
-#&gt; 7  Ursus americanus -108.53691 32.65237 2015-03-29 17:12:50 1088932273
-#&gt; 8  Ursus americanus -123.82900 40.13240 2015-03-28 23:00:00 1132403409
-#&gt; 9  Ursus americanus  -78.25027 36.93018 2015-03-20 21:11:24 1088923534
-#&gt; 10 Ursus americanus  -76.78671 35.53079 2015-04-05 23:00:00 1088954559
-#&gt; ..              ...        ...      ...                 ...        ...
-</span></code></pre>
-</div>
+## Coordinate based cleaning
 
-<p>Remove unlikely coordinates (e.g., those at 0,0)</p>
+Load some sample data that comes with the package
 
-<div class="language-r highlighter-rouge"><pre class="highlight"><code><span class="n">dframe</span><span class="p">(</span><span class="n">sample_data_1</span><span class="p">)</span><span class="w"> </span><span class="o">%&gt;%</span><span class="w"> </span><span class="n">coord_unlikely</span><span class="p">()</span><span class="w">
-</span><span class="c1">#&gt; &lt;scrubr dframe&gt;
-#&gt; Size: 1488 X 5
-#&gt; Lat/Lon vars: latitude/longitude
-#&gt; 
-#&gt;                name  longitude latitude                date        key
-#&gt;               (chr)      (dbl)    (dbl)              (time)      (int)
-#&gt; 1  Ursus americanus  -79.68283 38.36662 2015-01-14 16:36:45 1065590124
-#&gt; 2  Ursus americanus  -82.42028 35.73304 2015-01-13 00:25:39 1065588899
-#&gt; 3  Ursus americanus  -99.09625 23.66893 2015-02-20 23:00:00 1098894889
-#&gt; 4  Ursus americanus  -72.77432 43.94883 2015-02-13 16:16:41 1065611122
-#&gt; 5  Ursus americanus  -72.34617 43.86464 2015-03-01 20:20:45 1088908315
-#&gt; 6  Ursus americanus -108.53674 32.65219 2015-03-29 17:06:54 1088932238
-#&gt; 7  Ursus americanus -108.53691 32.65237 2015-03-29 17:12:50 1088932273
-#&gt; 8  Ursus americanus -123.82900 40.13240 2015-03-28 23:00:00 1132403409
-#&gt; 9  Ursus americanus  -78.25027 36.93018 2015-03-20 21:11:24 1088923534
-#&gt; 10 Ursus americanus  -76.78671 35.53079 2015-04-05 23:00:00 1088954559
-#&gt; ..              ...        ...      ...                 ...        ...
-</span></code></pre>
-</div>
 
-<p>Do all three</p>
+```r
+data("sampledata1")
+```
 
-<div class="language-r highlighter-rouge"><pre class="highlight"><code><span class="n">dframe</span><span class="p">(</span><span class="n">sample_data_1</span><span class="p">)</span><span class="w"> </span><span class="o">%&gt;%</span><span class="w">
-  </span><span class="n">coord_impossible</span><span class="p">()</span><span class="w"> </span><span class="o">%&gt;%</span><span class="w">
-  </span><span class="n">coord_incomplete</span><span class="p">()</span><span class="w"> </span><span class="o">%&gt;%</span><span class="w">
-  </span><span class="n">coord_unlikely</span><span class="p">()</span><span class="w">
-</span><span class="c1">#&gt; &lt;scrubr dframe&gt;
-#&gt; Size: 1294 X 5
-#&gt; Lat/Lon vars: latitude/longitude
-#&gt; 
-#&gt;                name  longitude latitude                date        key
-#&gt;               (chr)      (dbl)    (dbl)              (time)      (int)
-#&gt; 1  Ursus americanus  -79.68283 38.36662 2015-01-14 16:36:45 1065590124
-#&gt; 2  Ursus americanus  -82.42028 35.73304 2015-01-13 00:25:39 1065588899
-#&gt; 3  Ursus americanus  -99.09625 23.66893 2015-02-20 23:00:00 1098894889
-#&gt; 4  Ursus americanus  -72.77432 43.94883 2015-02-13 16:16:41 1065611122
-#&gt; 5  Ursus americanus  -72.34617 43.86464 2015-03-01 20:20:45 1088908315
-#&gt; 6  Ursus americanus -108.53674 32.65219 2015-03-29 17:06:54 1088932238
-#&gt; 7  Ursus americanus -108.53691 32.65237 2015-03-29 17:12:50 1088932273
-#&gt; 8  Ursus americanus -123.82900 40.13240 2015-03-28 23:00:00 1132403409
-#&gt; 9  Ursus americanus  -78.25027 36.93018 2015-03-20 21:11:24 1088923534
-#&gt; 10 Ursus americanus  -76.78671 35.53079 2015-04-05 23:00:00 1088954559
-#&gt; ..              ...        ...      ...                 ...        ...
-</span></code></pre>
-</div>
+Remove impossible coordinates (using sample data included in the pkg)
 
-<p>Do vs. don’t drop bad data</p>
 
-<div class="language-r highlighter-rouge"><pre class="highlight"><code><span class="c1"># do
-</span><span class="n">dframe</span><span class="p">(</span><span class="n">sample_data_1</span><span class="p">)</span><span class="w"> </span><span class="o">%&gt;%</span><span class="w"> </span><span class="n">coord_incomplete</span><span class="p">(</span><span class="n">drop</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="kc">TRUE</span><span class="p">)</span><span class="w"> </span><span class="o">%&gt;%</span><span class="w"> </span><span class="n">NROW</span><span class="w">
-</span><span class="c1">#&gt; [1] 1306
+```r
+dframe(sample_data_1) %>% coord_impossible()
+#> <scrubr dframe>
+#> Size: 1500 X 5
+#> Lat/Lon vars: latitude/longitude
+#> 
+#>                name  longitude latitude                date        key
+#>               (chr)      (dbl)    (dbl)              (time)      (int)
+#> 1  Ursus americanus  -79.68283 38.36662 2015-01-14 16:36:45 1065590124
+#> 2  Ursus americanus  -82.42028 35.73304 2015-01-13 00:25:39 1065588899
+#> 3  Ursus americanus  -99.09625 23.66893 2015-02-20 23:00:00 1098894889
+#> 4  Ursus americanus  -72.77432 43.94883 2015-02-13 16:16:41 1065611122
+#> 5  Ursus americanus  -72.34617 43.86464 2015-03-01 20:20:45 1088908315
+#> 6  Ursus americanus -108.53674 32.65219 2015-03-29 17:06:54 1088932238
+#> 7  Ursus americanus -108.53691 32.65237 2015-03-29 17:12:50 1088932273
+#> 8  Ursus americanus -123.82900 40.13240 2015-03-28 23:00:00 1132403409
+#> 9  Ursus americanus  -78.25027 36.93018 2015-03-20 21:11:24 1088923534
+#> 10 Ursus americanus  -76.78671 35.53079 2015-04-05 23:00:00 1088954559
+#> ..              ...        ...      ...                 ...        ...
+```
+
+Remove incomplete coordinates
+
+
+```r
+dframe(sample_data_1) %>% coord_incomplete()
+#> <scrubr dframe>
+#> Size: 1306 X 5
+#> Lat/Lon vars: latitude/longitude
+#> 
+#>                name  longitude latitude                date        key
+#>               (chr)      (dbl)    (dbl)              (time)      (int)
+#> 1  Ursus americanus  -79.68283 38.36662 2015-01-14 16:36:45 1065590124
+#> 2  Ursus americanus  -82.42028 35.73304 2015-01-13 00:25:39 1065588899
+#> 3  Ursus americanus  -99.09625 23.66893 2015-02-20 23:00:00 1098894889
+#> 4  Ursus americanus  -72.77432 43.94883 2015-02-13 16:16:41 1065611122
+#> 5  Ursus americanus  -72.34617 43.86464 2015-03-01 20:20:45 1088908315
+#> 6  Ursus americanus -108.53674 32.65219 2015-03-29 17:06:54 1088932238
+#> 7  Ursus americanus -108.53691 32.65237 2015-03-29 17:12:50 1088932273
+#> 8  Ursus americanus -123.82900 40.13240 2015-03-28 23:00:00 1132403409
+#> 9  Ursus americanus  -78.25027 36.93018 2015-03-20 21:11:24 1088923534
+#> 10 Ursus americanus  -76.78671 35.53079 2015-04-05 23:00:00 1088954559
+#> ..              ...        ...      ...                 ...        ...
+```
+
+Remove unlikely coordinates (e.g., those at 0,0)
+
+
+```r
+dframe(sample_data_1) %>% coord_unlikely()
+#> <scrubr dframe>
+#> Size: 1488 X 5
+#> Lat/Lon vars: latitude/longitude
+#> 
+#>                name  longitude latitude                date        key
+#>               (chr)      (dbl)    (dbl)              (time)      (int)
+#> 1  Ursus americanus  -79.68283 38.36662 2015-01-14 16:36:45 1065590124
+#> 2  Ursus americanus  -82.42028 35.73304 2015-01-13 00:25:39 1065588899
+#> 3  Ursus americanus  -99.09625 23.66893 2015-02-20 23:00:00 1098894889
+#> 4  Ursus americanus  -72.77432 43.94883 2015-02-13 16:16:41 1065611122
+#> 5  Ursus americanus  -72.34617 43.86464 2015-03-01 20:20:45 1088908315
+#> 6  Ursus americanus -108.53674 32.65219 2015-03-29 17:06:54 1088932238
+#> 7  Ursus americanus -108.53691 32.65237 2015-03-29 17:12:50 1088932273
+#> 8  Ursus americanus -123.82900 40.13240 2015-03-28 23:00:00 1132403409
+#> 9  Ursus americanus  -78.25027 36.93018 2015-03-20 21:11:24 1088923534
+#> 10 Ursus americanus  -76.78671 35.53079 2015-04-05 23:00:00 1088954559
+#> ..              ...        ...      ...                 ...        ...
+```
+
+Do all three
+
+
+```r
+dframe(sample_data_1) %>%
+  coord_impossible() %>%
+  coord_incomplete() %>%
+  coord_unlikely()
+#> <scrubr dframe>
+#> Size: 1294 X 5
+#> Lat/Lon vars: latitude/longitude
+#> 
+#>                name  longitude latitude                date        key
+#>               (chr)      (dbl)    (dbl)              (time)      (int)
+#> 1  Ursus americanus  -79.68283 38.36662 2015-01-14 16:36:45 1065590124
+#> 2  Ursus americanus  -82.42028 35.73304 2015-01-13 00:25:39 1065588899
+#> 3  Ursus americanus  -99.09625 23.66893 2015-02-20 23:00:00 1098894889
+#> 4  Ursus americanus  -72.77432 43.94883 2015-02-13 16:16:41 1065611122
+#> 5  Ursus americanus  -72.34617 43.86464 2015-03-01 20:20:45 1088908315
+#> 6  Ursus americanus -108.53674 32.65219 2015-03-29 17:06:54 1088932238
+#> 7  Ursus americanus -108.53691 32.65237 2015-03-29 17:12:50 1088932273
+#> 8  Ursus americanus -123.82900 40.13240 2015-03-28 23:00:00 1132403409
+#> 9  Ursus americanus  -78.25027 36.93018 2015-03-20 21:11:24 1088923534
+#> 10 Ursus americanus  -76.78671 35.53079 2015-04-05 23:00:00 1088954559
+#> ..              ...        ...      ...                 ...        ...
+```
+
+Do vs. don't drop bad data
+
+
+```r
+# do
+dframe(sample_data_1) %>% coord_incomplete(drop = TRUE) %>% NROW
+#> [1] 1306
 # don't
-</span><span class="n">dframe</span><span class="p">(</span><span class="n">sample_data_1</span><span class="p">)</span><span class="w"> </span><span class="o">%&gt;%</span><span class="w"> </span><span class="n">coord_incomplete</span><span class="p">(</span><span class="n">drop</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="kc">FALSE</span><span class="p">)</span><span class="w"> </span><span class="o">%&gt;%</span><span class="w"> </span><span class="n">NROW</span><span class="w">
-</span><span class="c1">#&gt; [1] 1500
-</span></code></pre>
-</div>
-
-<h2 id="deduplicate">Deduplicate</h2>
-
-<p>Get a smaller subset of a data.frame</p>
-
-<div class="language-r highlighter-rouge"><pre class="highlight"><code><span class="n">smalldf</span><span class="w"> </span><span class="o">&lt;-</span><span class="w"> </span><span class="n">sample_data_1</span><span class="p">[</span><span class="m">1</span><span class="o">:</span><span class="m">20</span><span class="p">,</span><span class="w"> </span><span class="p">]</span><span class="w">
-</span></code></pre>
-</div>
-
-<p>create a duplicate record</p>
-
-<div class="language-r highlighter-rouge"><pre class="highlight"><code><span class="n">smalldf</span><span class="w"> </span><span class="o">&lt;-</span><span class="w"> </span><span class="n">rbind</span><span class="p">(</span><span class="n">smalldf</span><span class="p">,</span><span class="w"> </span><span class="n">smalldf</span><span class="p">[</span><span class="m">10</span><span class="p">,])</span><span class="w">
-</span><span class="n">row.names</span><span class="p">(</span><span class="n">smalldf</span><span class="p">)</span><span class="w"> </span><span class="o">&lt;-</span><span class="w"> </span><span class="kc">NULL</span><span class="w">
-</span></code></pre>
-</div>
-
-<p>make it slightly different</p>
-
-<div class="language-r highlighter-rouge"><pre class="highlight"><code><span class="n">smalldf</span><span class="p">[</span><span class="m">21</span><span class="p">,</span><span class="w"> </span><span class="s2">"key"</span><span class="p">]</span><span class="w"> </span><span class="o">&lt;-</span><span class="w"> </span><span class="m">1088954555</span><span class="w">
-</span><span class="n">NROW</span><span class="p">(</span><span class="n">smalldf</span><span class="p">)</span><span class="w">
-</span><span class="c1">#&gt; [1] 21
-</span></code></pre>
-</div>
-
-<p>It’s 21 rows, including 1 duplicate. Do the deduplication</p>
-
-<div class="language-r highlighter-rouge"><pre class="highlight"><code><span class="p">(</span><span class="n">dp</span><span class="w"> </span><span class="o">&lt;-</span><span class="w"> </span><span class="n">dframe</span><span class="p">(</span><span class="n">smalldf</span><span class="p">)</span><span class="w"> </span><span class="o">%&gt;%</span><span class="w"> </span><span class="n">dedup</span><span class="p">())</span><span class="w">
-</span><span class="c1">#&gt; &lt;scrubr dframe&gt;
-#&gt; Size: 20 X 5
-#&gt; 
-#&gt; 
-#&gt;                name  longitude latitude                date        key
-#&gt;               (chr)      (dbl)    (dbl)              (time)      (dbl)
-#&gt; 1  Ursus americanus  -79.68283 38.36662 2015-01-14 16:36:45 1065590124
-#&gt; 2  Ursus americanus  -82.42028 35.73304 2015-01-13 00:25:39 1065588899
-#&gt; 3  Ursus americanus  -99.09625 23.66893 2015-02-20 23:00:00 1098894889
-#&gt; 4  Ursus americanus  -72.77432 43.94883 2015-02-13 16:16:41 1065611122
-#&gt; 5  Ursus americanus  -72.34617 43.86464 2015-03-01 20:20:45 1088908315
-#&gt; 6  Ursus americanus -108.53674 32.65219 2015-03-29 17:06:54 1088932238
-#&gt; 7  Ursus americanus -108.53691 32.65237 2015-03-29 17:12:50 1088932273
-#&gt; 8  Ursus americanus -123.82900 40.13240 2015-03-28 23:00:00 1132403409
-#&gt; 9  Ursus americanus  -78.25027 36.93018 2015-03-20 21:11:24 1088923534
-#&gt; 10 Ursus americanus -103.30058 29.27042 2015-04-29 22:00:00 1088964797
-#&gt; ..              ...        ...      ...                 ...        ...
-</span></code></pre>
-</div>
-
-<p>Now its 20 rows, duplicate removed</p>
-
-<p>Here’s the duplicates</p>
-
-<div class="language-r highlighter-rouge"><pre class="highlight"><code><span class="nf">attr</span><span class="p">(</span><span class="n">dp</span><span class="p">,</span><span class="w"> </span><span class="s2">"dups"</span><span class="p">)</span><span class="w">
-</span><span class="c1">#&gt; &lt;scrubr dframe&gt;
-#&gt; Size: 1 X 5
-#&gt; 
-#&gt; 
-#&gt;               name longitude latitude                date        key
-#&gt;              (chr)     (dbl)    (dbl)              (time)      (dbl)
-#&gt; 1 Ursus americanus -76.78671 35.53079 2015-04-05 23:00:00 1088954555
-</span></code></pre>
-</div>
-
-<h2 id="dates">Dates</h2>
-
-<p>Standardize/convert dates</p>
-
-<div class="language-r highlighter-rouge"><pre class="highlight"><code><span class="n">df</span><span class="w"> </span><span class="o">&lt;-</span><span class="w"> </span><span class="n">sample_data_1</span><span class="w">
-</span><span class="n">dframe</span><span class="p">(</span><span class="n">df</span><span class="p">)</span><span class="w"> </span><span class="o">%&gt;%</span><span class="w"> 
-  </span><span class="n">date_standardize</span><span class="p">(</span><span class="s2">"%d%b%Y"</span><span class="p">)</span><span class="w">
-</span><span class="c1">#&gt; &lt;scrubr dframe&gt;
-#&gt; Size: 1500 X 5
-#&gt; 
-#&gt; 
-#&gt;                name  longitude latitude      date        key
-#&gt;               (chr)      (dbl)    (dbl)     (chr)      (int)
-#&gt; 1  Ursus americanus  -79.68283 38.36662 14Jan2015 1065590124
-#&gt; 2  Ursus americanus  -82.42028 35.73304 13Jan2015 1065588899
-#&gt; 3  Ursus americanus  -99.09625 23.66893 20Feb2015 1098894889
-#&gt; 4  Ursus americanus  -72.77432 43.94883 13Feb2015 1065611122
-#&gt; 5  Ursus americanus  -72.34617 43.86464 01Mar2015 1088908315
-#&gt; 6  Ursus americanus -108.53674 32.65219 29Mar2015 1088932238
-#&gt; 7  Ursus americanus -108.53691 32.65237 29Mar2015 1088932273
-#&gt; 8  Ursus americanus -123.82900 40.13240 28Mar2015 1132403409
-#&gt; 9  Ursus americanus  -78.25027 36.93018 20Mar2015 1088923534
-#&gt; 10 Ursus americanus  -76.78671 35.53079 05Apr2015 1088954559
-#&gt; ..              ...        ...      ...       ...        ...
-</span></code></pre>
-</div>
-
-<p>Drop records without dates</p>
-
-<div class="language-r highlighter-rouge"><pre class="highlight"><code><span class="n">NROW</span><span class="p">(</span><span class="n">df</span><span class="p">)</span><span class="w">
-</span><span class="c1">#&gt; [1] 1500
-</span><span class="n">NROW</span><span class="p">(</span><span class="n">dframe</span><span class="p">(</span><span class="n">df</span><span class="p">)</span><span class="w"> </span><span class="o">%&gt;%</span><span class="w"> </span><span class="n">date_missing</span><span class="p">())</span><span class="w">
-</span><span class="c1">#&gt; [1] 1498
-</span></code></pre>
-</div>
+dframe(sample_data_1) %>% coord_incomplete(drop = FALSE) %>% NROW
+#> [1] 1500
+```
+
+
+## Deduplicate
+
+Get a smaller subset of a data.frame
+
+
+```r
+smalldf <- sample_data_1[1:20, ]
+```
+
+create a duplicate record
+
+
+```r
+smalldf <- rbind(smalldf, smalldf[10,])
+row.names(smalldf) <- NULL
+```
+
+make it slightly different
+
+
+```r
+smalldf[21, "key"] <- 1088954555
+NROW(smalldf)
+#> [1] 21
+```
+
+It's 21 rows, including 1 duplicate. Do the deduplication
+
+
+```r
+(dp <- dframe(smalldf) %>% dedup())
+#> <scrubr dframe>
+#> Size: 20 X 5
+#> 
+#> 
+#>                name  longitude latitude                date        key
+#>               (chr)      (dbl)    (dbl)              (time)      (dbl)
+#> 1  Ursus americanus  -79.68283 38.36662 2015-01-14 16:36:45 1065590124
+#> 2  Ursus americanus  -82.42028 35.73304 2015-01-13 00:25:39 1065588899
+#> 3  Ursus americanus  -99.09625 23.66893 2015-02-20 23:00:00 1098894889
+#> 4  Ursus americanus  -72.77432 43.94883 2015-02-13 16:16:41 1065611122
+#> 5  Ursus americanus  -72.34617 43.86464 2015-03-01 20:20:45 1088908315
+#> 6  Ursus americanus -108.53674 32.65219 2015-03-29 17:06:54 1088932238
+#> 7  Ursus americanus -108.53691 32.65237 2015-03-29 17:12:50 1088932273
+#> 8  Ursus americanus -123.82900 40.13240 2015-03-28 23:00:00 1132403409
+#> 9  Ursus americanus  -78.25027 36.93018 2015-03-20 21:11:24 1088923534
+#> 10 Ursus americanus -103.30058 29.27042 2015-04-29 22:00:00 1088964797
+#> ..              ...        ...      ...                 ...        ...
+```
+
+Now its 20 rows, duplicate removed
+
+Here's the duplicates
+
+
+```r
+attr(dp, "dups")
+#> <scrubr dframe>
+#> Size: 1 X 5
+#> 
+#> 
+#>               name longitude latitude                date        key
+#>              (chr)     (dbl)    (dbl)              (time)      (dbl)
+#> 1 Ursus americanus -76.78671 35.53079 2015-04-05 23:00:00 1088954555
+```
+
+## Dates
+
+Standardize/convert dates
+
+
+```r
+df <- sample_data_1
+dframe(df) %>% 
+  date_standardize("%d%b%Y")
+#> <scrubr dframe>
+#> Size: 1500 X 5
+#> 
+#> 
+#>                name  longitude latitude      date        key
+#>               (chr)      (dbl)    (dbl)     (chr)      (int)
+#> 1  Ursus americanus  -79.68283 38.36662 14Jan2015 1065590124
+#> 2  Ursus americanus  -82.42028 35.73304 13Jan2015 1065588899
+#> 3  Ursus americanus  -99.09625 23.66893 20Feb2015 1098894889
+#> 4  Ursus americanus  -72.77432 43.94883 13Feb2015 1065611122
+#> 5  Ursus americanus  -72.34617 43.86464 01Mar2015 1088908315
+#> 6  Ursus americanus -108.53674 32.65219 29Mar2015 1088932238
+#> 7  Ursus americanus -108.53691 32.65237 29Mar2015 1088932273
+#> 8  Ursus americanus -123.82900 40.13240 28Mar2015 1132403409
+#> 9  Ursus americanus  -78.25027 36.93018 20Mar2015 1088923534
+#> 10 Ursus americanus  -76.78671 35.53079 05Apr2015 1088954559
+#> ..              ...        ...      ...       ...        ...
+```
+
+Drop records without dates
+
 
-<p>Create date field from other fields</p>
-
-<div class="language-r highlighter-rouge"><pre class="highlight"><code><span class="n">dframe</span><span class="p">(</span><span class="n">sample_data_2</span><span class="p">)</span><span class="w"> </span><span class="o">%&gt;%</span><span class="w"> 
-  </span><span class="n">date_create</span><span class="p">(</span><span class="n">year</span><span class="p">,</span><span class="w"> </span><span class="n">month</span><span class="p">,</span><span class="w"> </span><span class="n">day</span><span class="p">)</span><span class="w">
-</span><span class="c1">#&gt; &lt;scrubr dframe&gt;
-#&gt; Size: 1500 X 8
-#&gt; 
-#&gt; 
-#&gt;                name  longitude latitude        key  year month   day
-#&gt;               (chr)      (dbl)    (dbl)      (int) (chr) (chr) (chr)
-#&gt; 1  Ursus americanus  -79.68283 38.36662 1065590124  2015    01    14
-#&gt; 2  Ursus americanus  -82.42028 35.73304 1065588899  2015    01    13
-#&gt; 3  Ursus americanus  -99.09625 23.66893 1098894889  2015    02    20
-#&gt; 4  Ursus americanus  -72.77432 43.94883 1065611122  2015    02    13
-#&gt; 5  Ursus americanus  -72.34617 43.86464 1088908315  2015    03    01
-#&gt; 6  Ursus americanus -108.53674 32.65219 1088932238  2015    03    29
-#&gt; 7  Ursus americanus -108.53691 32.65237 1088932273  2015    03    29
-#&gt; 8  Ursus americanus -123.82900 40.13240 1132403409  2015    03    28
-#&gt; 9  Ursus americanus  -78.25027 36.93018 1088923534  2015    03    20
-#&gt; 10 Ursus americanus  -76.78671 35.53079 1088954559  2015    04    05
-#&gt; ..              ...        ...      ...        ...   ...   ...   ...
-#&gt; Variables not shown: date (chr).
-</span></code></pre>
-</div>
-
-<h2 id="bugs-and-such">bugs and such</h2>
-
-<p>Report them in the <a href="https://github.com/ropenscilabs/scrubr/issues">scrubr issue tracker</a></p>
-
-  </div>
-  
-  <div class="post">
-    <h1>
-      <a href="/2016/01/request-hello-world/">
-        request - a high level HTTP client for R
-      </a>
-    </h1>
-
-    <span class="post-date">05 Jan 2016</span>
-
-    <p><code class="highlighter-rouge">request</code> is DSL for http requests for R, and is inspired by the CLI tool <a href="https://github.com/jakubroztocil/httpie">httpie</a>. It’s built on <code class="highlighter-rouge">httr</code>.</p>
-
-<p>The following were driving principles for this package:</p>
-
-<ul>
-  <li>The web is increasingly a JSON world, so we assume <code class="highlighter-rouge">applications/json</code> by default, but give back other types if not</li>
-  <li>The workflow follows logically, or at least should, from, <em>hey, I got this url</em>, to <em>i need to add some options</em>, to <em>execute request</em> - and functions support piping so that you can execute functions in this order</li>
-  <li>Whenever possible, we transform output to data.frame’s - facilitating downstream manipulation via <code class="highlighter-rouge">dplyr</code>, etc.</li>
-  <li>We do <code class="highlighter-rouge">GET</code> requests by default. Specify a different type if you don’t want <code class="highlighter-rouge">GET</code>. Given <code class="highlighter-rouge">GET</code> by default, this client is optimized for consumption of data, rather than creating new things on servers</li>
-  <li>You can use non-standard evaluation to easily pass in query parameters without worrying about <code class="highlighter-rouge">&amp;</code>’s, URL escaping, etc. (see <code class="highlighter-rouge">api_query()</code>)</li>
-  <li>Same for body params (see <code class="highlighter-rouge">api_body()</code>)</li>
-</ul>
-
-<p>The following is a brief demo of some of the package functionality:</p>
-
-<h2 id="install">Install</h2>
-
-<p>From CRAN</p>
-
-<div class="language-r highlighter-rouge"><pre class="highlight"><code><span class="n">install.packages</span><span class="p">(</span><span class="s2">"request"</span><span class="p">)</span><span class="w">
-</span></code></pre>
-</div>
-
-<p>Or from GitHub</p>
-
-<div class="language-r highlighter-rouge"><pre class="highlight"><code><span class="n">devtools</span><span class="o">::</span><span class="n">install_github</span><span class="p">(</span><span class="s2">"sckott/request"</span><span class="p">)</span><span class="w">
-</span></code></pre>
-</div>
-
-<div class="language-r highlighter-rouge"><pre class="highlight"><code><span class="n">library</span><span class="p">(</span><span class="s2">"request"</span><span class="p">)</span><span class="w">
-</span></code></pre>
-</div>
-
-<h2 id="execute-on-last-pipe">Execute on last pipe</h2>
-
-<p>When using pipes (<code class="highlighter-rouge">%&gt;%</code>) in <code class="highlighter-rouge">request</code>, we autodetect last piped command, and execute <code class="highlighter-rouge">http()</code> if it’s the last. If not the last, the output gets passed to the next command, and so on. This feature (and <code class="highlighter-rouge">magrittr</code>) were done by Stefan Milton Bache.</p>
-
-<p>This feature is really nice because a) it’s one less thing you need to do, and b) you only need to care about the request itself.</p>
-
-<p>You can escape auto-execution if you use the function <code class="highlighter-rouge">peep()</code>, which prints out a summary of the request you’ve created, but does not execute an HTTP request.</p>
-
-<h2 id="http-requests">HTTP Requests</h2>
-
-<p>A high level function <code class="highlighter-rouge">http()</code> wraps a lower level <code class="highlighter-rouge">R6</code> object <code class="highlighter-rouge">RequestIterator</code>, which holds a series of variables and functions to execute <code class="highlighter-rouge">GET</code> and <code class="highlighter-rouge">POST</code> requests, and will hold other HTTP verbs as well. In addition, it can hold state, which will allow us to do paging internally for you (see below). You have direct access to the <code class="highlighter-rouge">R6</code> object if you call <code class="highlighter-rouge">http_client()</code> instead of <code class="highlighter-rouge">http()</code>.</p>
-
-<h2 id="nse-and-se">NSE and SE</h2>
-
-<p>Most if not all functions in <code class="highlighter-rouge">request</code> support non-standard evaluation (NSE) as well as standard evaluation (SE). If a function supports both, there’s a version without an underscore for NSE, while a version with an underscore is for SE. For example, here, we make a HTTP request by passing a base URL, then a series of paths that get combined together. First the NSE version</p>
-
-<div class="language-r highlighter-rouge"><pre class="highlight"><code><span class="n">api</span><span class="p">(</span><span class="s1">'https://api.github.com/'</span><span class="p">)</span><span class="w"> </span><span class="o">%&gt;%</span><span class="w">
-  </span><span class="n">api_path</span><span class="p">(</span><span class="n">repos</span><span class="p">,</span><span class="w"> </span><span class="n">ropensci</span><span class="p">,</span><span class="w"> </span><span class="n">rgbif</span><span class="p">,</span><span class="w"> </span><span class="n">issues</span><span class="p">)</span><span class="w">
-</span></code></pre>
-</div>
-
-<p>Then the SE version</p>
-
-<div class="language-r highlighter-rouge"><pre class="highlight"><code><span class="n">api</span><span class="p">(</span><span class="s1">'https://api.github.com/'</span><span class="p">)</span><span class="w"> </span><span class="o">%&gt;%</span><span class="w">
-  </span><span class="n">api_path_</span><span class="p">(</span><span class="s1">'repos'</span><span class="p">,</span><span class="w"> </span><span class="s1">'ropensci'</span><span class="p">,</span><span class="w"> </span><span class="s1">'rgbif'</span><span class="p">,</span><span class="w"> </span><span class="s1">'issues'</span><span class="p">)</span><span class="w">
-</span></code></pre>
-</div>
-
-<h2 id="building-api-routes">Building API routes</h2>
-
-<p>The first thing you’ll want to do is lay out the base URL for your request. The function <code class="highlighter-rouge">api()</code> is your friend.</p>
-
-<p><code class="highlighter-rouge">api()</code> works with full or partial URLs:</p>
-
-<div class="language-r highlighter-rouge"><pre class="highlight"><code><span class="n">api</span><span class="p">(</span><span class="s1">'https://api.github.com/'</span><span class="p">)</span><span class="w">
-</span><span class="c1">#&gt; URL: https://api.github.com/
-</span><span class="n">api</span><span class="p">(</span><span class="s1">'http://api.gbif.org/v1'</span><span class="p">)</span><span class="w">
-</span><span class="c1">#&gt; URL: http://api.gbif.org/v1
-</span><span class="n">api</span><span class="p">(</span><span class="s1">'api.gbif.org/v1'</span><span class="p">)</span><span class="w">
-</span><span class="c1">#&gt; URL: api.gbif.org/v1
-</span></code></pre>
-</div>
-
-<p>And works with ports, full or partial</p>
-
-<div class="language-r highlighter-rouge"><pre class="highlight"><code><span class="n">api</span><span class="p">(</span><span class="s1">'http://localhost:9200'</span><span class="p">)</span><span class="w">
-</span><span class="c1">#&gt; URL: http://localhost:9200
-</span><span class="n">api</span><span class="p">(</span><span class="s1">'localhost:9200'</span><span class="p">)</span><span class="w">
-</span><span class="c1">#&gt; URL: http://localhost:9200
-</span><span class="n">api</span><span class="p">(</span><span class="s1">':9200'</span><span class="p">)</span><span class="w">
-</span><span class="c1">#&gt; URL: http://localhost:9200
-</span><span class="n">api</span><span class="p">(</span><span class="s1">'9200'</span><span class="p">)</span><span class="w">
-</span><span class="c1">#&gt; URL: http://localhost:9200
-</span><span class="n">api</span><span class="p">(</span><span class="s1">'9200/stuff'</span><span class="p">)</span><span class="w">
-</span><span class="c1">#&gt; URL: http://localhost:9200/stuff
-</span></code></pre>
-</div>
-
-<h2 id="make-http-requests">Make HTTP requests</h2>
-
-<p>The above examples with <code class="highlighter-rouge">api()</code> are not passed through a pipe, so only define a URL, but don’t do an HTTP request. To make an HTTP request, you can either pipe a url or partial url to e.g., <code class="highlighter-rouge">api()</code>, or call <code class="highlighter-rouge">http()</code> at the end of a string of function calls:</p>
-
-<div class="language-r highlighter-rouge"><pre class="highlight"><code><span class="s1">'https://api.github.com/'</span><span class="w"> </span><span class="o">%&gt;%</span><span class="w"> </span><span class="n">api</span><span class="p">()</span><span class="w">
-</span><span class="c1">#&gt; $current_user_url
-#&gt; [1] "https://api.github.com/user"
-#&gt;
-#&gt; $current_user_authorizations_html_url
-#&gt; [1] "https://github.com/settings/connections/applications{/client_id}"
-#&gt;
-#&gt; $authorizations_url
-#&gt; [1] "https://api.github.com/authorizations"
-#&gt;
-#&gt; $code_search_url
-</span><span class="n">...</span><span class="w">
-</span></code></pre>
-</div>
-
-<p>Or</p>
-
-<div class="language-r highlighter-rouge"><pre class="highlight"><code><span class="n">api</span><span class="p">(</span><span class="s1">'https://api.github.com/'</span><span class="p">)</span><span class="w"> </span><span class="o">%&gt;%</span><span class="w"> </span><span class="n">http</span><span class="p">()</span><span class="w">
-</span><span class="c1">#&gt; $current_user_url
-#&gt; [1] "https://api.github.com/user"
-#&gt;
-#&gt; $current_user_authorizations_html_url
-#&gt; [1] "https://github.com/settings/connections/applications{/client_id}"
-#&gt;
-#&gt; $authorizations_url
-#&gt; [1] "https://api.github.com/authorizations"
-#&gt;
-#&gt; $code_search_url
-</span><span class="n">...</span><span class="w">
-</span></code></pre>
-</div>
-
-<p><code class="highlighter-rouge">http()</code> is called at the end of a chain of piped commands, so no need to invoke it. However, you can if you like.</p>
-
-<h2 id="templating">Templating</h2>
-
-<div class="language-r highlighter-rouge"><pre class="highlight"><code><span class="n">repo_info</span><span class="w"> </span><span class="o">&lt;-</span><span class="w"> </span><span class="nf">list</span><span class="p">(</span><span class="n">username</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s1">'craigcitro'</span><span class="p">,</span><span class="w"> </span><span class="n">repo</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s1">'r-travis'</span><span class="p">)</span><span class="w">
-</span><span class="n">api</span><span class="p">(</span><span class="s1">'https://api.github.com/'</span><span class="p">)</span><span class="w"> </span><span class="o">%&gt;%</span><span class="w">
-  </span><span class="n">api_template</span><span class="p">(</span><span class="n">template</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s1">'repos///issues'</span><span class="p">,</span><span class="w"> </span><span class="n">data</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">repo_info</span><span class="p">)</span><span class="w">
-</span><span class="c1">#&gt; [[1]]
-#&gt; [[1]]$url
-#&gt; [1] "https://api.github.com/repos/craigcitro/r-travis/issues/164"
-#&gt;
-#&gt; [[1]]$labels_url
-#&gt; [1] "https://api.github.com/repos/craigcitro/r-travis/issues/164/labels{/name}"
-#&gt;
-#&gt; [[1]]$comments_url
-#&gt; [1] "https://api.github.com/repos/craigcitro/r-travis/issues/164/comments"
-#&gt; ...
-</span></code></pre>
-</div>
-
-<h2 id="set-paths">Set paths</h2>
-
-<p><code class="highlighter-rouge">api_path()</code> adds paths to the base URL</p>
-
-<div class="language-r highlighter-rouge"><pre class="highlight"><code><span class="n">api</span><span class="p">(</span><span class="s1">'https://api.github.com/'</span><span class="p">)</span><span class="w"> </span><span class="o">%&gt;%</span><span class="w">
-  </span><span class="n">api_path</span><span class="p">(</span><span class="n">repos</span><span class="p">,</span><span class="w"> </span><span class="n">ropensci</span><span class="p">,</span><span class="w"> </span><span class="n">rgbif</span><span class="p">,</span><span class="w"> </span><span class="n">issues</span><span class="p">)</span><span class="w"> </span><span class="o">%&gt;%</span><span class="w">
-  </span><span class="n">peep</span><span class="w">
-</span><span class="c1">#&gt; &lt;http request&gt;
-#&gt;   url: https://api.github.com/
-#&gt;   paths: repos/ropensci/rgbif/issues
-#&gt;   query:
-#&gt;   body:
-#&gt;   paging:
-#&gt;   headers:
-#&gt;   rate limit:
-#&gt;   retry (n/delay (s)): /
-#&gt;   error handler:
-#&gt;   config:
-</span></code></pre>
-</div>
-
-<h2 id="query">Query</h2>
-
-<div class="language-r highlighter-rouge"><pre class="highlight"><code><span class="n">api</span><span class="p">(</span><span class="s2">"http://api.plos.org/search"</span><span class="p">)</span><span class="w"> </span><span class="o">%&gt;%</span><span class="w">
-  </span><span class="n">api_query</span><span class="p">(</span><span class="n">q</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">ecology</span><span class="p">,</span><span class="w"> </span><span class="n">wt</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">json</span><span class="p">,</span><span class="w"> </span><span class="n">fl</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">journal</span><span class="p">)</span><span class="w"> </span><span class="o">%&gt;%</span><span class="w">
-  </span><span class="n">peep</span><span class="w">
-</span><span class="c1">#&gt; &lt;http request&gt;
-#&gt;   url: http://api.plos.org/search
-#&gt;   paths:
-#&gt;   query: q=ecology, wt=json, fl=journal
-#&gt;   body:
-#&gt;   paging:
-#&gt;   headers:
-#&gt;   rate limit:
-#&gt;   retry (n/delay (s)): /
-#&gt;   error handler:
-#&gt;   config:
-</span></code></pre>
-</div>
-
-<h2 id="headers">Headers</h2>
-
-<div class="language-r highlighter-rouge"><pre class="highlight"><code><span class="n">api</span><span class="p">(</span><span class="s1">'http://httpbin.org/headers'</span><span class="p">)</span><span class="w"> </span><span class="o">%&gt;%</span><span class="w">
-  </span><span class="n">api_headers</span><span class="p">(</span><span class="n">`X-FARGO-SEASON`</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="m">3</span><span class="p">,</span><span class="w"> </span><span class="n">`X-NARCOS-SEASON`</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="m">5</span><span class="p">)</span><span class="w"> </span><span class="o">%&gt;%</span><span class="w">
-  </span><span class="n">peep</span><span class="w">
-</span><span class="c1">#&gt; &lt;http request&gt;
-#&gt;   url: http://httpbin.org/headers
-#&gt;   paths:
-#&gt;   query:
-#&gt;   body:
-#&gt;   paging:
-#&gt;   headers:
-#&gt;     X-FARGO-SEASON: 3
-#&gt;     X-NARCOS-SEASON: 5
-#&gt;   rate limit:
-#&gt;   retry (n/delay (s)): /
-#&gt;   error handler:
-#&gt;   config:
-</span></code></pre>
-</div>
-
-<h2 id="curl-configuration">curl configuration</h2>
-
-<p><code class="highlighter-rouge">httr</code> is exported in <code class="highlighter-rouge">request</code>, so you can use <code class="highlighter-rouge">httr</code> functions like <code class="highlighter-rouge">verbose()</code> to get verbose curl output</p>
-
-<div class="language-r highlighter-rouge"><pre class="highlight"><code><span class="n">api</span><span class="p">(</span><span class="s1">'http://httpbin.org/headers'</span><span class="p">)</span><span class="w"> </span><span class="o">%&gt;%</span><span class="w">
-  </span><span class="n">api_config</span><span class="p">(</span><span class="n">verbose</span><span class="p">())</span><span class="w">
-</span><span class="c1">#&gt; -&gt; GET /headers HTTP/1.1
-#&gt; -&gt; Host: httpbin.org
-#&gt; -&gt; User-Agent: curl/7.43.0 curl/0.9.4 httr/1.0.0 request/0.1.0
-#&gt; -&gt; Accept-Encoding: gzip, deflate
-#&gt; -&gt; Accept: application/json, text/xml, application/xml, */*
-#&gt; -&gt;
-#&gt; &lt;- HTTP/1.1 200 OK
-#&gt; &lt;- Server: nginx
-#&gt; &lt;- Date: Sun, 03 Jan 2016 16:56:29 GMT
-#&gt; &lt;- Content-Type: application/json
-#&gt; &lt;- Content-Length: 227
-#&gt; &lt;- Connection: keep-alive
-#&gt; &lt;- Access-Control-Allow-Origin: *
-#&gt; &lt;- Access-Control-Allow-Credentials: true
-#&gt; &lt;-
-#&gt; $headers
-#&gt; $headers$Accept
-#&gt; [1] "application/json, text/xml, application/xml, */*"
-#&gt; ...
-</span></code></pre>
-</div>
-
-<h2 id="coming-soon">Coming soon</h2>
-
-<p>There’s a number of interesting features that should be coming soon to <code class="highlighter-rouge">request</code>.</p>
-
-<ul>
-  <li>Paging - a paging helper will make it easy to do paing, and will attempt to handle any parameters used for paging. Some user input will be required, like what parameter names are, and how many records you want returned  <a href="https://github.com/sckott/request/issues/2">sckott/request#2</a></li>
-  <li>Retry - a retry helper will make it easy to retry http requests on any failure, and execute a user defined function on failure <a href="https://github.com/sckott/request/issues/6">sckott/request#6</a></li>
-  <li>Rate limit - a rate limit helper will add info to a set of many requests - still in early design stages <a href="https://github.com/sckott/request/issues/5">sckott/request#5</a></li>
-  <li>Caching - a caching helper - may use in the background the in development <a href="https://github.com/ropensci/vcr">vcr R client</a> when on CRAN or perhaps <a href="https://github.com/richfitz/storr">storr</a>  <a href="https://github.com/sckott/request/issues/4">sckott/request#4</a></li>
-</ul>
+```r
+NROW(df)
+#> [1] 1500
+NROW(dframe(df) %>% date_missing())
+#> [1] 1498
+```
+
+Create date field from other fields
+
+
+```r
+dframe(sample_data_2) %>% 
+  date_create(year, month, day)
+#> <scrubr dframe>
+#> Size: 1500 X 8
+#> 
+#> 
+#>                name  longitude latitude        key  year month   day
+#>               (chr)      (dbl)    (dbl)      (int) (chr) (chr) (chr)
+#> 1  Ursus americanus  -79.68283 38.36662 1065590124  2015    01    14
+#> 2  Ursus americanus  -82.42028 35.73304 1065588899  2015    01    13
+#> 3  Ursus americanus  -99.09625 23.66893 1098894889  2015    02    20
+#> 4  Ursus americanus  -72.77432 43.94883 1065611122  2015    02    13
+#> 5  Ursus americanus  -72.34617 43.86464 1088908315  2015    03    01
+#> 6  Ursus americanus -108.53674 32.65219 1088932238  2015    03    29
+#> 7  Ursus americanus -108.53691 32.65237 1088932273  2015    03    29
+#> 8  Ursus americanus -123.82900 40.13240 1132403409  2015    03    28
+#> 9  Ursus americanus  -78.25027 36.93018 1088923534  2015    03    20
+#> 10 Ursus americanus  -76.78671 35.53079 1088954559  2015    04    05
+#> ..              ...        ...      ...        ...   ...   ...   ...
+#> Variables not shown: date (chr).
+```
+
+## bugs and such
+
+Report them in the [scrubr issue tracker](https://github.com/ropenscilabs/scrubr/issues)
 
   </div>
   

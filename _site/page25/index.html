@@ -61,6 +61,380 @@
   
   <div class="post">
     <h1>
+      <a href="/2013/03/r-metadata/">
+        Scholarly metadata in R
+      </a>
+    </h1>
+
+    <span class="post-date">16 Mar 2013</span>
+
+    Scholarly metadata - the meta-information surrounding articles - can be super useful.  Although metadata does not contain the full content of articles, it contains a lot of useful information, including title, authors, abstract, URL to the article, etc. 
+
+One of the largest sources of metadata is provided via the Open Archives Initiative Protocol for Metadata Harvesting or [OAI-PMH](http://www.openarchives.org/OAI/openarchivesprotocol.html). Many publishers, provide their metadata through their own endpoint, and implement the standard OAI-PMH methods: [GetRecord](http://www.openarchives.org/OAI/openarchivesprotocol.html#GetRecord), [Identify](http://www.openarchives.org/OAI/openarchivesprotocol.html#Identify), [ListIdentifiers](http://www.openarchives.org/OAI/openarchivesprotocol.html#ListIdentifiers), [ListMetadataFormats](http://www.openarchives.org/OAI/openarchivesprotocol.html#ListMetadataFormats), [ListRecords](http://www.openarchives.org/OAI/openarchivesprotocol.html#ListRecords), and [ListSets](http://www.openarchives.org/OAI/openarchivesprotocol.html#ListSets). Many providers use OAI-PMH, including [DataCite](http://oai.datacite.org/), [Dryad](http://wiki.datadryad.org/Data_Access#OAI-PMH), and [PubMed](http://www.ncbi.nlm.nih.gov/pmc/tools/oai/).
+
+Some data-/article-providers provide their metadata via their own APIs. For example, Nature Publishing Group provides their own metadata API [here](http://developers.nature.com/docs) in non OAI-PMH format; you can get PLoS metadata through their [search API](http://api.plos.org/), and the BHL (see below) provides their own custom metadata service.
+
+In addition, CrossRef provides a number of metadata search services: [metadata search](http://search.labs.crossref.org/help/api) and [openurl](http://labs.crossref.org/openurl/). 
+
+What about the other publishers? (please tell me if I'm wrong about these three) 
+
++ Springer has [a metadata API](http://dev.springer.com/docs), but it is terrible, soooo...
++ Elsevier, are you kidding? Well, they do have some sort of API service, but its a pain in the ass. 
++ Wiley, no better than Elsevier.
+
+Note that metadata can live in other places:
+
++ Another package being developed by David Springate, [rpubmed](https://github.com/ropensci/rpubmed) can get PubMed metadata. 
++ Our wrapper to the Mendeley API, [RMendeley](https://github.com/ropensci/rmendeley), gets article metadata via Mendeley's database. 
++ Our wrapper to the Biodiversity Heritage Library API [here](http://www.biodiversitylibrary.org/api2/docs/docs.html) gets their metadata. 
+
+No, you can't get metadata via Google Scholar - the don't allow scraping, and don't have expose their data via an API.
+
+I have discussed this package [in a previous blog post](http://sckott.github.io/2012/09/rmetadata/), but have since worked on the code a bit, and thought it deserved a new post. 
+
+You can see a tutorial for this package [here](http://ropensci.github.com/rmetadata/), and contribute to the code [here](https://github.com/ropensci/rmetadata).
+
+***************
+
+### Install rmetadata
+
+{% highlight r %}
+# install_github('rmetadata', 'ropensci') # uncomment to install
+library(rmetadata)
+{% endhighlight %}
+
+
+***************
+
+### Count OAI-PMH identifiers for a data provider.
+	
+
+{% highlight r %}
+# For DataCite.
+count_identifiers("datacite")
+
+  provider   count
+1 datacite 1216193
+{% endhighlight %}
+
+
+*********
+	
+### Lookup article info via CrossRef with DOI and get a citation.
+
+#### As Bibtex
+	
+
+{% highlight r %}
+print(crossref_citation("10.3998/3336451.0009.101"), style = "Bibtex")
+
+@Article{,
+  title = {In Google We Trust?},
+  author = {Geoffrey Bilder},
+  journal = {The Journal of Electronic Publishing},
+  year = {2006},
+  month = {01},
+  volume = {9},
+  doi = {10.3998/3336451.0009.101},
+}
+{% endhighlight %}
+
+	
+#### As regular text
+	
+
+{% highlight r %}
+print(crossref_citation("10.3998/3336451.0009.101"), style = "text")
+
+Bilder G (2006). "In Google We Trust?" _The Journal of Electronic
+Publishing_, *9*. <URL:
+http://dx.doi.org/10.3998/3336451.0009.101>.
+{% endhighlight %}
+
+	
+*********
+	
+### Search the CrossRef Metatdata for DOIs using free form references.
+	
+#### Search with title, author, year, and journal
+	
+
+{% highlight r %}
+crossref_search_free(query = "Piwowar Sharing Detailed Research Data Is Associated with Increased Citation Rate PLOS one 2007")
+
+                                                                                             text
+1 Piwowar Sharing Detailed Research Data Is Associated with Increased Citation Rate PLOS one 2007
+  match                   doi score
+1  TRUE 10.1038/npre.2007.361 4.905
+{% endhighlight %}
+
+	
+#### Get a DOI and get the citation using \code{crossref_search}
+	
+
+{% highlight r %}
+# Get a DOI for a paper
+doi <- crossref_search_free(query = "Piwowar sharing data PLOS one")$doi
+
+# Get the metadata
+crossref_search(doi = doi)[, 1:3]
+
+                           doi score normalizedScore
+1 10.1371/journal.pone.0000308 18.19             100
+{% endhighlight %}
+
+
+*********
+	
+### Get a random set of DOI's through CrossRef.
+	
+
+{% highlight r %}
+# Default search gets 20 random DOIs
+crossref_r()
+
+ [1] "10.4028/www.scientific.net/MSF.126-128.467"
+ [2] "10.2139/ssrn.548523"                       
+ [3] "10.1016/S0012-821X(02)00562-9"             
+ [4] "10.1093/rsq/13.2-3.167"                    
+ [5] "10.5772/55055"                             
+ [6] "10.1515/BC.1999.050"                       
+ [7] "10.1016/S0020-7292(98)90160-6"             
+ [8] "10.1111/j.1439-0418.1985.tb02788.x"        
+ [9] "10.1089/aid.2012.0115"                     
+[10] "10.1016/0002-9378(95)90155-8"              
+[11] "10.1001/jama.1949.02900490055028"          
+[12] "10.1051/jphyscol:1989172"                  
+[13] "10.1016/s0301-2115(03)00298-7"             
+[14] "10.1007/BF02735292"                        
+[15] "10.1016/0003-4916(65)90026-6"              
+[16] "10.4156/jdcta.vol5.issue5.12"              
+[17] "10.1007/s10904-009-9316-2"                 
+[18] "10.1023/A:1021690001832"                   
+[19] "10.1007/s12262-012-0724-0"                 
+[20] "10.1007/bf02192860"
+{% endhighlight %}
+
+
+
+{% highlight r %}
+
+# Specify you want journal articles only
+crossref_r(type = "journal_article")
+
+ [1] "10.1016/j.jacc.2011.09.055"                                 
+ [2] "10.1002/dev.420170603"                                      
+ [3] "10.4315/0362-028X.JFP-10-403"                               
+ [4] "10.1016/S0925-4927(98)00016-X"                              
+ [5] "10.1111/j.1933-1592.2002.tb00141.x"                         
+ [6] "10.1541/ieejfms.127.629"                                    
+ [7] "10.5539/enrr.v3n1p62"                                       
+ [8] "10.1016/S0960-9776(96)90038-7"                              
+ [9] "10.1016/0925-9635(94)05240-9"                               
+[10] "10.1016/s0929-693x(97)86846-7"                              
+[11] "10.1002/(SICI)1096-9071(199601)48:1<53::AID-JMV9>3.0.CO;2-K"
+[12] "10.1016/s0267-7261(01)00016-1"                              
+[13] "10.1111/j.1748-0361.2003.tb00575.x"                         
+[14] "10.1097/00005721-197701000-00011"                           
+[15] "10.1007/s00894-009-0593-z"                                  
+[16] "10.1071/AR9830063"                                          
+[17] "10.1186/gb-2009-10-4-r39"                                   
+[18] "10.2165/00128415-201113540-00038"                           
+[19] "10.1007/BF00522986"                                         
+[20] "10.1080/19407963.2011.539385"
+{% endhighlight %}
+
+	
+*********
+	
+### Search the CrossRef Metatdata API. 
+	
+
+{% highlight r %}
+# Search for two different query terms
+crossref_search(query = c("renear", "palmer"), rows = 4)[, 1:3]
+
+                            doi score normalizedScore
+1       10.1126/science.1157784 3.253             100
+2  10.1002/meet.2009.1450460141 2.169              66
+3 10.4242/BalisageVol3.Renear01 2.102              64
+4 10.4242/BalisageVol5.Renear01 2.102              64
+{% endhighlight %}
+
+
+
+{% highlight r %}
+
+# Get results for a certain year
+crossref_search(query = c("renear", "palmer"), year = 2010)[, 1:3]
+
+                                  doi  score normalizedScore
+1            10.1002/meet.14504701218 1.0509             100
+2            10.1002/meet.14504701240 1.0509             100
+3           10.5270/OceanObs09.cwp.68 1.0442              99
+4               10.1353/mpq.2010.0003 0.6890              65
+5                  10.1353/mpq.0.0041 0.6890              65
+6                  10.1353/mpq.0.0044 0.6890              65
+7                  10.1353/mpq.0.0057 0.6890              65
+8                    10.1386/fm.1.1.2 0.6890              65
+9                    10.1386/fm.1.2.2 0.6890              65
+10                   10.1386/fm.1.3.2 0.6890              65
+11       10.1097/ALN.0b013e3181f09404 0.6090              57
+12      10.1016/j.urology.2010.02.033 0.6090              57
+13              10.1353/ect.2010.0025 0.6090              57
+14               10.1117/2.4201001.04 0.6090              57
+15 10.1111/j.1835-9310.1977.tb01159.x 0.6090              57
+16    10.4067/S0717-69962010000100001 0.6090              57
+17    10.4067/S0717-69962010000200001 0.6090              57
+18           10.2105/AJPH.2009.191098 0.6029              57
+19              10.1353/mpq.2010.0004 0.5167              49
+20                 10.1353/mpq.0.0048 0.5167              49
+{% endhighlight %}
+
+	
+*********
+	
+### Get a short DOI from shortdoi.org.
+	
+
+{% highlight r %}
+# Geta a short DOI, just the short DOI returned
+short_doi(doi = "10.1371/journal.pone.0042793")
+
+[1] "10/f2bfz9"
+{% endhighlight %}
+
+
+
+{% highlight r %}
+
+# Geta a short DOI, all data returned
+short_doi(doi = "10.1371/journal.pone.0042793", justshort = FALSE)
+
+$DOI
+[1] "10.1371/journal.pone.0042793"
+
+$ShortDOI
+[1] "10/f2bfz9"
+
+$IsNew
+[1] FALSE
+{% endhighlight %}
+
+	
+*********
+	
+### Get a record from a OAI-PMH data provider.
+	
+
+{% highlight r %}
+# Single provider, one identifier
+md_getrecord(provider = "pensoft", identifier = "10.3897/zookeys.1.10")
+
+                                                                                                title
+1 A new candidate for a Gondwanaland distribution in the Zodariidae (Araneae): Australutica in Africa
+      creator date             type
+1 Jocqué,Rudy 2008 Research Article
+{% endhighlight %}
+
+
+
+{% highlight r %}
+
+# Single provider, multiple identifiers
+md_getrecord(provider = "pensoft", identifier = c("10.3897/zookeys.1.10", "10.3897/zookeys.4.57"))
+
+                                                                                                   title
+1    A new candidate for a Gondwanaland distribution in the Zodariidae (Araneae): Australutica in Africa
+2 Studies of Tiger Beetles. CLXXVIII. A new Lophyra (Lophyra) from Somaliland (Coleoptera, Cicindelidae)
+        creator date             type
+1   Jocqué,Rudy 2008 Research Article
+2 Cassola,Fabio 2008 Research Article
+{% endhighlight %}
+
+	
+*********
+
+### List available metadata formats from various providers. 
+	
+
+{% highlight r %}
+# List metadata formats for a provider
+md_listmetadataformats(provider = "dryad")
+
+  metadataPrefix
+1         oai_dc
+2            rdf
+3            ore
+4           mets
+                                                       schema
+1              http://www.openarchives.org/OAI/2.0/oai_dc.xsd
+2                 http://www.openarchives.org/OAI/2.0/rdf.xsd
+3 http://tweety.lanl.gov/public/schemas/2008-06/atom-tron.sch
+4                  http://www.loc.gov/standards/mets/mets.xsd
+                            metadataNamespace
+1 http://www.openarchives.org/OAI/2.0/oai_dc/
+2    http://www.openarchives.org/OAI/2.0/rdf/
+3                 http://www.w3.org/2005/Atom
+4                    http://www.loc.gov/METS/
+{% endhighlight %}
+
+
+
+{% highlight r %}
+
+# List metadata formats for a specific identifier for a provider
+md_listmetadataformats(provider = "pensoft", identifier = "10.3897/zookeys.1.10")
+
+            identifier metadataPrefix
+1 10.3897/zookeys.1.10         oai_dc
+2 10.3897/zookeys.1.10           mods
+                                             schema
+1    http://www.openarchives.org/OAI/2.0/oai_dc.xsd
+2 http://www.loc.gov/standards/mods/v3/mods-3-1.xsd
+                            metadataNamespace
+1 http://www.openarchives.org/OAI/2.0/oai_dc/
+2                  http://www.loc.gov/mods/v3
+{% endhighlight %}
+
+
+*********
+
+### Some plotting - mean number of authors per paper
+
+Okay, so this isn't a super useful visualization, but you can surely think of something better. 
+
+
+{% highlight r %}
+library(ggplot2)
+library(ggthemes)
+library(reshape)
+
+
+temp <- md_listrecords(provider = "pensoft", from = "2011-10-01", until = "2012-01-01")
+temp2 <- ldply(temp)[, -1]
+auths <- sapply(temp2$creator, function(x) length(strsplit(as.character(x), 
+    ";")[[1]]))
+toplot <- data.frame(authors = auths, articletype = temp2$type)
+toplot_ <- ddply(toplot, .(articletype), summarise, authors = mean(authors))
+toplot_$articletype <- reorder(toplot_$articletype, toplot_$authors)
+
+ggplot(toplot_, aes(articletype, authors)) + theme_tufte(base_size = 16) + geom_bar(stat = "identity") + 
+    coord_flip()
+{% endhighlight %}
+
+![center](/public/img/someplotting.png)
+
+***************
+
+#### Get the .Rmd file used to create this post [at my github account](https://github.com/sckott/sckott.github.com/tree/master/_drafts/2013-03-16-r-metadata.Rmd) - or [.md file](https://github.com/sckott/sckott.github.com/tree/master/_posts/2013-03-16-r-metadata.md).
+
+#### Written in [Markdown](http://daringfireball.net/projects/markdown/), with help from [knitr](http://yihui.name/knitr/), and [knitcitations](https://github.com/cboettig/knitcitations).
+
+  </div>
+  
+  <div class="post">
+    <h1>
       <a href="/2013/03/ropensci-collaboration/">
         Visualizing rOpenSci collaboration
       </a>
@@ -68,113 +442,130 @@
 
     <span class="post-date">08 Mar 2013</span>
 
-    <p>We (<a href="http://ropensci.org/">rOpenSci</a>) have been writing code for R packages for a couple years, so it is time to take a look back at the data. What data you ask? The commits data from GitHub ~ data that records who did what and when.</p>
+    We ([rOpenSci](http://ropensci.org/)) have been writing code for R packages for a couple years, so it is time to take a look back at the data. What data you ask? The commits data from GitHub ~ data that records who did what and when. 
 
-<p>Using the <a href="http://developer.github.com/v3/repos/commits/">Github commits API</a> we can gather data on who commited code to a Github repository, and when they did it. Then we can visualize this hitorical record.</p>
+Using the [Github commits API](http://developer.github.com/v3/repos/commits/) we can gather data on who commited code to a Github repository, and when they did it. Then we can visualize this hitorical record. 
 
-<hr />
+***************
 
-<h3 id="install-some-functions-for-interacting-with-the-github-api-via-r">Install some functions for interacting with the Github API via R</h3>
+### Install some functions for interacting with the Github API via R
 
-<figure class="highlight"><pre><code class="language-r" data-lang="r"><span class="n">install_github</span><span class="p">(</span><span class="s1">'sandbox'</span><span class="p">,</span><span class="w"> </span><span class="s1">'ropensci'</span><span class="p">)</span><span class="w"> 
+{% highlight r %}
 
-</span><span class="n">library</span><span class="p">(</span><span class="n">sandbox</span><span class="p">)</span><span class="w">
-</span><span class="n">library</span><span class="p">(</span><span class="n">httr</span><span class="p">)</span><span class="w">
-</span><span class="n">library</span><span class="p">(</span><span class="n">ggplot2</span><span class="p">)</span><span class="w">
-</span><span class="n">library</span><span class="p">(</span><span class="n">scales</span><span class="p">)</span><span class="w">
-</span><span class="n">library</span><span class="p">(</span><span class="n">reshape2</span><span class="p">)</span><span class="w">
-</span><span class="n">library</span><span class="p">(</span><span class="n">bipartite</span><span class="p">)</span><span class="w">
-</span><span class="n">library</span><span class="p">(</span><span class="n">doMC</span><span class="p">)</span><span class="w">
-</span><span class="n">library</span><span class="p">(</span><span class="n">plyr</span><span class="p">)</span><span class="w">
-</span><span class="n">library</span><span class="p">(</span><span class="n">ggthemes</span><span class="p">)</span><span class="w">
-</span><span class="n">library</span><span class="p">(</span><span class="n">picante</span><span class="p">)</span><span class="w">
+install_github('sandbox', 'ropensci') 
 
-</span><span class="c1"># And authenticate - pops open a page in your default browser, then tells 
+library(sandbox)
+library(httr)
+library(ggplot2)
+library(scales)
+library(reshape2)
+library(bipartite)
+library(doMC)
+library(plyr)
+library(ggthemes)
+library(picante)
+
+# And authenticate - pops open a page in your default browser, then tells 
 # you authentication was successful
-</span><span class="n">github_auth</span><span class="p">()</span></code></pre></figure>
+github_auth()
+{% endhighlight %}
 
-<hr />
 
-<h3 id="get-all-repos-for-an-organization-here-ropensci-of-course">Get all repos for an organization, here ropensci of course</h3>
+***************
 
-<figure class="highlight"><pre><code class="language-r" data-lang="r"><span class="n">ropensci_repos</span><span class="w"> </span><span class="o">&lt;-</span><span class="w"> </span><span class="n">github_allrepos</span><span class="p">(</span><span class="n">userorg</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"ropensci"</span><span class="p">)</span></code></pre></figure>
+### Get all repos for an organization, here ropensci of course
 
-<hr />
+{% highlight r %}
+ropensci_repos <- github_allrepos(userorg = "ropensci")
+{% endhighlight %}
 
-<h3 id="get-commits-broken-down-in-to-additions-and-deletions-though-below-we-just-collapse-them-to-all-commits">Get commits broken down in to additions and deletions, though below we just collapse them to all commits</h3>
 
-<figure class="highlight"><pre><code class="language-r" data-lang="r"><span class="n">registerDoMC</span><span class="p">(</span><span class="n">cores</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="m">4</span><span class="p">)</span><span class="w">
-</span><span class="n">github_commits_safe</span><span class="w"> </span><span class="o">&lt;-</span><span class="w"> </span><span class="n">plyr</span><span class="o">::</span><span class="n">failwith</span><span class="p">(</span><span class="kc">NULL</span><span class="p">,</span><span class="w"> </span><span class="n">github_commits</span><span class="p">)</span><span class="w">
-</span><span class="n">out</span><span class="w"> </span><span class="o">&lt;-</span><span class="w"> </span><span class="n">llply</span><span class="p">(</span><span class="n">ropensci_repos</span><span class="p">,</span><span class="w"> </span><span class="k">function</span><span class="p">(</span><span class="n">x</span><span class="p">)</span><span class="w"> </span><span class="n">github_commits_safe</span><span class="p">(</span><span class="s2">"ropensci"</span><span class="p">,</span><span class="w"> </span><span class="n">x</span><span class="p">,</span><span class="w"> 
-    </span><span class="n">since</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"2009-01-01T"</span><span class="p">,</span><span class="w"> </span><span class="n">limit</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="m">500</span><span class="p">),</span><span class="w"> </span><span class="n">.parallel</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="kc">TRUE</span><span class="p">)</span><span class="w">
-</span><span class="nf">names</span><span class="p">(</span><span class="n">out</span><span class="p">)</span><span class="w"> </span><span class="o">&lt;-</span><span class="w"> </span><span class="n">ropensci_repos</span><span class="w">
-</span><span class="n">out2</span><span class="w"> </span><span class="o">&lt;-</span><span class="w"> </span><span class="n">compact</span><span class="p">(</span><span class="n">out</span><span class="p">)</span><span class="w">
-</span><span class="n">outdf</span><span class="w"> </span><span class="o">&lt;-</span><span class="w"> </span><span class="n">ldply</span><span class="p">(</span><span class="n">out2</span><span class="p">)</span></code></pre></figure>
+***************
 
-<hr />
+### Get commits broken down in to additions and deletions, though below we just collapse them to all commits
 
-<h3 id="plot-commits-by-date-and-repo">Plot commits by date and repo</h3>
+{% highlight r %}
+registerDoMC(cores = 4)
+github_commits_safe <- plyr::failwith(NULL, github_commits)
+out <- llply(ropensci_repos, function(x) github_commits_safe("ropensci", x, 
+    since = "2009-01-01T", limit = 500), .parallel = TRUE)
+names(out) <- ropensci_repos
+out2 <- compact(out)
+outdf <- ldply(out2)
+{% endhighlight %}
 
-<figure class="highlight"><pre><code class="language-r" data-lang="r"><span class="n">outdf_subset</span><span class="w"> </span><span class="o">&lt;-</span><span class="w"> </span><span class="n">outdf</span><span class="p">[</span><span class="o">!</span><span class="n">outdf</span><span class="o">$</span><span class="n">.id</span><span class="w"> </span><span class="o">%in%</span><span class="w"> </span><span class="nf">c</span><span class="p">(</span><span class="s2">"citeulike"</span><span class="p">,</span><span class="w"> </span><span class="s2">"challenge"</span><span class="p">,</span><span class="w"> </span><span class="s2">"docs"</span><span class="p">,</span><span class="w"> </span><span class="s2">"ropensci-book"</span><span class="p">,</span><span class="w"> 
-    </span><span class="s2">"usecases"</span><span class="p">,</span><span class="w"> </span><span class="s2">"textmine"</span><span class="p">,</span><span class="w"> </span><span class="s2">"usgs"</span><span class="p">,</span><span class="w"> </span><span class="s2">"ropenscitoolkit"</span><span class="p">,</span><span class="w"> </span><span class="s2">"neotoma"</span><span class="p">,</span><span class="w"> </span><span class="s2">"rEWDB"</span><span class="p">,</span><span class="w"> </span><span class="s2">"rgauges"</span><span class="p">,</span><span class="w"> 
-    </span><span class="s2">"rodash"</span><span class="p">,</span><span class="w"> </span><span class="s2">"ropensci.github.com"</span><span class="p">,</span><span class="w"> </span><span class="s2">"ROAuth"</span><span class="p">),</span><span class="w"> </span><span class="p">]</span><span class="w">
-</span><span class="n">outdf_subset</span><span class="o">$</span><span class="n">.id</span><span class="w"> </span><span class="o">&lt;-</span><span class="w"> </span><span class="n">tolower</span><span class="p">(</span><span class="n">outdf_subset</span><span class="o">$</span><span class="n">.id</span><span class="p">)</span><span class="w">
-</span><span class="n">outdf_subset</span><span class="w"> </span><span class="o">&lt;-</span><span class="w"> </span><span class="n">ddply</span><span class="p">(</span><span class="n">outdf_subset</span><span class="p">,</span><span class="w"> </span><span class="n">.</span><span class="p">(</span><span class="n">.id</span><span class="p">,</span><span class="w"> </span><span class="n">date</span><span class="p">),</span><span class="w"> </span><span class="n">summarise</span><span class="p">,</span><span class="w"> </span><span class="n">value</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nf">sum</span><span class="p">(</span><span class="n">value</span><span class="p">))</span><span class="w">
 
-</span><span class="n">mindates</span><span class="w"> </span><span class="o">&lt;-</span><span class="w"> </span><span class="n">llply</span><span class="p">(</span><span class="n">unique</span><span class="p">(</span><span class="n">outdf_subset</span><span class="o">$</span><span class="n">.id</span><span class="p">),</span><span class="w"> </span><span class="k">function</span><span class="p">(</span><span class="n">x</span><span class="p">)</span><span class="w"> </span><span class="nf">min</span><span class="p">(</span><span class="n">outdf_subset</span><span class="p">[</span><span class="n">outdf_subset</span><span class="o">$</span><span class="n">.id</span><span class="w"> </span><span class="o">==</span><span class="w"> 
-    </span><span class="n">x</span><span class="p">,</span><span class="w"> </span><span class="s2">"date"</span><span class="p">]))</span><span class="w">
-</span><span class="nf">names</span><span class="p">(</span><span class="n">mindates</span><span class="p">)</span><span class="w"> </span><span class="o">&lt;-</span><span class="w"> </span><span class="n">unique</span><span class="p">(</span><span class="n">outdf_subset</span><span class="o">$</span><span class="n">.id</span><span class="p">)</span><span class="w">
-</span><span class="n">mindates</span><span class="w"> </span><span class="o">&lt;-</span><span class="w"> </span><span class="n">sort</span><span class="p">(</span><span class="n">do.call</span><span class="p">(</span><span class="n">c</span><span class="p">,</span><span class="w"> </span><span class="n">mindates</span><span class="p">))</span><span class="w">
-</span><span class="n">outdf_subset</span><span class="o">$</span><span class="n">.id</span><span class="w"> </span><span class="o">&lt;-</span><span class="w"> </span><span class="n">factor</span><span class="p">(</span><span class="n">outdf_subset</span><span class="o">$</span><span class="n">.id</span><span class="p">,</span><span class="w"> </span><span class="n">levels</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nf">names</span><span class="p">(</span><span class="n">mindates</span><span class="p">))</span><span class="w">
+***************
 
-</span><span class="n">ggplot</span><span class="p">(</span><span class="n">outdf_subset</span><span class="p">,</span><span class="w"> </span><span class="n">aes</span><span class="p">(</span><span class="n">date</span><span class="p">,</span><span class="w"> </span><span class="n">value</span><span class="p">,</span><span class="w"> </span><span class="n">fill</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">.id</span><span class="p">))</span><span class="w"> </span><span class="o">+</span><span class="w"> 
-    </span><span class="n">geom_bar</span><span class="p">(</span><span class="n">stat</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"identity"</span><span class="p">,</span><span class="w"> </span><span class="n">width</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="m">0.5</span><span class="p">)</span><span class="w"> </span><span class="o">+</span><span class="w"> 
-    </span><span class="n">geom_rangeframe</span><span class="p">(</span><span class="n">sides</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"b"</span><span class="p">,</span><span class="w"> </span><span class="n">colour</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"grey"</span><span class="p">)</span><span class="w"> </span><span class="o">+</span><span class="w"> 
-    </span><span class="n">theme_bw</span><span class="p">(</span><span class="n">base_size</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="m">9</span><span class="p">)</span><span class="w"> </span><span class="o">+</span><span class="w"> 
-    </span><span class="n">scale_x_date</span><span class="p">(</span><span class="n">labels</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">date_format</span><span class="p">(</span><span class="s2">"%Y"</span><span class="p">),</span><span class="w"> </span><span class="n">breaks</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">date_breaks</span><span class="p">(</span><span class="s2">"year"</span><span class="p">))</span><span class="w"> </span><span class="o">+</span><span class="w"> 
-    </span><span class="n">scale_y_log10</span><span class="p">()</span><span class="w"> </span><span class="o">+</span><span class="w"> 
-    </span><span class="n">facet_grid</span><span class="p">(</span><span class="n">.id</span><span class="w"> </span><span class="o">~</span><span class="w"> </span><span class="n">.</span><span class="p">)</span><span class="w"> </span><span class="o">+</span><span class="w"> 
-    </span><span class="n">labs</span><span class="p">(</span><span class="n">x</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">""</span><span class="p">,</span><span class="w"> </span><span class="n">y</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">""</span><span class="p">)</span><span class="w"> </span><span class="o">+</span><span class="w"> 
-    </span><span class="n">theme</span><span class="p">(</span><span class="n">axis.text.y</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">element_blank</span><span class="p">(),</span><span class="w"> 
-        </span><span class="n">axis.text.x</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">element_text</span><span class="p">(</span><span class="n">colour</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"black"</span><span class="p">),</span><span class="w"> 
-        </span><span class="n">axis.ticks.y</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">element_blank</span><span class="p">(),</span><span class="w"> 
-        </span><span class="n">strip.text.y</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">element_text</span><span class="p">(</span><span class="n">angle</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="m">0</span><span class="p">,</span><span class="w"> </span><span class="n">size</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="m">8</span><span class="p">,</span><span class="w"> </span><span class="p">),</span><span class="w"> 
-        </span><span class="n">strip.background</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">element_rect</span><span class="p">(</span><span class="n">size</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="m">0</span><span class="p">),</span><span class="w"> 
-        </span><span class="n">panel.grid.major</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">element_blank</span><span class="p">(),</span><span class="w"> 
-        </span><span class="n">panel.grid.minor</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">element_blank</span><span class="p">(),</span><span class="w"> 
-        </span><span class="n">legend.text</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">element_text</span><span class="p">(</span><span class="n">size</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="m">8</span><span class="p">),</span><span class="w"> 
-        </span><span class="n">legend.position</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"none"</span><span class="p">,</span><span class="w"> 
-        </span><span class="n">panel.border</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">element_blank</span><span class="p">())</span></code></pre></figure>
+### Plot commits by date and repo
 
-<p><img src="/public/img/commitsbydate.png" alt="center" /></p>
+{% highlight r %}
+outdf_subset <- outdf[!outdf$.id %in% c("citeulike", "challenge", "docs", "ropensci-book", 
+    "usecases", "textmine", "usgs", "ropenscitoolkit", "neotoma", "rEWDB", "rgauges", 
+    "rodash", "ropensci.github.com", "ROAuth"), ]
+outdf_subset$.id <- tolower(outdf_subset$.id)
+outdf_subset <- ddply(outdf_subset, .(.id, date), summarise, value = sum(value))
 
-<p>The plot above plots the sum of additions+deletions, and is sorted by the first commit date of reach repo, with the first being <a href="https://github.com/ropensci/treeBASE">treebase</a>, which wraps the <a href="http://treebase.org/treebase-web/urlAPI.html">Treebase API</a>, and the most recent being <a href="https://github.com/ropensci/rWBclimate">rwbclimate</a>, which wraps the <a href="http://data.worldbank.org/developers/climate-data-api">World Blank climate data API</a>.</p>
+mindates <- llply(unique(outdf_subset$.id), function(x) min(outdf_subset[outdf_subset$.id == 
+    x, "date"]))
+names(mindates) <- unique(outdf_subset$.id)
+mindates <- sort(do.call(c, mindates))
+outdf_subset$.id <- factor(outdf_subset$.id, levels = names(mindates))
 
-<p>You can see that some repos have recieved commits more or less consistently over their life time, while others have seen a little development here and there.</p>
+ggplot(outdf_subset, aes(date, value, fill = .id)) + 
+    geom_bar(stat = "identity", width = 0.5) + 
+    geom_rangeframe(sides = "b", colour = "grey") + 
+    theme_bw(base_size = 9) + 
+    scale_x_date(labels = date_format("%Y"), breaks = date_breaks("year")) + 
+    scale_y_log10() + 
+    facet_grid(.id ~ .) + 
+    labs(x = "", y = "") + 
+    theme(axis.text.y = element_blank(), 
+        axis.text.x = element_text(colour = "black"), 
+        axis.ticks.y = element_blank(), 
+        strip.text.y = element_text(angle = 0, size = 8, ), 
+        strip.background = element_rect(size = 0), 
+        panel.grid.major = element_blank(), 
+        panel.grid.minor = element_blank(), 
+        legend.text = element_text(size = 8), 
+        legend.position = "none", 
+        panel.border = element_blank())
+{% endhighlight %}
 
-<hr />
-<p>w
-### In addition, there are quite a few people that have committed code now to rOpenSci repos, calling for a network vizualization of course.</p>
 
-<figure class="highlight"><pre><code class="language-r" data-lang="r"><span class="n">outdf_network</span><span class="w"> </span><span class="o">&lt;-</span><span class="w"> </span><span class="n">droplevels</span><span class="p">(</span><span class="n">outdf</span><span class="p">[</span><span class="o">!</span><span class="n">outdf</span><span class="o">$</span><span class="n">.id</span><span class="w"> </span><span class="o">%in%</span><span class="w"> </span><span class="nf">c</span><span class="p">(</span><span class="s2">"citeulike"</span><span class="p">,</span><span class="w"> </span><span class="s2">"challenge"</span><span class="p">,</span><span class="w"> 
-    </span><span class="s2">"docs"</span><span class="p">,</span><span class="w"> </span><span class="s2">"ropensci-book"</span><span class="p">,</span><span class="w"> </span><span class="s2">"usecases"</span><span class="p">,</span><span class="w"> </span><span class="s2">"textmine"</span><span class="p">,</span><span class="w"> </span><span class="s2">"usgs"</span><span class="p">,</span><span class="w"> </span><span class="s2">"ropenscitoolkit"</span><span class="p">,</span><span class="w"> 
-    </span><span class="s2">"retriever"</span><span class="p">,</span><span class="w"> </span><span class="s2">"rodash"</span><span class="p">,</span><span class="w"> </span><span class="s2">"ropensci.github.com"</span><span class="p">,</span><span class="w"> </span><span class="s2">"ROAuth"</span><span class="p">,</span><span class="w"> </span><span class="s2">"rgauges"</span><span class="p">,</span><span class="w"> </span><span class="s2">"sandbox"</span><span class="p">,</span><span class="w"> 
-    </span><span class="s2">"rfna"</span><span class="p">,</span><span class="w"> </span><span class="s2">"rmetadata"</span><span class="p">,</span><span class="w"> </span><span class="s2">"rhindawi"</span><span class="p">,</span><span class="w"> </span><span class="s2">"rpmc"</span><span class="p">,</span><span class="w"> </span><span class="s2">"rpensoft"</span><span class="p">,</span><span class="w"> </span><span class="s2">"ritis"</span><span class="p">),</span><span class="w"> </span><span class="p">])</span><span class="w">
-</span><span class="n">casted</span><span class="w"> </span><span class="o">&lt;-</span><span class="w"> </span><span class="n">dcast</span><span class="p">(</span><span class="n">outdf_network</span><span class="p">,</span><span class="w"> </span><span class="n">.id</span><span class="w"> </span><span class="o">+</span><span class="w"> </span><span class="n">date</span><span class="w"> </span><span class="o">+</span><span class="w"> </span><span class="n">name</span><span class="w"> </span><span class="o">~</span><span class="w"> </span><span class="n">variable</span><span class="p">,</span><span class="w"> </span><span class="n">fun.aggregate</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">length</span><span class="p">,</span><span class="w"> 
-    </span><span class="n">value.var</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"value"</span><span class="p">)</span><span class="w">
-</span><span class="nf">names</span><span class="p">(</span><span class="n">casted</span><span class="p">)[</span><span class="m">1</span><span class="p">]</span><span class="w"> </span><span class="o">&lt;-</span><span class="w"> </span><span class="s2">"repo"</span><span class="w">
-</span><span class="n">casted2</span><span class="w"> </span><span class="o">&lt;-</span><span class="w"> </span><span class="n">ddply</span><span class="p">(</span><span class="n">casted</span><span class="p">,</span><span class="w"> </span><span class="n">.</span><span class="p">(</span><span class="n">repo</span><span class="p">,</span><span class="w"> </span><span class="n">name</span><span class="p">),</span><span class="w"> </span><span class="n">summarise</span><span class="p">,</span><span class="w"> </span><span class="n">commits</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nf">sum</span><span class="p">(</span><span class="n">additions</span><span class="p">))</span><span class="w">
-</span><span class="n">casted2</span><span class="w"> </span><span class="o">&lt;-</span><span class="w"> </span><span class="n">data.frame</span><span class="p">(</span><span class="n">repo</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">casted2</span><span class="o">$</span><span class="n">repo</span><span class="p">,</span><span class="w"> </span><span class="n">weight</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">casted2</span><span class="o">$</span><span class="n">commits</span><span class="p">,</span><span class="w"> </span><span class="n">name</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">casted2</span><span class="o">$</span><span class="n">name</span><span class="p">)</span><span class="w">
-</span><span class="n">mat</span><span class="w"> </span><span class="o">&lt;-</span><span class="w"> </span><span class="n">sample2matrix</span><span class="p">(</span><span class="n">casted2</span><span class="p">)</span><span class="w">
-</span><span class="n">plotweb</span><span class="p">(</span><span class="n">sortweb</span><span class="p">(</span><span class="n">mat</span><span class="p">,</span><span class="w"> </span><span class="n">sort.order</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"dec"</span><span class="p">),</span><span class="w"> </span><span class="n">method</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"normal"</span><span class="p">,</span><span class="w"> </span><span class="n">text.rot</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="m">90</span><span class="p">,</span><span class="w"> 
-    </span><span class="n">adj.high</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nf">c</span><span class="p">(</span><span class="m">-0.3</span><span class="p">,</span><span class="w"> </span><span class="m">0</span><span class="p">),</span><span class="w"> </span><span class="n">adj.low</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nf">c</span><span class="p">(</span><span class="m">1</span><span class="p">,</span><span class="w"> </span><span class="m">-0.3</span><span class="p">),</span><span class="w"> </span><span class="n">y.width.low</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="m">0.05</span><span class="p">,</span><span class="w"> </span><span class="n">y.width.high</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="m">0.05</span><span class="p">,</span><span class="w"> 
-    </span><span class="n">ybig</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="m">0.09</span><span class="p">,</span><span class="w"> </span><span class="n">labsize</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="m">0.7</span><span class="p">)</span></code></pre></figure>
+![center](/public/img/commitsbydate.png) 
 
-<p><img src="/public/img/collabnetwork.png" alt="center" /></p>
 
-<p>The plot above shows repos on one side and contributors on the other. Some folks (the core rOpenSci team: cboettig, karthikram, emhart, and schamberlain) have committed quite a lot to many packages. We also have amny awesome contributors to our packages (some contributors and repos have been removed for clarity).</p>
+The plot above plots the sum of additions+deletions, and is sorted by the first commit date of reach repo, with the first being [treebase](https://github.com/ropensci/treeBASE), which wraps the [Treebase API](http://treebase.org/treebase-web/urlAPI.html), and the most recent being [rwbclimate](https://github.com/ropensci/rWBclimate), which wraps the [World Blank climate data API](http://data.worldbank.org/developers/climate-data-api). 
 
-<p>rOpenSci is truly a collaborative effort to develop tools for open science, so thanks to all our contributors - keep on forking, pull requesting, and commiting.</p>
+You can see that some repos have recieved commits more or less consistently over their life time, while others have seen a little development here and there. 
+
+***************
+w
+### In addition, there are quite a few people that have committed code now to rOpenSci repos, calling for a network vizualization of course.
+
+{% highlight r %}
+outdf_network <- droplevels(outdf[!outdf$.id %in% c("citeulike", "challenge", 
+    "docs", "ropensci-book", "usecases", "textmine", "usgs", "ropenscitoolkit", 
+    "retriever", "rodash", "ropensci.github.com", "ROAuth", "rgauges", "sandbox", 
+    "rfna", "rmetadata", "rhindawi", "rpmc", "rpensoft", "ritis"), ])
+casted <- dcast(outdf_network, .id + date + name ~ variable, fun.aggregate = length, 
+    value.var = "value")
+names(casted)[1] <- "repo"
+casted2 <- ddply(casted, .(repo, name), summarise, commits = sum(additions))
+casted2 <- data.frame(repo = casted2$repo, weight = casted2$commits, name = casted2$name)
+mat <- sample2matrix(casted2)
+plotweb(sortweb(mat, sort.order = "dec"), method = "normal", text.rot = 90, 
+    adj.high = c(-0.3, 0), adj.low = c(1, -0.3), y.width.low = 0.05, y.width.high = 0.05, 
+    ybig = 0.09, labsize = 0.7)
+{% endhighlight %}
+
+![center](/public/img/collabnetwork.png) 
+
+
+The plot above shows repos on one side and contributors on the other. Some folks (the core rOpenSci team: cboettig, karthikram, emhart, and schamberlain) have committed quite a lot to many packages. We also have amny awesome contributors to our packages (some contributors and repos have been removed for clarity). 
+
+rOpenSci is truly a collaborative effort to develop tools for open science, so thanks to all our contributors - keep on forking, pull requesting, and commiting. 
 
   </div>
   
@@ -187,125 +578,48 @@
 
     <span class="post-date">22 Feb 2013</span>
 
-    <h2 id="reboot">Reboot</h2>
+    ## Reboot
 
-<p>We need to reboot academia, at least for graduate training. I am speaking from the point of view of ecology/evolution (EEB). Why you ask? Because of the following line of reasoning:</p>
+We need to reboot academia, at least for graduate training. I am speaking from the point of view of ecology/evolution (EEB). Why you ask? Because of the following line of reasoning:
 
-<ul>
-  <li>
-    <p>First, the most important factor for me comes down to supply and demand. We have too much supply (=graduate students) and not enough demand (=faculty positions, etc.) - see <a href="http://www.phdcomics.com/comics/archive.php?comicid=911">this comic at PhDComics</a> for proof. This seems especially apparent when you hear from your fellow postdoc friends that there were hundreds of other people with Ph.D.’s applying for the same position.</p>
-  </li>
-  <li>
-    <p>Second, funding is getting thin. I have never received funding from a competitive grant, despite having 12 published papers to my name. Recent cuts to the NSF, NIH, and other federal agencies mean that getting a grant will be harder and harder. Furthermore, the mean age of a first time NIH grant recipient in 2008 was 51 according to a recent study in PLoS One (Matthews <em>et. al.</em> 2011).</p>
-  </li>
-  <li>
-    <p>Third, we don’t learn the skills we really need. This is many fold. First, we don’t learn the appropriate mathematical and statistical techniques in undergraduate and grad school - a forthcoming paper found that in a survey of nearly 1000 ecology and evolution graduate students, most thought they were unprepared wrt to math and stats (interview with author in Soundcloud widget below). Second, we don’t learn enough computational skills. Digital data (not on your physical clipboard, but your digital one) is more and more important, requiring knowing how to leverage and keep track of data. Yet, we aren’t taught these skills, at least in my experience. The need for training in computation/coding is evident from the sold out <a href="http://software-carpentry.org/">Software Carpentry workshops</a>. Third, reproducibility is not something we are taught. Well, we are taught to check over everything in detail (read: proof your data), but there is often no way to reproduce analyses when we use 10 different expensive software programs to do an analysis (read: MS Word, JMP, SAS, SigmaPlot, etc.). And isn’t reproduciblity important?</p>
-  </li>
-</ul>
++ First, the most important factor for me comes down to supply and demand. We have too much supply (=graduate students) and not enough demand (=faculty positions, etc.) - see [this comic at PhDComics](http://www.phdcomics.com/comics/archive.php?comicid=911) for proof. This seems especially apparent when you hear from your fellow postdoc friends that there were hundreds of other people with Ph.D.'s applying for the same position. 
 
-<hr />
++ Second, funding is getting thin. I have never received funding from a competitive grant, despite having 12 published papers to my name. Recent cuts to the NSF, NIH, and other federal agencies mean that getting a grant will be harder and harder. Furthermore, the mean age of a first time NIH grant recipient in 2008 was 51 according to a recent study in PLoS One (Matthews _et. al._ 2011). 
+
++ Third, we don't learn the skills we really need. This is many fold. First, we don't learn the appropriate mathematical and statistical techniques in undergraduate and grad school - a forthcoming paper found that in a survey of nearly 1000 ecology and evolution graduate students, most thought they were unprepared wrt to math and stats (interview with author in Soundcloud widget below). Second, we don't learn enough computational skills. Digital data (not on your physical clipboard, but your digital one) is more and more important, requiring knowing how to leverage and keep track of data. Yet, we aren't taught these skills, at least in my experience. The need for training in computation/coding is evident from the sold out [Software Carpentry workshops](http://software-carpentry.org/). Third, reproducibility is not something we are taught. Well, we are taught to check over everything in detail (read: proof your data), but there is often no way to reproduce analyses when we use 10 different expensive software programs to do an analysis (read: MS Word, JMP, SAS, SigmaPlot, etc.). And isn't reproduciblity important?
+
+***************
 
 <iframe width="30%" height="140" scrolling="no" frameborder="no" src="https://w.soundcloud.com/player/?url=http%3A%2F%2Fapi.soundcloud.com%2Ftracks%2F78215101&amp;color=ff6600&amp;auto_play=false&amp;show_artwork=false"></iframe>
 
-<hr />
+***************
 
-<h2 id="what-do-we-do">What do we do?</h2>
+## What do we do?
 
-<p>To address the supply/demand issue, I think we need fewer graduate students, period. I think this will work for a few reasons. If there are fewer graduate students, those that get in will be of higher quality because profs can be more selective, they may get payed more (hopefully) since there are few students, and they should in theory get more attention from their advisers (if they want it). In addition, there would be less competition for the very few grants out there for grad students.  This would then lead to fewer postdocs, and less competition for faculty positions. I think the supply/demand issue in EEB is particularly problematic. That is, in EEB there doesn’t seem to be the large quantity of private sector jobs as there is for Ph.D. graduates in engineering, physics, etc.</p>
+To address the supply/demand issue, I think we need fewer graduate students, period. I think this will work for a few reasons. If there are fewer graduate students, those that get in will be of higher quality because profs can be more selective, they may get payed more (hopefully) since there are few students, and they should in theory get more attention from their advisers (if they want it). In addition, there would be less competition for the very few grants out there for grad students.  This would then lead to fewer postdocs, and less competition for faculty positions. I think the supply/demand issue in EEB is particularly problematic. That is, in EEB there doesn't seem to be the large quantity of private sector jobs as there is for Ph.D. graduates in engineering, physics, etc. 
 
-<p>The funding situation is beyond me, but definitely makes me want to leave academia. Crowdfunding, especially <a href="http://scifundchallenge.org/">#SciFund</a>, is an option for scientists, but mostly only on a small financial scale. Any thoughts?</p>
+The funding situation is beyond me, but definitely makes me want to leave academia. Crowdfunding, especially [#SciFund](http://scifundchallenge.org/), is an option for scientists, but mostly only on a small financial scale. Any thoughts?
 
-<p>The skills issue will likely be addressed in time, and vary among schools for sure. Some schools will focus on natural history, which is good (that’s where I did my undergrad and it was great), and some schools will incorporate more of these science 2.0 skills (advanced stats, better math training, and computer science).</p>
+The skills issue will likely be addressed in time, and vary among schools for sure. Some schools will focus on natural history, which is good (that's where I did my undergrad and it was great), and some schools will incorporate more of these science 2.0 skills (advanced stats, better math training, and computer science).
 
-<hr />
+***************
 
-<h2 id="thoughts"><em>Thoughts?</em></h2>
+## _Thoughts?_
 
-<hr />
+***************
 
-<h4 id="get-the-rmd-file-used-to-create-this-post-at-my-github-accounthttpsgithubcomsckottsckottgithubcomtreemasterdrafts2013-02-22-academia-rebootrmd---or-md-filehttpsgithubcomsckottsckottgithubcomtreemasterposts2013-02-22-academia-rebootmd">Get the .Rmd file used to create this post <a href="https://github.com/sckott/sckott.github.com/tree/master/_drafts/2013-02-22-academia-reboot.Rmd">at my github account</a> - or <a href="https://github.com/sckott/sckott.github.com/tree/master/_posts/2013-02-22-academia-reboot.md">.md file</a>.</h4>
+#### Get the .Rmd file used to create this post [at my github account](https://github.com/sckott/sckott.github.com/tree/master/_drafts/2013-02-22-academia-reboot.Rmd) - or [.md file](https://github.com/sckott/sckott.github.com/tree/master/_posts/2013-02-22-academia-reboot.md).
 
-<h4 id="written-in-markdownhttpdaringfireballnetprojectsmarkdown-with-help-from-knitrhttpyihuinameknitr-and-knitcitationshttpsgithubcomcboettigknitcitations">Written in <a href="http://daringfireball.net/projects/markdown/">Markdown</a>, with help from <a href="http://yihui.name/knitr/">knitr</a>, and <a href="https://github.com/cboettig/knitcitations">knitcitations</a>.</h4>
+#### Written in [Markdown](http://daringfireball.net/projects/markdown/), with help from [knitr](http://yihui.name/knitr/), and [knitcitations](https://github.com/cboettig/knitcitations).
 
-<hr />
+***************
 
-<h4 id="references">References</h4>
+#### References
 <p>Matthews KRW, Calhoun KM, lo N, ho V and Germano G (2011).
 &ldquo;The Aging of Biomedical Research in The United States.&rdquo;
-<em>Plos One</em>, <b>6</b>.
+<EM>Plos One</EM>, <B>6</B>.
 <a href="http://dx.doi.org/10.1371/journal.pone.0029738">http://dx.doi.org/10.1371/journal.pone.0029738</a>.
 
-</p>
-
-  </div>
-  
-  <div class="post">
-    <h1>
-      <a href="/2013/02/common-tree/">
-        Getting a simple tree via NCBI
-      </a>
-    </h1>
-
-    <span class="post-date">14 Feb 2013</span>
-
-    <p>I was just at the <a href="http://www.evoio.org/wiki/Phylotastic">Phylotastic hackathon</a> in Tucson, AZ at the <a href="http://www.iplantcollaborative.org/">iPlant</a> facilities at the UofA.</p>
-
-<p>A problem that needs to be solved is getting the incrasingly vast phylogenetic information to folks not comfortable building their own phylogenies. <a href="http://phylodiversity.net/phylomatic/">Phylomatic</a> has made this super easy for people that want plant phylogenies (at least 250 or so papers have used and cited Phylomatic in their papers) - however, there are few options for those that want phylogenies for other taxonomic groups.</p>
-
-<p>One cool tool that was brought up was the <a href="http://www.ncbi.nlm.nih.gov/Taxonomy/CommonTree/wwwcmt.cgi">Common Tree</a> service provided by NCBI. <a href="http://www.ncbi.nlm.nih.gov/Taxonomy/CommonTree/cmthelp.html">Here’s</a> some help on the service. Unlike Phylomatic, Common Tree is purely based off of taxonomic relationships (A and B are both in the C family, so are sisters), not an actual phylogeny as Phylomatic is based on.</p>
-
-<p>But how do you use Common Tree?</p>
-
-<hr />
-
-<h3 id="get-a-species-list">Get a species list</h3>
-<p>Grab the taxon list from my github account <a href="https://raw.github.com/sckott/sckott.github.com/master/public/img/species.txt">here</a></p>
-
-<h3 id="go-to-the-site">Go to the site</h3>
-<p>Go to the Common Tree site <a href="http://www.ncbi.nlm.nih.gov/Taxonomy/CommonTree/wwwcmt.cgi">here</a></p>
-
-<h3 id="choose-file">Choose file</h3>
-<p>Hit the “choose file” button, then select the <code class="highlighter-rouge">species.txt</code> file you downloaded in the first step.</p>
-
-<h3 id="add-the-species-list-to-make-the-tree">Add the species list to make the tree</h3>
-<p>Then hit “add from file”, and you got a “tree”</p>
-
-<p><img src="https://raw.github.com/sckott/sckott.github.com/master/public/img/ncbi.png" alt="image" /></p>
-
-<h2 id="download">Download</h2>
-<p>You can download the tree in a variety of formats, including a .phy file</p>
-
-<p><img src="https://raw.github.com/sckott/sckott.github.com/master/public/img/ncbi2.png" alt="image" /></p>
-
-<h2 id="plot-the-tree-on-your-machine">Plot the tree on your machine</h2>
-<p>Make a tree, in R for me</p>
-
-<figure class="highlight"><pre><code class="language-r" data-lang="r"><span class="c1"># install.packages('ape') # install if you don't have ape
-</span><span class="n">library</span><span class="p">(</span><span class="n">ape</span><span class="p">)</span><span class="w">
-
-</span><span class="c1"># Read the tree in. YOu get the tree back with alot of newlines (\n) -
-# can easily take these out with a good text editor.
-</span><span class="n">tree</span><span class="w"> </span><span class="o">&lt;-</span><span class="w"> </span><span class="n">read.tree</span><span class="p">(</span><span class="n">text</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"(Lampetra:4,((((((Umbra:4,((Lota:4,Microgadus:4)Gadiformes:4,((Culaea:4,Apeltes:4,Pungitius:4,Gasterosteus:4)Gasterosteidae:4,(Morone:4,(Ambloplites:4,Micropterus:4,Lepomis:4)Centrarchidae:4,(Sander:4,Perca:4)Percidae:4)Percoidei:4,Cottus:4)Percomorpha:4)Holacanthopterygii:4)Neognathi:4,(((Prosopium:4,Coregonus:4)Coregoninae:4,(Salvelinus:4,Salmo:4,Oncorhynchus:4)Salmoninae:4)Salmonidae:4,Osmerus:4)Protacanthopterygii:4)Euteleostei:4,(Alosa:4,(Ameiurus:4,(Catostomus:4,(Semotilus:4,Rhinichthys:4,Margariscus:4,Couesius:4,Pimephales:4,Luxilus:4,Notemigonus:4,Notropis:4,Carassius:4)Cyprinidae:4)Cypriniformes:4)Otophysi:4)Otocephala:4)Clupeocephala:4,Anguilla:4)Elopocephala:4,Acipenser:4)Actinopteri:4,Scyliorhinus:4)Gnathostomata:4)Vertebrata:4;"</span><span class="p">)</span><span class="w">
-
-</span><span class="c1"># stretch the branches so tips line up
-</span><span class="n">tree2</span><span class="w"> </span><span class="o">&lt;-</span><span class="w"> </span><span class="n">compute.brlen</span><span class="p">(</span><span class="n">tree</span><span class="p">,</span><span class="w"> </span><span class="n">method</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"Grafen"</span><span class="p">)</span><span class="w">
-
-</span><span class="c1"># Plot the tree
-</span><span class="n">plot</span><span class="p">(</span><span class="n">tree2</span><span class="p">,</span><span class="w"> </span><span class="n">no.margin</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="kc">TRUE</span><span class="p">,</span><span class="w"> </span><span class="n">cex</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="m">0.7</span><span class="p">)</span></code></pre></figure>
-
-<h3 id="w00p-there-it-is">w00p, there it is…</h3>
-
-<p><img src="https://raw.github.com/sckott/sckott.github.com/master/public/img/ncbi_tree.png" alt="image4" /></p>
-
-<hr />
-
-<h3 id="and-the-answer-is-no-to-the-question-is-there-an-api-for-common-tree">And the answer is <em>NO</em> to the question: Is there an API for Common Tree?</h3>
-
-<hr />
-
-<h4 id="get-the-rmd-file-used-to-create-this-post-at-my-github-accounthttpsgithubcomsckottsckottgithubcomtreemasterdrafts2013-02-14-common-treermd---or-md-filehttpsgithubcomsckottsckottgithubcomtreemasterposts2013-02-14-common-treemd">Get the .Rmd file used to create this post <a href="https://github.com/sckott/sckott.github.com/tree/master/_drafts/2013-02-14-common-tree.Rmd">at my github account</a> - or <a href="https://github.com/sckott/sckott.github.com/tree/master/_posts/2013-02-14-common-tree.md">.md file</a>.</h4>
-
-<h4 id="written-in-markdownhttpdaringfireballnetprojectsmarkdown-with-help-from-knitrhttpyihuinameknitr">Written in <a href="http://daringfireball.net/projects/markdown/">Markdown</a>, with help from <a href="http://yihui.name/knitr/">knitr</a>.</h4>
 
   </div>
   

@@ -61,6 +61,411 @@
   
   <div class="post">
     <h1>
+      <a href="/2012/09/rmetadata/">
+        Scholarly metadata from R
+      </a>
+    </h1>
+
+    <span class="post-date">17 Sep 2012</span>
+
+    Metadata!  Metadata is very cool.  It's super hot right now - everybody is talking about it.  Okay, maybe not everyone, but it's an important part of archiving scholarly work.
+
+We are working on [a repo on GitHub `rmetadata`](https://github.com/ropensci/rmetadata) to be a one stop shop for querying metadata from around the web.  Various repos on GitHub we have started - [rpmc](https://github.com/ropensci/rpmc), [rdatacite](https://github.com/ropensci/rpmc), [rdryad](https://github.com/ropensci/rpmc), [rpensoft](https://github.com/ropensci/rpmc), [rhindawi](https://github.com/ropensci/rpmc) - will at least in part be folded into `rmetadata`.
+
+As a start we are writing functions to hit any metadata services that use the [OAI-PMH: "Open Archives Initiative Protocol for Metadata Harvesting"](http://www.openarchives.org/OAI/openarchivesprotocol.html) framework.  `OAI-PMH` has six methods (or verbs as they are called) for data harvesting that are the same across different metadata providers:
+
++ `GetRecord`
++ `Identify`
++ `ListIdentifiers`
++ `ListMetadataFormats`
++ `ListRecords`
++ `ListSets`
+
+`OAI-PMH` provides an updating list of data providers, which we can easily use to get the base URLs for their data.  Then we just use one of the six above methods to query their metadata.
+
+### Let's install rmetadata first.
+
+{% highlight r linenos %}
+install_github("rmetadata", "ropensci")
+library(rmetadata)
+{% endhighlight %}
+
+
+### The most basic thing you can do with `OAI-PMH` is identify the data provider, getting their basic information. The `Identify` verb.
+
+{% highlight r linenos %}
+# one provider
+md_identify(provider = "datacite")
+{% endhighlight %}
+
+
+
+{% highlight text %}
+repositoryName                     baseURL protocolVersion
+1   DataCite MDS http://oai.datacite.org/oai             2.0
+        adminEmail    earliestDatestamp deletedRecord
+1 admin@datacite.org 2011-01-01T00:00:00Z            no
+         granularity compression compression.1
+1 YYYY-MM-DDThh:mm:ssZ        gzip       deflate
+                                                                                                                                                    description
+1 oai, oai.datacite.org, :, oai:oai.datacite.org:12425, http://www.openarchives.org/OAI/2.0/oai-identifier http://www.openarchives.org/OAI/2.0/oai-identifier.xsd
+{% endhighlight %}
+
+
+
+{% highlight r linenos %}
+
+# many providers
+md_identify(provider = c("datacite", "pensoft"))
+{% endhighlight %}
+
+
+
+{% highlight text %}
+    repositoryName                     baseURL protocolVersion
+1       DataCite MDS http://oai.datacite.org/oai             2.0
+2 Pensoft Publishers       http://oai.pensoft.eu             2.0
+        adminEmail    earliestDatestamp deletedRecord
+1 admin@datacite.org 2011-01-01T00:00:00Z            no
+2               NULL           2008-07-04            no
+         granularity compression compression.1
+1 YYYY-MM-DDThh:mm:ssZ        gzip       deflate
+2           YYYY-MM-DD        NULL          NULL
+                                                                                                                                                    description
+1 oai, oai.datacite.org, :, oai:oai.datacite.org:12425, http://www.openarchives.org/OAI/2.0/oai-identifier http://www.openarchives.org/OAI/2.0/oai-identifier.xsd
+2                                                                                                                                                            NULL
+{% endhighlight %}
+
+
+
+{% highlight r linenos %}
+
+# no match for one, two matches for other
+md_identify(provider = c("harvard", "journal"))
+{% endhighlight %}
+
+
+
+{% highlight text %}
+$harvard
+             x
+1 no match found
+
+$journal
+                                             repo_name
+1       Hrcak - Portal of scientific journals of Croatia
+2 International journal of Power Electronics Engineering
+
+{% endhighlight %}
+
+
+
+{% highlight r linenos %}
+
+# let's pick one from the second
+md_identify(provider = "Hrcak")
+{% endhighlight %}
+
+
+
+{% highlight text %}
+                                  repositoryName
+1 Hrcak - Portal of scientific journals of Croatia
+                  baseURL protocolVersion    adminEmail
+1 http://hrcak.srce.hr/oai/             2.0 hrcak@srce.hr
+earliestDatestamp deletedRecord granularity
+1        2005-12-01            no  YYYY-MM-DD
+                                                                                                                                                                        description
+1 oai, hrcak.srce.hr, :, oai:hrcak.srce.hr:anIdentifier, http://www.openarchives.org/OAI/2.0/oai-identifier                    http://www.openarchives.org/OAI/2.0/oai-identifier.xsd
+{% endhighlight %}
+
+
+### There are a variety of metadata formats, depending on the data provider - list them with the `ListMetadataFormats` verb.
+
+{% highlight r linenos %}
+# List metadata formats for a provider
+md_listmetadataformats(provider = "dryad")
+{% endhighlight %}
+
+
+
+{% highlight text %}
+metadataPrefix
+1         oai_dc
+2            rdf
+3            ore
+4           mets
+                                                     schema
+1              http://www.openarchives.org/OAI/2.0/oai_dc.xsd
+2                 http://www.openarchives.org/OAI/2.0/rdf.xsd
+3 http://tweety.lanl.gov/public/schemas/2008-06/atom-tron.sch
+4                  http://www.loc.gov/standards/mets/mets.xsd
+                          metadataNamespace
+1 http://www.openarchives.org/OAI/2.0/oai_dc/
+2    http://www.openarchives.org/OAI/2.0/rdf/
+3                 http://www.w3.org/2005/Atom
+4                    http://www.loc.gov/METS/
+{% endhighlight %}
+
+
+
+{% highlight r linenos %}
+
+# List metadata formats for a specific identifier for a provider
+md_listmetadataformats(provider = "pensoft", identifier = "10.3897/zookeys.1.10")
+{% endhighlight %}
+
+
+
+{% highlight text %}
+          identifier metadataPrefix
+1 10.3897/zookeys.1.10         oai_dc
+2 10.3897/zookeys.1.10           mods
+                                           schema
+1    http://www.openarchives.org/OAI/2.0/oai_dc.xsd
+2 http://www.loc.gov/standards/mods/v3/mods-3-1.xsd
+                          metadataNamespace
+1 http://www.openarchives.org/OAI/2.0/oai_dc/
+2                  http://www.loc.gov/mods/v3
+{% endhighlight %}
+
+
+### The `ListRecords` verb is used to harvest records from a repository
+
+{% highlight r linenos %}
+head(md_listrecords(provider = "datacite")[[1]][, 2:4])
+{% endhighlight %}
+
+
+
+{% highlight text %}
+                identifier            datestamp setSpec
+1 oai:oai.datacite.org:32153 2011-06-08T08:57:11Z     TIB
+2 oai:oai.datacite.org:32200 2011-06-20T08:11:08Z     TIB
+3 oai:oai.datacite.org:32220 2011-06-28T14:11:08Z     TIB
+4 oai:oai.datacite.org:32241 2011-06-30T13:24:45Z     TIB
+5 oai:oai.datacite.org:32255 2011-07-01T12:09:24Z     TIB
+6 oai:oai.datacite.org:32282 2011-07-05T09:08:10Z     TIB
+{% endhighlight %}
+
+
+### `ListIdentifiers` is an abbreviated form of `ListRecords`, retrieving only headers rather than records.
+
+{% highlight r linenos %}
+# Single provider
+md_listidentifiers(provider = "datacite", set = "REFQUALITY")[[1]][1:10]
+{% endhighlight %}
+
+
+
+{% highlight text %}
+[1] "oai:oai.datacite.org:32426" "oai:oai.datacite.org:32152"
+[3] "oai:oai.datacite.org:25453" "oai:oai.datacite.org:25452"
+[5] "oai:oai.datacite.org:25451" "oai:oai.datacite.org:25450"
+[7] "oai:oai.datacite.org:25449" "oai:oai.datacite.org:25407"
+[9] "oai:oai.datacite.org:48328" "oai:oai.datacite.org:48439"
+{% endhighlight %}
+
+
+
+{% highlight r linenos %}
+md_listidentifiers(provider = "dryad", from = "2012-07-15")[[1]][1:10]
+{% endhighlight %}
+
+
+
+{% highlight text %}
+[1] "oai:datadryad.org:10255/dryad.9106"
+[2] "oai:datadryad.org:10255/dryad.33780"
+[3] "oai:datadryad.org:10255/dryad.33901"
+[4] "oai:datadryad.org:10255/dryad.33902"
+[5] "oai:datadryad.org:10255/dryad.34472"
+[6] "oai:datadryad.org:10255/dryad.34558"
+[7] "oai:datadryad.org:10255/dryad.39975"
+[8] "oai:datadryad.org:10255/dryad.35065"
+[9] "oai:datadryad.org:10255/dryad.35081"
+[10] "oai:datadryad.org:10255/dryad.35082"
+{% endhighlight %}
+
+
+
+{% highlight r linenos %}
+
+# Many providers
+out <- md_listidentifiers(provider = c("datacite", "pensoft"), from = "2012-08-21")
+llply(out, function(x) x[1:10])  # display just a few of them
+{% endhighlight %}
+
+
+
+{% highlight text %}
+[[1]]
+[1] "oai:oai.datacite.org:1099317" "oai:oai.datacite.org:1099572"
+[3] "oai:oai.datacite.org:1099824" "oai:oai.datacite.org:1099695"
+[5] "oai:oai.datacite.org:1088239" "oai:oai.datacite.org:1088122"
+[7] "oai:oai.datacite.org:1088190" "oai:oai.datacite.org:1175749"
+[9] "oai:oai.datacite.org:1175288" "oai:oai.datacite.org:1115603"
+
+[[2]]
+[1] "10.3897/phytokeys.16.2884" "10.3897/phytokeys.16.3602"
+[3] "10.3897/phytokeys.16.3186" "10.3897/zookeys.216.3407"
+[5] "10.3897/zookeys.216.3332"  "10.3897/zookeys.216.3224"
+[7] "10.3897/zookeys.216.3769"  "10.3897/zookeys.216.3360"
+[9] "10.3897/zookeys.216.3646"  "10.3897/neobiota.14.3140"
+
+{% endhighlight %}
+
+
+### With `ListSets` you can retrieve the set structure of a repository.
+
+{% highlight r linenos %}
+# arXiv, returns a data.frame
+head(md_listsets(provider = "arXiv")[[1]])
+{% endhighlight %}
+
+
+
+{% highlight text %}
+           setName          setSpec
+1   Computer Science               cs
+2        Mathematics             math
+3 Nonlinear Sciences             nlin
+4            Physics          physics
+5       Astrophysics physics:astro-ph
+6   Condensed Matter physics:cond-mat
+{% endhighlight %}
+
+
+
+{% highlight r linenos %}
+
+# many providers, returns a list
+md_listsets(provider = c("pensoft", "arXiv"))
+{% endhighlight %}
+
+
+
+{% highlight text %}
+[[1]]
+                                setName            setSpec
+1                                 ZooKeys            zookeys
+2                                 BioRisk            biorisk
+3                               PhytoKeys          phytokeys
+4                                NeoBiota           neobiota
+5         Journal of Hymenoptera Research                jhr
+6  International Journal of Myriapodology                ijm
+7                Comparative Cytogenetics        compcytogen
+8                    Subterranean Biology           subtbiol
+9                     Nature Conservation natureconservation
+10                               MycoKeys           mycokeys
+
+[[2]]
+                                  setName          setSpec
+1                          Computer Science               cs
+2                               Mathematics             math
+3                        Nonlinear Sciences             nlin
+4                                   Physics          physics
+5                              Astrophysics physics:astro-ph
+6                          Condensed Matter physics:cond-mat
+7  General Relativity and Quantum Cosmology    physics:gr-qc
+8          High Energy Physics - Experiment   physics:hep-ex
+9             High Energy Physics - Lattice  physics:hep-lat
+10      High Energy Physics - Phenomenology   physics:hep-ph
+11             High Energy Physics - Theory   physics:hep-th
+12                     Mathematical Physics  physics:math-ph
+13                       Nuclear Experiment  physics:nucl-ex
+14                           Nuclear Theory  physics:nucl-th
+15                          Physics (Other)  physics:physics
+16                          Quantum Physics physics:quant-ph
+17                     Quantitative Biology            q-bio
+18                     Quantitative Finance            q-fin
+19                               Statistics             stat
+
+{% endhighlight %}
+
+
+### Retrieve an individual metadata record from a repository using the `GetRecord` verb.
+
+{% highlight r linenos %}
+# Single provider, one identifier
+md_getrecord(provider = "pensoft", identifier = "10.3897/zookeys.1.10")
+{% endhighlight %}
+
+
+
+{% highlight text %}
+          identifier  datestamp
+1 10.3897/zookeys.1.10 2008-07-04
+                                                                                           dc.title
+1 A new candidate for a Gondwanaland distribution in the Zodariidae (Araneae): Australutica in Africa
+ dc.creator  dc.subject dc.subject.1 dc.subject.2 dc.subject.3
+1 Jocqué,Rudy new species Gondwanaland Soutpansberg      Araneae
+       dc.source
+1 ZooKeys 1: 59-66
+                                                                                                                                                                                                                                                                                                                   dc.description
+1 Two new species of Australutica Jocqué, 1995, a genus formerly only known from Australia, are described from South Africa: A. africana n. sp. from Soutpansberg and A. normanlarseni n. sp. from the Cape Peninsula. The taxonomic position of the new species is discussed and a key to the species of Australutica is provided.
+      dc.publisher dc.date          dc.type dc.format
+1 Pensoft Publishers    2008 Research Article text/html
+                         dc.identifier
+1 http://dx.doi.org/10.3897/zookeys.1.10
+                                    dc.identifier.1 dc.language
+1 http://www.pensoft.net/journals/zookeys/article/10/          en
+                                                                                 dc..attrs
+1 http://www.openarchives.org/OAI/2.0/oai_dc/ http://www.openarchives.org/OAI/2.0/oai_dc.xsd
+{% endhighlight %}
+
+
+
+{% highlight r linenos %}
+
+# Single provider, multiple identifiers
+md_getrecord(provider = "pensoft", identifier = c("10.3897/zookeys.1.10", "10.3897/zookeys.4.57"))
+{% endhighlight %}
+
+
+
+{% highlight text %}
+          identifier  datestamp
+1 10.3897/zookeys.1.10 2008-07-04
+2 10.3897/zookeys.4.57 2008-12-17
+                                                                                              dc.title
+1    A new candidate for a Gondwanaland distribution in the Zodariidae (Araneae): Australutica in Africa
+2 Studies of Tiger Beetles. CLXXVIII. A new Lophyra (Lophyra) from Somaliland (Coleoptera, Cicindelidae)
+   dc.creator    dc.subject dc.subject.1 dc.subject.2 dc.subject.3
+1   Jocqué,Rudy   new species Gondwanaland Soutpansberg      Araneae
+2 Cassola,Fabio Tiger Beetles Cicindelidae      Lophyra   Somaliland
+       dc.source
+1 ZooKeys 1: 59-66
+2 ZooKeys 4: 65-69
+                                                                                                                                                                                                                                                                                                                                                                                                                 dc.description
+1                                                                                               Two new species of Australutica Jocqué, 1995, a genus formerly only known from Australia, are described from South Africa: A. africana n. sp. from Soutpansberg and A. normanlarseni n. sp. from the Cape Peninsula. The taxonomic position of the new species is discussed and a key to the species of Australutica is provided.
+2 A new tiger beetle species, Lophyra (Lophyra) praetermissa n. sp. (Coleoptera, Cicindelidae), obviously a close relative of L. (L.) histrio (Tschitschérine, 1903), is described from the environs of Erigavo, Somaliland (northern Somalia). Its discovery thus brings up to 73 the number of the species of this genus presently known worldwide (39 species of which - 29 from Africa - belong to the typonominal subgenus).
+      dc.publisher dc.date          dc.type dc.format
+1 Pensoft Publishers    2008 Research Article text/html
+2 Pensoft Publishers    2008 Research Article text/html
+                         dc.identifier
+1 http://dx.doi.org/10.3897/zookeys.1.10
+2 http://dx.doi.org/10.3897/zookeys.4.57
+                                    dc.identifier.1 dc.language
+1 http://www.pensoft.net/journals/zookeys/article/10/          en
+2 http://www.pensoft.net/journals/zookeys/article/57/          en
+                                                                                 dc..attrs
+1 http://www.openarchives.org/OAI/2.0/oai_dc/ http://www.openarchives.org/OAI/2.0/oai_dc.xsd
+2 http://www.openarchives.org/OAI/2.0/oai_dc/ http://www.openarchives.org/OAI/2.0/oai_dc.xsd
+{% endhighlight %}
+
+
+Cool, so I hope people find this post and package useful.  Let me know what you think in comments below, or if you have code specific comments or additions, go to [the GitHub repo for `rmetadata`](https://github.com/ropensci/rmetadata).  In a upcoming post I will show an example  of what you can do with `rmetadata` in terms of an actual research question.
+
+*********
+#### Get the .Rmd file used to create this post [at my github account](https://github.com/sckott/sckott.github.com/tree/master/_drafts/2012-09-15-rmetadata.Rmd) - or [.md file](https://github.com/sckott/sckott.github.com/tree/master/_posts/2012-09-17-rmetadata.md).
+
+#### Written in [Markdown](http://daringfireball.net/projects/markdown/), with help from [knitr](http://yihui.name/knitr/), and nice knitr highlighting/etc. in in [RStudio](http://rstudio.org/).
+
+  </div>
+  
+  <div class="post">
+    <h1>
       <a href="/2012/09/gov-dat/">
         Getting data on your government
       </a>
@@ -68,67 +473,54 @@
 
     <span class="post-date">01 Sep 2012</span>
 
-    <hr />
+    *********
 
-<p>I created an R package a while back to interact with some APIs that serve up data on what our elected represenatives are up to, including the <a href="http://developer.nytimes.com/">New York Times Congress API</a>, and the <a href="http://services.sunlightlabs.com/">Sunlight Labs API</a>.</p>
+I created an R package a while back to interact with some APIs that serve up data on what our elected represenatives are up to, including the [New York Times Congress API](http://developer.nytimes.com/), and the [Sunlight Labs API](http://services.sunlightlabs.com/).
 
-<p>What kinds of things can you do with <code class="highlighter-rouge">govdat</code>?  Here are a few examples.</p>
+What kinds of things can you do with `govdat`?  Here are a few examples. 
 
-<hr />
+*********
 
-<h3 id="how-do-the-two-major-parties-differ-in-the-use-of-certain-words-searches-the-congressional-record-using-the-sunlight-labs-capitol-words-api">How do the two major parties differ in the use of certain words (searches the congressional record using the Sunlight Labs Capitol Words API)?</h3>
+### How do the two major parties differ in the use of certain words (searches the congressional record using the Sunlight Labs Capitol Words API)?
 
-<figure class="highlight"><pre><code class="language-r" data-lang="r"><table style="border-spacing: 0"><tbody><tr><td class="gutter gl" style="text-align: right"><pre class="lineno">1
-2
-3
-4
-5
-6
-7
-8
-9
-10
-11
-12
-13
-14
-15
-16
-17</pre></td><td class="code"><pre><span class="c1"># install_github('govdat', 'sckott')
-</span><span class="n">library</span><span class="p">(</span><span class="n">govdat</span><span class="p">)</span><span class="w">
-</span><span class="n">library</span><span class="p">(</span><span class="n">reshape2</span><span class="p">)</span><span class="w">
-</span><span class="n">library</span><span class="p">(</span><span class="n">ggplot2</span><span class="p">)</span><span class="w">
+{% highlight r linenos %}
+# install_github('govdat', 'sckott')
+library(govdat)
+library(reshape2)
+library(ggplot2)
 
-</span><span class="n">dems</span><span class="w"> </span><span class="o">&lt;-</span><span class="w"> </span><span class="n">sll_cw_dates</span><span class="p">(</span><span class="n">phrase</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"science"</span><span class="p">,</span><span class="w"> </span><span class="n">start_date</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"1996-01-20"</span><span class="p">,</span><span class="w"> </span><span class="n">end_date</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"2012-09-01"</span><span class="p">,</span><span class="w"> 
-    </span><span class="n">granularity</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"year"</span><span class="p">,</span><span class="w"> </span><span class="n">party</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"D"</span><span class="p">,</span><span class="w"> </span><span class="n">printdf</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="kc">TRUE</span><span class="p">)</span><span class="w">
-</span><span class="n">repubs</span><span class="w"> </span><span class="o">&lt;-</span><span class="w"> </span><span class="n">sll_cw_dates</span><span class="p">(</span><span class="n">phrase</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"science"</span><span class="p">,</span><span class="w"> </span><span class="n">start_date</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"1996-01-20"</span><span class="p">,</span><span class="w"> </span><span class="n">end_date</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"2012-09-01"</span><span class="p">,</span><span class="w"> 
-    </span><span class="n">granularity</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"year"</span><span class="p">,</span><span class="w"> </span><span class="n">party</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"R"</span><span class="p">,</span><span class="w"> </span><span class="n">printdf</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="kc">TRUE</span><span class="p">)</span><span class="w">
-</span><span class="n">df</span><span class="w"> </span><span class="o">&lt;-</span><span class="w"> </span><span class="n">melt</span><span class="p">(</span><span class="n">rbind</span><span class="p">(</span><span class="n">data.frame</span><span class="p">(</span><span class="n">party</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nf">rep</span><span class="p">(</span><span class="s2">"D"</span><span class="p">,</span><span class="w"> </span><span class="n">nrow</span><span class="p">(</span><span class="n">dems</span><span class="p">)),</span><span class="w"> </span><span class="n">dems</span><span class="p">),</span><span class="w"> </span><span class="n">data.frame</span><span class="p">(</span><span class="n">party</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nf">rep</span><span class="p">(</span><span class="s2">"R"</span><span class="p">,</span><span class="w"> 
-    </span><span class="n">nrow</span><span class="p">(</span><span class="n">repubs</span><span class="p">)),</span><span class="w"> </span><span class="n">repubs</span><span class="p">)))</span><span class="w">
-</span><span class="n">df</span><span class="o">$</span><span class="n">count</span><span class="w"> </span><span class="o">&lt;-</span><span class="w"> </span><span class="nf">as.numeric</span><span class="p">(</span><span class="n">df</span><span class="o">$</span><span class="n">count</span><span class="p">)</span><span class="w">
+dems <- sll_cw_dates(phrase = "science", start_date = "1996-01-20", end_date = "2012-09-01", 
+    granularity = "year", party = "D", printdf = TRUE)
+repubs <- sll_cw_dates(phrase = "science", start_date = "1996-01-20", end_date = "2012-09-01", 
+    granularity = "year", party = "R", printdf = TRUE)
+df <- melt(rbind(data.frame(party = rep("D", nrow(dems)), dems), data.frame(party = rep("R", 
+    nrow(repubs)), repubs)))
+df$count <- as.numeric(df$count)
 
-</span><span class="n">ggplot</span><span class="p">(</span><span class="n">df</span><span class="p">,</span><span class="w"> </span><span class="n">aes</span><span class="p">(</span><span class="n">yearmonth</span><span class="p">,</span><span class="w"> </span><span class="n">count</span><span class="p">,</span><span class="w"> </span><span class="n">colour</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">party</span><span class="p">,</span><span class="w"> </span><span class="n">group</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">party</span><span class="p">))</span><span class="w"> </span><span class="o">+</span><span class="w"> </span><span class="n">geom_line</span><span class="p">()</span><span class="w"> </span><span class="o">+</span><span class="w"> 
-    </span><span class="n">scale_colour_manual</span><span class="p">(</span><span class="n">values</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nf">c</span><span class="p">(</span><span class="s2">"blue"</span><span class="p">,</span><span class="w"> </span><span class="s2">"red"</span><span class="p">))</span><span class="w"> </span><span class="o">+</span><span class="w"> </span><span class="n">labs</span><span class="p">(</span><span class="n">y</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"use of the word 'Science'"</span><span class="p">)</span><span class="w"> </span><span class="o">+</span><span class="w"> 
-    </span><span class="n">theme_bw</span><span class="p">(</span><span class="n">base_size</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="m">18</span><span class="p">)</span><span class="w"> </span><span class="o">+</span><span class="w"> </span><span class="n">opts</span><span class="p">(</span><span class="n">axis.text.x</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">theme_text</span><span class="p">(</span><span class="n">size</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="m">10</span><span class="p">),</span><span class="w"> </span><span class="n">panel.grid.major</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">theme_blank</span><span class="p">(),</span><span class="w"> 
-    </span><span class="n">panel.grid.minor</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">theme_blank</span><span class="p">(),</span><span class="w"> </span><span class="n">legend.position</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nf">c</span><span class="p">(</span><span class="m">0.2</span><span class="p">,</span><span class="w"> </span><span class="m">0.8</span><span class="p">))</span><span class="w">
-</span></pre></td></tr></tbody></table></code></pre></figure>
+ggplot(df, aes(yearmonth, count, colour = party, group = party)) + geom_line() + 
+    scale_colour_manual(values = c("blue", "red")) + labs(y = "use of the word 'Science'") + 
+    theme_bw(base_size = 18) + opts(axis.text.x = theme_text(size = 10), panel.grid.major = theme_blank(), 
+    panel.grid.minor = theme_blank(), legend.position = c(0.2, 0.8))
+{% endhighlight %}
 
-<p><img src="/public/img/unnamed-chunk-1.png" alt="center" /></p>
+![center](/public/img/unnamed-chunk-1.png) 
 
-<hr />
 
-<h3 id="lets-get-some-data-on-donations-to-individual-elected-representatives">Let’s get some data on donations to individual elected representatives.</h3>
+*********
 
-<figure class="highlight"><pre><code class="language-r" data-lang="r"><table style="border-spacing: 0"><tbody><tr><td class="gutter gl" style="text-align: right"><pre class="lineno">1
-2
-3
-4</pre></td><td class="code"><pre><span class="n">library</span><span class="p">(</span><span class="n">plyr</span><span class="p">)</span><span class="w">
+### Let's get some data on donations to individual elected representatives.
 
-</span><span class="c1"># Let's get Nancy Pelosi's entity ID
-</span><span class="n">sll_ts_aggregatesearch</span><span class="p">(</span><span class="s2">"Nancy Pelosi"</span><span class="p">)[[</span><span class="m">1</span><span class="p">]]</span><span class="w">
-</span></pre></td></tr></tbody></table></code></pre></figure>
+{% highlight r linenos %}
+library(plyr)
 
-<figure class="highlight"><pre><code class="language-text" data-lang="text">$name
+# Let's get Nancy Pelosi's entity ID
+sll_ts_aggregatesearch("Nancy Pelosi")[[1]]
+{% endhighlight %}
+
+
+
+{% highlight text %}
+$name
 [1] "Nancy Pelosi (D)"
 
 $count_given
@@ -171,23 +563,37 @@ $non_firm_spending
 [1] 0
 
 $is_superpac
-NULL</code></pre></figure>
+NULL
 
-<figure class="highlight"><pre><code class="language-r" data-lang="r"><table style="border-spacing: 0"><tbody><tr><td class="gutter gl" style="text-align: right"><pre class="lineno">1
-2</pre></td><td class="code"><pre><span class="c1"># Her entity ID
-</span><span class="n">sll_ts_aggregatesearch</span><span class="p">(</span><span class="s2">"Nancy Pelosi"</span><span class="p">)[[</span><span class="m">1</span><span class="p">]]</span><span class="o">$</span><span class="n">id</span><span class="w">
-</span></pre></td></tr></tbody></table></code></pre></figure>
+{% endhighlight %}
 
-<figure class="highlight"><pre><code class="language-text" data-lang="text">[1] "85ab2e74589a414495d18cc7a9233981"</code></pre></figure>
 
-<figure class="highlight"><pre><code class="language-r" data-lang="r"><table style="border-spacing: 0"><tbody><tr><td class="gutter gl" style="text-align: right"><pre class="lineno">1
-2
-3</pre></td><td class="code"><pre><span class="c1"># And search for her top donors by sector
-</span><span class="n">nancy</span><span class="w"> </span><span class="o">&lt;-</span><span class="w"> </span><span class="n">ldply</span><span class="p">(</span><span class="n">sll_ts_aggregatetopsectors</span><span class="p">(</span><span class="n">sll_ts_aggregatesearch</span><span class="p">(</span><span class="s2">"Nancy Pelosi"</span><span class="p">)[[</span><span class="m">1</span><span class="p">]]</span><span class="o">$</span><span class="n">id</span><span class="p">))</span><span class="w">
-</span><span class="n">nancy</span><span class="w">  </span><span class="err">#</span><span class="w"> </span><span class="n">but</span><span class="w"> </span><span class="n">just</span><span class="w"> </span><span class="n">abbreviations</span><span class="w"> </span><span class="k">for</span><span class="w"> </span><span class="n">sectors</span><span class="w">
-</span></pre></td></tr></tbody></table></code></pre></figure>
 
-<figure class="highlight"><pre><code class="language-text" data-lang="text">   sector count     amount
+{% highlight r linenos %}
+
+# Her entity ID
+sll_ts_aggregatesearch("Nancy Pelosi")[[1]]$id
+{% endhighlight %}
+
+
+
+{% highlight text %}
+[1] "85ab2e74589a414495d18cc7a9233981"
+{% endhighlight %}
+
+
+
+{% highlight r linenos %}
+
+# And search for her top donors by sector
+nancy <- ldply(sll_ts_aggregatetopsectors(sll_ts_aggregatesearch("Nancy Pelosi")[[1]]$id))
+nancy  # but just abbreviations for sectors
+{% endhighlight %}
+
+
+
+{% highlight text %}
+   sector count     amount
 1       F  1847 2698672.00
 2       P   981 2243050.00
 3       H   829 1412700.00
@@ -197,71 +603,74 @@ NULL</code></pre></figure>
 7       B   537  932044.00
 8       W   724  760800.00
 9       Y   820  664926.00
-10      E   201  283575.00</code></pre></figure>
+10      E   201  283575.00
+{% endhighlight %}
 
-<figure class="highlight"><pre><code class="language-r" data-lang="r"><table style="border-spacing: 0"><tbody><tr><td class="gutter gl" style="text-align: right"><pre class="lineno">1
-2
-3
-4
-5
-6
-7
-8</pre></td><td class="code"><pre><span class="n">data</span><span class="p">(</span><span class="n">sll_ts_sectors</span><span class="p">)</span><span class="w">  </span><span class="c1"># load sectors abbrevations data
-</span><span class="n">nancy2</span><span class="w"> </span><span class="o">&lt;-</span><span class="w"> </span><span class="n">merge</span><span class="p">(</span><span class="n">nancy</span><span class="p">,</span><span class="w"> </span><span class="n">sll_ts_sectors</span><span class="p">,</span><span class="w"> </span><span class="n">by</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"sector"</span><span class="p">)</span><span class="w">  </span><span class="c1"># attach full sector names
-</span><span class="n">nancy2_melt</span><span class="w"> </span><span class="o">&lt;-</span><span class="w"> </span><span class="n">melt</span><span class="p">(</span><span class="n">nancy2</span><span class="p">[,</span><span class="w"> </span><span class="m">-1</span><span class="p">],</span><span class="w"> </span><span class="n">id.vars</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="m">3</span><span class="p">)</span><span class="w">
-</span><span class="n">nancy2_melt</span><span class="o">$</span><span class="n">value</span><span class="w"> </span><span class="o">&lt;-</span><span class="w"> </span><span class="nf">as.numeric</span><span class="p">(</span><span class="n">nancy2_melt</span><span class="o">$</span><span class="n">value</span><span class="p">)</span><span class="w">
 
-</span><span class="c1"># and lets plot some results
-</span><span class="n">ggplot</span><span class="p">(</span><span class="n">nancy2_melt</span><span class="p">,</span><span class="w"> </span><span class="n">aes</span><span class="p">(</span><span class="n">sector_name</span><span class="p">,</span><span class="w"> </span><span class="n">value</span><span class="p">))</span><span class="w"> </span><span class="o">+</span><span class="w"> </span><span class="n">geom_bar</span><span class="p">()</span><span class="w"> </span><span class="o">+</span><span class="w"> </span><span class="n">coord_flip</span><span class="p">()</span><span class="w"> </span><span class="o">+</span><span class="w"> </span><span class="n">facet_wrap</span><span class="p">(</span><span class="o">~</span><span class="n">variable</span><span class="p">,</span><span class="w"> 
-    </span><span class="n">scales</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"free"</span><span class="p">,</span><span class="w"> </span><span class="n">ncol</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="m">1</span><span class="p">)</span><span class="w">
-</span></pre></td></tr></tbody></table></code></pre></figure>
 
-<p><img src="/public/img/unnamed-chunk-2.png" alt="center" /></p>
+{% highlight r linenos %}
+data(sll_ts_sectors)  # load sectors abbrevations data
+nancy2 <- merge(nancy, sll_ts_sectors, by = "sector")  # attach full sector names
+nancy2_melt <- melt(nancy2[, -1], id.vars = 3)
+nancy2_melt$value <- as.numeric(nancy2_melt$value)
 
-<figure class="highlight"><pre><code class="language-r" data-lang="r"><table style="border-spacing: 0"><tbody><tr><td class="gutter gl" style="text-align: right"><pre class="lineno">1
-2
-3</pre></td><td class="code"><pre><span class="c1">## It looks like a lot of individual donations (the count facet) by
+# and lets plot some results
+ggplot(nancy2_melt, aes(sector_name, value)) + geom_bar() + coord_flip() + facet_wrap(~variable, 
+    scales = "free", ncol = 1)
+{% endhighlight %}
+
+![center](/public/img/unnamed-chunk-2.png) 
+
+{% highlight r linenos %}
+
+## It looks like a lot of individual donations (the count facet) by
 ## finance/insurance/realestate, but by amount, the most (by slim margin)
-</span><span class="err">##</span><span class="w"> </span><span class="n">is</span><span class="w"> </span><span class="n">from</span><span class="w"> </span><span class="n">labor</span><span class="w"> </span><span class="n">organizations.</span><span class="w">
-</span></pre></td></tr></tbody></table></code></pre></figure>
+## is from labor organizations.
+{% endhighlight %}
 
-<hr />
 
-<h3 id="or-we-may-want-to-get-a-bio-of-a-congressperson-here-we-get-todd-akin-of-mo-and-some-twitter-searching-too-indeed">Or we may want to get a bio of a congressperson. Here we get Todd Akin of MO. And some twitter searching too? Indeed.</h3>
+*********
 
-<figure class="highlight"><pre><code class="language-r" data-lang="r"><table style="border-spacing: 0"><tbody><tr><td class="gutter gl" style="text-align: right"><pre class="lineno">1
-2</pre></td><td class="code"><pre><span class="n">out</span><span class="w"> </span><span class="o">&lt;-</span><span class="w"> </span><span class="n">nyt_cg_memberbioroles</span><span class="p">(</span><span class="s2">"A000358"</span><span class="p">)</span><span class="w">  </span><span class="c1"># cool, lots of info, output cutoff for brevity
-</span><span class="n">out</span><span class="p">[[</span><span class="m">3</span><span class="p">]][[</span><span class="m">1</span><span class="p">]][</span><span class="m">1</span><span class="o">:</span><span class="m">2</span><span class="p">]</span><span class="w">
-</span></pre></td></tr></tbody></table></code></pre></figure>
+### Or we may want to get a bio of a congressperson. Here we get Todd Akin of MO. And some twitter searching too? Indeed.
 
-<figure class="highlight"><pre><code class="language-text" data-lang="text">$member_id
+{% highlight r linenos %}
+out <- nyt_cg_memberbioroles("A000358")  # cool, lots of info, output cutoff for brevity
+out[[3]][[1]][1:2]
+{% endhighlight %}
+
+
+
+{% highlight text %}
+$member_id
 [1] "A000358"
 
 $first_name
-[1] "Todd"</code></pre></figure>
+[1] "Todd"
 
-<figure class="highlight"><pre><code class="language-r" data-lang="r"><table style="border-spacing: 0"><tbody><tr><td class="gutter gl" style="text-align: right"><pre class="lineno">1
-2
-3
-4
-5
-6
-7
-8</pre></td><td class="code"><pre><span class="c1"># we can get her twitter id from this bio, and search twitter using
+{% endhighlight %}
+
+
+
+{% highlight r linenos %}
+
+# we can get her twitter id from this bio, and search twitter using
 # twitteR package
-</span><span class="n">akintwitter</span><span class="w"> </span><span class="o">&lt;-</span><span class="w"> </span><span class="n">out</span><span class="p">[[</span><span class="m">3</span><span class="p">]][[</span><span class="m">1</span><span class="p">]]</span><span class="o">$</span><span class="n">twitter_id</span><span class="w">
+akintwitter <- out[[3]][[1]]$twitter_id
 
-</span><span class="c1"># install.packages('twitteR')
-</span><span class="n">library</span><span class="p">(</span><span class="n">twitteR</span><span class="p">)</span><span class="w">
-</span><span class="n">tweets</span><span class="w"> </span><span class="o">&lt;-</span><span class="w"> </span><span class="n">userTimeline</span><span class="p">(</span><span class="n">akintwitter</span><span class="p">,</span><span class="w"> </span><span class="n">n</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="m">100</span><span class="p">)</span><span class="w">
-</span><span class="n">tweets</span><span class="p">[</span><span class="m">1</span><span class="o">:</span><span class="m">5</span><span class="p">]</span><span class="w">  </span><span class="err">#</span><span class="w"> </span><span class="n">there</span><span class="err">'</span><span class="n">s</span><span class="w"> </span><span class="n">some</span><span class="w"> </span><span class="n">gems</span><span class="w"> </span><span class="k">in</span><span class="w"> </span><span class="n">there</span><span class="w"> </span><span class="n">no</span><span class="w"> </span><span class="n">doubt</span><span class="w">
-</span></pre></td></tr></tbody></table></code></pre></figure>
+# install.packages('twitteR')
+library(twitteR)
+tweets <- userTimeline(akintwitter, n = 100)
+tweets[1:5]  # there's some gems in there no doubt
+{% endhighlight %}
 
-<figure class="highlight"><pre><code class="language-text" data-lang="text">[[1]]
+
+
+{% highlight text %}
+[[1]]
 [1] "RepToddAkin: Do you receive my Akin Alert e-newsletter?  Pick the issues you’d like to get updates on and sign up here!\nhttp://t.co/nZfiRjTF"
 
 [[2]]
-[1] "RepToddAkin: If the 2001 &amp;amp; 2003 tax policies expire, taxes will increase over $4 trillion in the next 10 years. America can't afford it. #stopthetaxhike"
+[1] "RepToddAkin: If the 2001 &amp; 2003 tax policies expire, taxes will increase over $4 trillion in the next 10 years. America can't afford it. #stopthetaxhike"
 
 [[3]]
 [1] "RepToddAkin: A govt agency's order shouldn't defy constitutional rights. I'm still working for #religiousfreedom and repealing the HHS mandate. #prolife"
@@ -270,15 +679,18 @@ $first_name
 [1] "RepToddAkin: I am a cosponsor of the bill being considered today to limit abortions in DC. RT if you agree! #prolife http://t.co/Mesrjl0w"
 
 [[5]]
-[1] "RepToddAkin: We need to #StopTheTaxHike. Raising taxes like the President wants would destroy more than 700,000 jobs. #4jobs http://t.co/KUTd0M7U"</code></pre></figure>
+[1] "RepToddAkin: We need to #StopTheTaxHike. Raising taxes like the President wants would destroy more than 700,000 jobs. #4jobs http://t.co/KUTd0M7U"
 
-<hr />
+{% endhighlight %}
 
-<h3 id="get-the-rmd-file-used-to-create-this-post-at-my-github-accounthttpsgithubcomsckottsckottgithubcomtreemasterdrafts2012-09-01-gov-datrmd---or-md-filehttpsgithubcomsckottsckottgithubcomtreemasterposts2012-09-01-gov-datmd">Get the .Rmd file used to create this post <a href="https://github.com/sckott/sckott.github.com/tree/master/_drafts/2012-09-01-gov-dat.Rmd">at my github account</a> - or <a href="https://github.com/sckott/sckott.github.com/tree/master/_posts/2012-09-01-gov-dat.md">.md file</a>.</h3>
 
-<hr />
+*********
 
-<h3 id="written-in-markdownhttpdaringfireballnetprojectsmarkdown-with-help-from-knitrhttpyihuinameknitr-and-nice-knitr-highlightingetc-in-in-rstudiohttprstudioorg">Written in <a href="http://daringfireball.net/projects/markdown/">Markdown</a>, with help from <a href="http://yihui.name/knitr/">knitr</a>, and nice knitr highlighting/etc. in in <a href="http://rstudio.org/">RStudio</a>.</h3>
+### Get the .Rmd file used to create this post [at my github account](https://github.com/sckott/sckott.github.com/tree/master/_drafts/2012-09-01-gov-dat.Rmd) - or [.md file](https://github.com/sckott/sckott.github.com/tree/master/_posts/2012-09-01-gov-dat.md).
+
+*********
+
+### Written in [Markdown](http://daringfireball.net/projects/markdown/), with help from [knitr](http://yihui.name/knitr/), and nice knitr highlighting/etc. in in [RStudio](http://rstudio.org/).
 
   </div>
   
@@ -291,120 +703,116 @@ $first_name
 
     <span class="post-date">31 Aug 2012</span>
 
-    <hr />
+    *********
 
-<p>So I want to mine some #altmetrics data for some research I’m thinking about doing.  The steps would be:</p>
+So I want to mine some #altmetrics data for some research I'm thinking about doing.  The steps would be: 
 
-<ul>
-  <li>Get journal titles for ecology and evolution journals.</li>
-  <li>Get DOI’s for all papers in all the above journal titles.</li>
-  <li>Get altmetrics data on each DOI.</li>
-  <li>Do some fancy analyses.</li>
-  <li>Make som pretty figs.</li>
-  <li>Write up results.</li>
-</ul>
++ Get journal titles for ecology and evolution journals. 
++ Get DOI's for all papers in all the above journal titles. 
++ Get altmetrics data on each DOI. 
++ Do some fancy analyses. 
++ Make som pretty figs. 
++ Write up results. 
 
-<p>It’s early days, so jus working on the first step.  However, getting a list of journals in ecology and evolution is frustratingly hard.  This turns out to not be that easy if you are (1) trying to avoid <a href="http://thomsonreuters.com/">Thomson Reuters</a>, and (2) want a machine interface way to do it (read: API).</p>
+It's early days, so jus working on the first step.  However, getting a list of journals in ecology and evolution is frustratingly hard.  This turns out to not be that easy if you are (1) trying to avoid [Thomson Reuters](http://thomsonreuters.com/), and (2) want a machine interface way to do it (read: API). 
 
-<p>Unfortunately, Mendeley’s API does not have methods for getting a list of journals by field, or at least I don’t know how to do it using <a href="http://apidocs.mendeley.com/">their API</a>.  No worries though - <a href="http://crossref.org/">Crossref</a> comes to save the day.   Here’s my attempt at this using the <a href="http://help.crossref.org/#using_oai_pmh">Crossref OAI-PMH</a>.</p>
+Unfortunately, Mendeley's API does not have methods for getting a list of journals by field, or at least I don't know how to do it using [their API](http://apidocs.mendeley.com/).  No worries though - [Crossref](http://crossref.org/) comes to save the day.   Here's my attempt at this using the [Crossref OAI-PMH](http://help.crossref.org/#using_oai_pmh).
 
-<hr />
+*********
 
-<h3 id="i-wrote-a-little-while-loop-to-get-journal-titles-from-the-crossref-oai-pmh-this-takes-a-while-to-run-but-at-least-it-works-on-my-machine---hopefully-yours-too">I wrote a little while loop to get journal titles from the Crossref OAI-PMH. This takes a while to run, but at least it works on my machine - hopefully yours too!</h3>
+### I wrote a little while loop to get journal titles from the Crossref OAI-PMH. This takes a while to run, but at least it works on my machine - hopefully yours too!
 
-<figure class="highlight"><pre><code class="language-r" data-lang="r"><table style="border-spacing: 0"><tbody><tr><td class="gutter gl" style="text-align: right"><pre class="lineno">1
-2
-3
-4
-5
-6
-7
-8
-9
-10
-11
-12
-13
-14
-15
-16
-17
-18
-19
-20</pre></td><td class="code"><pre><span class="n">library</span><span class="p">(</span><span class="n">XML</span><span class="p">)</span><span class="w">
-</span><span class="n">library</span><span class="p">(</span><span class="n">RCurl</span><span class="p">)</span><span class="w">
+{% highlight r linenos %}
+library(XML)
+library(RCurl)
 
-</span><span class="n">token</span><span class="w"> </span><span class="o">&lt;-</span><span class="w"> </span><span class="s2">"characters"</span><span class="w">  </span><span class="c1"># define a iterator, also used for gettingn the resumptionToken
-</span><span class="n">nameslist</span><span class="w"> </span><span class="o">&lt;-</span><span class="w"> </span><span class="nf">list</span><span class="p">()</span><span class="w">  </span><span class="c1"># define empty list to put joural titles in to
-</span><span class="k">while</span><span class="w"> </span><span class="p">(</span><span class="nf">is.character</span><span class="p">(</span><span class="n">token</span><span class="p">)</span><span class="w"> </span><span class="o">==</span><span class="w"> </span><span class="kc">TRUE</span><span class="p">)</span><span class="w"> </span><span class="p">{</span><span class="w">
-    </span><span class="n">baseurl</span><span class="w"> </span><span class="o">&lt;-</span><span class="w"> </span><span class="s2">"http://oai.crossref.org/OAIHandler?verb=ListSets"</span><span class="w">
-    </span><span class="k">if</span><span class="w"> </span><span class="p">(</span><span class="n">token</span><span class="w"> </span><span class="o">==</span><span class="w"> </span><span class="s2">"characters"</span><span class="p">)</span><span class="w"> </span><span class="p">{</span><span class="w">
-        </span><span class="n">tok2</span><span class="w"> </span><span class="o">&lt;-</span><span class="w"> </span><span class="kc">NULL</span><span class="w">
-    </span><span class="p">}</span><span class="w"> </span><span class="k">else</span><span class="w"> </span><span class="p">{</span><span class="w">
-        </span><span class="n">tok2</span><span class="w"> </span><span class="o">&lt;-</span><span class="w"> </span><span class="n">paste</span><span class="p">(</span><span class="s2">"&amp;resumptionToken="</span><span class="p">,</span><span class="w"> </span><span class="n">token</span><span class="p">,</span><span class="w"> </span><span class="n">sep</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">""</span><span class="p">)</span><span class="w">
-    </span><span class="p">}</span><span class="w">
-    </span><span class="n">query</span><span class="w"> </span><span class="o">&lt;-</span><span class="w"> </span><span class="n">paste</span><span class="p">(</span><span class="n">baseurl</span><span class="p">,</span><span class="w"> </span><span class="n">tok2</span><span class="p">,</span><span class="w"> </span><span class="n">sep</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">""</span><span class="p">)</span><span class="w">
-    </span><span class="n">crsets</span><span class="w"> </span><span class="o">&lt;-</span><span class="w"> </span><span class="n">xmlToList</span><span class="p">(</span><span class="n">xmlParse</span><span class="p">(</span><span class="n">getURL</span><span class="p">(</span><span class="n">query</span><span class="p">)))</span><span class="w">
-    </span><span class="n">names</span><span class="w"> </span><span class="o">&lt;-</span><span class="w"> </span><span class="nf">as.character</span><span class="p">(</span><span class="n">sapply</span><span class="p">(</span><span class="n">crsets</span><span class="p">[[</span><span class="m">4</span><span class="p">]],</span><span class="w"> </span><span class="k">function</span><span class="p">(</span><span class="n">x</span><span class="p">)</span><span class="w"> </span><span class="n">x</span><span class="p">[[</span><span class="s2">"setName"</span><span class="p">]]))</span><span class="w">
-    </span><span class="n">nameslist</span><span class="p">[[</span><span class="n">token</span><span class="p">]]</span><span class="w"> </span><span class="o">&lt;-</span><span class="w"> </span><span class="n">names</span><span class="w">
-    </span><span class="k">if</span><span class="w"> </span><span class="p">(</span><span class="nf">class</span><span class="p">(</span><span class="n">try</span><span class="p">(</span><span class="n">crsets</span><span class="p">[[</span><span class="m">2</span><span class="p">]]</span><span class="o">$</span><span class="n">.attrs</span><span class="p">[[</span><span class="s2">"resumptionToken"</span><span class="p">]]))</span><span class="w"> </span><span class="o">==</span><span class="w"> </span><span class="s2">"try-error"</span><span class="p">)</span><span class="w"> </span><span class="p">{</span><span class="w">
-        </span><span class="n">stop</span><span class="p">(</span><span class="s2">"no more data"</span><span class="p">)</span><span class="w">
-    </span><span class="p">}</span><span class="w"> </span><span class="k">else</span><span class="w"> </span><span class="n">token</span><span class="w"> </span><span class="o">&lt;-</span><span class="w"> </span><span class="n">crsets</span><span class="p">[[</span><span class="m">2</span><span class="p">]]</span><span class="o">$</span><span class="n">.attrs</span><span class="p">[[</span><span class="s2">"resumptionToken"</span><span class="p">]]</span><span class="w">
-</span><span class="p">}</span><span class="w">
-</span></pre></td></tr></tbody></table></code></pre></figure>
+token <- "characters"  # define a iterator, also used for gettingn the resumptionToken
+nameslist <- list()  # define empty list to put joural titles in to
+while (is.character(token) == TRUE) {
+    baseurl <- "http://oai.crossref.org/OAIHandler?verb=ListSets"
+    if (token == "characters") {
+        tok2 <- NULL
+    } else {
+        tok2 <- paste("&resumptionToken=", token, sep = "")
+    }
+    query <- paste(baseurl, tok2, sep = "")
+    crsets <- xmlToList(xmlParse(getURL(query)))
+    names <- as.character(sapply(crsets[[4]], function(x) x[["setName"]]))
+    nameslist[[token]] <- names
+    if (class(try(crsets[[2]]$.attrs[["resumptionToken"]])) == "try-error") {
+        stop("no more data")
+    } else token <- crsets[[2]]$.attrs[["resumptionToken"]]
+}
+{% endhighlight %}
 
-<hr />
 
-<h3 id="yay--hopefully-it-worked-if-you-tried-it--lets-see-how-long-the-list-of-journal-titles-is">Yay!  Hopefully it worked if you tried it.  Let’s see how long the list of journal titles is.</h3>
+*********
 
-<figure class="highlight"><pre><code class="language-r" data-lang="r"><table style="border-spacing: 0"><tbody><tr><td class="gutter gl" style="text-align: right"><pre class="lineno">1</pre></td><td class="code"><pre><span class="n">sapply</span><span class="p">(</span><span class="n">nameslist</span><span class="p">,</span><span class="w"> </span><span class="n">length</span><span class="p">)</span><span class="w">  </span><span class="err">#</span><span class="w"> </span><span class="n">length</span><span class="w"> </span><span class="n">of</span><span class="w"> </span><span class="n">each</span><span class="w"> </span><span class="n">list</span><span class="w">
-</span></pre></td></tr></tbody></table></code></pre></figure>
+### Yay!  Hopefully it worked if you tried it.  Let's see how long the list of journal titles is. 
 
-<figure class="highlight"><pre><code class="language-text" data-lang="text">                          characters c65ebc3f-b540-4672-9c00-f3135bf849e3 
+{% highlight r linenos %}
+sapply(nameslist, length)  # length of each list
+{% endhighlight %}
+
+
+
+{% highlight text %}
+                          characters c65ebc3f-b540-4672-9c00-f3135bf849e3 
                                10001                                10001 
 6f61b343-a8f4-48f1-8297-c6f6909ca7f7 
-                                6864 </code></pre></figure>
+                                6864 
+{% endhighlight %}
 
-<figure class="highlight"><pre><code class="language-r" data-lang="r"><table style="border-spacing: 0"><tbody><tr><td class="gutter gl" style="text-align: right"><pre class="lineno">1
-2</pre></td><td class="code"><pre><span class="n">allnames</span><span class="w"> </span><span class="o">&lt;-</span><span class="w"> </span><span class="n">do.call</span><span class="p">(</span><span class="n">c</span><span class="p">,</span><span class="w"> </span><span class="n">nameslist</span><span class="p">)</span><span class="w">  </span><span class="c1"># combine to list
-</span><span class="nf">length</span><span class="p">(</span><span class="n">allnames</span><span class="p">)</span><span class="w">
-</span></pre></td></tr></tbody></table></code></pre></figure>
 
-<figure class="highlight"><pre><code class="language-text" data-lang="text">[1] 26866</code></pre></figure>
 
-<hr />
+{% highlight r linenos %}
+allnames <- do.call(c, nameslist)  # combine to list
+length(allnames)
+{% endhighlight %}
 
-<h3 id="now-lets-use-some-regex-to-pull-out-the-journal-titles-that-are-likely-ecology-and-evolutionary-biology-journals--the--symbol-says-the-string-must-start-here-the-s-means-whitespace--the--lets-you-specify-a-set-of-letters-you-are-looking-for-eg-ee-means-capital-e-or-lowercase-e--i-threw-in-titles-that-had-the-words-systematic-and-natrualist-too--tried-to-trim-any-whitespace-as-well-using-the-stringr-package">Now, let’s use some <code class="highlighter-rouge">regex</code> to pull out the journal titles that are likely ecology and evolutionary biology journals.  The <code class="highlighter-rouge">^</code> symbol says “the string must start here”. The <code class="highlighter-rouge">\\s</code> means whitespace.  The <code class="highlighter-rouge">[]</code> lets you specify a set of letters you are looking for, e.g., <code class="highlighter-rouge">[Ee]</code> means capital <code class="highlighter-rouge">E</code> <em>OR</em> lowercase <code class="highlighter-rouge">e</code>.  I threw in titles that had the words systematic and natrualist too.  Tried to trim any whitespace as well using the <code class="highlighter-rouge">stringr</code> package.</h3>
 
-<figure class="highlight"><pre><code class="language-r" data-lang="r"><table style="border-spacing: 0"><tbody><tr><td class="gutter gl" style="text-align: right"><pre class="lineno">1
-2
-3
-4
-5
-6
-7
-8
-9
-10</pre></td><td class="code"><pre><span class="n">library</span><span class="p">(</span><span class="n">stringr</span><span class="p">)</span><span class="w">
 
-</span><span class="n">ecotitles</span><span class="w"> </span><span class="o">&lt;-</span><span class="w"> </span><span class="nf">as.character</span><span class="p">(</span><span class="n">allnames</span><span class="p">[</span><span class="n">str_detect</span><span class="p">(</span><span class="n">allnames</span><span class="p">,</span><span class="w"> </span><span class="s2">"^[Ee]cology|\\s[Ee]cology"</span><span class="p">)])</span><span class="w">
-</span><span class="n">evotitles</span><span class="w"> </span><span class="o">&lt;-</span><span class="w"> </span><span class="nf">as.character</span><span class="p">(</span><span class="n">allnames</span><span class="p">[</span><span class="n">str_detect</span><span class="p">(</span><span class="n">allnames</span><span class="p">,</span><span class="w"> </span><span class="s2">"^[Ee]volution|\\s[Ee]volution"</span><span class="p">)])</span><span class="w">
-</span><span class="n">systtitles</span><span class="w"> </span><span class="o">&lt;-</span><span class="w"> </span><span class="nf">as.character</span><span class="p">(</span><span class="n">allnames</span><span class="p">[</span><span class="n">str_detect</span><span class="p">(</span><span class="n">allnames</span><span class="p">,</span><span class="w"> </span><span class="s2">"^[Ss]ystematic|\\s[Ss]systematic"</span><span class="p">)])</span><span class="w">
-</span><span class="n">naturalist</span><span class="w"> </span><span class="o">&lt;-</span><span class="w"> </span><span class="nf">as.character</span><span class="p">(</span><span class="n">allnames</span><span class="p">[</span><span class="n">str_detect</span><span class="p">(</span><span class="n">allnames</span><span class="p">,</span><span class="w"> </span><span class="s2">"[Nn]aturalist"</span><span class="p">)])</span><span class="w">
+{% highlight text %}
+[1] 26866
+{% endhighlight %}
 
-</span><span class="n">ecoevotitles</span><span class="w"> </span><span class="o">&lt;-</span><span class="w"> </span><span class="n">unique</span><span class="p">(</span><span class="nf">c</span><span class="p">(</span><span class="n">ecotitles</span><span class="p">,</span><span class="w"> </span><span class="n">evotitles</span><span class="p">,</span><span class="w"> </span><span class="n">systtitles</span><span class="p">,</span><span class="w"> </span><span class="n">naturalist</span><span class="p">))</span><span class="w">  </span><span class="c1"># combine to list
-</span><span class="n">ecoevotitles</span><span class="w"> </span><span class="o">&lt;-</span><span class="w"> </span><span class="n">str_trim</span><span class="p">(</span><span class="n">ecoevotitles</span><span class="p">,</span><span class="w"> </span><span class="n">side</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"both"</span><span class="p">)</span><span class="w">  </span><span class="c1"># trim whitespace, if any
-</span><span class="nf">length</span><span class="p">(</span><span class="n">ecoevotitles</span><span class="p">)</span><span class="w">
-</span></pre></td></tr></tbody></table></code></pre></figure>
 
-<figure class="highlight"><pre><code class="language-text" data-lang="text">[1] 188</code></pre></figure>
+*********
 
-<figure class="highlight"><pre><code class="language-r" data-lang="r"><table style="border-spacing: 0"><tbody><tr><td class="gutter gl" style="text-align: right"><pre class="lineno">1
-2</pre></td><td class="code"><pre><span class="c1"># Just the first ten titles
-</span><span class="n">ecoevotitles</span><span class="p">[</span><span class="m">1</span><span class="o">:</span><span class="m">10</span><span class="p">]</span><span class="w">
-</span></pre></td></tr></tbody></table></code></pre></figure>
 
-<figure class="highlight"><pre><code class="language-text" data-lang="text"> [1] "Microbial Ecology in Health and Disease"           
+### Now, let's use some `regex` to pull out the journal titles that are likely ecology and evolutionary biology journals.  The `^` symbol says "the string must start here". The `\\s` means whitespace.  The `[]` lets you specify a set of letters you are looking for, e.g., `[Ee]` means capital `E` *OR* lowercase `e`.  I threw in titles that had the words systematic and natrualist too.  Tried to trim any whitespace as well using the `stringr` package. 
+
+{% highlight r linenos %}
+library(stringr)
+
+ecotitles <- as.character(allnames[str_detect(allnames, "^[Ee]cology|\\s[Ee]cology")])
+evotitles <- as.character(allnames[str_detect(allnames, "^[Ee]volution|\\s[Ee]volution")])
+systtitles <- as.character(allnames[str_detect(allnames, "^[Ss]ystematic|\\s[Ss]systematic")])
+naturalist <- as.character(allnames[str_detect(allnames, "[Nn]aturalist")])
+
+ecoevotitles <- unique(c(ecotitles, evotitles, systtitles, naturalist))  # combine to list
+ecoevotitles <- str_trim(ecoevotitles, side = "both")  # trim whitespace, if any
+length(ecoevotitles)
+{% endhighlight %}
+
+
+
+{% highlight text %}
+[1] 188
+{% endhighlight %}
+
+
+
+{% highlight r linenos %}
+
+# Just the first ten titles
+ecoevotitles[1:10]
+{% endhighlight %}
+
+
+
+{% highlight text %}
+ [1] "Microbial Ecology in Health and Disease"           
  [2] "Population Ecology"                                
  [3] "Researches on Population Ecology"                  
  [4] "Behavioral Ecology and Sociobiology"               
@@ -413,52 +821,16 @@ $first_name
  [7] "FEMS Microbiology Ecology"                         
  [8] "Journal of Experimental Marine Biology and Ecology"
  [9] "Applied Soil Ecology"                              
-[10] "Forest Ecology and Management"                     </code></pre></figure>
+[10] "Forest Ecology and Management"                     
+{% endhighlight %}
 
-<hr />
+*********
 
-<h3 id="get-the-rmd-file-used-to-create-this-post-at-my-github-accounthttpsgithubcomsckottsckottgithubcomtreemasterdrafts2012-08-30-get-ecoevo-journal-titlesrmd">Get the .Rmd file used to create this post <a href="https://github.com/sckott/sckott.github.com/tree/master/_drafts/2012-08-30-get-ecoevo-journal-titles.Rmd">at my github account</a>.</h3>
+### Get the .Rmd file used to create this post [at my github account](https://github.com/sckott/sckott.github.com/tree/master/_drafts/2012-08-30-get-ecoevo-journal-titles.Rmd).
 
-<hr />
+*********
 
-<h3 id="written-in-markdownhttpdaringfireballnetprojectsmarkdown-with-help-from-knitrhttpyihuinameknitr-and-nice-knitr-highlightingetc-in-in-rstudiohttprstudioorg">Written in <a href="http://daringfireball.net/projects/markdown/">Markdown</a>, with help from <a href="http://yihui.name/knitr/">knitr</a>, and nice knitr highlighting/etc. in in <a href="http://rstudio.org/">RStudio</a>.</h3>
-
-  </div>
-  
-  <div class="post">
-    <h1>
-      <a href="/2012/08/ecology-unconference/">
-        Ecology unconference at ESA 2013
-      </a>
-    </h1>
-
-    <span class="post-date">30 Aug 2012</span>
-
-    <hr />
-
-<p>So I heard many people say after or during the recent ESA conference in Portland that they really enjoyed the converstations more than listening to talks or looking at posters.</p>
-
-<p>There was some chatter about doing an unconference associated with next year’s ESA conference in Minneapolis. And Sandra Chung (@sandramchung) got on it and started a wiki that we can all conribute ideas to. The wiki is here: <a href="http://ecologyunconference.wikispaces.com/">http://ecologyunconference.wikispaces.com/</a></p>
-
-<p>What is an unconference? The idea of an unconference is to have a community organized meetup in which interactions among people are emphasized over the traditional lecture and poster format. For example, many sessions may just be organized a single idea, and people attending have a discussion around the topic. The format can be decided by the community.</p>
-
-<p>What will we do there? The broadest restriction is that topics should be about science that happens online. You may say, “Well, real ecology happens in the field!”. Yes, but a lot of the products of ecology are put online, and increasingly the discussion of the practice of ecology happens online. Check out the <a href="http://scienceonline2012.com/">Science Online 2012 website</a> for a little taste of what we hope to achieve next year.</p>
-
-<p>How do I get involved? Go to the wiki and start contributing: <a href="http://ecologyunconference.wikispaces.com/">http://ecologyunconference.wikispaces.com/</a>. There are already some suggestions for topics…Here’s a screenshot of the ideas for Session Proposals page:</p>
-
-<p><img src="/public/img/ecologyunconf.png" alt="ecologyunconf" /></p>
-
-<hr />
-
-<h3 id="important--use-the-esaun13-hashtag-to-talk-about-this-unconference-on-twitter-g-and-appnet">Important!  Use the #esaun13 hashtag to talk about this unconference on Twitter, G+, and app.net.</h3>
-
-<hr />
-
-<h3 id="get-the-rmd-file-used-to-create-this-post-at-my-github-accounthttpsgithubcomsckottsckottgithubcomtreemasterdrafts2012-08-30-making-matricesrmd">Get the .Rmd file used to create this post <a href="https://github.com/sckott/sckott.github.com/tree/master/_drafts/2012-08-30-making-matrices.Rmd">at my github account</a>.</h3>
-
-<hr />
-
-<h3 id="written-in-markdownhttpdaringfireballnetprojectsmarkdown-with-help-from-knitrhttpyihuinameknitr">Written in <a href="http://daringfireball.net/projects/markdown/">Markdown</a>, with help from <a href="http://yihui.name/knitr/">knitr</a>.</h3>
+### Written in [Markdown](http://daringfireball.net/projects/markdown/), with help from [knitr](http://yihui.name/knitr/), and nice knitr highlighting/etc. in in [RStudio](http://rstudio.org/).
 
   </div>
   

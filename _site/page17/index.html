@@ -61,6 +61,380 @@
   
   <div class="post">
     <h1>
+      <a href="/2014/06/analogsea-v01/">
+        analogsea - v0.1 notes
+      </a>
+    </h1>
+
+    <span class="post-date">18 Jun 2014</span>
+
+    My [last blog ](http://recology.info/2014/05/analogsea/) post introduced the R package I'm working on `analogsea`, an R client for the Digital Ocean API.
+
+Things have changed a bit, including fillig out more functions for all API endpoints, and incorparting feedback from Hadley and Karthik. The package is as `v0.1` now, so I thought I'd say a few things about how it works.
+
+Note that Digital Ocean's v2 API is in beta stage now, so the current version of `analogsea` at `v0.1` works with their v1 API. The [v2 branch of analogsea](https://github.com/sckott/analogsea/tree/v2) is being developed for their v2 API.
+
+If you sign up for an account with Digital Ocean use this referral link: [https://www.digitalocean.com/?refcode=0740f5169634](https://www.digitalocean.com/?refcode=0740f5169634) so I can earn some credits. thx :)
+
+First, installation
+
+Note: I did try to submit to CRAN, but Ripley complained about the package name so I'd rather not waste my time esp since people using this likely will already know about `install_github()`.
+
+
+```r
+devtools::install_github("sckott/analogsea")
+```
+
+Load the library
+
+
+```r
+library("analogsea")
+```
+
+```
+## Loading required package: magrittr
+```
+
+Authenticate has changed a bit. Whereas auth details were stored as environment variables before, I'm just using R's options. `do_auth()` will ask for your Digital Ocean details. You can enter them each R session, or store them in your `.Rprofile` file. After successful authentication, each function simply looks for your auth details with `getOption()`.  You don't have to use this function first, though if you don't your first call to another function will ask for auth details.
+
+
+```r
+do_auth()
+```
+
+`sizes`, `images`, and `keys` functions have changed a bit, by default outputting a `data.frame` now.
+
+List available regions
+
+
+```r
+regions()
+```
+
+```
+##   id            name slug
+## 1  3 San Francisco 1 sfo1
+## 2  4      New York 2 nyc2
+## 3  5     Amsterdam 2 ams2
+## 4  6     Singapore 1 sgp1
+```
+
+List available sizes
+
+
+```r
+sizes()
+```
+
+```
+##   id  name  slug memory cpu disk cost_per_hour cost_per_month
+## 1 66 512MB 512mb    512   1   20       0.00744            5.0
+## 2 63   1GB   1gb   1024   1   30       0.01488           10.0
+## 3 62   2GB   2gb   2048   2   40       0.02976           20.0
+## 4 64   4GB   4gb   4096   2   60       0.05952           40.0
+## 5 65   8GB   8gb   8192   4   80       0.11905           80.0
+## 6 61  16GB  16gb  16384   8  160       0.23810          160.0
+## 7 60  32GB  32gb  32768  12  320       0.47619          320.0
+## 8 70  48GB  48gb  49152  16  480       0.71429          480.0
+## 9 69  64GB  64gb  65536  20  640       0.95238          640.0
+```
+
+List available images
+
+
+```r
+head(images())
+```
+
+```
+##        id                  name             slug distribution public sfo1
+## 1 3209452 rstudioserverssh_snap             <NA>       Ubuntu  FALSE    1
+## 2    1601        CentOS 5.8 x64   centos-5-8-x64       CentOS   TRUE    1
+## 3    1602        CentOS 5.8 x32   centos-5-8-x32       CentOS   TRUE    1
+## 4   12573        Debian 6.0 x64   debian-6-0-x64       Debian   TRUE    1
+## 5   12575        Debian 6.0 x32   debian-6-0-x32       Debian   TRUE    1
+## 6   14097      Ubuntu 10.04 x64 ubuntu-10-04-x64       Ubuntu   TRUE    1
+##   nyc1 ams1 nyc2 ams2 sgp1
+## 1   NA   NA   NA   NA   NA
+## 2    1    1    1    1    1
+## 3    1    1    1    1    1
+## 4    1    1    1    1    1
+## 5    1    1    1    1    1
+## 6    1    1    1    1    1
+```
+
+List ssh keys
+
+
+```r
+keys()
+```
+
+```
+## $ssh_keys
+## $ssh_keys[[1]]
+## $ssh_keys[[1]]$id
+## [1] 89103
+##
+## $ssh_keys[[1]]$name
+## [1] "Scott Chamberlain"
+```
+
+One change that's of interest is that most of the various `droplets_*()` functions take in the outputs of other `droplets_*()` functions. This means that we can pipe outputs of one `droplets_*()` function to another, including non-`droplet_*` functions (see examples).
+
+Let's create a droplet:
+
+
+```r
+(res <- droplets_new(name="foo", size_slug = '512mb', image_slug = 'ubuntu-14-04-x64', region_slug = 'sfo1', ssh_key_ids = 89103))
+```
+
+```r
+$droplet
+$droplet$id
+[1] 1880805
+
+$droplet$name
+[1] "foo"
+
+$droplet$image_id
+[1] 3240036
+
+$droplet$size_id
+[1] 66
+
+$droplet$event_id
+[1] 26711810
+```
+
+List my droplets
+
+This function used to be `do_droplets_get()`
+
+
+```r
+droplets()
+```
+
+```
+## $droplet_ids
+## [1] 1880805
+##
+## $droplets
+## $droplets[[1]]
+## $droplets[[1]]$id
+## [1] 1880805
+##
+## $droplets[[1]]$name
+## [1] "foo"
+##
+## $droplets[[1]]$image_id
+## [1] 3240036
+##
+## $droplets[[1]]$size_id
+## [1] 66
+##
+## $droplets[[1]]$region_id
+## [1] 3
+##
+## $droplets[[1]]$backups_active
+## [1] FALSE
+##
+## $droplets[[1]]$ip_address
+## [1] "162.243.152.56"
+##
+## $droplets[[1]]$private_ip_address
+## NULL
+##
+## $droplets[[1]]$locked
+## [1] FALSE
+##
+## $droplets[[1]]$status
+## [1] "active"
+##
+## $droplets[[1]]$created_at
+## [1] "2014-06-18T14:15:35Z"
+##
+##
+##
+## $event_id
+## NULL
+```
+
+As mentioned above we can now pipe output of `droplet*()` functions to other `droplet*()` functions.
+
+Here, pipe output of lising droplets `droplets()` to the `events()` function
+
+
+```r
+droplets() %>% events()
+```
+
+```
+## Error: No event id found
+```
+
+In this case there were no event ids to get event data on.
+
+Here, we'll get details for the droplet we just created, then pipe that to `droplets_power_off()`
+
+
+```r
+droplets(1880805) %>% droplets_power_off
+```
+
+```
+## $droplet_ids
+## [1] 1880805
+##
+## $droplets
+## $droplets$droplet_ids
+## [1] 1880805
+##
+## $droplets$droplets
+## $droplets$droplets$id
+## [1] 1880805
+##
+## $droplets$droplets$name
+## [1] "foo"
+##
+## $droplets$droplets$image_id
+## [1] 3240036
+##
+## $droplets$droplets$size_id
+## [1] 66
+##
+## $droplets$droplets$region_id
+## [1] 3
+##
+## $droplets$droplets$backups_active
+## [1] FALSE
+##
+## $droplets$droplets$ip_address
+## [1] "162.243.152.56"
+##
+## $droplets$droplets$private_ip_address
+## NULL
+##
+## $droplets$droplets$locked
+## [1] FALSE
+##
+## $droplets$droplets$status
+## [1] "active"
+##
+## $droplets$droplets$created_at
+## [1] "2014-06-18T14:15:35Z"
+##
+## $droplets$droplets$backups
+## list()
+##
+## $droplets$droplets$snapshots
+## list()
+##
+##
+## $droplets$event_id
+## NULL
+##
+##
+## $event_id
+## [1] 26714109
+```
+
+Then pipe it again to `droplets_power_on()`
+
+
+
+
+```r
+droplets(1880805) %>%
+  droplets_power_on
+```
+
+```
+## $droplet_ids
+## [1] 1880805
+##
+## $droplets
+## $droplets$droplet_ids
+## [1] 1880805
+##
+## $droplets$droplets
+## $droplets$droplets$id
+## [1] 1880805
+##
+## $droplets$droplets$name
+## [1] "foo"
+##
+## $droplets$droplets$image_id
+## [1] 3240036
+##
+## $droplets$droplets$size_id
+## [1] 66
+##
+## $droplets$droplets$region_id
+## [1] 3
+##
+## $droplets$droplets$backups_active
+## [1] FALSE
+##
+## $droplets$droplets$ip_address
+## [1] "162.243.152.56"
+##
+## $droplets$droplets$private_ip_address
+## NULL
+##
+## $droplets$droplets$locked
+## [1] FALSE
+##
+## $droplets$droplets$status
+## [1] "off"
+##
+## $droplets$droplets$created_at
+## [1] "2014-06-18T14:15:35Z"
+##
+## $droplets$droplets$backups
+## list()
+##
+## $droplets$droplets$snapshots
+## list()
+##
+##
+## $droplets$event_id
+## NULL
+##
+##
+## $event_id
+## [1] 26714152
+```
+
+```r
+Sys.sleep(6)
+droplets(1880805)$droplets$status
+```
+
+```
+## [1] "off"
+```
+
+Why not use more pipes?
+
+
+```r
+droplets(1880805) %>%
+  droplets_power_off %>%
+  droplets_power_on %>%
+  events
+```
+
+-------
+
+Last time I talked about installing R, RStudio, etc. on a droplet. I'm still working out bugs in that stuff, but do test out so it can get better faster. See `do_install()`.
+
+  </div>
+  
+  <div class="post">
+    <h1>
       <a href="/2014/05/analogsea/">
         analogsea - an R client for the Digital Ocean API
       </a>
@@ -68,51 +442,57 @@
 
     <span class="post-date">28 May 2014</span>
 
-    <p>I think this package name is my best yet. Maybe it doesn’t make sense though? At least it did at the time…</p>
+    I think this package name is my best yet. Maybe it doesn't make sense though? At least it did at the time...
 
-<p>Anyway, the main motivation for this package was to be able to automate spinning up Linux boxes to do cloud R/RStudio work. Of course if you are a command line native this is all easy for you, but if you are afraid of the command line and/or just don’t want to deal with it, this tool will hopefully help.</p>
+Anyway, the main motivation for this package was to be able to automate spinning up Linux boxes to do cloud R/RStudio work. Of course if you are a command line native this is all easy for you, but if you are afraid of the command line and/or just don't want to deal with it, this tool will hopefully help. 
 
-<p>Most of the functions in this package wrap the Digital Ocean API. So you can do things like create a new <em>droplet</em>, get information on your droplets, <em>destroy</em> droplets, get information on available images, make snapshots, etc. Basically everything you can do from their website you can do here. Note that all functions are prefixed with <code class="highlighter-rouge">do_</code> (for Digital Ocean).</p>
+Most of the functions in this package wrap the Digital Ocean API. So you can do things like create a new _droplet_, get information on your droplets, _destroy_ droplets, get information on available images, make snapshots, etc. Basically everything you can do from their website you can do here. Note that all functions are prefixed with `do_` (for Digital Ocean). 
 
-<p>The droplet creation part is what we can leverage to spin up a cloud machine to then install R on, and optionally RStudio server, and even RStudio Shiny server. This allows you to stay within R entirely, not having to go to <code class="highlighter-rouge">ssh</code> into the Linux machine itself or go to the Digital Ocean website (after initial setup of course).</p>
+The droplet creation part is what we can leverage to spin up a cloud machine to then install R on, and optionally RStudio server, and even RStudio Shiny server. This allows you to stay within R entirely, not having to go to `ssh` into the Linux machine itself or go to the Digital Ocean website (after initial setup of course). 
 
-<p>If you try this, I recommend using this on R on the command line as you can more easily kill the R session if something goes wrong, and quickly open a new tab/window to <code class="highlighter-rouge">ssh</code> into the Linux machine if you want.</p>
+If you try this, I recommend using this on R on the command line as you can more easily kill the R session if something goes wrong, and quickly open a new tab/window to `ssh` into the Linux machine if you want.
 
-<p>First, installation</p>
+First, installation
 
-<div class="language-r highlighter-rouge"><pre class="highlight"><code><span class="n">devtools</span><span class="o">::</span><span class="n">install_github</span><span class="p">(</span><span class="s2">"sckott/analogsea"</span><span class="p">)</span><span class="w">
-</span></code></pre>
-</div>
 
-<p>Load the library</p>
+```r
+devtools::install_github("sckott/analogsea")
+```
 
-<div class="language-r highlighter-rouge"><pre class="highlight"><code><span class="n">library</span><span class="p">(</span><span class="s2">"analogsea"</span><span class="p">)</span><span class="w">
-</span></code></pre>
-</div>
+Load the library
 
-<p>Firt, authenticate. This will ask for your Digital Ocean details. You can enter them each R session, or store them in your <code class="highlighter-rouge">.Renviron</code> file. After successful authentication, each function simply looks for your auth details with <code class="highlighter-rouge">Sys.getenv()</code>.</p>
 
-<div class="language-r highlighter-rouge"><pre class="highlight"><code><span class="n">do_auth</span><span class="p">()</span><span class="w">
-</span></code></pre>
-</div>
+```r
+library("analogsea")
+```
 
-<p>List available regions</p>
+Firt, authenticate. This will ask for your Digital Ocean details. You can enter them each R session, or store them in your `.Renviron` file. After successful authentication, each function simply looks for your auth details with `Sys.getenv()`.
 
-<div class="language-r highlighter-rouge"><pre class="highlight"><code><span class="n">sapply</span><span class="p">(</span><span class="n">do_regions</span><span class="p">()</span><span class="o">$</span><span class="n">regions</span><span class="p">,</span><span class="w"> </span><span class="s2">"[["</span><span class="p">,</span><span class="w"> </span><span class="s2">"name"</span><span class="p">)</span><span class="w">
-</span></code></pre>
-</div>
 
-<div class="highlighter-rouge"><pre class="highlight"><code>## [1] "San Francisco 1" "New York 2"      "Amsterdam 2"     "Singapore 1"
-</code></pre>
-</div>
+```r
+do_auth()
+```
 
-<p>List available images</p>
+List available regions
 
-<div class="language-r highlighter-rouge"><pre class="highlight"><code><span class="n">sapply</span><span class="p">(</span><span class="n">do_images</span><span class="p">()</span><span class="o">$</span><span class="n">images</span><span class="p">,</span><span class="w"> </span><span class="s2">"[["</span><span class="p">,</span><span class="w"> </span><span class="s2">"name"</span><span class="p">)</span><span class="w">
-</span></code></pre>
-</div>
 
-<div class="highlighter-rouge"><pre class="highlight"><code>##  [1] "rstudioserverssh_snap"                          
+```r
+sapply(do_regions()$regions, "[[", "name")
+```
+
+```
+## [1] "San Francisco 1" "New York 2"      "Amsterdam 2"     "Singapore 1"
+```
+
+List available images
+
+
+```r
+sapply(do_images()$images, "[[", "name")
+```
+
+```
+##  [1] "rstudioserverssh_snap"                          
 ##  [2] "CentOS 5.8 x64"                                 
 ##  [3] "CentOS 5.8 x32"                                 
 ##  [4] "Debian 6.0 x64"                                 
@@ -148,16 +528,17 @@
 ## [34] "LAMP on Ubuntu 14.04"                           
 ## [35] "node-v0.10.28 on Ubuntu 14.04"                  
 ## [36] "GitLab 6.9.0 CE"
-</code></pre>
-</div>
+```
 
-<p>List available sizes</p>
+List available sizes
 
-<div class="language-r highlighter-rouge"><pre class="highlight"><code><span class="n">do.call</span><span class="p">(</span><span class="n">rbind</span><span class="p">,</span><span class="w"> </span><span class="n">do_sizes</span><span class="p">()</span><span class="o">$</span><span class="n">sizes</span><span class="p">)</span><span class="w">
-</span></code></pre>
-</div>
 
-<div class="highlighter-rouge"><pre class="highlight"><code>##       id name    slug    memory cpu disk cost_per_hour cost_per_month
+```r
+do.call(rbind, do_sizes()$sizes)
+```
+
+```
+##       id name    slug    memory cpu disk cost_per_hour cost_per_month
 ##  [1,] 66 "512MB" "512mb" 512    1   20   0.00744       "5.0"         
 ##  [2,] 63 "1GB"   "1gb"   1024   1   30   0.01488       "10.0"        
 ##  [3,] 62 "2GB"   "2gb"   2048   2   40   0.02976       "20.0"        
@@ -167,47 +548,51 @@
 ##  [7,] 60 "32GB"  "32gb"  32768  12  320  0.4762        "320.0"       
 ##  [8,] 70 "48GB"  "48gb"  49152  16  480  0.7143        "480.0"       
 ##  [9,] 69 "64GB"  "64gb"  65536  20  640  0.9524        "640.0"
-</code></pre>
-</div>
+```
 
-<p>Let’s create a droplet:</p>
-
-<div class="language-r highlighter-rouge"><pre class="highlight"><code><span class="p">(</span><span class="n">res</span><span class="w"> </span><span class="o">&lt;-</span><span class="w"> </span><span class="n">do_droplets_new</span><span class="p">(</span><span class="n">name</span><span class="o">=</span><span class="s2">"foo"</span><span class="p">,</span><span class="w"> </span><span class="n">size_slug</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s1">'512mb'</span><span class="p">,</span><span class="w"> </span><span class="n">image_slug</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s1">'ubuntu-14-04-x64'</span><span class="p">,</span><span class="w"> </span><span class="n">region_slug</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s1">'sfo1'</span><span class="p">,</span><span class="w"> </span><span class="n">ssh_key_ids</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="m">89103</span><span class="p">))</span><span class="w">
-</span></code></pre>
-</div>
-
-<div class="language-r highlighter-rouge"><pre class="highlight"><code><span class="o">$</span><span class="n">status</span><span class="w">
-</span><span class="p">[</span><span class="m">1</span><span class="p">]</span><span class="w"> </span><span class="s2">"OK"</span><span class="w">
-
-</span><span class="o">$</span><span class="n">droplet</span><span class="w">
-</span><span class="o">$</span><span class="n">droplet</span><span class="o">$</span><span class="n">id</span><span class="w">
-</span><span class="p">[</span><span class="m">1</span><span class="p">]</span><span class="w"> </span><span class="m">1733336</span><span class="w">
-
-</span><span class="o">$</span><span class="n">droplet</span><span class="o">$</span><span class="n">name</span><span class="w">
-</span><span class="p">[</span><span class="m">1</span><span class="p">]</span><span class="w"> </span><span class="s2">"foo"</span><span class="w">
-
-</span><span class="o">$</span><span class="n">droplet</span><span class="o">$</span><span class="n">image_id</span><span class="w">
-</span><span class="p">[</span><span class="m">1</span><span class="p">]</span><span class="w"> </span><span class="m">3240036</span><span class="w">
-
-</span><span class="o">$</span><span class="n">droplet</span><span class="o">$</span><span class="n">size_id</span><span class="w">
-</span><span class="p">[</span><span class="m">1</span><span class="p">]</span><span class="w"> </span><span class="m">66</span><span class="w">
-
-</span><span class="o">$</span><span class="n">droplet</span><span class="o">$</span><span class="n">event_id</span><span class="w">
-</span><span class="p">[</span><span class="m">1</span><span class="p">]</span><span class="w"> </span><span class="m">25278892</span><span class="w">
+Let's create a droplet:
 
 
-</span><span class="nf">attr</span><span class="p">(,</span><span class="s2">"class"</span><span class="p">)</span><span class="w">
-</span><span class="p">[</span><span class="m">1</span><span class="p">]</span><span class="w"> </span><span class="s2">"dodroplet"</span><span class="w">
-</span></code></pre>
-</div>
+```r
+(res <- do_droplets_new(name="foo", size_slug = '512mb', image_slug = 'ubuntu-14-04-x64', region_slug = 'sfo1', ssh_key_ids = 89103))
+```
 
-<p>List my droplets</p>
+```r
+$status
+[1] "OK"
 
-<div class="language-r highlighter-rouge"><pre class="highlight"><code><span class="n">do_droplets_get</span><span class="p">()</span><span class="w">
-</span></code></pre>
-</div>
+$droplet
+$droplet$id
+[1] 1733336
 
-<div class="highlighter-rouge"><pre class="highlight"><code>## $status
+$droplet$name
+[1] "foo"
+
+$droplet$image_id
+[1] 3240036
+
+$droplet$size_id
+[1] 66
+
+$droplet$event_id
+[1] 25278892
+
+
+attr(,"class")
+[1] "dodroplet"
+```
+
+
+
+List my droplets
+
+
+```r
+do_droplets_get()
+```
+
+```
+## $status
 ## [1] "OK"
 ## 
 ## $droplets
@@ -244,36 +629,37 @@
 ## 
 ## $droplets[[1]]$created_at
 ## [1] "2014-05-28T05:59:22Z"
-</code></pre>
-</div>
+```
 
-<p>Cool, we have a new Linux box with 512 mb RAM, running Ubuntu 14.04 in the SF region. Notice that I’m using my SSH key here. If you don’t use your SSH key, Digital Ocean will email you a password, which you then use. We just have to wait a bit (sometimes 20 seconds, sometimes a few minutes) for it to spin up.</p>
+Cool, we have a new Linux box with 512 mb RAM, running Ubuntu 14.04 in the SF region. Notice that I'm using my SSH key here. If you don't use your SSH key, Digital Ocean will email you a password, which you then use. We just have to wait a bit (sometimes 20 seconds, sometimes a few minutes) for it to spin up.
 
-<p>Now we can install stuff. Here, I’ll install R, and RStudio Server. This step prints out the progress as you would see if you did <code class="highlighter-rouge">ssh</code> into the box itself outside of R. The RStudio Server instance will pop up in your default browser when this operation is done.</p>
+Now we can install stuff. Here, I'll install R, and RStudio Server. This step prints out the progress as you would see if you did `ssh` into the box itself outside of R. The RStudio Server instance will pop up in your default browser when this operation is done. 
 
-<div class="language-r highlighter-rouge"><pre class="highlight"><code><span class="n">do_install</span><span class="p">(</span><span class="n">res</span><span class="o">$</span><span class="n">droplet</span><span class="o">$</span><span class="n">id</span><span class="p">,</span><span class="w"> </span><span class="n">what</span><span class="o">=</span><span class="s1">'rstudio'</span><span class="p">,</span><span class="w"> </span><span class="n">usr</span><span class="o">=</span><span class="s1">'hey'</span><span class="p">,</span><span class="w"> </span><span class="n">pwd</span><span class="o">=</span><span class="s1">'there'</span><span class="p">)</span><span class="w">
-</span></code></pre>
-</div>
 
-<p><img src="/public/img/2014-05-28-analogsea/rstudioinstance.png" width="100%" /></p>
+```r
+do_install(res$droplet$id, what='rstudio', usr='hey', pwd='there')
+```
 
-<p>You can install some things like the <code class="highlighter-rouge">libcurl</code> and <code class="highlighter-rouge">libxml</code> libraries too with the <code class="highlighter-rouge">deps</code> parameter.</p>
+<img src="/public/img/2014-05-28-analogsea/rstudioinstance.png" width="100%">
 
-<p>When you’re done, you can destroy your droplet from R too</p>
+You can install some things like the `libcurl` and `libxml` libraries too with the `deps` parameter.
 
-<div class="language-r highlighter-rouge"><pre class="highlight"><code><span class="n">do_droplets_destroy</span><span class="p">(</span><span class="n">res</span><span class="o">$</span><span class="n">droplet</span><span class="o">$</span><span class="n">id</span><span class="p">)</span><span class="w">
-</span></code></pre>
-</div>
+When you're done, you can destroy your droplet from R too
 
-<div class="highlighter-rouge"><pre class="highlight"><code>## $status
+
+```r
+do_droplets_destroy(res$droplet$id)
+```
+
+```
+## $status
 ## [1] "OK"
 ## 
 ## $event_id
 ## [1] 25279124
-</code></pre>
-</div>
+```
 
-<p>Let me know if you have any thoughts :)</p>
+Let me know if you have any thoughts :)
 
   </div>
   
@@ -286,458 +672,148 @@
 
     <span class="post-date">22 May 2014</span>
 
-    <p>Someone asked about plotting something like this today</p>
-
-<p>I <a href="http://recology.info/2012/01/logistic-regression-barplot-fig/">wrote a few functions previously</a> to do something like this. However, since then <code class="highlighter-rouge">ggplot2</code> has changed, and one of the functions no longer works.</p>
-
-<p>Hence, I fixed <code class="highlighter-rouge">opts()</code> to <code class="highlighter-rouge">theme()</code>, <code class="highlighter-rouge">theme_blank()</code> to <code class="highlighter-rouge">element_blank()</code>, and <code class="highlighter-rouge">panel.background = element_blank()</code> to <code class="highlighter-rouge">plot.background = element_blank()</code> to get the histograms to show up with the line plot and not cover it.</p>
-
-<p>The new functions:</p>
-
-<div class="language-r highlighter-rouge"><pre class="highlight"><code><span class="n">loghistplot</span><span class="w">  </span><span class="o">&lt;-</span><span class="w"> </span><span class="k">function</span><span class="p">(</span><span class="n">data</span><span class="p">)</span><span class="w"> </span><span class="p">{</span><span class="w">
-  </span><span class="nf">names</span><span class="p">(</span><span class="n">data</span><span class="p">)</span><span class="w"> </span><span class="o">&lt;-</span><span class="w"> </span><span class="nf">c</span><span class="p">(</span><span class="s1">'x'</span><span class="p">,</span><span class="s1">'y'</span><span class="p">)</span><span class="w"> </span><span class="c1"># rename columns
-</span><span class="w">
-  </span><span class="c1"># get min and max axis values
-</span><span class="w">  </span><span class="n">min_x</span><span class="w"> </span><span class="o">&lt;-</span><span class="w"> </span><span class="nf">min</span><span class="p">(</span><span class="n">data</span><span class="o">$</span><span class="n">x</span><span class="p">)</span><span class="w">
-  </span><span class="n">max_x</span><span class="w"> </span><span class="o">&lt;-</span><span class="w"> </span><span class="nf">max</span><span class="p">(</span><span class="n">data</span><span class="o">$</span><span class="n">x</span><span class="p">)</span><span class="w">
-  </span><span class="n">min_y</span><span class="w"> </span><span class="o">&lt;-</span><span class="w"> </span><span class="nf">min</span><span class="p">(</span><span class="n">data</span><span class="o">$</span><span class="n">y</span><span class="p">)</span><span class="w">
-  </span><span class="n">max_y</span><span class="w"> </span><span class="o">&lt;-</span><span class="w"> </span><span class="nf">max</span><span class="p">(</span><span class="n">data</span><span class="o">$</span><span class="n">y</span><span class="p">)</span><span class="w">
-
-  </span><span class="c1"># get bin numbers
-</span><span class="w">  </span><span class="n">bin_no</span><span class="w"> </span><span class="o">&lt;-</span><span class="w"> </span><span class="nf">max</span><span class="p">(</span><span class="n">hist</span><span class="p">(</span><span class="n">data</span><span class="o">$</span><span class="n">x</span><span class="p">,</span><span class="w"> </span><span class="n">plot</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="kc">FALSE</span><span class="p">)</span><span class="o">$</span><span class="n">counts</span><span class="p">)</span><span class="w"> </span><span class="o">+</span><span class="w"> </span><span class="m">5</span><span class="w">
-
-  </span><span class="c1"># create plots
-</span><span class="w">  </span><span class="n">a</span><span class="w"> </span><span class="o">&lt;-</span><span class="w"> </span><span class="n">ggplot</span><span class="p">(</span><span class="n">data</span><span class="p">,</span><span class="w"> </span><span class="n">aes</span><span class="p">(</span><span class="n">x</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">x</span><span class="p">,</span><span class="w"> </span><span class="n">y</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">y</span><span class="p">))</span><span class="w"> </span><span class="o">+</span><span class="w">
-    </span><span class="n">theme_bw</span><span class="p">(</span><span class="n">base_size</span><span class="o">=</span><span class="m">16</span><span class="p">)</span><span class="w"> </span><span class="o">+</span><span class="w">
-    </span><span class="n">geom_smooth</span><span class="p">(</span><span class="n">method</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"glm"</span><span class="p">,</span><span class="w"> </span><span class="n">family</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"binomial"</span><span class="p">,</span><span class="w"> </span><span class="n">se</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="kc">TRUE</span><span class="p">,</span><span class="w">
-                </span><span class="n">colour</span><span class="o">=</span><span class="s1">'black'</span><span class="p">,</span><span class="w"> </span><span class="n">size</span><span class="o">=</span><span class="m">1.5</span><span class="p">,</span><span class="w"> </span><span class="n">alpha</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="m">0.3</span><span class="p">)</span><span class="w"> </span><span class="o">+</span><span class="w">
-    </span><span class="n">scale_x_continuous</span><span class="p">(</span><span class="n">limits</span><span class="o">=</span><span class="nf">c</span><span class="p">(</span><span class="n">min_x</span><span class="p">,</span><span class="n">max_x</span><span class="p">))</span><span class="w"> </span><span class="o">+</span><span class="w">
-    </span><span class="n">theme</span><span class="p">(</span><span class="n">panel.grid.major</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">element_blank</span><span class="p">(),</span><span class="w">
-          </span><span class="n">panel.grid.minor</span><span class="o">=</span><span class="n">element_blank</span><span class="p">(),</span><span class="w">
-          </span><span class="n">panel.background</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">element_blank</span><span class="p">(),</span><span class="w">
-          </span><span class="n">plot.background</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">element_blank</span><span class="p">())</span><span class="w"> </span><span class="o">+</span><span class="w">
-    </span><span class="n">labs</span><span class="p">(</span><span class="n">y</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"Probability\n"</span><span class="p">,</span><span class="w"> </span><span class="n">x</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"\nYour X Variable"</span><span class="p">)</span><span class="w">
-
-  </span><span class="n">theme_loghist</span><span class="w"> </span><span class="o">&lt;-</span><span class="w"> </span><span class="nf">list</span><span class="p">(</span><span class="w">
-    </span><span class="n">theme</span><span class="p">(</span><span class="n">panel.grid.major</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">element_blank</span><span class="p">(),</span><span class="w">
-          </span><span class="n">panel.grid.minor</span><span class="o">=</span><span class="n">element_blank</span><span class="p">(),</span><span class="w">
-          </span><span class="n">axis.text.y</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">element_blank</span><span class="p">(),</span><span class="w">
-          </span><span class="n">axis.text.x</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">element_blank</span><span class="p">(),</span><span class="w">
-          </span><span class="n">axis.ticks</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">element_blank</span><span class="p">(),</span><span class="w">
-          </span><span class="n">panel.border</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">element_blank</span><span class="p">(),</span><span class="w">
-          </span><span class="n">panel.background</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">element_blank</span><span class="p">(),</span><span class="w">
-          </span><span class="n">plot.background</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">element_blank</span><span class="p">())</span><span class="w">
-  </span><span class="p">)</span><span class="w">
-
-  </span><span class="n">b</span><span class="w"> </span><span class="o">&lt;-</span><span class="w">
-  </span><span class="n">ggplot</span><span class="p">(</span><span class="n">data</span><span class="p">[</span><span class="n">data</span><span class="o">$</span><span class="n">y</span><span class="w"> </span><span class="o">==</span><span class="w"> </span><span class="n">unique</span><span class="p">(</span><span class="n">data</span><span class="o">$</span><span class="n">y</span><span class="p">)[</span><span class="m">1</span><span class="p">],</span><span class="w"> </span><span class="p">],</span><span class="w"> </span><span class="n">aes</span><span class="p">(</span><span class="n">x</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">x</span><span class="p">))</span><span class="w"> </span><span class="o">+</span><span class="w">
-    </span><span class="n">theme_bw</span><span class="p">(</span><span class="n">base_size</span><span class="o">=</span><span class="m">16</span><span class="p">)</span><span class="w"> </span><span class="o">+</span><span class="w">
-    </span><span class="n">geom_histogram</span><span class="p">(</span><span class="n">fill</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"grey"</span><span class="p">)</span><span class="w"> </span><span class="o">+</span><span class="w">
-    </span><span class="n">scale_y_continuous</span><span class="p">(</span><span class="n">limits</span><span class="o">=</span><span class="nf">c</span><span class="p">(</span><span class="m">0</span><span class="p">,</span><span class="n">bin_no</span><span class="p">))</span><span class="w"> </span><span class="o">+</span><span class="w">
-    </span><span class="n">scale_x_continuous</span><span class="p">(</span><span class="n">limits</span><span class="o">=</span><span class="nf">c</span><span class="p">(</span><span class="n">min_x</span><span class="p">,</span><span class="n">max_x</span><span class="p">))</span><span class="w"> </span><span class="o">+</span><span class="w">
-    </span><span class="n">theme_loghist</span><span class="w"> </span><span class="o">+</span><span class="w">
-    </span><span class="n">labs</span><span class="p">(</span><span class="n">y</span><span class="o">=</span><span class="s1">'\n'</span><span class="p">,</span><span class="w"> </span><span class="n">x</span><span class="o">=</span><span class="s1">'\n'</span><span class="p">)</span><span class="w">
-
-  </span><span class="n">c</span><span class="w"> </span><span class="o">&lt;-</span><span class="w"> </span><span class="n">ggplot</span><span class="p">(</span><span class="n">data</span><span class="p">[</span><span class="n">data</span><span class="o">$</span><span class="n">y</span><span class="w"> </span><span class="o">==</span><span class="w"> </span><span class="n">unique</span><span class="p">(</span><span class="n">data</span><span class="o">$</span><span class="n">y</span><span class="p">)[</span><span class="m">2</span><span class="p">],</span><span class="w"> </span><span class="p">],</span><span class="w"> </span><span class="n">aes</span><span class="p">(</span><span class="n">x</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">x</span><span class="p">))</span><span class="w"> </span><span class="o">+</span><span class="w">
-    </span><span class="n">theme_bw</span><span class="p">(</span><span class="n">base_size</span><span class="o">=</span><span class="m">16</span><span class="p">)</span><span class="w"> </span><span class="o">+</span><span class="w">
-    </span><span class="n">geom_histogram</span><span class="p">(</span><span class="n">fill</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"grey"</span><span class="p">)</span><span class="w"> </span><span class="o">+</span><span class="w">
-    </span><span class="n">scale_y_continuous</span><span class="p">(</span><span class="n">trans</span><span class="o">=</span><span class="s1">'reverse'</span><span class="p">,</span><span class="w"> </span><span class="n">limits</span><span class="o">=</span><span class="nf">c</span><span class="p">(</span><span class="n">bin_no</span><span class="p">,</span><span class="m">0</span><span class="p">))</span><span class="w"> </span><span class="o">+</span><span class="w">
-    </span><span class="n">scale_x_continuous</span><span class="p">(</span><span class="n">limits</span><span class="o">=</span><span class="nf">c</span><span class="p">(</span><span class="n">min_x</span><span class="p">,</span><span class="n">max_x</span><span class="p">))</span><span class="w"> </span><span class="o">+</span><span class="w">
-    </span><span class="n">theme_loghist</span><span class="w"> </span><span class="o">+</span><span class="w">
-    </span><span class="n">labs</span><span class="p">(</span><span class="n">y</span><span class="o">=</span><span class="s1">'\n'</span><span class="p">,</span><span class="w"> </span><span class="n">x</span><span class="o">=</span><span class="s1">'\n'</span><span class="p">)</span><span class="w">
-
-  </span><span class="n">grid.newpage</span><span class="p">()</span><span class="w">
-  </span><span class="n">pushViewport</span><span class="p">(</span><span class="n">viewport</span><span class="p">(</span><span class="n">layout</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">grid.layout</span><span class="p">(</span><span class="m">1</span><span class="p">,</span><span class="m">1</span><span class="p">)))</span><span class="w">
-
-  </span><span class="n">vpa_</span><span class="w"> </span><span class="o">&lt;-</span><span class="w"> </span><span class="n">viewport</span><span class="p">(</span><span class="n">width</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="m">1</span><span class="p">,</span><span class="w"> </span><span class="n">height</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="m">1</span><span class="p">,</span><span class="w"> </span><span class="n">x</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="m">0.5</span><span class="p">,</span><span class="w"> </span><span class="n">y</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="m">0.5</span><span class="p">)</span><span class="w">
-  </span><span class="n">vpb_</span><span class="w"> </span><span class="o">&lt;-</span><span class="w"> </span><span class="n">viewport</span><span class="p">(</span><span class="n">width</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="m">1</span><span class="p">,</span><span class="w"> </span><span class="n">height</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="m">1</span><span class="p">,</span><span class="w"> </span><span class="n">x</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="m">0.5</span><span class="p">,</span><span class="w"> </span><span class="n">y</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="m">0.5</span><span class="p">)</span><span class="w">
-  </span><span class="n">vpc_</span><span class="w"> </span><span class="o">&lt;-</span><span class="w"> </span><span class="n">viewport</span><span class="p">(</span><span class="n">width</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="m">1</span><span class="p">,</span><span class="w"> </span><span class="n">height</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="m">1</span><span class="p">,</span><span class="w"> </span><span class="n">x</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="m">0.5</span><span class="p">,</span><span class="w"> </span><span class="n">y</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="m">0.5</span><span class="p">)</span><span class="w">
-
-  </span><span class="n">print</span><span class="p">(</span><span class="n">b</span><span class="p">,</span><span class="w"> </span><span class="n">vp</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">vpb_</span><span class="p">)</span><span class="w">
-  </span><span class="n">print</span><span class="p">(</span><span class="n">c</span><span class="p">,</span><span class="w"> </span><span class="n">vp</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">vpc_</span><span class="p">)</span><span class="w">
-  </span><span class="n">print</span><span class="p">(</span><span class="n">a</span><span class="p">,</span><span class="w"> </span><span class="n">vp</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">vpa_</span><span class="p">)</span><span class="w">
-</span><span class="p">}</span><span class="w">
-</span></code></pre>
-</div>
-
-<div class="language-r highlighter-rouge"><pre class="highlight"><code><span class="n">logpointplot</span><span class="w">  </span><span class="o">&lt;-</span><span class="w"> </span><span class="k">function</span><span class="p">(</span><span class="n">data</span><span class="p">)</span><span class="w"> </span><span class="p">{</span><span class="w">
-  </span><span class="nf">names</span><span class="p">(</span><span class="n">data</span><span class="p">)</span><span class="w"> </span><span class="o">&lt;-</span><span class="w"> </span><span class="nf">c</span><span class="p">(</span><span class="s1">'x'</span><span class="p">,</span><span class="s1">'y'</span><span class="p">)</span><span class="w"> </span><span class="c1"># rename columns
-</span><span class="w">
-  </span><span class="c1"># get min and max axis values
-</span><span class="w">  </span><span class="n">min_x</span><span class="w"> </span><span class="o">&lt;-</span><span class="w"> </span><span class="nf">min</span><span class="p">(</span><span class="n">data</span><span class="o">$</span><span class="n">x</span><span class="p">)</span><span class="w">
-  </span><span class="n">max_x</span><span class="w"> </span><span class="o">&lt;-</span><span class="w"> </span><span class="nf">max</span><span class="p">(</span><span class="n">data</span><span class="o">$</span><span class="n">x</span><span class="p">)</span><span class="w">
-  </span><span class="n">min_y</span><span class="w"> </span><span class="o">&lt;-</span><span class="w"> </span><span class="nf">min</span><span class="p">(</span><span class="n">data</span><span class="o">$</span><span class="n">y</span><span class="p">)</span><span class="w">
-  </span><span class="n">max_y</span><span class="w"> </span><span class="o">&lt;-</span><span class="w"> </span><span class="nf">max</span><span class="p">(</span><span class="n">data</span><span class="o">$</span><span class="n">y</span><span class="p">)</span><span class="w">
-
-  </span><span class="c1"># create plots
-</span><span class="w">  </span><span class="n">ggplot</span><span class="p">(</span><span class="n">data</span><span class="p">,</span><span class="w"> </span><span class="n">aes</span><span class="p">(</span><span class="n">x</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">x</span><span class="p">,</span><span class="w"> </span><span class="n">y</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">y</span><span class="p">))</span><span class="w"> </span><span class="o">+</span><span class="w">
-    </span><span class="n">theme_bw</span><span class="p">(</span><span class="n">base_size</span><span class="o">=</span><span class="m">16</span><span class="p">)</span><span class="w"> </span><span class="o">+</span><span class="w">
-    </span><span class="n">geom_point</span><span class="p">(</span><span class="n">size</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="m">3</span><span class="p">,</span><span class="w"> </span><span class="n">alpha</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="m">0.5</span><span class="p">,</span><span class="w"> </span><span class="n">position</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">position_jitter</span><span class="p">(</span><span class="n">w</span><span class="o">=</span><span class="m">0</span><span class="p">,</span><span class="w"> </span><span class="n">h</span><span class="o">=</span><span class="m">0.02</span><span class="p">))</span><span class="w"> </span><span class="o">+</span><span class="w">
-    </span><span class="n">geom_smooth</span><span class="p">(</span><span class="n">method</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"glm"</span><span class="p">,</span><span class="w"> </span><span class="n">family</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"binomial"</span><span class="p">,</span><span class="w"> </span><span class="n">se</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="kc">TRUE</span><span class="p">,</span><span class="w">
-                </span><span class="n">colour</span><span class="o">=</span><span class="s1">'black'</span><span class="p">,</span><span class="w"> </span><span class="n">size</span><span class="o">=</span><span class="m">1.5</span><span class="p">,</span><span class="w"> </span><span class="n">alpha</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="m">0.3</span><span class="p">)</span><span class="w"> </span><span class="o">+</span><span class="w">
-    </span><span class="n">scale_x_continuous</span><span class="p">(</span><span class="n">limits</span><span class="o">=</span><span class="nf">c</span><span class="p">(</span><span class="n">min_x</span><span class="p">,</span><span class="n">max_x</span><span class="p">))</span><span class="w"> </span><span class="o">+</span><span class="w">
-    </span><span class="n">theme</span><span class="p">(</span><span class="n">panel.grid.major</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">element_blank</span><span class="p">(),</span><span class="w">
-          </span><span class="n">panel.grid.minor</span><span class="o">=</span><span class="n">element_blank</span><span class="p">(),</span><span class="w">
-          </span><span class="n">panel.background</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">element_blank</span><span class="p">())</span><span class="w"> </span><span class="o">+</span><span class="w">
-    </span><span class="n">labs</span><span class="p">(</span><span class="n">y</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"Probability\n"</span><span class="p">,</span><span class="w"> </span><span class="n">x</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"\nYour X Variable"</span><span class="p">)</span><span class="w">
-
-</span><span class="p">}</span><span class="w">
-</span></code></pre>
-</div>
-
-<p>Install <code class="highlighter-rouge">ggplot2</code> and <code class="highlighter-rouge">gridExtra</code> if you don’t have them:</p>
-
-<div class="language-r highlighter-rouge"><pre class="highlight"><code><span class="n">install.packages</span><span class="p">(</span><span class="nf">c</span><span class="p">(</span><span class="s2">"ggplot2"</span><span class="p">,</span><span class="s2">"gridExtra"</span><span class="p">),</span><span class="w"> </span><span class="n">repos</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"http://cran.rstudio.com"</span><span class="p">)</span><span class="w">
-</span></code></pre>
-</div>
+    Someone asked about plotting something like this today
+
+I [wrote a few functions previously](http://recology.info/2012/01/logistic-regression-barplot-fig/) to do something like this. However, since then `ggplot2` has changed, and one of the functions no longer works.
+
+Hence, I fixed `opts()` to `theme()`, `theme_blank()` to `element_blank()`, and `panel.background = element_blank()` to `plot.background = element_blank()` to get the histograms to show up with the line plot and not cover it.
+
+The new functions:
+
+
+```r
+loghistplot  <- function(data) {
+  names(data) <- c('x','y') # rename columns
+
+  # get min and max axis values
+  min_x <- min(data$x)
+  max_x <- max(data$x)
+  min_y <- min(data$y)
+  max_y <- max(data$y)
+
+  # get bin numbers
+  bin_no <- max(hist(data$x, plot = FALSE)$counts) + 5
+
+  # create plots
+  a <- ggplot(data, aes(x = x, y = y)) +
+    theme_bw(base_size=16) +
+    geom_smooth(method = "glm", family = "binomial", se = TRUE,
+                colour='black', size=1.5, alpha = 0.3) +
+    scale_x_continuous(limits=c(min_x,max_x)) +
+    theme(panel.grid.major = element_blank(),
+          panel.grid.minor=element_blank(),
+          panel.background = element_blank(),
+          plot.background = element_blank()) +
+    labs(y = "Probability\n", x = "\nYour X Variable")
 
-<p>And their use:</p>
+  theme_loghist <- list(
+    theme(panel.grid.major = element_blank(),
+          panel.grid.minor=element_blank(),
+          axis.text.y = element_blank(),
+          axis.text.x = element_blank(),
+          axis.ticks = element_blank(),
+          panel.border = element_blank(),
+          panel.background = element_blank(),
+          plot.background = element_blank())
+  )
 
-<p><strong>Logistic histogram plots</strong></p>
+  b <-
+  ggplot(data[data$y == unique(data$y)[1], ], aes(x = x)) +
+    theme_bw(base_size=16) +
+    geom_histogram(fill = "grey") +
+    scale_y_continuous(limits=c(0,bin_no)) +
+    scale_x_continuous(limits=c(min_x,max_x)) +
+    theme_loghist +
+    labs(y='\n', x='\n')
 
-<div class="language-r highlighter-rouge"><pre class="highlight"><code><span class="n">loghistplot</span><span class="p">(</span><span class="n">data</span><span class="o">=</span><span class="n">mtcars</span><span class="p">[,</span><span class="nf">c</span><span class="p">(</span><span class="s2">"mpg"</span><span class="p">,</span><span class="s2">"vs"</span><span class="p">)])</span><span class="w">
-</span></code></pre>
-</div>
+  c <- ggplot(data[data$y == unique(data$y)[2], ], aes(x = x)) +
+    theme_bw(base_size=16) +
+    geom_histogram(fill = "grey") +
+    scale_y_continuous(trans='reverse', limits=c(bin_no,0)) +
+    scale_x_continuous(limits=c(min_x,max_x)) +
+    theme_loghist +
+    labs(y='\n', x='\n')
 
-<p><img src="/public/img/2014-05-22-logplotreboot/unnamed-chunk-5.png" alt="plot of chunk unnamed-chunk-5" /></p>
+  grid.newpage()
+  pushViewport(viewport(layout = grid.layout(1,1)))
 
-<div class="language-r highlighter-rouge"><pre class="highlight"><code><span class="n">loghistplot</span><span class="p">(</span><span class="n">movies</span><span class="p">[,</span><span class="nf">c</span><span class="p">(</span><span class="s2">"rating"</span><span class="p">,</span><span class="s2">"Action"</span><span class="p">)])</span><span class="w">
-</span></code></pre>
-</div>
+  vpa_ <- viewport(width = 1, height = 1, x = 0.5, y = 0.5)
+  vpb_ <- viewport(width = 1, height = 1, x = 0.5, y = 0.5)
+  vpc_ <- viewport(width = 1, height = 1, x = 0.5, y = 0.5)
 
-<p><img src="/public/img/2014-05-22-logplotreboot/unnamed-chunk-6.png" alt="plot of chunk unnamed-chunk-6" /></p>
+  print(b, vp = vpb_)
+  print(c, vp = vpc_)
+  print(a, vp = vpa_)
+}
+```
 
-<p><strong>Logistic point plots</strong></p>
 
-<div class="language-r highlighter-rouge"><pre class="highlight"><code><span class="n">loghistplot</span><span class="p">(</span><span class="n">data</span><span class="o">=</span><span class="n">mtcars</span><span class="p">[,</span><span class="nf">c</span><span class="p">(</span><span class="s2">"mpg"</span><span class="p">,</span><span class="s2">"vs"</span><span class="p">)])</span><span class="w">
-</span></code></pre>
-</div>
+```r
+logpointplot  <- function(data) {
+  names(data) <- c('x','y') # rename columns
 
-<p><img src="/public/img/2014-05-22-logplotreboot/unnamed-chunk-7.png" alt="plot of chunk unnamed-chunk-7" /></p>
+  # get min and max axis values
+  min_x <- min(data$x)
+  max_x <- max(data$x)
+  min_y <- min(data$y)
+  max_y <- max(data$y)
 
-<div class="language-r highlighter-rouge"><pre class="highlight"><code><span class="n">loghistplot</span><span class="p">(</span><span class="n">movies</span><span class="p">[,</span><span class="nf">c</span><span class="p">(</span><span class="s2">"rating"</span><span class="p">,</span><span class="s2">"Action"</span><span class="p">)])</span><span class="w">
-</span></code></pre>
-</div>
+  # create plots
+  ggplot(data, aes(x = x, y = y)) +
+    theme_bw(base_size=16) +
+    geom_point(size = 3, alpha = 0.5, position = position_jitter(w=0, h=0.02)) +
+    geom_smooth(method = "glm", family = "binomial", se = TRUE,
+                colour='black', size=1.5, alpha = 0.3) +
+    scale_x_continuous(limits=c(min_x,max_x)) +
+    theme(panel.grid.major = element_blank(),
+          panel.grid.minor=element_blank(),
+          panel.background = element_blank()) +
+    labs(y = "Probability\n", x = "\nYour X Variable")
 
-<p><img src="/public/img/2014-05-22-logplotreboot/unnamed-chunk-8.png" alt="plot of chunk unnamed-chunk-8" /></p>
+}
+```
 
-  </div>
-  
-  <div class="post">
-    <h1>
-      <a href="/2014/02/cowsay/">
-        cowsay - ascii messages and warnings for R
-      </a>
-    </h1>
+Install `ggplot2` and `gridExtra` if you don't have them:
 
-    <span class="post-date">20 Feb 2014</span>
 
-    <h2 id="the-history">The history</h2>
+```r
+install.packages(c("ggplot2","gridExtra"), repos = "http://cran.rstudio.com")
+```
 
-<p>Cowsay is a terminal program that generates ascii pictures of a cow saying what you tell the cow to say in a bubble. See the Wikipedia page for more information: <a href="http://en.wikipedia.org/wiki/Cowsay">http://en.wikipedia.org/wiki/Cowsay</a>.</p>
+And their use:
 
-<p>Install cowsay to use in your terminal (on OSX):</p>
+__Logistic histogram plots__
 
-<div class="highlighter-rouge"><pre class="highlight"><code>brew update
-brew install cowsay
-</code></pre>
-</div>
 
-<p>Type <code class="highlighter-rouge">cowsay hello world!</code>, and you get:</p>
+```r
+loghistplot(data=mtcars[,c("mpg","vs")])
+```
 
-<div class="highlighter-rouge"><pre class="highlight"><code> ______________
-&lt; hello world! &gt;
- --------------
-        \   ^__^
-         \  (oo)\_______
-            (__)\       )\/\
-                ||----w |
-                ||     ||
-</code></pre>
-</div>
-
-<p>Optionally, you can install <a href="http://en.wikipedia.org/wiki/Fortune_(Unix)">fortune</a> to get pseudorandom messages from a database of quotations. On OSX do <code class="highlighter-rouge">brew install fortune</code>, then you can pipe a fortune quote to <code class="highlighter-rouge">cowsay</code>:</p>
-
-<div class="highlighter-rouge"><pre class="highlight"><code>fortune | cowsay
-</code></pre>
-</div>
-
-<p>And get something like:</p>
-
-<div class="highlighter-rouge"><pre class="highlight"><code> ______________________________________
-/ "To take a significant step forward, \
-| you must make a series of finite     |
-| improvements." -- Donald J. Atwood,  |
-\ General Motors                       /
- --------------------------------------
-        \   ^__^
-         \  (oo)\_______
-            (__)\       )\/\
-                ||----w |
-                ||     ||
-</code></pre>
-</div>
-
-<p>You can also get different animals. Try <code class="highlighter-rouge">cowsay -f tux &lt;yourmessage&gt;</code></p>
-
-<h2 id="cowsay-in-r">Cowsay in R</h2>
-
-<p>Why cowsay for R?  Why not. You never know what you will learn in fun side projects. Basically, this cowsay R package we are making prints messages that you pass to the function <code class="highlighter-rouge">say</code>.  There are three arguments to the <code class="highlighter-rouge">say</code> function:</p>
-
-<ul>
-  <li><strong>what</strong>: What do you want to say?  You can pass it a custom message, anything you want, like <em>what’s up</em>, or <em>howdy!</em>. You can also get R’s version of fortunes, quotes about R. Just pass the exact term <em>forture</em>. If you want a fact about cats from the <a href="http://catfacts-api.appspot.com/">Cat Facts API</a>, pass in <em>catfact</em>. Last, you can get the current time by passing <em>time</em> to this parameter.</li>
-  <li><strong>by</strong>: Type of animal, one of cow, chicken, poop, cat, ant, pumpkin, ghost, spider, rabbit, pig, snowman, or frog. If you want more animals, send a pull request, or ask and at some point it will be added.</li>
-  <li><strong>type</strong>: One of message (default), warning, or string (returns string). You could use string to pass into other functions, etc., instead of printing a warning or message.</li>
-</ul>
-
-<p>There are three other contributors so far (a big thanks to them):</p>
-
-<ul>
-  <li>Tyler Rinker</li>
-  <li>Thomas Leeper</li>
-  <li>Noam Ross</li>
-</ul>
-
-<h3 id="installation">Installation</h3>
-
-<div class="language-r highlighter-rouge"><pre class="highlight"><code><span class="n">library</span><span class="p">(</span><span class="n">devtools</span><span class="p">)</span><span class="w">
-</span><span class="n">install_github</span><span class="p">(</span><span class="s2">"cowsay"</span><span class="p">,</span><span class="w"> </span><span class="s2">"sckott"</span><span class="p">)</span><span class="w">
-</span></code></pre>
-</div>
-
-<div class="language-r highlighter-rouge"><pre class="highlight"><code><span class="n">library</span><span class="p">(</span><span class="n">cowsay</span><span class="p">)</span><span class="w">
-</span></code></pre>
-</div>
-
-<p>p.s. or <code class="highlighter-rouge">install_github("sckott/cowsay")</code> if you have a newer version of devtools</p>
-
-<h3 id="get-time">Get time</h3>
-
-<div class="language-r highlighter-rouge"><pre class="highlight"><code><span class="n">say</span><span class="p">(</span><span class="s2">"time"</span><span class="p">)</span><span class="w">
-</span></code></pre>
-</div>
-
-<div class="highlighter-rouge"><pre class="highlight"><code>
- ----- 
- 2014-02-20 14:15:35 
- ------ 
-    \   ^__^ 
-     \  (oo)\ ________ 
-        (__)\         )\ /\ 
-             ||------w|
-             ||      ||
-</code></pre>
-</div>
-
-<div class="language-r highlighter-rouge"><pre class="highlight"><code><span class="n">say</span><span class="p">(</span><span class="s2">"time"</span><span class="p">,</span><span class="w"> </span><span class="s2">"chicken"</span><span class="p">)</span><span class="w">
-</span></code></pre>
-</div>
-
-<div class="highlighter-rouge"><pre class="highlight"><code>
-
- ----- 
- 2014-02-20 14:15:35 
- ------ 
-    \   
-     \  
-         _
-       _/ }
-      `&gt;' \
-      `|   \
-       |   /'-.     .-.
-        \'     ';`--' .'
-         \'.    `'-./
-          '.`-..-;`
-            `;-..'
-            _| _|
-            /` /`
-  
-</code></pre>
-</div>
-
-<h3 id="vary-type-of-output-default-calls-message">Vary type of output, default calls message</h3>
-
-<div class="language-r highlighter-rouge"><pre class="highlight"><code><span class="n">say</span><span class="p">(</span><span class="s2">"hello world"</span><span class="p">)</span><span class="w">
-</span></code></pre>
-</div>
-
-<div class="highlighter-rouge"><pre class="highlight"><code>
- ----- 
- hello world 
- ------ 
-    \   ^__^ 
-     \  (oo)\ ________ 
-        (__)\         )\ /\ 
-             ||------w|
-             ||      ||
-</code></pre>
-</div>
-
-<div class="language-r highlighter-rouge"><pre class="highlight"><code><span class="n">say</span><span class="p">(</span><span class="s2">"hello world"</span><span class="p">,</span><span class="w"> </span><span class="n">type</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"warning"</span><span class="p">)</span><span class="w">
-</span></code></pre>
-</div>
-
-<div class="highlighter-rouge"><pre class="highlight"><code>Warning: 
- ----- 
- hello world 
- ------ 
-    \   ^__^ 
-     \  (oo)\ ________ 
-        (__)\         )\ /\ 
-             ||------w|
-             ||      ||
-</code></pre>
-</div>
-
-<div class="language-r highlighter-rouge"><pre class="highlight"><code><span class="n">say</span><span class="p">(</span><span class="s2">"hello world"</span><span class="p">,</span><span class="w"> </span><span class="n">type</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"string"</span><span class="p">)</span><span class="w">
-</span></code></pre>
-</div>
-
-<div class="highlighter-rouge"><pre class="highlight"><code>[1] "\n ----- \n hello world \n ------ \n    \\   ^__^ \n     \\  (oo)\\ ________ \n        (__)\\         )\\ /\\ \n             ||------w|\n             ||      ||"
-</code></pre>
-</div>
-
-<h3 id="catfacts">Catfacts!!!!</h3>
-
-<p>From the <a href="http://catfacts-api.appspot.com/">catfacts API</a>, we can get random cat facts. If you put in <em>catfact</em> you by default get a cat saying it.</p>
-
-<div class="language-r highlighter-rouge"><pre class="highlight"><code><span class="n">say</span><span class="p">(</span><span class="s2">"catfact"</span><span class="p">,</span><span class="w"> </span><span class="s2">"cat"</span><span class="p">)</span><span class="w">
-</span></code></pre>
-</div>
-
-<div class="highlighter-rouge"><pre class="highlight"><code>
-
- ----- 
- Neutering a cat extends its life span by two or three years. 
- ------ 
-    \   
-     \  
-               \`*-.
-                 )  _`-.                 
-                .  : `. .                
-                : _   '                 
-                ; *` _.   `*-._          
-                `-.-'          `-.       
-                  ;       `       `.     
-                  :.       .       \
-                  .\  .   :   .-'   .   
-                  '  `+.;  ;  '      :   
-                  :  '  |    ;       ;-. 
-                  ; '   : :`-:     _.`* ;
-               .*' /  .*' ; .*`- +'  `*' 
-               `*-*   `*-*  `*-*'        
-    
-</code></pre>
-</div>
-
-<h3 id="r-fortunes">R fortunes</h3>
-
-<div class="language-r highlighter-rouge"><pre class="highlight"><code><span class="n">say</span><span class="p">(</span><span class="s2">"fortune"</span><span class="p">)</span><span class="w">
-</span></code></pre>
-</div>
-
-<div class="highlighter-rouge"><pre class="highlight"><code>
- ----- 
- If I were to be treated by a cure created by stepwise regression, I would prefer voodoo.
- Dieter Menne
- in a thread about regressions with many variables
- R-help
- October 2009 
- ------ 
-    \   ^__^ 
-     \  (oo)\ ________ 
-        (__)\         )\ /\ 
-             ||------w|
-             ||      ||
-</code></pre>
-</div>
-
-<div class="language-r highlighter-rouge"><pre class="highlight"><code><span class="n">say</span><span class="p">(</span><span class="s2">"fortune"</span><span class="p">,</span><span class="w"> </span><span class="s2">"pig"</span><span class="p">)</span><span class="w">
-</span></code></pre>
-</div>
-
-<div class="highlighter-rouge"><pre class="highlight"><code>
-
- ----- 
- Cross posting is sociopathic.
- Roger Koenker
- NA
- R-help
- November 2008 
- ------ 
-    \   
-     \  
-       _//| .-~~~-.
-     _/oo  }       }-@
-    ('')_  }       |
-     `--'| { }--{  }
-          //_/  /_/
-  
-</code></pre>
-</div>
-
-<h3 id="incorporate-into-a-function">Incorporate into a function</h3>
-
-<p>Define a function</p>
-
-<div class="language-r highlighter-rouge"><pre class="highlight"><code><span class="n">foo</span><span class="w"> </span><span class="o">&lt;-</span><span class="w"> </span><span class="k">function</span><span class="p">(</span><span class="n">x</span><span class="p">)</span><span class="w"> </span><span class="p">{</span><span class="w">
-    </span><span class="k">if</span><span class="w"> </span><span class="p">(</span><span class="n">x</span><span class="w"> </span><span class="o">&lt;</span><span class="w"> </span><span class="m">5</span><span class="p">)</span><span class="w"> 
-        </span><span class="n">say</span><span class="p">(</span><span class="s2">"woops, x should be 5 or greater"</span><span class="p">)</span><span class="w">
-</span><span class="p">}</span><span class="w">
-</span></code></pre>
-</div>
-
-<p>Call the function, with an error on purpose</p>
-
-<div class="language-r highlighter-rouge"><pre class="highlight"><code><span class="n">foo</span><span class="p">(</span><span class="m">3</span><span class="p">)</span><span class="w">
-</span></code></pre>
-</div>
-
-<div class="highlighter-rouge"><pre class="highlight"><code>
- ----- 
- woops, x should be 5 or greater 
- ------ 
-    \   ^__^ 
-     \  (oo)\ ________ 
-        (__)\         )\ /\ 
-             ||------w|
-             ||      ||
-</code></pre>
-</div>
-
-<p>Or capture a warning or message and pass to the <code class="highlighter-rouge">say</code> function</p>
-
-<div class="language-r highlighter-rouge"><pre class="highlight"><code><span class="n">foo2</span><span class="w"> </span><span class="o">&lt;-</span><span class="w"> </span><span class="k">function</span><span class="p">(</span><span class="n">x</span><span class="p">)</span><span class="w"> </span><span class="p">{</span><span class="w">
-    </span><span class="n">err</span><span class="w"> </span><span class="o">&lt;-</span><span class="w"> </span><span class="n">tryCatch</span><span class="p">(</span><span class="n">x</span><span class="o">^</span><span class="m">2</span><span class="p">,</span><span class="w"> </span><span class="n">error</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="k">function</span><span class="p">(</span><span class="n">e</span><span class="p">)</span><span class="w"> </span><span class="n">e</span><span class="p">)</span><span class="w">
-    </span><span class="n">say</span><span class="p">(</span><span class="n">err</span><span class="o">$</span><span class="n">message</span><span class="p">,</span><span class="w"> </span><span class="s2">"frog"</span><span class="p">)</span><span class="w">
-</span><span class="p">}</span><span class="w">
-</span></code></pre>
-</div>
-
-<p>Then call the function</p>
-
-<div class="language-r highlighter-rouge"><pre class="highlight"><code><span class="n">foo2</span><span class="p">(</span><span class="s2">"hello"</span><span class="p">)</span><span class="w">
-</span></code></pre>
-</div>
-
-<div class="highlighter-rouge"><pre class="highlight"><code>
-
- ----- 
- non-numeric argument to binary operator 
- ------ 
-    \   
-     \  
-        (.)_(.)
-     _ (   _   ) _
-    / \/`-----'\/ \
-  __\ ( (     ) ) /__
-  )   /\ \._./ /\   (
-   )_/ /|\   /|\ \_(
-  
-</code></pre>
-</div>
-
-<p>Awesome. Much better to have an error message from a frog than just the harsh console alone :)</p>
+![plot of chunk unnamed-chunk-5](/public/img/2014-05-22-logplotreboot/unnamed-chunk-5.png)
+
+
+```r
+loghistplot(movies[,c("rating","Action")])
+```
+
+![plot of chunk unnamed-chunk-6](/public/img/2014-05-22-logplotreboot/unnamed-chunk-6.png)
+
+
+__Logistic point plots__
+
+
+```r
+loghistplot(data=mtcars[,c("mpg","vs")])
+```
+
+![plot of chunk unnamed-chunk-7](/public/img/2014-05-22-logplotreboot/unnamed-chunk-7.png)
+
+
+```r
+loghistplot(movies[,c("rating","Action")])
+```
+
+![plot of chunk unnamed-chunk-8](/public/img/2014-05-22-logplotreboot/unnamed-chunk-8.png)
 
   </div>
   

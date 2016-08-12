@@ -61,6 +61,455 @@
   
   <div class="post">
     <h1>
+      <a href="/2015/01/gistr-github-gists/">
+        gistr - R client for GitHub gists
+      </a>
+    </h1>
+
+    <span class="post-date">05 Jan 2015</span>
+
+    GitHub has this site [https://gist.github.com/](https://gist.github.com/) in which we can share code, text, images, maps, plots, etc super easily, without having to open up a repo, etc. GitHub gists are a great way to throw up an example use case to show someone, or show code that's throwing errors to a support person, etc. In addition, there's API access, which means we can interact with Gists not just from their web interface, but from the command line, or any programming language. There are clients for [Node.js](https://github.com/mbostock/gistup), [Ruby](https://rubygems.org/gems/gist), [Python](https://pypi.python.org/pypi/gists/0.4.6), and on and on. But AFAIK there wasn't one for R. Along with [Ramnath](https://github.com/ramnathv) and others, we've been working on an R client for gists. `v0.1` is [now on CRAN](http://cran.r-project.org/web/packages/gistr/index.html). Below is an overview. 
+
+One useful thing about this package in terms of other R packages is that you can now depend on `gistr` to easily share results as Gists. For example, you can share maps as gists (via geojson, rendered as interactive map), or code, or plots, etc. That is, you don't have to re-write an interface to Github Gists yourself. We plan on using `gistr` in a few rOpenSci packages. 
+
+## Installation
+
+## Installation
+
+Install from CRAN
+
+
+```r
+install.packages("gistr")
+```
+
+Or the development version from GitHub
+
+
+```r
+install.packages("devtools")
+devtools::install_github("ropensci/gistr")
+```
+
+
+```r
+library("gistr")
+```
+
+## Authentication
+
+There are two ways to authorise `gistr` to work with your GitHub account:
+
+* Generate a personal access token (PAT) at [https://help.github.com/articles/creating-an-access-token-for-command-line-use](https://help.github.com/articles/creating-an-access-token-for-command-line-use) and record it in the `GITHUB_PAT` envar.
+* Interactively login into your GitHub account and authorise with OAuth.
+
+Using the PAT is recommended.
+
+Using the `gist_auth()` function you can authenticate seperately first, or if you're not authenticated, this function will run internally with each functionn call. If you have a PAT, that will be used, if not, OAuth will be used.
+
+
+```r
+gist_auth()
+```
+
+## Workflow
+
+In `gistr` you can use pipes to pass outputs from one function to another. If you have used `dplyr` with pipes you can see the difference, and perhaps the utility, of this workflow over the traditional workflow in R. You can use a non-piping or a piping workflow with `gistr`. Examples below use a mix of both workflows. Here is an example of a piping wofklow (with some explanation):
+
+
+```r
+gists(what = "minepublic")[[6]] %>% # List my public gists, and index 1st
+  add_files("~/alm_othersources.md") %>% # Add new file to that gist
+  update() # update sends a PATCH command to Gists API to add file to your gist
+```
+
+And a non-piping workflow that does the same exact thing:
+
+
+```r
+g <- gists(what = "minepublic")[[1]]
+g <- add_files(g, "~/alm_othersources.md")
+update(g)
+```
+
+Or you could string them all together in one line (but it's rather difficult to follow what's going on because you have to read from the inside out)
+
+
+```r
+update(add_files(gists(what = "minepublic")[[1]], "~/alm_othersources.md"))
+```
+
+## Rate limit information
+
+
+```r
+rate_limit()
+#> Rate limit: 5000
+#> Remaining:  4948
+#> Resets in:  46 minutes
+```
+
+## List gists
+
+Limiting to a few results here to keep it brief
+
+
+```r
+gists(per_page = 2)
+#> [[1]]
+#> <gist>575fd0342ae15f89645f
+#>   URL: https://gist.github.com/575fd0342ae15f89645f
+#>   Description: Script to disable the mouse acceleration on Ubuntu (and probably also other distributions). Read the 'usage' section.
+#>   Public: TRUE
+#>   Created/Edited: 2015-01-04T17:41:49Z / 2015-01-04T17:41:50Z
+#>   Files: disable-mouse-accel.sh
+#> 
+#> [[2]]
+#> <gist>1ebff1af906f214f98cd
+#>   URL: https://gist.github.com/1ebff1af906f214f98cd
+#>   Description: Ladda
+#>   Public: TRUE
+#>   Created/Edited: 2015-01-04T17:41:45Z / 2015-01-04T17:41:45Z
+#>   Files: Ladda.markdown, index.html, script.js, style.css
+```
+
+Since a certain date/time
+
+
+```r
+gists(since='2014-05-26T00:00:00Z', per_page = 2)
+#> [[1]]
+#> <gist>575fd0342ae15f89645f
+#>   URL: https://gist.github.com/575fd0342ae15f89645f
+#>   Description: Script to disable the mouse acceleration on Ubuntu (and probably also other distributions). Read the 'usage' section.
+#>   Public: TRUE
+#>   Created/Edited: 2015-01-04T17:41:49Z / 2015-01-04T17:41:50Z
+#>   Files: disable-mouse-accel.sh
+#> 
+#> [[2]]
+#> <gist>1ebff1af906f214f98cd
+#>   URL: https://gist.github.com/1ebff1af906f214f98cd
+#>   Description: Ladda
+#>   Public: TRUE
+#>   Created/Edited: 2015-01-04T17:41:45Z / 2015-01-04T17:41:45Z
+#>   Files: Ladda.markdown, index.html, script.js, style.css
+```
+
+Request different types of gists, one of public, minepublic, mineall, or starred.
+
+
+```r
+gists('minepublic', per_page = 2)
+#> [[1]]
+#> <gist>588921d4111e00551bcf
+#>   URL: https://gist.github.com/588921d4111e00551bcf
+#>   Description: 
+#>   Public: TRUE
+#>   Created/Edited: 2015-01-04T17:33:47Z / 2015-01-04T17:33:56Z
+#>   Files: code.R
+#> 
+#> [[2]]
+#> <gist>54c0195ee8753c7aaf9f
+#>   URL: https://gist.github.com/54c0195ee8753c7aaf9f
+#>   Description: a new cool gist
+#>   Public: TRUE
+#>   Created/Edited: 2015-01-04T17:33:47Z / 2015-01-04T17:33:47Z
+#>   Files: stuff.md
+```
+
+
+## List a single gist
+
+
+```r
+gist(id = 'f1403260eb92f5dfa7e1')
+#> <gist>f1403260eb92f5dfa7e1
+#>   URL: https://gist.github.com/f1403260eb92f5dfa7e1
+#>   Description: Querying bitly from R 
+#>   Public: TRUE
+#>   Created/Edited: 2014-10-15T20:40:12Z / 2014-10-15T21:54:29Z
+#>   Files: bitly_r.md
+```
+
+## Create gist
+
+You can pass in files
+
+First, get a file to work with
+
+
+```r
+stuffpath <- system.file("examples", "stuff.md", package = "gistr")
+```
+
+
+```r
+gist_create(files=stuffpath, description='a new cool gist')
+```
+
+
+```r
+gist_create(files=stuffpath, description='a new cool gist', browse = FALSE)
+#> <gist>aa391404638f2f368b99
+#>   URL: https://gist.github.com/aa391404638f2f368b99
+#>   Description: a new cool gist
+#>   Public: TRUE
+#>   Created/Edited: 2015-01-04T17:42:37Z / 2015-01-04T17:42:37Z
+#>   Files: stuff.md
+```
+
+Or, wrap `gist_create()` around some code in your R session/IDE, like so, with just the function name, and a `{'` at the start and a `}'` at the end.
+
+
+```r
+gist_create(code={'
+x <- letters
+numbers <- runif(8)
+numbers
+
+[1] 0.3229318 0.5933054 0.7778408 0.3898947 0.1309717 0.7501378 0.3206379 0.3379005
+'}, browse=FALSE)
+#> <gist>85158117880f197df422
+#>   URL: https://gist.github.com/85158117880f197df422
+#>   Description: 
+#>   Public: TRUE
+#>   Created/Edited: 2015-01-04T17:42:37Z / 2015-01-04T17:42:37Z
+#>   Files: code.R
+```
+
+You can also knit an input file before posting as a gist:
+
+
+```r
+file <- system.file("examples", "stuff.Rmd", package = "gistr")
+gist_create(file, description='a new cool gist', knit=TRUE)
+#> <gist>4162b9c53479fbc298db
+#>   URL: https://gist.github.com/4162b9c53479fbc298db
+#>   Description: a new cool gist
+#>   Public: TRUE
+#>   Created/Edited: 2014-10-27T16:07:31Z / 2014-10-27T16:07:31Z
+#>   Files: stuff.md
+```
+
+Or code blocks before (note that code blocks without knitr block demarcations will result in unexecuted code):
+
+
+```r
+gist_create(code={'
+x <- letters
+(numbers <- runif(8))
+'}, knit=TRUE)
+#> <gist>ec45c396dee4aa492139
+#>   URL: https://gist.github.com/ec45c396dee4aa492139
+#>   Description:
+#>   Public: TRUE
+#>   Created/Edited: 2014-10-27T16:09:09Z / 2014-10-27T16:09:09Z
+#>   Files: file81720d1ceff.md
+```
+
+## knit code from file path, code block, or gist file
+
+knit a local file
+
+
+```r
+file <- system.file("examples", "stuff.Rmd", package = "gistr")
+run(file, knitopts = list(quiet=TRUE)) %>% gist_create(browse = FALSE)
+#> <gist>d5d86e11964c36cb4f1e
+#>   URL: https://gist.github.com/d5d86e11964c36cb4f1e
+#>   Description: 
+#>   Public: TRUE
+#>   Created/Edited: 2015-01-04T17:42:38Z / 2015-01-04T17:42:38Z
+#>   Files: stuff.md
+```
+
+
+
+knit a code block (`knitr` code block notation missing, do add that in) (result not shown)
+
+
+```r
+run({'
+x <- letters
+(numbers <- runif(8))
+'}) %>% gist_create
+```
+
+knit a file from a gist, has to get file first (result not shown)
+
+
+```r
+gists('minepublic')[[1]] %>% run() %>% update()
+```
+
+## List commits on a gist
+
+
+```r
+gists()[[1]] %>% commits()
+#> [[1]]
+#> <commit>
+#>   Version: faa7a40f4b55aa7914be7685c75d5c80731971bb
+#>   User: sckott
+#>   Commited: 2015-01-04T17:42:37Z
+#>   Commits [total, additions, deletions]: [5,5,0]
+```
+
+## Star a gist
+
+Star
+
+
+```r
+gist('7ddb9810fc99c84c65ec') %>% star()
+#> <gist>7ddb9810fc99c84c65ec
+#>   URL: https://gist.github.com/7ddb9810fc99c84c65ec
+#>   Description: 
+#>   Public: TRUE
+#>   Created/Edited: 2014-06-27T17:50:37Z / 2014-06-27T17:50:37Z
+#>   Files: code.R, manifest.yml, rrt_manifest.yml
+```
+
+Unstar
+
+
+```r
+gist('7ddb9810fc99c84c65ec') %>% unstar()
+#> <gist>7ddb9810fc99c84c65ec
+#>   URL: https://gist.github.com/7ddb9810fc99c84c65ec
+#>   Description: 
+#>   Public: TRUE
+#>   Created/Edited: 2014-06-27T17:50:37Z / 2014-06-27T17:50:37Z
+#>   Files: code.R, manifest.yml, rrt_manifest.yml
+```
+
+## Update a gist
+
+Add files
+
+First, path to file
+
+
+```r
+file <- system.file("examples", "alm_othersources.md", package = "gistr")
+```
+
+
+```r
+gists(what = "minepublic")[[1]] %>%
+  add_files(file) %>%
+  update()
+#> <gist>85158117880f197df422
+#>   URL: https://gist.github.com/85158117880f197df422
+#>   Description: 
+#>   Public: TRUE
+#>   Created/Edited: 2015-01-04T17:42:37Z / 2015-01-04T17:42:42Z
+#>   Files: alm_othersources.md, code.R
+```
+
+Delete files
+
+
+```r
+gists(what = "minepublic")[[1]] %>%
+  delete_files(file) %>%
+  update()
+#> <gist>85158117880f197df422
+#>   URL: https://gist.github.com/85158117880f197df422
+#>   Description: 
+#>   Public: TRUE
+#>   Created/Edited: 2015-01-04T17:42:37Z / 2015-01-04T17:42:42Z
+#>   Files: code.R
+```
+
+## Open a gist in your default browser
+
+
+```r
+gists()[[1]] %>% browse()
+```
+
+> Opens the gist in your default browser
+
+## Get embed script
+
+
+```r
+gists()[[1]] %>% embed()
+#> [1] "<script src=\"https://gist.github.com/sckott/85158117880f197df422.js\"></script>"
+```
+
+### List forks
+
+Returns a list of `gist` objects, just like `gists()`
+
+
+```r
+gist(id='1642874') %>% forks(per_page=2)
+#> [[1]]
+#> <gist>1642989
+#>   URL: https://gist.github.com/1642989
+#>   Description: Spline Transition
+#>   Public: TRUE
+#>   Created/Edited: 2012-01-19T21:45:20Z / 2014-12-10T03:25:19Z
+#>   Files: 
+#> 
+#> [[2]]
+#> <gist>1643051
+#>   URL: https://gist.github.com/1643051
+#>   Description: Line Transition (Broken)
+#>   Public: TRUE
+#>   Created/Edited: 2012-01-19T21:51:30Z / 2014-04-09T03:11:36Z
+#>   Files:
+```
+
+## Fork a gist
+
+Returns a `gist` object
+
+
+```r
+g <- gists()
+(forked <- g[[ sample(seq_along(g), 1) ]] %>% fork())
+#> <gist>62b05dd4ebc2d29add15
+#>   URL: https://gist.github.com/62b05dd4ebc2d29add15
+#>   Description: Solution to level 1 in Untrusted: http://alex.nisnevich.com/untrusted/
+#>   Public: TRUE
+#>   Created/Edited: 2015-01-04T17:42:43Z / 2015-01-04T17:42:43Z
+#>   Files: untrusted-lvl1-solution.js
+```
+
+
+
+## Example use case
+
+_Working with the Mapzen Pelias geocoding API_
+
+The API is described at [https://github.com/pelias/pelias](https://github.com/pelias/pelias), and is still in alpha they say. The steps: get data, make a gist. The data is returned from Mapzen as geojson, so all we have to do is literally push it up to GitHub gists and we're done b/c GitHub renders the map.
+
+
+```r
+library('httr')
+base <- "http://pelias.mapzen.com/search"
+res <- GET(base, query = list(input = 'coffee shop', lat = 45.5, lon = -122.6))
+json <- content(res, as = "text")
+gist_create(code = json, filename = "pelias_test.geojson")
+#> <gist>017214637bcfeb198070
+#>   URL: https://gist.github.com/017214637bcfeb198070
+#>   Description:
+#>   Public: TRUE
+#>   Created/Edited: 2014-10-28T14:42:36Z / 2014-10-28T14:42:36Z
+#>   Files: pelias_test.geojson
+```
+
+And here's that gist: [https://gist.github.com/sckott/017214637bcfeb198070](https://gist.github.com/sckott/017214637bcfeb198070)
+
+![image](/public/img/2015-01-05-gistr-github-gists/gistr_ss.png)
+
+  </div>
+  
+  <div class="post">
+    <h1>
       <a href="/2014/12/pytaxize-itis/">
         pytaxize - low level ITIS functions
       </a>
@@ -68,160 +517,160 @@
 
     <span class="post-date">26 Dec 2014</span>
 
-    <p>I’ve been working on a Python port of the R package <code class="highlighter-rouge">taxize</code> that I maintain. It’s still early days with this Python library, I’d love to know what people think. For example, I’m giving back Pandas DataFrame’s from most functions. Does this make sense?</p>
+    I've been working on a Python port of the R package `taxize` that I maintain. It's still early days with this Python library, I'd love to know what people think. For example, I'm giving back Pandas DataFrame's from most functions. Does this make sense?
 
-<h2 id="installation">Installation</h2>
+## Installation
 
-<div class="highlighter-rouge"><pre class="highlight"><code>sudo pip install git+git://github.com/sckott/pytaxize.git#egg=pytaxize
-</code></pre>
-</div>
+```
+sudo pip install git+git://github.com/sckott/pytaxize.git#egg=pytaxize
+```
 
-<p>Or <code class="highlighter-rouge">git clone</code> the repo down, and <code class="highlighter-rouge">python setup.py build &amp;&amp; python setup.py install</code></p>
+Or `git clone` the repo down, and `python setup.py build && python setup.py install`
 
-<h2 id="load-library">Load library</h2>
+## Load library
 
-<div class="language-python highlighter-rouge"><pre class="highlight"><code><span class="kn">import</span> <span class="nn">pytaxize</span>
-</code></pre>
-</div>
+```python
+import pytaxize
+```
 
-<h2 id="itis-ping">ITIS ping</h2>
+## ITIS ping
 
-<div class="language-python highlighter-rouge"><pre class="highlight"><code><span class="n">pytaxize</span><span class="o">.</span><span class="n">itis_ping</span><span class="p">()</span>
-</code></pre>
-</div>
+```python
+pytaxize.itis_ping()
+```
 
-<div class="language-python highlighter-rouge"><pre class="highlight"><code><span class="s">'This is the ITIS Web Service, providing access to the data behind www.itis.gov. The database contains 665,266 scientific names (501,207 of them valid/accepted) and 122,735 common names.'</span>
-</code></pre>
-</div>
+```python
+'This is the ITIS Web Service, providing access to the data behind www.itis.gov. The database contains 665,266 scientific names (501,207 of them valid/accepted) and 122,735 common names.'
+```
 
-<h2 id="get-hierarchy-down-from-tsn">Get hierarchy down from tsn</h2>
+## Get hierarchy down from tsn
 
-<div class="language-python highlighter-rouge"><pre class="highlight"><code><span class="n">pytaxize</span><span class="o">.</span><span class="n">gethierarchydownfromtsn</span><span class="p">(</span><span class="n">tsn</span> <span class="o">=</span> <span class="mi">161030</span><span class="p">)</span>
-</code></pre>
-</div>
+```python
+pytaxize.gethierarchydownfromtsn(tsn = 161030)
+```
 
-<div class="language-python highlighter-rouge"><pre class="highlight"><code>      <span class="n">tsn</span> <span class="n">rankName</span>       <span class="n">taxonName</span>    <span class="n">parentName</span> <span class="n">parentTsn</span>
-<span class="mi">0</span>  <span class="mi">161048</span>    <span class="n">Class</span>   <span class="n">Sarcopterygii</span>  <span class="n">Osteichthyes</span>    <span class="mi">161030</span>
-<span class="mi">1</span>  <span class="mi">161061</span>    <span class="n">Class</span>  <span class="n">Actinopterygii</span>  <span class="n">Osteichthyes</span>    <span class="mi">161030</span>
-</code></pre>
-</div>
+```python
+      tsn rankName       taxonName    parentName parentTsn
+0  161048    Class   Sarcopterygii  Osteichthyes    161030
+1  161061    Class  Actinopterygii  Osteichthyes    161030
+```
 
-<h2 id="get-hierarchy-up-from-tsn">Get hierarchy up from tsn</h2>
+## Get hierarchy up from tsn
 
-<div class="language-python highlighter-rouge"><pre class="highlight"><code><span class="n">pytaxize</span><span class="o">.</span><span class="n">gethierarchyupfromtsn</span><span class="p">(</span><span class="n">tsn</span> <span class="o">=</span> <span class="mi">37906</span><span class="p">)</span>
-</code></pre>
-</div>
+```python
+pytaxize.gethierarchyupfromtsn(tsn = 37906)
+```
 
-<div class="language-python highlighter-rouge"><pre class="highlight"><code>               <span class="n">author</span>  <span class="n">parentName</span> <span class="n">parentTsn</span> <span class="n">rankName</span> <span class="n">taxonName</span>    <span class="n">tsn</span>
-<span class="mi">0</span>  <span class="n">Gaertn</span><span class="o">.</span> <span class="n">ex</span> <span class="n">Schreb</span><span class="o">.</span>  <span class="n">Asteraceae</span>     <span class="mi">35420</span>    <span class="n">Genus</span>   <span class="n">Liatris</span>  <span class="mi">37906</span>
-</code></pre>
-</div>
+```python
+               author  parentName parentTsn rankName taxonName    tsn
+0  Gaertn. ex Schreb.  Asteraceae     35420    Genus   Liatris  37906
+```
 
-<h2 id="get-rank-names">Get rank names</h2>
+## Get rank names
 
-<div class="language-python highlighter-rouge"><pre class="highlight"><code><span class="n">pytaxize</span><span class="o">.</span><span class="n">getranknames</span><span class="p">()</span>
-</code></pre>
-</div>
+```python
+pytaxize.getranknames()
+```
 
-<div class="language-python highlighter-rouge"><pre class="highlight"><code>    <span class="n">kingdomname</span> <span class="n">rankid</span>      <span class="n">rankname</span>
-<span class="mi">0</span>      <span class="n">Bacteria</span>     <span class="mi">10</span>       <span class="n">Kingdom</span>
-<span class="mi">1</span>      <span class="n">Bacteria</span>     <span class="mi">20</span>    <span class="n">Subkingdom</span>
-<span class="mi">2</span>      <span class="n">Bacteria</span>     <span class="mi">30</span>        <span class="n">Phylum</span>
-<span class="mi">3</span>      <span class="n">Bacteria</span>     <span class="mi">40</span>     <span class="n">Subphylum</span>
-<span class="mi">4</span>      <span class="n">Bacteria</span>     <span class="mi">50</span>    <span class="n">Superclass</span>
-<span class="mi">5</span>      <span class="n">Bacteria</span>     <span class="mi">60</span>         <span class="n">Class</span>
-<span class="mi">6</span>      <span class="n">Bacteria</span>     <span class="mi">70</span>      <span class="n">Subclass</span>
-<span class="mi">7</span>      <span class="n">Bacteria</span>     <span class="mi">80</span>    <span class="n">Infraclass</span>
-<span class="mi">8</span>      <span class="n">Bacteria</span>     <span class="mi">90</span>    <span class="n">Superorder</span>
-<span class="mi">9</span>      <span class="n">Bacteria</span>    <span class="mi">100</span>         <span class="n">Order</span>
-<span class="mi">10</span>     <span class="n">Bacteria</span>    <span class="mi">110</span>      <span class="n">Suborder</span>
-<span class="mi">11</span>     <span class="n">Bacteria</span>    <span class="mi">120</span>    <span class="n">Infraorder</span>
-<span class="mi">12</span>     <span class="n">Bacteria</span>    <span class="mi">130</span>   <span class="n">Superfamily</span>
-<span class="mi">13</span>     <span class="n">Bacteria</span>    <span class="mi">140</span>        <span class="n">Family</span>
-<span class="mi">14</span>     <span class="n">Bacteria</span>    <span class="mi">150</span>     <span class="n">Subfamily</span>
-<span class="mi">15</span>     <span class="n">Bacteria</span>    <span class="mi">160</span>         <span class="n">Tribe</span>
-<span class="mi">16</span>     <span class="n">Bacteria</span>    <span class="mi">170</span>      <span class="n">Subtribe</span>
-<span class="mi">17</span>     <span class="n">Bacteria</span>    <span class="mi">180</span>         <span class="n">Genus</span>
-<span class="mi">18</span>     <span class="n">Bacteria</span>    <span class="mi">190</span>      <span class="n">Subgenus</span>
-<span class="mi">19</span>     <span class="n">Bacteria</span>    <span class="mi">220</span>       <span class="n">Species</span>
-<span class="mi">20</span>     <span class="n">Bacteria</span>    <span class="mi">230</span>    <span class="n">Subspecies</span>
-<span class="mi">21</span>     <span class="n">Protozoa</span>     <span class="mi">10</span>       <span class="n">Kingdom</span>
-<span class="mi">22</span>     <span class="n">Protozoa</span>     <span class="mi">20</span>    <span class="n">Subkingdom</span>
-<span class="mi">23</span>     <span class="n">Protozoa</span>     <span class="mi">25</span>  <span class="n">Infrakingdom</span>
-<span class="mi">24</span>     <span class="n">Protozoa</span>     <span class="mi">30</span>        <span class="n">Phylum</span>
-<span class="mi">25</span>     <span class="n">Protozoa</span>     <span class="mi">40</span>     <span class="n">Subphylum</span>
-<span class="mi">26</span>     <span class="n">Protozoa</span>     <span class="mi">45</span>   <span class="n">Infraphylum</span>
-<span class="mi">27</span>     <span class="n">Protozoa</span>     <span class="mi">47</span>    <span class="n">Parvphylum</span>
-<span class="mi">28</span>     <span class="n">Protozoa</span>     <span class="mi">50</span>    <span class="n">Superclass</span>
-<span class="mi">29</span>     <span class="n">Protozoa</span>     <span class="mi">60</span>         <span class="n">Class</span>
-<span class="o">..</span>          <span class="o">...</span>    <span class="o">...</span>           <span class="o">...</span>
-<span class="mi">150</span>   <span class="n">Chromista</span>    <span class="mi">190</span>      <span class="n">Subgenus</span>
-<span class="mi">151</span>   <span class="n">Chromista</span>    <span class="mi">200</span>       <span class="n">Section</span>
-<span class="mi">152</span>   <span class="n">Chromista</span>    <span class="mi">210</span>    <span class="n">Subsection</span>
-<span class="mi">153</span>   <span class="n">Chromista</span>    <span class="mi">220</span>       <span class="n">Species</span>
-<span class="mi">154</span>   <span class="n">Chromista</span>    <span class="mi">230</span>    <span class="n">Subspecies</span>
-<span class="mi">155</span>   <span class="n">Chromista</span>    <span class="mi">240</span>       <span class="n">Variety</span>
-<span class="mi">156</span>   <span class="n">Chromista</span>    <span class="mi">250</span>    <span class="n">Subvariety</span>
-<span class="mi">157</span>   <span class="n">Chromista</span>    <span class="mi">260</span>          <span class="n">Form</span>
-<span class="mi">158</span>   <span class="n">Chromista</span>    <span class="mi">270</span>       <span class="n">Subform</span>
-<span class="mi">159</span>     <span class="n">Archaea</span>     <span class="mi">10</span>       <span class="n">Kingdom</span>
-<span class="mi">160</span>     <span class="n">Archaea</span>     <span class="mi">20</span>    <span class="n">Subkingdom</span>
-<span class="mi">161</span>     <span class="n">Archaea</span>     <span class="mi">30</span>        <span class="n">Phylum</span>
-<span class="mi">162</span>     <span class="n">Archaea</span>     <span class="mi">40</span>     <span class="n">Subphylum</span>
-<span class="mi">163</span>     <span class="n">Archaea</span>     <span class="mi">50</span>    <span class="n">Superclass</span>
-<span class="mi">164</span>     <span class="n">Archaea</span>     <span class="mi">60</span>         <span class="n">Class</span>
-<span class="mi">165</span>     <span class="n">Archaea</span>     <span class="mi">70</span>      <span class="n">Subclass</span>
-<span class="mi">166</span>     <span class="n">Archaea</span>     <span class="mi">80</span>    <span class="n">Infraclass</span>
-<span class="mi">167</span>     <span class="n">Archaea</span>     <span class="mi">90</span>    <span class="n">Superorder</span>
-<span class="mi">168</span>     <span class="n">Archaea</span>    <span class="mi">100</span>         <span class="n">Order</span>
-<span class="mi">169</span>     <span class="n">Archaea</span>    <span class="mi">110</span>      <span class="n">Suborder</span>
-<span class="mi">170</span>     <span class="n">Archaea</span>    <span class="mi">120</span>    <span class="n">Infraorder</span>
-<span class="mi">171</span>     <span class="n">Archaea</span>    <span class="mi">130</span>   <span class="n">Superfamily</span>
-<span class="mi">172</span>     <span class="n">Archaea</span>    <span class="mi">140</span>        <span class="n">Family</span>
-<span class="mi">173</span>     <span class="n">Archaea</span>    <span class="mi">150</span>     <span class="n">Subfamily</span>
-<span class="mi">174</span>     <span class="n">Archaea</span>    <span class="mi">160</span>         <span class="n">Tribe</span>
-<span class="mi">175</span>     <span class="n">Archaea</span>    <span class="mi">170</span>      <span class="n">Subtribe</span>
-<span class="mi">176</span>     <span class="n">Archaea</span>    <span class="mi">180</span>         <span class="n">Genus</span>
-<span class="mi">177</span>     <span class="n">Archaea</span>    <span class="mi">190</span>      <span class="n">Subgenus</span>
-<span class="mi">178</span>     <span class="n">Archaea</span>    <span class="mi">220</span>       <span class="n">Species</span>
-<span class="mi">179</span>     <span class="n">Archaea</span>    <span class="mi">230</span>    <span class="n">Subspecies</span>
-</code></pre>
-</div>
+```python
+    kingdomname rankid      rankname
+0      Bacteria     10       Kingdom
+1      Bacteria     20    Subkingdom
+2      Bacteria     30        Phylum
+3      Bacteria     40     Subphylum
+4      Bacteria     50    Superclass
+5      Bacteria     60         Class
+6      Bacteria     70      Subclass
+7      Bacteria     80    Infraclass
+8      Bacteria     90    Superorder
+9      Bacteria    100         Order
+10     Bacteria    110      Suborder
+11     Bacteria    120    Infraorder
+12     Bacteria    130   Superfamily
+13     Bacteria    140        Family
+14     Bacteria    150     Subfamily
+15     Bacteria    160         Tribe
+16     Bacteria    170      Subtribe
+17     Bacteria    180         Genus
+18     Bacteria    190      Subgenus
+19     Bacteria    220       Species
+20     Bacteria    230    Subspecies
+21     Protozoa     10       Kingdom
+22     Protozoa     20    Subkingdom
+23     Protozoa     25  Infrakingdom
+24     Protozoa     30        Phylum
+25     Protozoa     40     Subphylum
+26     Protozoa     45   Infraphylum
+27     Protozoa     47    Parvphylum
+28     Protozoa     50    Superclass
+29     Protozoa     60         Class
+..          ...    ...           ...
+150   Chromista    190      Subgenus
+151   Chromista    200       Section
+152   Chromista    210    Subsection
+153   Chromista    220       Species
+154   Chromista    230    Subspecies
+155   Chromista    240       Variety
+156   Chromista    250    Subvariety
+157   Chromista    260          Form
+158   Chromista    270       Subform
+159     Archaea     10       Kingdom
+160     Archaea     20    Subkingdom
+161     Archaea     30        Phylum
+162     Archaea     40     Subphylum
+163     Archaea     50    Superclass
+164     Archaea     60         Class
+165     Archaea     70      Subclass
+166     Archaea     80    Infraclass
+167     Archaea     90    Superorder
+168     Archaea    100         Order
+169     Archaea    110      Suborder
+170     Archaea    120    Infraorder
+171     Archaea    130   Superfamily
+172     Archaea    140        Family
+173     Archaea    150     Subfamily
+174     Archaea    160         Tribe
+175     Archaea    170      Subtribe
+176     Archaea    180         Genus
+177     Archaea    190      Subgenus
+178     Archaea    220       Species
+179     Archaea    230    Subspecies
+```
 
-<h2 id="search-by-scientific-name">Search by scientific name</h2>
+## Search by scientific name
 
-<div class="language-python highlighter-rouge"><pre class="highlight"><code><span class="n">pytaxize</span><span class="o">.</span><span class="n">searchbyscientificname</span><span class="p">(</span><span class="n">x</span><span class="o">=</span><span class="s">"Tardigrada"</span><span class="p">)</span>
-</code></pre>
-</div>
+```python
+pytaxize.searchbyscientificname(x="Tardigrada")
+```
 
-<div class="language-python highlighter-rouge"><pre class="highlight"><code>           <span class="n">combinedname</span>     <span class="n">tsn</span>
-<span class="mi">0</span>    <span class="n">Rotaria</span> <span class="n">tardigrada</span>   <span class="mi">58274</span>
-<span class="mi">1</span>  <span class="n">Notommata</span> <span class="n">tardigrada</span>   <span class="mi">58898</span>
-<span class="mi">2</span>   <span class="n">Pilargis</span> <span class="n">tardigrada</span>   <span class="mi">65562</span>
-<span class="mi">3</span>            <span class="n">Tardigrada</span>  <span class="mi">155166</span>
-<span class="mi">4</span>      <span class="n">Heterotardigrada</span>  <span class="mi">155167</span>
-<span class="mi">5</span>      <span class="n">Arthrotardigrada</span>  <span class="mi">155168</span>
-<span class="mi">6</span>        <span class="n">Mesotardigrada</span>  <span class="mi">155358</span>
-<span class="mi">7</span>          <span class="n">Eutardigrada</span>  <span class="mi">155362</span>
-<span class="mi">8</span>   <span class="n">Scytodes</span> <span class="n">tardigrada</span>  <span class="mi">866744</span>
-</code></pre>
-</div>
+```python
+           combinedname     tsn
+0    Rotaria tardigrada   58274
+1  Notommata tardigrada   58898
+2   Pilargis tardigrada   65562
+3            Tardigrada  155166
+4      Heterotardigrada  155167
+5      Arthrotardigrada  155168
+6        Mesotardigrada  155358
+7          Eutardigrada  155362
+8   Scytodes tardigrada  866744
+```
 
-<h2 id="get-accepted-names-from-tsn">Get accepted names from tsn</h2>
+## Get accepted names from tsn
 
-<div class="language-python highlighter-rouge"><pre class="highlight"><code><span class="n">pytaxize</span><span class="o">.</span><span class="n">getacceptednamesfromtsn</span><span class="p">(</span><span class="s">'208527'</span><span class="p">)</span>
-</code></pre>
-</div>
+```python
+pytaxize.getacceptednamesfromtsn('208527')
+```
 
-<p>If accepted, returns the same id</p>
+If accepted, returns the same id
 
-<div class="language-python highlighter-rouge"><pre class="highlight"><code><span class="s">'208527'</span>
-</code></pre>
-</div>
+```python
+'208527'
+```
 
-<h2 id="more">More</h2>
+## More
 
-<p>For the other functions see https://github.com/sckott/pytaxize/blob/master/pytaxize/itis.py</p>
+For the other functions see https://github.com/sckott/pytaxize/blob/master/pytaxize/itis.py
 
   </div>
   
@@ -234,292 +683,131 @@
 
     <span class="post-date">10 Dec 2014</span>
 
-    <p>I was in San Francisco last week for an altmetrics conference at PLOS. While there, I visited the <a href="http://www.asianart.org/">Asian Art Museum</a>, just the <a href="http://www.asianart.org/exhibitions_index/roads-of-arabia">Roads of Arabia exhibition</a>.</p>
+    I was in San Francisco last week for an altmetrics conference at PLOS. While there, I visited the [Asian Art Museum](http://www.asianart.org/), just the [Roads of Arabia exhibition](http://www.asianart.org/exhibitions_index/roads-of-arabia).
 
-<p>It was a great exhibit. While I was looking at the pieces, I read many labels, and thought, “hey, what if someone wants this metadata”?</p>
+It was a great exhibit. While I was looking at the pieces, I read many labels, and thought, "hey, what if someone wants this metadata"? 
 
-<p>Since we have an R package in development for scraping museum metadata (called <a href="https://github.com/ropensci/musemeta">musemeta</a>), I just started some scraping code for this museum. Unfortunately, I don’t think the pieces from the Roads of Arabia exhibit are on their site, so no metadata to get. But they do have their main collection searchable online at <a href="http://www.asianart.org/collections/collection">http://www.asianart.org/collections/collection</a>. Examples follow.</p>
+Since we have an R package in development for scraping museum metadata (called [musemeta](https://github.com/ropensci/musemeta)), I just started some scraping code for this museum. Unfortunately, I don't think the pieces from the Roads of Arabia exhibit are on their site, so no metadata to get. But they do have their main collection searchable online at [http://www.asianart.org/collections/collection](http://www.asianart.org/collections/collection). Examples follow. 
 
-<h2 id="installation">Installation</h2>
+## Installation
 
-<div class="language-r highlighter-rouge"><pre class="highlight"><code><span class="n">install.packages</span><span class="p">(</span><span class="s2">"devtools"</span><span class="p">)</span><span class="w">
-</span><span class="n">devtools</span><span class="o">::</span><span class="n">install_github</span><span class="p">(</span><span class="s2">"ropensci/musemeta"</span><span class="p">)</span><span class="w">
-</span></code></pre>
-</div>
 
-<div class="language-r highlighter-rouge"><pre class="highlight"><code><span class="n">library</span><span class="p">(</span><span class="s2">"musemeta"</span><span class="p">)</span><span class="w">
-</span></code></pre>
-</div>
+```r
+install.packages("devtools")
+devtools::install_github("ropensci/musemeta")
+```
 
-<h2 id="get-metadata-for-a-single-object">Get metadata for a single object</h2>
 
-<p>You have to get the ID for the piece from their website, e.g., <code class="highlighter-rouge">11462</code> from the url <code class="highlighter-rouge">http://searchcollection.asianart.org/view/objects/asitem/nid/11462</code>. Once you have an ID you can pass it in ot the <code class="highlighter-rouge">aam()</code> function.</p>
+```r
+library("musemeta")
+```
 
-<div class="language-r highlighter-rouge"><pre class="highlight"><code><span class="p">(</span><span class="n">out</span><span class="w"> </span><span class="o">&lt;-</span><span class="w"> </span><span class="n">aam</span><span class="p">(</span><span class="m">11462</span><span class="p">))</span><span class="w">
-</span><span class="c1">#&gt; &lt;AAM metadata&gt; Molded plaque (tsha tsha)
-#&gt;   Object id: 1992.96
-#&gt;   Object name: Votive plaque
-#&gt;   Date: approx. 1992
-#&gt;   Artist: 
-#&gt;   Medium: Plaster mixed with resin and pigment
-#&gt;   Credit line: Gift of Robert Tevis
-#&gt;   On display?: no
-#&gt;   Collection: Decorative Arts
-#&gt;   Department: Himalayan Art
-#&gt;   Dimensions: 
-#&gt;   Label: Molded plaques (tsha tshas) are small sacred images, flat or
-#&gt;           three-dimensional, shaped out of clay in metal molds. The
-#&gt;           images are usually unbaked, and sometimes seeds, paper, or
-#&gt;           human ashes were mixed with the clay. Making tsha tshas is
-#&gt;           a meritorious act, and monasteries give them away to
-#&gt;           pilgrims. Some Tibetans carry tsha tshas inside the amulet
-#&gt;           boxes they wear or stuff them into larger images as part of
-#&gt;           the consecration of those images. In Bhutan tsha tshas are
-#&gt;           found in mani walls (a wall of stones carved with prayers)
-#&gt;           or piled up in caves.The practice of making such plaques
-#&gt;           began in India, and from there it spread to other countries
-#&gt;           in Asia with the introduction of Buddhism. Authentic tsha
-#&gt;           tshas are cast from clay. Modern examples , such as those
-#&gt;           made for the tourist trade in Tibet, are made of plaster
-#&gt;           and cast from ancient (1100-1200) molds and hand colored to
-#&gt;           give them the appearance of age.
-</span></code></pre>
-</div>
+## Get metadata for a single object
 
-<p>The output is printed for clarity, but you can dig into each element, like</p>
+You have to get the ID for the piece from their website, e.g., `11462` from the url `http://searchcollection.asianart.org/view/objects/asitem/nid/11462`. Once you have an ID you can pass it in ot the `aam()` function.
 
-<div class="language-r highlighter-rouge"><pre class="highlight"><code><span class="n">out</span><span class="o">$</span><span class="n">label</span><span class="w">
-</span><span class="c1">#&gt; [1] "Molded plaques (tsha tshas) are small sacred images, flat or three-dimensional, shaped out of clay in metal molds. The images are usually unbaked, and sometimes seeds, paper, or human ashes were mixed with the clay. Making tsha tshas is a meritorious act, and monasteries give them away to pilgrims. Some Tibetans carry tsha tshas inside the amulet boxes they wear or stuff them into larger images as part of the consecration of those images. In Bhutan tsha tshas are found in mani walls (a wall of stones carved with prayers) or piled up in caves.The practice of making such plaques began in India, and from there it spread to other countries in Asia with the introduction of Buddhism. Authentic tsha tshas are cast from clay. Modern examples , such as those made for the tourist trade in Tibet, are made of plaster and cast from ancient (1100-1200) molds and hand colored to give them the appearance of age."
-</span></code></pre>
-</div>
 
-<h2 id="get-metadata-for-many-objects">Get metadata for many objects</h2>
+```r
+(out <- aam(11462))
+#> <AAM metadata> Molded plaque (tsha tsha)
+#>   Object id: 1992.96
+#>   Object name: Votive plaque
+#>   Date: approx. 1992
+#>   Artist: 
+#>   Medium: Plaster mixed with resin and pigment
+#>   Credit line: Gift of Robert Tevis
+#>   On display?: no
+#>   Collection: Decorative Arts
+#>   Department: Himalayan Art
+#>   Dimensions: 
+#>   Label: Molded plaques (tsha tshas) are small sacred images, flat or
+#>           three-dimensional, shaped out of clay in metal molds. The
+#>           images are usually unbaked, and sometimes seeds, paper, or
+#>           human ashes were mixed with the clay. Making tsha tshas is
+#>           a meritorious act, and monasteries give them away to
+#>           pilgrims. Some Tibetans carry tsha tshas inside the amulet
+#>           boxes they wear or stuff them into larger images as part of
+#>           the consecration of those images. In Bhutan tsha tshas are
+#>           found in mani walls (a wall of stones carved with prayers)
+#>           or piled up in caves.The practice of making such plaques
+#>           began in India, and from there it spread to other countries
+#>           in Asia with the introduction of Buddhism. Authentic tsha
+#>           tshas are cast from clay. Modern examples , such as those
+#>           made for the tourist trade in Tibet, are made of plaster
+#>           and cast from ancient (1100-1200) molds and hand colored to
+#>           give them the appearance of age.
+```
 
-<p>The <code class="highlighter-rouge">aam()</code> function is not vectorized, but you can easily get data for many IDs via <code class="highlighter-rouge">lapply</code> type functions, etc.</p>
+The output is printed for clarity, but you can dig into each element, like 
 
-<div class="language-r highlighter-rouge"><pre class="highlight"><code><span class="n">lapply</span><span class="p">(</span><span class="nf">c</span><span class="p">(</span><span class="m">17150</span><span class="p">,</span><span class="m">17140</span><span class="p">,</span><span class="m">17144</span><span class="p">),</span><span class="w"> </span><span class="n">aam</span><span class="p">)</span><span class="w">
-</span><span class="c1">#&gt; [[1]]
-#&gt; &lt;AAM metadata&gt; Boys sumo wrestling
-#&gt;   Object id: 2005.100.35
-#&gt;   Object name: Woodblock print
-#&gt;   Date: approx. 1769
-#&gt;   Artist: Suzuki HarunobuJapanese, 1724 - 1770
-#&gt;   Medium: Ink and colors on paper
-#&gt;   Credit line: Gift of the Grabhorn Ukiyo-e Collection
-#&gt;   On display?: no
-#&gt;   Collection: Prints And Drawings
-#&gt;   Department: Japanese Art
-#&gt;   Dimensions: H. 12 5/8 in x W. 5 3/4 in, H. 32.1 cm x W. 14.6 cm
-#&gt;   Label: 40 é木Ø春t信M 相'撲oVびÑSuzuki Harunobu, 1725?1770Boys sumo wrestling ( Sumō
-#&gt;           ?)c. 1769Woodblock print ( nishiki-e) Hosoban
-#&gt; 
-#&gt; [[2]]
-#&gt; &lt;AAM metadata&gt; Autumn Moon of Matsukaze
-#&gt;   Object id: 2005.100.25
-#&gt;   Object name: Woodblock print
-#&gt;   Date: 1768-1769
-#&gt;   Artist: Suzuki HarunobuJapanese, 1724 - 1770
-#&gt;   Medium: Ink and colors on paper
-#&gt;   Credit line: Gift of the Grabhorn Ukiyo-e Collection
-#&gt;   On display?: no
-#&gt;   Collection: Prints And Drawings
-#&gt;   Department: Japanese Art
-#&gt;   Dimensions: H. 12 1/2 in x W. 5 3/4 in, H. 31.7 cm x W. 14.6 cm
-#&gt;   Label: 30 é木Ø春t信M 『w流¬æ八"ª景i』x 「u松¼のÌ秋H月」vSuzuki Harunobu, 1725?1770"Autumn Moon of
-#&gt;           Matsukaze" (Matsukaze no shū ?)From Fashionable Eight Views
-#&gt;           of Noh Chants (Fū ?ū ?17681769Woodblock print
-#&gt;           (nishiki-e)Hosoban
-#&gt; 
-#&gt; [[3]]
-#&gt; &lt;AAM metadata&gt; Hunting for fireflies
-#&gt;   Object id: 2005.100.29
-#&gt;   Object name: Woodblock print
-#&gt;   Date: 1767-1768
-#&gt;   Artist: Suzuki HarunobuJapanese, 1724 - 1770
-#&gt;   Medium: Ink and colors on paper
-#&gt;   Credit line: Gift of the Grabhorn Ukiyo-e Collection
-#&gt;   On display?: no
-#&gt;   Collection: Prints And Drawings
-#&gt;   Department: Japanese Art
-#&gt;   Dimensions: H. 10 1/2 in x W. 8 in, H. 26.7 cm x W. 20.3 cm
-#&gt;   Label: 34 é木Ø春t信M u狩ëりèSuzuki Harunobu, 1725?1770Hunting for
-#&gt;           fireflies17671768Woodblock print ( nishiki-e) Chū ?
-</span></code></pre>
-</div>
 
-<h2 id="no-search-boo">No search, boo</h2>
+```r
+out$label
+#> [1] "Molded plaques (tsha tshas) are small sacred images, flat or three-dimensional, shaped out of clay in metal molds. The images are usually unbaked, and sometimes seeds, paper, or human ashes were mixed with the clay. Making tsha tshas is a meritorious act, and monasteries give them away to pilgrims. Some Tibetans carry tsha tshas inside the amulet boxes they wear or stuff them into larger images as part of the consecration of those images. In Bhutan tsha tshas are found in mani walls (a wall of stones carved with prayers) or piled up in caves.The practice of making such plaques began in India, and from there it spread to other countries in Asia with the introduction of Buddhism. Authentic tsha tshas are cast from clay. Modern examples , such as those made for the tourist trade in Tibet, are made of plaster and cast from ancient (1100-1200) molds and hand colored to give them the appearance of age."
+```
 
-<p>Note that there is no search functionality yet for this source. Maybe someone can add that via pull requests :)</p>
+## Get metadata for many objects
 
-<h2 id="like-the-others">Like the others</h2>
+The `aam()` function is not vectorized, but you can easily get data for many IDs via `lapply` type functions, etc. 
 
-<p>The others sources in <code class="highlighter-rouge">musemeta</code> mostly work the same way as the above.</p>
 
-  </div>
-  
-  <div class="post">
-    <h1>
-      <a href="/2014/12/icanhaz-altmetrics/">
-        icanhaz altmetrics
-      </a>
-    </h1>
+```r
+lapply(c(17150,17140,17144), aam)
+#> [[1]]
+#> <AAM metadata> Boys sumo wrestling
+#>   Object id: 2005.100.35
+#>   Object name: Woodblock print
+#>   Date: approx. 1769
+#>   Artist: Suzuki HarunobuJapanese, 1724 - 1770
+#>   Medium: Ink and colors on paper
+#>   Credit line: Gift of the Grabhorn Ukiyo-e Collection
+#>   On display?: no
+#>   Collection: Prints And Drawings
+#>   Department: Japanese Art
+#>   Dimensions: H. 12 5/8 in x W. 5 3/4 in, H. 32.1 cm x W. 14.6 cm
+#>   Label: 40 é木Ø春t信M 相'撲oVびÑSuzuki Harunobu, 1725?1770Boys sumo wrestling ( Sumō
+#>           ?)c. 1769Woodblock print ( nishiki-e) Hosoban
+#> 
+#> [[2]]
+#> <AAM metadata> Autumn Moon of Matsukaze
+#>   Object id: 2005.100.25
+#>   Object name: Woodblock print
+#>   Date: 1768-1769
+#>   Artist: Suzuki HarunobuJapanese, 1724 - 1770
+#>   Medium: Ink and colors on paper
+#>   Credit line: Gift of the Grabhorn Ukiyo-e Collection
+#>   On display?: no
+#>   Collection: Prints And Drawings
+#>   Department: Japanese Art
+#>   Dimensions: H. 12 1/2 in x W. 5 3/4 in, H. 31.7 cm x W. 14.6 cm
+#>   Label: 30 é木Ø春t信M 『w流¬æ八"ª景i』x 「u松¼のÌ秋H月」vSuzuki Harunobu, 1725?1770"Autumn Moon of
+#>           Matsukaze" (Matsukaze no shū ?)From Fashionable Eight Views
+#>           of Noh Chants (Fū ?ū ?17681769Woodblock print
+#>           (nishiki-e)Hosoban
+#> 
+#> [[3]]
+#> <AAM metadata> Hunting for fireflies
+#>   Object id: 2005.100.29
+#>   Object name: Woodblock print
+#>   Date: 1767-1768
+#>   Artist: Suzuki HarunobuJapanese, 1724 - 1770
+#>   Medium: Ink and colors on paper
+#>   Credit line: Gift of the Grabhorn Ukiyo-e Collection
+#>   On display?: no
+#>   Collection: Prints And Drawings
+#>   Department: Japanese Art
+#>   Dimensions: H. 10 1/2 in x W. 8 in, H. 26.7 cm x W. 20.3 cm
+#>   Label: 34 é木Ø春t信M u狩ëりèSuzuki Harunobu, 1725?1770Hunting for
+#>           fireflies17671768Woodblock print ( nishiki-e) Chū ?
+```
 
-    <span class="post-date">08 Dec 2014</span>
+## No search, boo
 
-    <p>The Lagotto application is a Rails app that collects and serves up via RESTful API article level metrics data for research objects. So far, this application has only been applied to scholarly articles, but will <a href="http://articlemetrics.github.io/MDC/">see action on datasets soon</a>.</p>
+Note that there is no search functionality yet for this source. Maybe someone can add that via pull requests :)
 
-<p><a href="http://blog.martinfenner.org/">Martin Fenner</a> has lead the development of Lagotto. He recently set up <a href="http://discuss.lagotto.io/">a discussion site</a> if you want to chat about it.</p>
+## Like the others
 
-<p>The application has a <a href="http://alm.plos.org/">nice GUI interface</a>, and a quite nice <a href="http://alm.plos.org/docs/api">RESTful API</a>.</p>
-
-<p>Lagotto is open source! Because of this, and the quality of the software, other publishers have started using it to gather and deliver publicly article level metrics data, including:</p>
-
-<ul>
-  <li><a href="http://lagotto.svr.elifesciences.org/">eLife</a></li>
-  <li><a href="http://pkp-alm.lib.sfu.ca/">Public Knowledge Project (PKP)</a></li>
-  <li><a href="http://metricus.copernicus.org/">Copernicus</a></li>
-  <li><a href="http://det.labs.crossref.org/">Crossref</a></li>
-  <li><a href="http://alm.pensoft.net:81/">Pensoft</a></li>
-</ul>
-
-<p>The PLOS instance at <a href="http://alm.plos.org/">http://alm.plos.org/</a> is always the most up to date with the Lagotto software, but <a href="http://det.labs.crossref.org/">Crossref</a> has the largest number of articles.</p>
-
-<p>I’ve been working on three clients for the Lagotto REST API, including for a while now on <code class="highlighter-rouge">R</code>, recently on <code class="highlighter-rouge">Python</code>, and just last week on <code class="highlighter-rouge">Ruby</code>.</p>
-
-<p>Please do try the clients, report bugs, request features - you know the open source drill…</p>
-
-<p>I’d say the R client is the most mature, while Python is less so, end the Ruby gem the least mature.</p>
-
-<h2 id="installation">Installation</h2>
-
-<p>R</p>
-
-<div class="language-r highlighter-rouge"><pre class="highlight"><code><span class="n">install.packages</span><span class="p">(</span><span class="s2">"devtools"</span><span class="p">)</span><span class="w">
-</span><span class="n">devtools</span><span class="o">::</span><span class="n">install_github</span><span class="p">(</span><span class="s2">"ropensci/alm"</span><span class="p">)</span><span class="w">
-</span></code></pre>
-</div>
-
-<p>Python</p>
-
-<div class="language-r highlighter-rouge"><pre class="highlight"><code><span class="n">git</span><span class="w"> </span><span class="n">clone</span><span class="w"> </span><span class="n">https</span><span class="o">://</span><span class="n">github.com</span><span class="o">/</span><span class="n">cameronneylon</span><span class="o">/</span><span class="n">pyalm.git</span><span class="w">
-</span><span class="n">cd</span><span class="w"> </span><span class="n">pyalm</span><span class="w">
-</span><span class="n">git</span><span class="w"> </span><span class="n">checkout</span><span class="w"> </span><span class="n">scott</span><span class="w">
-</span><span class="n">python</span><span class="w"> </span><span class="n">setup.py</span><span class="w"> </span><span class="n">install</span><span class="w">
-</span></code></pre>
-</div>
-
-<p>Ruby</p>
-
-<div class="language-r highlighter-rouge"><pre class="highlight"><code><span class="n">gem</span><span class="w"> </span><span class="n">install</span><span class="w"> </span><span class="n">httparty</span><span class="w"> </span><span class="n">json</span><span class="w"> </span><span class="n">rake</span><span class="w">
-</span><span class="n">git</span><span class="w"> </span><span class="n">clone</span><span class="w"> </span><span class="n">https</span><span class="o">://</span><span class="n">github.com</span><span class="o">/</span><span class="n">sckott</span><span class="o">/</span><span class="n">alm.git</span><span class="w">
-</span><span class="n">cd</span><span class="w"> </span><span class="n">alm</span><span class="w">
-</span><span class="n">make</span><span class="w"> </span><span class="c1"># which runs build and install tasks
-</span></code></pre>
-</div>
-
-<p>If you don’t have <code class="highlighter-rouge">make</code>, then just run <code class="highlighter-rouge">gem build alm.gemspec</code> and 	<code class="highlighter-rouge">gem install alm-0.1.0.gem</code> seperately.</p>
-
-<h2 id="example">Example</h2>
-
-<p>In this example, we’ll get altmetrics data for two DOIs: <a href="http://www.plosone.org/article/info%3Adoi%2F10.1371%2Fjournal.pone.0029797">10.1371/journal.pone.0029797</a>, and <a href="http://www.plosone.org/article/info%3Adoi%2F10.1371%2Fjournal.pone.0029798">10.1371/journal.pone.0029798</a> (click on links to go to paper).</p>
-
-<h3 id="r">R</h3>
-
-<div class="language-r highlighter-rouge"><pre class="highlight"><code><span class="n">library</span><span class="p">(</span><span class="s1">'alm'</span><span class="p">)</span><span class="w">
-</span><span class="n">ids</span><span class="w"> </span><span class="o">&lt;-</span><span class="w"> </span><span class="nf">c</span><span class="p">(</span><span class="s2">"10.1371/journal.pone.0029797"</span><span class="p">,</span><span class="s2">"10.1371/journal.pone.0029798"</span><span class="p">)</span><span class="w">
-</span><span class="n">alm_ids</span><span class="p">(</span><span class="n">ids</span><span class="p">,</span><span class="w"> </span><span class="n">info</span><span class="o">=</span><span class="s2">"summary"</span><span class="p">)</span><span class="w">
-</span><span class="c1">#&gt; $meta
-#&gt;   total total_pages page error
-#&gt; 1     2           1    1    NA
-#&gt; 
-#&gt; $data
-#&gt; $data$`10.1371/journal.pone.0029798`
-#&gt; $data$`10.1371/journal.pone.0029798`$info
-#&gt;                            doi
-#&gt; 1 10.1371/journal.pone.0029798
-#&gt;                                                                                     title
-#&gt; 1 Mitochondrial Electron Transport Is the Cellular Target of the Oncology Drug Elesclomol
-#&gt;                                                                canonical_url
-#&gt; 1 http://www.plosone.org/article/info%3Adoi%2F10.1371%2Fjournal.pone.0029798
-#&gt;       pmid   pmcid                        mendeley_uuid
-#&gt; 1 22253786 3256171 b08cc99e-b526-3f0c-adaa-d5ee6d0d978a
-#&gt;            update_date     issued
-#&gt; 1 2014-12-09T02:52:47Z 2012-01-11
-#&gt; 
-#&gt; $data$`10.1371/journal.pone.0029798`$signposts
-#&gt;                            doi viewed saved discussed cited
-#&gt; 1 10.1371/journal.pone.0029798   4346    14         2    26
-#&gt; 
-#&gt; 
-#&gt; $data$`10.1371/journal.pone.0029797`
-#&gt; $data$`10.1371/journal.pone.0029797`$info
-#&gt;                            doi
-#&gt; 1 10.1371/journal.pone.0029797
-#&gt;                                                                             title
-#&gt; 1 Ecological Guild Evolution and the Discovery of the World's Smallest Vertebrate
-#&gt;                                                                canonical_url
-#&gt; 1 http://www.plosone.org/article/info%3Adoi%2F10.1371%2Fjournal.pone.0029797
-#&gt;       pmid   pmcid                        mendeley_uuid
-#&gt; 1 22253785 3256195 897fbbd6-5a23-3552-8077-97251b82c1e1
-#&gt;            update_date     issued
-#&gt; 1 2014-12-09T02:52:46Z 2012-01-11
-#&gt; 
-#&gt; $data$`10.1371/journal.pone.0029797`$signposts
-#&gt;                            doi viewed saved discussed cited
-#&gt; 1 10.1371/journal.pone.0029797  34282    81       244     8
-</span></code></pre>
-</div>
-
-<h3 id="python">Python</h3>
-
-<div class="language-r highlighter-rouge"><pre class="highlight"><code><span class="n">import</span><span class="w"> </span><span class="n">pyalm</span><span class="w">
-</span><span class="n">ids</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="s2">"10.1371/journal.pone.0029797"</span><span class="p">,</span><span class="s2">"10.1371/journal.pone.0029798"</span><span class="p">]</span><span class="w">
-</span><span class="n">pyalm.get_alm</span><span class="p">(</span><span class="n">ids</span><span class="p">,</span><span class="w"> </span><span class="n">info</span><span class="o">=</span><span class="s2">"summary"</span><span class="p">)</span><span class="w">
-
-</span><span class="c1">#&gt; {'articles': [&lt;ArticleALM Mitochondrial Electron Transport Is the Cellular Target of the Oncology Drug Elesclomol,
-#&gt; DOI 10.1371/journal.pone.0029798&gt;,
-#&gt;   &lt;ArticleALM Ecological Guild Evolution and the Discovery of the World's Smallest Vertebrate,
-#&gt;         DOI 10.1371/journal.pone.0029797&gt;],
-#&gt;  'meta': {u'error': None, u'page': 1, u'total': 2, u'total_pages': 1}}
-</span></code></pre>
-</div>
-
-<h3 id="ruby">Ruby</h3>
-
-<div class="language-r highlighter-rouge"><pre class="highlight"><code><span class="n">require</span><span class="w"> </span><span class="s1">'alm'</span><span class="w">
-</span><span class="n">Alm.alm</span><span class="p">(</span><span class="n">ids</span><span class="o">:</span><span class="w"> </span><span class="p">[</span><span class="s2">"10.1371/journal.pone.0029797"</span><span class="p">,</span><span class="s2">"10.1371/journal.pone.0029798"</span><span class="p">],</span><span class="w"> </span><span class="n">key</span><span class="o">:</span><span class="w"> </span><span class="n">ENV</span><span class="p">[</span><span class="s1">'PLOS_API_KEY'</span><span class="p">])</span><span class="w">
-
-</span><span class="c1">#&gt; =&gt; {"total"=&gt;2,
-#&gt;  "total_pages"=&gt;1,
-#&gt;  "page"=&gt;1,
-#&gt;  "error"=&gt;nil,
-#&gt;  "data"=&gt;
-#&gt;   [{"doi"=&gt;"10.1371/journal.pone.0029798",
-#&gt;     "title"=&gt;"Mitochondrial Electron Transport Is the Cellular Target of the Oncology Drug Elesclomol",
-#&gt;     "issued"=&gt;{"date-parts"=&gt;[[2012, 1, 11]]},
-#&gt;     "canonical_url"=&gt;"http://www.plosone.org/article/info%3Adoi%2F10.1371%2Fjournal.pone.0029798",
-#&gt;     "pmid"=&gt;"22253786",
-#&gt;     "pmcid"=&gt;"3256171",
-#&gt;     "mendeley_uuid"=&gt;"b08cc99e-b526-3f0c-adaa-d5ee6d0d978a",
-#&gt;     "viewed"=&gt;4346,
-#&gt;     "saved"=&gt;14,
-#&gt;     "discussed"=&gt;2,
-#&gt;     "cited"=&gt;26,
-#&gt;     "update_date"=&gt;"2014-12-09T02:52:47Z"},
-#&gt;    {"doi"=&gt;"10.1371/journal.pone.0029797",
-#&gt;     "title"=&gt;"Ecological Guild Evolution and the Discovery of the World's Smallest Vertebrate",
-#&gt;     "issued"=&gt;{"date-parts"=&gt;[[2012, 1, 11]]},
-#&gt;     "canonical_url"=&gt;"http://www.plosone.org/article/info%3Adoi%2F10.1371%2Fjournal.pone.0029797",
-#&gt;     "pmid"=&gt;"22253785",
-#&gt;     "pmcid"=&gt;"3256195",
-#&gt;     "mendeley_uuid"=&gt;"897fbbd6-5a23-3552-8077-97251b82c1e1",
-#&gt;     "viewed"=&gt;34282,
-#&gt;     "saved"=&gt;81,
-#&gt;     "discussed"=&gt;244,
-#&gt;     "cited"=&gt;8,
-#&gt;     "update_date"=&gt;"2014-12-09T02:52:46Z"}]}
-</span></code></pre>
-</div>
+The others sources in `musemeta` mostly work the same way as the above.
 
   </div>
   
