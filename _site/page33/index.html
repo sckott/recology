@@ -61,6 +61,140 @@
   
   <div class="post">
     <h1>
+      <a href="/2012/08/ggplot-inset-map/">
+        ggplot2 maps with insets
+      </a>
+    </h1>
+
+    <span class="post-date">22 Aug 2012</span>
+
+    <blockquote>
+  <p>UPDATE: changed data source so that the entire example can be run by anyone on their own machine. Also, per Joachim’s suggestion, I put a box around the blown up area of the map. In addition, rgeos and maptools removed, not needed.</p>
+</blockquote>
+
+<hr />
+
+<p>Here’s a quick demo of creating a map with an inset within it using ggplot. The inset is achieved using the <code class="highlighter-rouge">gridExtra</code> package.</p>
+
+<h3 id="install-libraries">Install libraries</h3>
+
+<div class="language-r highlighter-rouge"><pre class="highlight"><code><span class="n">install.packages</span><span class="p">(</span><span class="nf">c</span><span class="p">(</span><span class="s2">"ggplot2"</span><span class="p">,</span><span class="w"> </span><span class="s2">"maps"</span><span class="p">,</span><span class="w"> </span><span class="s2">"grid"</span><span class="p">,</span><span class="w"> </span><span class="s2">"gridExtra"</span><span class="p">))</span><span class="w">
+</span></code></pre>
+</div>
+
+<div class="language-r highlighter-rouge"><pre class="highlight"><code><span class="n">library</span><span class="p">(</span><span class="s2">"ggplot2"</span><span class="p">)</span><span class="w">
+</span><span class="n">library</span><span class="p">(</span><span class="s2">"maps"</span><span class="p">)</span><span class="w">
+</span><span class="n">library</span><span class="p">(</span><span class="s2">"grid"</span><span class="p">)</span><span class="w">
+</span><span class="n">library</span><span class="p">(</span><span class="s2">"gridExtra"</span><span class="p">)</span><span class="w">
+</span></code></pre>
+</div>
+
+<h3 id="create-a-data-frame">Create a data frame</h3>
+
+<div class="language-r highlighter-rouge"><pre class="highlight"><code><span class="n">dat</span><span class="w"> </span><span class="o">&lt;-</span><span class="w"> </span><span class="n">data.frame</span><span class="p">(</span><span class="n">ecosystem</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nf">rep</span><span class="p">(</span><span class="nf">c</span><span class="p">(</span><span class="s2">"oak"</span><span class="p">,</span><span class="w"> </span><span class="s2">"steppe"</span><span class="p">,</span><span class="w"> </span><span class="s2">"prairie"</span><span class="p">),</span><span class="w"> </span><span class="n">each</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="m">8</span><span class="p">),</span><span class="w">
+    </span><span class="n">lat</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">rnorm</span><span class="p">(</span><span class="m">24</span><span class="p">,</span><span class="w"> </span><span class="n">mean</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="m">51</span><span class="p">,</span><span class="w"> </span><span class="n">sd</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="m">1</span><span class="p">),</span><span class="w"> </span><span class="n">lon</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">rnorm</span><span class="p">(</span><span class="m">24</span><span class="p">,</span><span class="w"> </span><span class="n">mean</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="m">-113</span><span class="p">,</span><span class="w"> </span><span class="n">sd</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="m">5</span><span class="p">))</span><span class="w">
+</span><span class="n">head</span><span class="p">(</span><span class="n">dat</span><span class="p">)</span><span class="w">
+</span><span class="c1">#&gt;   ecosystem      lat       lon
+#&gt; 1       oak 49.58285 -107.6930
+#&gt; 2       oak 52.58942 -116.6920
+#&gt; 3       oak 50.49277 -114.5542
+#&gt; 4       oak 50.05943 -116.5660
+#&gt; 5       oak 51.76492 -112.1457
+#&gt; 6       oak 52.82153 -112.8858
+</span></code></pre>
+</div>
+
+<h3 id="get-maps-using-the-maps-library">Get maps using the maps library</h3>
+
+<p>Get a map of Canada</p>
+
+<div class="language-r highlighter-rouge"><pre class="highlight"><code><span class="n">canadamap</span><span class="w"> </span><span class="o">&lt;-</span><span class="w"> </span><span class="n">data.frame</span><span class="p">(</span><span class="n">map</span><span class="p">(</span><span class="s2">"world"</span><span class="p">,</span><span class="w"> </span><span class="s2">"Canada"</span><span class="p">,</span><span class="w"> </span><span class="n">plot</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="kc">FALSE</span><span class="p">)[</span><span class="nf">c</span><span class="p">(</span><span class="s2">"x"</span><span class="p">,</span><span class="w"> </span><span class="s2">"y"</span><span class="p">)])</span><span class="w">
+</span></code></pre>
+</div>
+
+<p>Get a map of smaller extent</p>
+
+<div class="language-r highlighter-rouge"><pre class="highlight"><code><span class="n">canadamapsmall</span><span class="w"> </span><span class="o">&lt;-</span><span class="w"> </span><span class="n">canadamap</span><span class="p">[</span><span class="n">canadamap</span><span class="o">$</span><span class="n">x</span><span class="w"> </span><span class="o">&lt;</span><span class="w"> </span><span class="m">-90</span><span class="w"> </span><span class="o">&amp;</span><span class="w"> </span><span class="n">canadamap</span><span class="o">$</span><span class="n">y</span><span class="w"> </span><span class="o">&lt;</span><span class="w"> </span><span class="m">54</span><span class="p">,</span><span class="w"> </span><span class="p">]</span><span class="w">
+</span><span class="n">canadamapsmall_</span><span class="w"> </span><span class="o">&lt;-</span><span class="w"> </span><span class="n">na.omit</span><span class="p">(</span><span class="n">canadamapsmall</span><span class="p">)</span><span class="w">
+</span></code></pre>
+</div>
+
+<p>This should get your corner points for the box, picking min and max of lat and lon</p>
+
+<div class="language-r highlighter-rouge"><pre class="highlight"><code><span class="p">(</span><span class="n">insetrect</span><span class="w"> </span><span class="o">&lt;-</span><span class="w"> </span><span class="n">data.frame</span><span class="p">(</span><span class="n">xmin</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nf">min</span><span class="p">(</span><span class="n">canadamapsmall_</span><span class="o">$</span><span class="n">x</span><span class="p">),</span><span class="w"> </span><span class="n">xmax</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nf">max</span><span class="p">(</span><span class="n">canadamapsmall_</span><span class="o">$</span><span class="n">x</span><span class="p">),</span><span class="w">
+    </span><span class="n">ymin</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nf">min</span><span class="p">(</span><span class="n">canadamapsmall_</span><span class="o">$</span><span class="n">y</span><span class="p">),</span><span class="w"> </span><span class="n">ymax</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nf">max</span><span class="p">(</span><span class="n">canadamapsmall_</span><span class="o">$</span><span class="n">y</span><span class="p">)))</span><span class="w">
+</span><span class="c1">#&gt;        xmin      xmax     ymin     ymax
+#&gt; 1 -133.0975 -90.38942 48.04721 53.99915
+</span></code></pre>
+</div>
+
+<h3 id="make-the-maps">Make the maps</h3>
+
+<p>Create a theme to be used by both plots</p>
+
+<div class="language-r highlighter-rouge"><pre class="highlight"><code><span class="n">ptheme</span><span class="w"> </span><span class="o">&lt;-</span><span class="w"> </span><span class="n">theme</span><span class="p">(</span><span class="w">
+  </span><span class="n">panel.border</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">element_rect</span><span class="p">(</span><span class="n">colour</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s1">'black'</span><span class="p">,</span><span class="w"> </span><span class="n">size</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="m">1</span><span class="p">,</span><span class="w"> </span><span class="n">linetype</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="m">1</span><span class="p">),</span><span class="w">
+  </span><span class="n">panel.grid.major</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">element_blank</span><span class="p">(),</span><span class="w"> 
+  </span><span class="n">panel.grid.minor</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">element_blank</span><span class="p">(),</span><span class="w">
+  </span><span class="n">panel.background</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">element_rect</span><span class="p">(</span><span class="n">fill</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s1">'white'</span><span class="p">),</span><span class="w">
+  </span><span class="n">legend.key</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">element_blank</span><span class="p">()</span><span class="w">
+</span><span class="p">)</span><span class="w">
+</span></code></pre>
+</div>
+
+<p>The inset map, all of Canada</p>
+
+<div class="language-r highlighter-rouge"><pre class="highlight"><code><span class="n">a</span><span class="w"> </span><span class="o">&lt;-</span><span class="w"> </span><span class="n">ggplot</span><span class="p">(</span><span class="n">canadamap</span><span class="p">)</span><span class="w"> </span><span class="o">+</span><span class="w">
+	</span><span class="n">theme_bw</span><span class="p">(</span><span class="n">base_size</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="m">22</span><span class="p">)</span><span class="w"> </span><span class="o">+</span><span class="w">
+	</span><span class="n">geom_path</span><span class="p">(</span><span class="n">data</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">canadamap</span><span class="p">,</span><span class="w"> </span><span class="n">aes</span><span class="p">(</span><span class="n">x</span><span class="p">,</span><span class="w"> </span><span class="n">y</span><span class="p">),</span><span class="w"> </span><span class="n">colour</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"black"</span><span class="p">,</span><span class="w"> </span><span class="n">fill</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"white"</span><span class="p">)</span><span class="w"> </span><span class="o">+</span><span class="w">
+	</span><span class="n">geom_rect</span><span class="p">(</span><span class="n">data</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">insetrect</span><span class="p">,</span><span class="w"> </span><span class="n">aes</span><span class="p">(</span><span class="n">xmin</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">xmin</span><span class="p">,</span><span class="w"> </span><span class="n">xmax</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">xmax</span><span class="p">,</span><span class="w"> </span><span class="n">ymin</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">ymin</span><span class="p">,</span><span class="w"> </span><span class="n">ymax</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">ymax</span><span class="p">),</span><span class="w"> </span><span class="n">alpha</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="m">0</span><span class="p">,</span><span class="w"> </span><span class="n">colour</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"blue"</span><span class="p">,</span><span class="w"> </span><span class="n">size</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="m">1</span><span class="p">,</span><span class="w"> </span><span class="n">linetype</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="m">1</span><span class="p">)</span><span class="w"> </span><span class="o">+</span><span class="w">
+  </span><span class="n">ptheme</span><span class="w"> </span><span class="o">%+%</span><span class="w"> </span><span class="n">theme</span><span class="p">(</span><span class="w">
+    </span><span class="n">legend.position</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nf">c</span><span class="p">(</span><span class="m">0.15</span><span class="p">,</span><span class="w"> </span><span class="m">0.80</span><span class="p">),</span><span class="w">
+    </span><span class="n">axis.ticks</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">element_blank</span><span class="p">(),</span><span class="w"> 
+    </span><span class="n">axis.text.x</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">element_blank</span><span class="p">(),</span><span class="w">
+    </span><span class="n">axis.text.y</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">element_blank</span><span class="p">()</span><span class="w">
+  </span><span class="p">)</span><span class="w"> </span><span class="o">+</span><span class="w">
+	</span><span class="n">labs</span><span class="p">(</span><span class="n">x</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s1">''</span><span class="p">,</span><span class="w"> </span><span class="n">y</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s1">''</span><span class="p">)</span><span class="w">
+</span></code></pre>
+</div>
+
+<p>The larger map, zoomed in, with the data</p>
+
+<div class="language-r highlighter-rouge"><pre class="highlight"><code><span class="n">b</span><span class="w"> </span><span class="o">&lt;-</span><span class="w"> </span><span class="n">ggplot</span><span class="p">(</span><span class="n">dat</span><span class="p">,</span><span class="w"> </span><span class="n">aes</span><span class="p">(</span><span class="n">lon</span><span class="p">,</span><span class="w"> </span><span class="n">lat</span><span class="p">,</span><span class="w"> </span><span class="n">colour</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">ecosystem</span><span class="p">))</span><span class="w"> </span><span class="o">+</span><span class="w">
+	</span><span class="n">theme_bw</span><span class="p">(</span><span class="n">base_size</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="m">22</span><span class="p">)</span><span class="w"> </span><span class="o">+</span><span class="w">
+	</span><span class="n">geom_jitter</span><span class="p">(</span><span class="n">size</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="m">4</span><span class="p">,</span><span class="w"> </span><span class="n">alpha</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="m">0.6</span><span class="p">)</span><span class="w"> </span><span class="o">+</span><span class="w">
+	</span><span class="n">geom_path</span><span class="p">(</span><span class="n">data</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">canadamapsmall</span><span class="p">,</span><span class="w"> </span><span class="n">aes</span><span class="p">(</span><span class="n">x</span><span class="p">,</span><span class="w"> </span><span class="n">y</span><span class="p">),</span><span class="w"> </span><span class="n">colour</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"black"</span><span class="p">,</span><span class="w"> </span><span class="n">fill</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"white"</span><span class="p">)</span><span class="w"> </span><span class="o">+</span><span class="w">
+	</span><span class="n">scale_size</span><span class="p">(</span><span class="n">guide</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"none"</span><span class="p">)</span><span class="w"> </span><span class="o">+</span><span class="w">
+  </span><span class="n">ptheme</span><span class="w"> </span><span class="o">%+%</span><span class="w"> </span><span class="n">theme</span><span class="p">(</span><span class="w">
+    </span><span class="n">legend.position</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nf">c</span><span class="p">(</span><span class="m">0.1</span><span class="p">,</span><span class="w"> </span><span class="m">0.20</span><span class="p">),</span><span class="w">
+    </span><span class="n">legend.text</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">element_text</span><span class="p">(</span><span class="n">size</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="m">12</span><span class="p">,</span><span class="w"> </span><span class="n">face</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s1">'bold'</span><span class="p">),</span><span class="w">
+    </span><span class="n">legend.title</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">element_text</span><span class="p">(</span><span class="n">size</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="m">12</span><span class="p">,</span><span class="w"> </span><span class="n">face</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s1">'bold'</span><span class="p">),</span><span class="w"> 
+    </span><span class="n">axis.ticks</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">element_line</span><span class="p">(</span><span class="n">size</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="m">2</span><span class="p">)</span><span class="w">
+  </span><span class="p">)</span><span class="w"> </span><span class="o">+</span><span class="w">
+	</span><span class="n">labs</span><span class="p">(</span><span class="n">x</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s1">''</span><span class="p">,</span><span class="w"> </span><span class="n">y</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s1">''</span><span class="p">)</span><span class="w">
+</span></code></pre>
+</div>
+
+<h3 id="print-maps">Print maps</h3>
+
+<p>One an inset of the other. This approach uses the <code class="highlighter-rouge">gridExtra</code> package for flexible alignment, etc. of ggplot graphs.</p>
+
+<div class="language-r highlighter-rouge"><pre class="highlight"><code><span class="n">grid.newpage</span><span class="p">()</span><span class="w">
+</span><span class="n">vpb_</span><span class="w"> </span><span class="o">&lt;-</span><span class="w"> </span><span class="n">viewport</span><span class="p">(</span><span class="n">width</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="m">1</span><span class="p">,</span><span class="w"> </span><span class="n">height</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="m">1</span><span class="p">,</span><span class="w"> </span><span class="n">x</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="m">0.5</span><span class="p">,</span><span class="w"> </span><span class="n">y</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="m">0.5</span><span class="p">)</span><span class="w">  </span><span class="c1"># the larger map
+</span><span class="n">vpa_</span><span class="w"> </span><span class="o">&lt;-</span><span class="w"> </span><span class="n">viewport</span><span class="p">(</span><span class="n">width</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="m">0.4</span><span class="p">,</span><span class="w"> </span><span class="n">height</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="m">0.4</span><span class="p">,</span><span class="w"> </span><span class="n">x</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="m">0.8</span><span class="p">,</span><span class="w"> </span><span class="n">y</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="m">0.8</span><span class="p">)</span><span class="w">  </span><span class="c1"># the inset in upper right
+</span><span class="n">print</span><span class="p">(</span><span class="n">b</span><span class="p">,</span><span class="w"> </span><span class="n">vp</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">vpb_</span><span class="p">)</span><span class="w">
+</span><span class="n">print</span><span class="p">(</span><span class="n">a</span><span class="p">,</span><span class="w"> </span><span class="n">vp</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">vpa_</span><span class="p">)</span><span class="w">
+</span></code></pre>
+</div>
+
+<p><img src="/public/img/2012-08-22-ggplot-inset-map/unnamed-chunk-11-1.png" alt="plot of chunk unnamed-chunk-11" /></p>
+
+<p>Written in <a href="http://daringfireball.net/projects/markdown/">Markdown</a>, with help from <a href="http://yihui.name/knitr/">knitr</a>, and nice knitr highlighting/etc. in in <a href="http://rstudio.org/">RStudio</a>.</p>
+
+  </div>
+  
+  <div class="post">
+    <h1>
       <a href="/2012/07/global-names-resolver/">
         Hitting the Global Names Resolver API
       </a>
@@ -68,146 +202,130 @@
 
     <span class="post-date">20 Jul 2012</span>
 
-    ## Example of using the Global Names Resolver API to check species names
+    <h2 id="example-of-using-the-global-names-resolver-api-to-check-species-names">Example of using the Global Names Resolver API to check species names</h2>
 
-*********
+<hr />
 
-There are a number of options for resolution of taxonomic names. The [Taxonomic Name Resolution Service (TNRS)](http://tnrs.iplantcollaborative.org/) comes to mind. There is a new service for taxonomic name resoultion called the [Global Names Resolver](http://resolver.globalnames.org/). They describe the service thusly "_Resolve lists of scientific names against known sources. This service parses incoming names, executes exact or fuzzy matching as required, and displays a confidence score for each match along with its identifier._". 
+<p>There are a number of options for resolution of taxonomic names. The <a href="http://tnrs.iplantcollaborative.org/">Taxonomic Name Resolution Service (TNRS)</a> comes to mind. There is a new service for taxonomic name resoultion called the <a href="http://resolver.globalnames.org/">Global Names Resolver</a>. They describe the service thusly “<em>Resolve lists of scientific names against known sources. This service parses incoming names, executes exact or fuzzy matching as required, and displays a confidence score for each match along with its identifier.</em>”.</p>
 
-*********
+<hr />
 
-## Load required packages
+<h2 id="load-required-packages">Load required packages</h2>
 
-### Just uncomment the code to use.
+<h3 id="just-uncomment-the-code-to-use">Just uncomment the code to use.</h3>
 
-
-{% highlight r linenos %}
-# If you don't have them already
+<figure class="highlight"><pre><code class="language-r" data-lang="r"><table style="border-spacing: 0"><tbody><tr><td class="gutter gl" style="text-align: right"><pre class="lineno">1
+2
+3
+4
+5
+6</pre></td><td class="code"><pre><span class="c1"># If you don't have them already
 # install.packages(c('RJSONIO','plyr','devtools')) require(devtools)
 # install_github('taxize_','ropensci')
-library(RJSONIO)
-library(plyr)
-library(taxize)
-{% endhighlight %}
+</span><span class="n">library</span><span class="p">(</span><span class="n">RJSONIO</span><span class="p">)</span><span class="w">
+</span><span class="n">library</span><span class="p">(</span><span class="n">plyr</span><span class="p">)</span><span class="w">
+</span><span class="n">library</span><span class="p">(</span><span class="n">taxize</span><span class="p">)</span><span class="w">
+</span></pre></td></tr></tbody></table></code></pre></figure>
 
+<h2 id="get-the-data-sources-available">Get the data sources available</h2>
 
-## Get the data sources available
+<h3 id="get-just-ids-and-names-of-sources-in-a-dataframe">Get just id’s and names of sources in a data.frame</h3>
 
-### Get just id's and names of sources in a data.frame
+<figure class="highlight"><pre><code class="language-r" data-lang="r"><table style="border-spacing: 0"><tbody><tr><td class="gutter gl" style="text-align: right"><pre class="lineno">1</pre></td><td class="code"><pre><span class="n">tail</span><span class="p">(</span><span class="n">gnr_datasources</span><span class="p">(</span><span class="n">todf</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nb">T</span><span class="p">))</span><span class="w">
+</span></pre></td></tr></tbody></table></code></pre></figure>
 
-{% highlight r linenos %}
-tail(gnr_datasources(todf = T))
-{% endhighlight %}
-
-
-
-{% highlight text %}
-##     id                                title
+<figure class="highlight"><pre><code class="language-text" data-lang="text">##     id                                title
 ## 82 164                            BioLib.cz
 ## 83 165 Tropicos - Missouri Botanical Garden
 ## 84 166                                nlbif
 ## 85 167                                 IPNI
 ## 86 168              Index to Organism Names
-## 87 169                        uBio NameBank
-{% endhighlight %}
+## 87 169                        uBio NameBank</code></pre></figure>
 
+<hr />
 
-*********
+<h3 id="give-me-the-id-for-eol-encyclopedia-of-life">Give me the id for EOL (Encyclopedia of Life)</h3>
 
-### Give me the id for EOL (Encyclopedia of Life)
+<figure class="highlight"><pre><code class="language-r" data-lang="r"><table style="border-spacing: 0"><tbody><tr><td class="gutter gl" style="text-align: right"><pre class="lineno">1
+2</pre></td><td class="code"><pre><span class="n">out</span><span class="w"> </span><span class="o">&lt;-</span><span class="w"> </span><span class="n">gnr_datasources</span><span class="p">(</span><span class="n">todf</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nb">T</span><span class="p">)</span><span class="w">
+</span><span class="n">out</span><span class="p">[</span><span class="n">out</span><span class="o">$</span><span class="n">title</span><span class="w"> </span><span class="o">==</span><span class="w"> </span><span class="s2">"EOL"</span><span class="p">,</span><span class="w"> </span><span class="s2">"id"</span><span class="p">]</span><span class="w">
+</span></pre></td></tr></tbody></table></code></pre></figure>
 
-{% highlight r linenos %}
-out <- gnr_datasources(todf = T)
-out[out$title == "EOL", "id"]
-{% endhighlight %}
+<figure class="highlight"><pre><code class="language-text" data-lang="text">## [1] 12</code></pre></figure>
 
+<hr />
 
+<h3 id="fuzzy-search-for-sources-with-the-word-zoo">Fuzzy search for sources with the word “zoo”</h3>
 
-{% highlight text %}
-## [1] 12
-{% endhighlight %}
+<figure class="highlight"><pre><code class="language-r" data-lang="r"><table style="border-spacing: 0"><tbody><tr><td class="gutter gl" style="text-align: right"><pre class="lineno">1
+2
+3</pre></td><td class="code"><pre><span class="n">out</span><span class="w"> </span><span class="o">&lt;-</span><span class="w"> </span><span class="n">gnr_datasources</span><span class="p">(</span><span class="n">todf</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nb">T</span><span class="p">)</span><span class="w">
+</span><span class="n">outdf</span><span class="w"> </span><span class="o">&lt;-</span><span class="w"> </span><span class="n">out</span><span class="p">[</span><span class="n">agrep</span><span class="p">(</span><span class="s2">"zoo"</span><span class="p">,</span><span class="w"> </span><span class="n">out</span><span class="o">$</span><span class="n">title</span><span class="p">,</span><span class="w"> </span><span class="n">ignore.case</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nb">T</span><span class="p">),</span><span class="w"> </span><span class="p">]</span><span class="w">
+</span><span class="n">outdf</span><span class="p">[</span><span class="m">1</span><span class="o">:</span><span class="m">2</span><span class="p">,</span><span class="w"> </span><span class="p">]</span><span class="w">
+</span></pre></td></tr></tbody></table></code></pre></figure>
 
-
-*********
-
-### Fuzzy search for sources with the word "zoo"
-
-{% highlight r linenos %}
-out <- gnr_datasources(todf = T)
-outdf <- out[agrep("zoo", out$title, ignore.case = T), ]
-outdf[1:2, ]
-{% endhighlight %}
-
-
-
-{% highlight text %}
-##     id             title
+<figure class="highlight"><pre><code class="language-text" data-lang="text">##     id             title
 ## 20 100 Mushroom Observer
-## 25 105           ZooKeys
-{% endhighlight %}
+## 25 105           ZooKeys</code></pre></figure>
 
+<h2 id="resolve-some-names">Resolve some names</h2>
 
-## Resolve some names
+<h3 id="search-for-helianthus-annuus-and-homo-sapiens-return-a-dataframe">Search for <em>Helianthus annuus</em> and <em>Homo sapiens</em>, return a data.frame</h3>
 
-### Search for _Helianthus annuus_ and _Homo sapiens_, return a data.frame
+<figure class="highlight"><pre><code class="language-r" data-lang="r"><table style="border-spacing: 0"><tbody><tr><td class="gutter gl" style="text-align: right"><pre class="lineno">1</pre></td><td class="code"><pre><span class="n">gnr</span><span class="p">(</span><span class="n">names</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nf">c</span><span class="p">(</span><span class="s2">"Helianthus annuus"</span><span class="p">,</span><span class="w"> </span><span class="s2">"Homo sapiens"</span><span class="p">),</span><span class="w"> </span><span class="n">returndf</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="kc">TRUE</span><span class="p">)[</span><span class="m">1</span><span class="o">:</span><span class="m">2</span><span class="p">,</span><span class="w"> </span><span class="p">]</span><span class="w">
+</span></pre></td></tr></tbody></table></code></pre></figure>
 
-{% highlight r linenos %}
-gnr(names = c("Helianthus annuus", "Homo sapiens"), returndf = TRUE)[1:2, ]
-{% endhighlight %}
-
-
-
-{% highlight text %}
-##   data_source_id    submitted_name       name_string score    title
+<figure class="highlight"><pre><code class="language-text" data-lang="text">##   data_source_id    submitted_name       name_string score    title
 ## 1              4 Helianthus annuus Helianthus annuus 0.988     NCBI
-## 3             10 Helianthus annuus Helianthus annuus 0.988 Freebase
-{% endhighlight %}
+## 3             10 Helianthus annuus Helianthus annuus 0.988 Freebase</code></pre></figure>
 
+<hr />
 
-*********
+<h3 id="search-for-the-same-species-with-only-using-data-source-12-ie-eol">Search for the same species, with only using data source 12 (i.e., EOL)</h3>
 
-### Search for the same species, with only using data source 12 (i.e., EOL)
+<figure class="highlight"><pre><code class="language-r" data-lang="r"><table style="border-spacing: 0"><tbody><tr><td class="gutter gl" style="text-align: right"><pre class="lineno">1
+2</pre></td><td class="code"><pre><span class="n">gnr</span><span class="p">(</span><span class="n">names</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nf">c</span><span class="p">(</span><span class="s2">"Helianthus annuus"</span><span class="p">,</span><span class="w"> </span><span class="s2">"Homo sapiens"</span><span class="p">),</span><span class="w"> </span><span class="n">data_source_ids</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"12"</span><span class="p">,</span><span class="w"> 
+    </span><span class="n">returndf</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="kc">TRUE</span><span class="p">)</span><span class="w">
+</span></pre></td></tr></tbody></table></code></pre></figure>
 
-{% highlight r linenos %}
-gnr(names = c("Helianthus annuus", "Homo sapiens"), data_source_ids = "12", 
-    returndf = TRUE)
-{% endhighlight %}
-
-
-
-{% highlight text %}
-##   data_source_id    submitted_name       name_string score title
+<figure class="highlight"><pre><code class="language-text" data-lang="text">##   data_source_id    submitted_name       name_string score title
 ## 1             12 Helianthus annuus Helianthus annuus 0.988   EOL
-## 2             12      Homo sapiens      Homo sapiens 0.988   EOL
-{% endhighlight %}
+## 2             12      Homo sapiens      Homo sapiens 0.988   EOL</code></pre></figure>
 
+<h3 id="thats-it-have-fun-and-put-bugscommentsetc-herehttpsgithubcomropenscitaxizeissues">That’s it. Have fun! And put bugs/comments/etc. <a href="https://github.com/ropensci/taxize_/issues">here</a>.</h3>
 
+<hr />
 
-### That's it. Have fun! And put bugs/comments/etc. [here](https://github.com/ropensci/taxize_/issues).
+<h3 id="written-in-markdownhttpdaringfireballnetprojectsmarkdown-with-help-from-knitrhttpyihuinameknitr-and-nice-knitr-highlightingetc-in-in-rstudiohttprstudioorg">Written in <a href="http://daringfireball.net/projects/markdown/">Markdown</a>, with help from <a href="http://yihui.name/knitr/">knitr</a>, and nice knitr highlighting/etc. in in <a href="http://rstudio.org/">RStudio</a>.</h3>
 
-*********
+<hr />
 
-### Written in [Markdown](http://daringfireball.net/projects/markdown/), with help from [knitr](http://yihui.name/knitr/), and nice knitr highlighting/etc. in in [RStudio](http://rstudio.org/).
+<h3 id="i-prepared-the-markdown-for-this-post-by">I prepared the markdown for this post by:</h3>
 
-*********
+<figure class="highlight"><pre><code class="language-r" data-lang="r"><table style="border-spacing: 0"><tbody><tr><td class="gutter gl" style="text-align: right"><pre class="lineno">1
+2
+3
+4
+5
+6
+7
+8
+9
+10
+11</pre></td><td class="code"><pre><span class="n">KnitPost</span><span class="w"> </span><span class="o">&lt;-</span><span class="w"> </span><span class="k">function</span><span class="p">(</span><span class="n">input</span><span class="p">,</span><span class="w"> </span><span class="n">base.url</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"/"</span><span class="p">)</span><span class="w"> </span><span class="p">{</span><span class="w">
+    </span><span class="n">require</span><span class="p">(</span><span class="n">knitr</span><span class="p">)</span><span class="w">
+    </span><span class="n">opts_knit</span><span class="o">$</span><span class="n">set</span><span class="p">(</span><span class="n">base.url</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">base.url</span><span class="p">)</span><span class="w">
+    </span><span class="n">fig.path</span><span class="w"> </span><span class="o">&lt;-</span><span class="w"> </span><span class="n">paste0</span><span class="p">(</span><span class="s2">"img/"</span><span class="p">,</span><span class="w"> </span><span class="n">sub</span><span class="p">(</span><span class="s2">".Rmd$"</span><span class="p">,</span><span class="w"> </span><span class="s2">""</span><span class="p">,</span><span class="w"> </span><span class="n">basename</span><span class="p">(</span><span class="n">input</span><span class="p">)),</span><span class="w"> </span><span class="s2">"/"</span><span class="p">)</span><span class="w">
+    </span><span class="n">opts_chunk</span><span class="o">$</span><span class="n">set</span><span class="p">(</span><span class="n">fig.path</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">fig.path</span><span class="p">)</span><span class="w">
+    </span><span class="n">opts_chunk</span><span class="o">$</span><span class="n">set</span><span class="p">(</span><span class="n">fig.cap</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"center"</span><span class="p">)</span><span class="w">
+    </span><span class="n">render_jekyll</span><span class="p">()</span><span class="w">
+    </span><span class="n">knit</span><span class="p">(</span><span class="n">input</span><span class="p">,</span><span class="w"> </span><span class="n">envir</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">parent.frame</span><span class="p">())</span><span class="w">
+</span><span class="p">}</span><span class="w">
+</span><span class="n">setwd</span><span class="p">(</span><span class="s2">"/path/to/_posts"</span><span class="p">)</span><span class="w">
+</span><span class="n">KnitPost</span><span class="p">(</span><span class="s2">"/path/to/postfile.Rmd"</span><span class="p">)</span><span class="w">
+</span></pre></td></tr></tbody></table></code></pre></figure>
 
-### I prepared the markdown for this post by:
-
-{% highlight r linenos %}
-KnitPost <- function(input, base.url = "/") {
-    require(knitr)
-    opts_knit$set(base.url = base.url)
-    fig.path <- paste0("img/", sub(".Rmd$", "", basename(input)), "/")
-    opts_chunk$set(fig.path = fig.path)
-    opts_chunk$set(fig.cap = "center")
-    render_jekyll()
-    knit(input, envir = parent.frame())
-}
-setwd("/path/to/_posts")
-KnitPost("/path/to/postfile.Rmd")
-{% endhighlight %}
-
-from [jfisher](http://jfisher-usgs.github.com/r/2012/07/03/knitr-jekyll/).
+<p>from <a href="http://jfisher-usgs.github.com/r/2012/07/03/knitr-jekyll/">jfisher</a>.</p>
 
   </div>
   
@@ -220,96 +338,76 @@ from [jfisher](http://jfisher-usgs.github.com/r/2012/07/03/knitr-jekyll/).
 
     <span class="post-date">14 Jun 2012</span>
 
-    Many R packages/tools have come out recently for doing ecology and evolution. All of the below were described in Methods in Ecology and Evolution, except for spider, which came out in [Molecular Ecology Resources][mer]. Here are some highlights.
+    <p>Many R packages/tools have come out recently for doing ecology and evolution. All of the below were described in Methods in Ecology and Evolution, except for spider, which came out in <a href="http://onlinelibrary.wiley.com/journal/10.1111/(ISSN)1755-0998">Molecular Ecology Resources</a>. Here are some highlights.</p>
 
-+ mvabund [paper][mvabund] - [get R pkg](http://cran.r-project.org/web/packages/mvabund/index.html)
-	+ Model-based analysis of multivariate abundance data. Visualising data, fitting predictive models, checking assumptions, hypothesis testing.
-+ popdemo [paper][popdemo] - [get R pkg](http://cran.r-project.org/web/packages/popdemo/index.html)
-	+ Population demography using projection matrix analysis. 
-+ motmot [paper][motmot] - [get R pkg](http://cran.r-project.org/web/packages/motmot/index.html)
-	+ Models of trait macroevolution on trees
-+ spider [paper][spider] - [get R pkg](http://cran.r-project.org/web/packages/spider/index.html)
-	+ Analysis of species identity and evolution, with particular reference to DNA barcoding
-+ BaSTA [paper][BaSTA] - [get R pkg](http://cran.r-project.org/web/packages/BaSTA/index.html)
-	+ Bayesian estimation of age-specific survival from incomplete mark–recapture/recovery data with covariates
-+ abc [paper][abc] - [get R pkg](http://cran.r-project.org/web/packages/abc/index.html)
-	+ Approximate Bayesian Computation (ABC)
-+ RNetLogo [paper][RNetLogo] - [get R pkg](http://cran.r-project.org/web/packages/RNetLogo/index.html)
-	+ Running and exploring individual-based models implemented in NetLogo
-+ phytools [paper][phytools] - [get R pkg](http://cran.r-project.org/web/packages/phytools/index.html)
-	+ Tools for phylogenetic comparative biology
-+ smatr [paper][smatr] - [get R pkg](http://cran.r-project.org/web/packages/smatr/index.html)
-	+ Estimation and inference about allometric lines
-+ RBrownie [paper][brown] - [get R pkg ?](http://www.brianomeara.info/tutorials/brownie)
-	+ Testing hypotheses about rates of evolutionary change
-+ polytomy resolver [paper][poly] - [get R pkg](http://onlinelibrary.wiley.com/doi/10.1111/j.2041-210X.2011.00103.x/suppinfo)
-	+ Resolve polytomies on dated phylogenies with their R scripts [here][].
+<ul>
+  <li>mvabund <a href="http://onlinelibrary.wiley.com/doi/10.1111/j.2041-210X.2012.00190.x/abstract">paper</a> - <a href="http://cran.r-project.org/web/packages/mvabund/index.html">get R pkg</a>
+    <ul>
+      <li>Model-based analysis of multivariate abundance data. Visualising data, fitting predictive models, checking assumptions, hypothesis testing.</li>
+    </ul>
+  </li>
+  <li>popdemo <a href="http://onlinelibrary.wiley.com/doi/10.1111/j.2041-210X.2012.00222.x/abstract">paper</a> - <a href="http://cran.r-project.org/web/packages/popdemo/index.html">get R pkg</a>
+    <ul>
+      <li>Population demography using projection matrix analysis.</li>
+    </ul>
+  </li>
+  <li>motmot <a href="http://onlinelibrary.wiley.com/doi/10.1111/j.2041-210X.2011.00132.x/abstract">paper</a> - <a href="http://cran.r-project.org/web/packages/motmot/index.html">get R pkg</a>
+    <ul>
+      <li>Models of trait macroevolution on trees</li>
+    </ul>
+  </li>
+  <li>spider <a href="http://onlinelibrary.wiley.com/doi/10.1111/j.1755-0998.2011.03108.x/abstract?deniedAccessCustomisedMessage=&amp;userIsAuthenticated=false">paper</a> - <a href="http://cran.r-project.org/web/packages/spider/index.html">get R pkg</a>
+    <ul>
+      <li>Analysis of species identity and evolution, with particular reference to DNA barcoding</li>
+    </ul>
+  </li>
+  <li>BaSTA <a href="http://onlinelibrary.wiley.com/doi/10.1111/j.2041-210X.2012.00186.x/abstract">paper</a> - <a href="http://cran.r-project.org/web/packages/BaSTA/index.html">get R pkg</a>
+    <ul>
+      <li>Bayesian estimation of age-specific survival from incomplete mark–recapture/recovery data with covariates</li>
+    </ul>
+  </li>
+  <li>abc <a href="http://onlinelibrary.wiley.com/doi/10.1111/j.2041-210X.2011.00179.x/abstract">paper</a> - <a href="http://cran.r-project.org/web/packages/abc/index.html">get R pkg</a>
+    <ul>
+      <li>Approximate Bayesian Computation (ABC)</li>
+    </ul>
+  </li>
+  <li>RNetLogo <a href="http://onlinelibrary.wiley.com/doi/10.1111/j.2041-210X.2011.00180.x/abstract">paper</a> - <a href="http://cran.r-project.org/web/packages/RNetLogo/index.html">get R pkg</a>
+    <ul>
+      <li>Running and exploring individual-based models implemented in NetLogo</li>
+    </ul>
+  </li>
+  <li>phytools <a href="http://onlinelibrary.wiley.com/doi/10.1111/j.2041-210X.2011.00169.x/abstract">paper</a> - <a href="http://cran.r-project.org/web/packages/phytools/index.html">get R pkg</a>
+    <ul>
+      <li>Tools for phylogenetic comparative biology</li>
+    </ul>
+  </li>
+  <li>smatr <a href="http://onlinelibrary.wiley.com/doi/10.1111/j.2041-210X.2011.00153.x/abstract">paper</a> - <a href="http://cran.r-project.org/web/packages/smatr/index.html">get R pkg</a>
+    <ul>
+      <li>Estimation and inference about allometric lines</li>
+    </ul>
+  </li>
+  <li>RBrownie <a href="http://onlinelibrary.wiley.com/doi/10.1111/j.2041-210X.2011.00112.x/abstract">paper</a> - <a href="http://www.brianomeara.info/tutorials/brownie">get R pkg ?</a>
+    <ul>
+      <li>Testing hypotheses about rates of evolutionary change</li>
+    </ul>
+  </li>
+  <li>polytomy resolver <a href="http://onlinelibrary.wiley.com/doi/10.1111/j.2041-210X.2011.00103.x/abstract">paper</a> - <a href="http://onlinelibrary.wiley.com/doi/10.1111/j.2041-210X.2011.00103.x/suppinfo">get R pkg</a>
+    <ul>
+      <li>Resolve polytomies on dated phylogenies with their R scripts [here][].</li>
+    </ul>
+  </li>
+</ul>
 
-And a cool tool came out for the Python programming language. 
+<p>And a cool tool came out for the Python programming language.</p>
 
-+ NichePy [paper][NichePy] - [get python](https://github.com/bastodian/NichePy)
-	+ Modular tools for estimating the similarity of ecological niche and species distribution models
+<ul>
+  <li>NichePy <a href="http://onlinelibrary.wiley.com/doi/10.1111/j.2041-210X.2011.00184.x/abstract">paper</a> - <a href="https://github.com/bastodian/NichePy">get python</a>
+    <ul>
+      <li>Modular tools for estimating the similarity of ecological niche and species distribution models</li>
+    </ul>
+  </li>
+</ul>
 
-[mvabund]: http://onlinelibrary.wiley.com/doi/10.1111/j.2041-210X.2012.00190.x/abstract
-[popdemo]: http://onlinelibrary.wiley.com/doi/10.1111/j.2041-210X.2012.00222.x/abstract
-[motmot]: http://onlinelibrary.wiley.com/doi/10.1111/j.2041-210X.2011.00132.x/abstract
-[spider]: http://onlinelibrary.wiley.com/doi/10.1111/j.1755-0998.2011.03108.x/abstract?deniedAccessCustomisedMessage=&userIsAuthenticated=false
-[BaSTA]: http://onlinelibrary.wiley.com/doi/10.1111/j.2041-210X.2012.00186.x/abstract
-[abc]: http://onlinelibrary.wiley.com/doi/10.1111/j.2041-210X.2011.00179.x/abstract
-[RNetLogo]: http://onlinelibrary.wiley.com/doi/10.1111/j.2041-210X.2011.00180.x/abstract
-[phytools]: http://onlinelibrary.wiley.com/doi/10.1111/j.2041-210X.2011.00169.x/abstract
-[smatr]: http://onlinelibrary.wiley.com/doi/10.1111/j.2041-210X.2011.00153.x/abstract
-[brown]: http://onlinelibrary.wiley.com/doi/10.1111/j.2041-210X.2011.00112.x/abstract
-[poly]: http://onlinelibrary.wiley.com/doi/10.1111/j.2041-210X.2011.00103.x/abstract
-[NichePy]: http://onlinelibrary.wiley.com/doi/10.1111/j.2041-210X.2011.00184.x/abstract
-[mer]: http://onlinelibrary.wiley.com/journal/10.1111/(ISSN)1755-0998
-
-  </div>
-  
-  <div class="post">
-    <h1>
-      <a href="/2012/05/opencpu-github-stats/">
-        Visualize your Github stats (forks and watchers) in a browser with R!
-      </a>
-    </h1>
-
-    <span class="post-date">05 May 2012</span>
-
-    So [OpenCPU][] is pretty awesome.  You can run R in a browser using URL calls with an alphanumeric code (e.g., x3e50ee0780) defining a stored function, and any arguments you pass to it. 
-
-Go [here][] to store a function.  And you can output lots of different types of things: png, pdf, json, etc - see [here][here2].
-
-
-Here's a function I created:
-
-<script src="https://gist.github.com/2602432.js?file=getgithubstats.r"></script>
-
-It makes a [ggplot2][] graphic of your watchers and forks on each repo (up to 100 repos), sorted by descending number of forks/watchers.
-
-Here's an example from the function.  Paste the following in to your browser and you should get the below figure. 
-
-http://beta.opencpu.org/R/call/opencpu.demo/gitstats/png
-
-![had](/public/img/hadley.png)
-
-
-
-And you can specify user or organization name using arguments in the URL
-
-http://beta.opencpu.org/R/call/opencpu.demo/gitstats/png?type='org'&id='ropensci'
-
-![ropensci](/public/img/ropensci.png)
-
-
-
-Sweet. Have fun. 
-
-[ggplot2]: http://had.co.nz/ggplot2/
-[OpenCPU]: http://opencpu.org/
-[here]: http://beta.opencpu.org/apps/opencpu.demo/storefunction/
-[http://beta.opencpu.org/R/call/store:tmp/x3e50ee0780/png]: http://beta.opencpu.org/R/call/store:tmp/x3e50ee0780/png
-[http://beta.opencpu.org/R/call/store:tmp/x3e50ee0780/png?id='ropensci'&type='org']: http://beta.opencpu.org/R/call/store:tmp/x3e50ee0780/png?id='ropensci'&type='org'
-[here2]: http://opencpu.org/documentation/outputs/
 
   </div>
   

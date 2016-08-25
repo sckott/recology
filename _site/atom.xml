@@ -4,7 +4,7 @@
  <title>Recology</title>
  <link href="http://recology.info//atom.xml" rel="self"/>
  <link href="http://recology.info//"/>
- <updated>2016-08-12T15:54:57-07:00</updated>
+ <updated>2016-08-25T10:37:16-07:00</updated>
  <id>http://recology.info/</id>
  <author>
    <name>Scott Chamberlain</name>
@@ -13,15 +13,322 @@
 
  
  <entry>
+   <title>nonoyes - text analysis of Reply All podcast transcripts</title>
+   <link href="http://recology.info//2016/08/no-no-yes/"/>
+   <updated>2016-08-25T00:00:00-07:00</updated>
+   <id>http://recology.info//2016/08/no-no-yes</id>
+   <content type="html">&lt;ul&gt;
+  &lt;li&gt;&lt;a href=&quot;#setup&quot;&gt;Setup&lt;/a&gt;&lt;/li&gt;
+  &lt;li&gt;&lt;a href=&quot;#urls&quot;&gt;URLs&lt;/a&gt;&lt;/li&gt;
+  &lt;li&gt;&lt;a href=&quot;#episode-names&quot;&gt;Episode names&lt;/a&gt;&lt;/li&gt;
+  &lt;li&gt;&lt;a href=&quot;#transcripts&quot;&gt;Transcripts&lt;/a&gt;&lt;/li&gt;
+  &lt;li&gt;&lt;a href=&quot;#summary-word-usage&quot;&gt;Summary word usage&lt;/a&gt;&lt;/li&gt;
+  &lt;li&gt;&lt;a href=&quot;#sentiment&quot;&gt;Sentiment&lt;/a&gt;
+    &lt;ul&gt;
+      &lt;li&gt;&lt;a href=&quot;#most-common-positive-and-negative-words&quot;&gt;Most common positive and negative
+words&lt;/a&gt;&lt;/li&gt;
+    &lt;/ul&gt;
+  &lt;/li&gt;
+&lt;/ul&gt;
+
+&lt;p&gt;&lt;a href=&quot;https://gimletmedia.com/show/reply-all/&quot;&gt;Reply All&lt;/a&gt; is a great podcast.
+I’ve been wanting to learn some text analysis tools, and transcripts
+from the podcast are on their site.&lt;/p&gt;
+
+&lt;p&gt;Took some approaches outlined in the
+&lt;a href=&quot;https://cran.rstudio.com/web/packages/tidytext/&quot;&gt;tidytext&lt;/a&gt; package in
+&lt;a href=&quot;https://cran.rstudio.com/web/packages/tidytext/vignettes/tidytext.html&quot;&gt;this
+vignette&lt;/a&gt;,
+and used the
+&lt;a href=&quot;https://cran.rstudio.com/web/packages/tokenizers&quot;&gt;tokenizers&lt;/a&gt; package,
+and some of the tidyverse.&lt;/p&gt;
+
+&lt;h2 id=&quot;setup&quot;&gt;Setup&lt;/h2&gt;
+
+&lt;p&gt;Load deps&lt;/p&gt;
+
+&lt;div class=&quot;highlighter-rouge&quot;&gt;&lt;pre class=&quot;highlight&quot;&gt;&lt;code&gt;library(&quot;httr&quot;)
+library(&quot;xml2&quot;)
+library(&quot;stringi&quot;)
+library(&quot;dplyr&quot;)
+library(&quot;ggplot2&quot;)
+library(&quot;tokenizers&quot;)
+library(&quot;tidytext&quot;)
+library(&quot;tidyr&quot;)
+&lt;/code&gt;&lt;/pre&gt;
+&lt;/div&gt;
+
+&lt;p&gt;source helper functions&lt;/p&gt;
+
+&lt;div class=&quot;highlighter-rouge&quot;&gt;&lt;pre class=&quot;highlight&quot;&gt;&lt;code&gt;source(&quot;funs.R&quot;)
+&lt;/code&gt;&lt;/pre&gt;
+&lt;/div&gt;
+
+&lt;p&gt;set base url&lt;/p&gt;
+
+&lt;div class=&quot;highlighter-rouge&quot;&gt;&lt;pre class=&quot;highlight&quot;&gt;&lt;code&gt;ra_base &amp;lt;- &quot;https://gimletmedia.com/show/reply-all/episodes&quot;
+&lt;/code&gt;&lt;/pre&gt;
+&lt;/div&gt;
+
+&lt;h2 id=&quot;urls&quot;&gt;URLs&lt;/h2&gt;
+
+&lt;p&gt;Make all urls for each page of episodes&lt;/p&gt;
+
+&lt;div class=&quot;highlighter-rouge&quot;&gt;&lt;pre class=&quot;highlight&quot;&gt;&lt;code&gt;urls &amp;lt;- c(ra_base, file.path(ra_base, &quot;page&quot;, 2:8))
+&lt;/code&gt;&lt;/pre&gt;
+&lt;/div&gt;
+
+&lt;p&gt;Get urls for each episode&lt;/p&gt;
+
+&lt;div class=&quot;highlighter-rouge&quot;&gt;&lt;pre class=&quot;highlight&quot;&gt;&lt;code&gt;res &amp;lt;- lapply(urls, get_urls)
+&lt;/code&gt;&lt;/pre&gt;
+&lt;/div&gt;
+
+&lt;p&gt;Remove those that are rebroadcasts, updates, or revisited&lt;/p&gt;
+
+&lt;div class=&quot;highlighter-rouge&quot;&gt;&lt;pre class=&quot;highlight&quot;&gt;&lt;code&gt;res &amp;lt;- grep(&quot;rebroadcast|update|revisited&quot;, unlist(res), value = TRUE, invert = TRUE)
+&lt;/code&gt;&lt;/pre&gt;
+&lt;/div&gt;
+
+&lt;h2 id=&quot;episode-names&quot;&gt;Episode names&lt;/h2&gt;
+
+&lt;p&gt;Give some episodes numbers that don’t have them&lt;/p&gt;
+
+&lt;div class=&quot;highlighter-rouge&quot;&gt;&lt;pre class=&quot;highlight&quot;&gt;&lt;code&gt;epnames &amp;lt;- sub(&quot;/$&quot;, &quot;&quot;, sub(&quot;https://gimletmedia.com/episode/&quot;, &quot;&quot;, res))
+epnames &amp;lt;- sub(&quot;the-anxiety-box&quot;, &quot;8-the-anxiety-box&quot;, epnames)
+epnames &amp;lt;- sub(&quot;french-connection&quot;, &quot;10-french-connection&quot;, epnames)
+epnames &amp;lt;- sub(&quot;ive-killed-people-and-i-have-hostages&quot;, &quot;15-ive-killed-people-and-i-have-hostages&quot;, epnames)
+epnames &amp;lt;- sub(&quot;6-this-proves-everything&quot;, &quot;75-this-proves-everything&quot;, epnames)
+epnames &amp;lt;- sub(&quot;zardulu&quot;, &quot;56-zardulu&quot;, epnames)
+&lt;/code&gt;&lt;/pre&gt;
+&lt;/div&gt;
+
+&lt;h2 id=&quot;transcripts&quot;&gt;Transcripts&lt;/h2&gt;
+
+&lt;p&gt;Get transcripts&lt;/p&gt;
+
+&lt;div class=&quot;highlighter-rouge&quot;&gt;&lt;pre class=&quot;highlight&quot;&gt;&lt;code&gt;txts &amp;lt;- lapply(res, transcript_fetch, sleep = 1)
+&lt;/code&gt;&lt;/pre&gt;
+&lt;/div&gt;
+
+&lt;p&gt;Parse transcripts&lt;/p&gt;
+
+&lt;div class=&quot;highlighter-rouge&quot;&gt;&lt;pre class=&quot;highlight&quot;&gt;&lt;code&gt;txtsp &amp;lt;- lapply(txts, transcript_parse)
+&lt;/code&gt;&lt;/pre&gt;
+&lt;/div&gt;
+
+&lt;h2 id=&quot;summary-word-usage&quot;&gt;Summary word usage&lt;/h2&gt;
+
+&lt;p&gt;Summarise data for each transcript&lt;/p&gt;
+
+&lt;div class=&quot;highlighter-rouge&quot;&gt;&lt;pre class=&quot;highlight&quot;&gt;&lt;code&gt;dat &amp;lt;- stats::setNames(lapply(txtsp, function(m) {
+  bind_rows(lapply(m, function(v) {
+    tmp &amp;lt;- unname(vapply(v, nchar, 1))
+    data_frame(
+      n = length(tmp),
+      mean = mean(tmp),
+      n_laugh = count_word(v, &quot;laugh&quot;),
+      n_groan = count_word(v, &quot;groan&quot;)
+    )
+  }), .id = &quot;name&quot;)
+}), epnames)
+&lt;/code&gt;&lt;/pre&gt;
+&lt;/div&gt;
+
+&lt;p&gt;Bind data together to single dataframe, and filter, summarise&lt;/p&gt;
+
+&lt;div class=&quot;highlighter-rouge&quot;&gt;&lt;pre class=&quot;highlight&quot;&gt;&lt;code&gt;data &amp;lt;- bind_rows(dat, .id = &quot;episode&quot;) %&amp;gt;%
+  filter(!is.na(episode)) %&amp;gt;%
+  filter(grepl(&quot;^PJ$|^ALEX GOLDMAN$&quot;, name)) %&amp;gt;%
+  mutate(ep_no = as.numeric(strextract(episode, &quot;^[0-9]+&quot;))) %&amp;gt;%
+  group_by(ep_no) %&amp;gt;%
+  mutate(nrow = NROW(ep_no)) %&amp;gt;%
+  ungroup() %&amp;gt;%
+  filter(nrow == 2)
+data
+#&amp;gt; # A tibble: 114 × 8
+#&amp;gt;                 episode         name     n      mean n_laugh n_groan ep_no
+#&amp;gt;                   &amp;lt;chr&amp;gt;        &amp;lt;chr&amp;gt; &amp;lt;int&amp;gt;     &amp;lt;dbl&amp;gt;   &amp;lt;int&amp;gt;   &amp;lt;int&amp;gt; &amp;lt;dbl&amp;gt;
+#&amp;gt; 1            73-sandbox           PJ    89 130.65169       9       0    73
+#&amp;gt; 2            73-sandbox ALEX GOLDMAN    25  44.00000       1       1    73
+#&amp;gt; 3       72-dead-is-paul           PJ   137  67.77372      17       0    72
+#&amp;gt; 4       72-dead-is-paul ALEX GOLDMAN    90  61.82222       8       0    72
+#&amp;gt; 5  71-the-picture-taker           PJ    74  77.70270       3       0    71
+#&amp;gt; 6  71-the-picture-taker ALEX GOLDMAN    93 105.94624       6       0    71
+#&amp;gt; 7        69-disappeared           PJ    72  76.50000       2       0    69
+#&amp;gt; 8        69-disappeared ALEX GOLDMAN    50 135.90000       5       0    69
+#&amp;gt; 9      68-vampire-rules           PJ   142  88.00704       6       0    68
+#&amp;gt; 10     68-vampire-rules ALEX GOLDMAN   117  73.16239      13       0    68
+#&amp;gt; # ... with 104 more rows, and 1 more variables: nrow &amp;lt;int&amp;gt;
+&lt;/code&gt;&lt;/pre&gt;
+&lt;/div&gt;
+
+&lt;p&gt;Number of words - seems PJ talks more, but didn’t do quantiative
+comparison&lt;/p&gt;
+
+&lt;div class=&quot;highlighter-rouge&quot;&gt;&lt;pre class=&quot;highlight&quot;&gt;&lt;code&gt;ggplot(data, aes(ep_no, n, colour = name)) +
+  geom_point(size = 3, alpha = 0.5) +
+  geom_line(aes(group = ep_no), colour = &quot;black&quot;) +
+  scale_color_discrete(labels = c(&#39;Alex&#39;, &#39;PJ&#39;))
+&lt;/code&gt;&lt;/pre&gt;
+&lt;/div&gt;
+
+&lt;p&gt;&lt;img src=&quot;/public/img/2016-08-25-no-no-yes/unnamed-chunk-12-1.png&quot; alt=&quot;&quot; /&gt;&lt;/p&gt;
+
+&lt;p&gt;Laughs per episode - take home: PJ laughs a lot&lt;/p&gt;
+
+&lt;div class=&quot;highlighter-rouge&quot;&gt;&lt;pre class=&quot;highlight&quot;&gt;&lt;code&gt;ggplot(data, aes(ep_no, n_laugh, colour = name)) +
+  geom_point(size = 3, alpha = 0.5) +
+  geom_line(aes(group = ep_no), colour = &quot;black&quot;) +
+  scale_color_discrete(labels = c(&#39;Alex&#39;, &#39;PJ&#39;))
+&lt;/code&gt;&lt;/pre&gt;
+&lt;/div&gt;
+
+&lt;p&gt;&lt;img src=&quot;/public/img/2016-08-25-no-no-yes/unnamed-chunk-13-1.png&quot; alt=&quot;&quot; /&gt;&lt;/p&gt;
+
+&lt;h2 id=&quot;sentiment&quot;&gt;Sentiment&lt;/h2&gt;
+
+&lt;div class=&quot;highlighter-rouge&quot;&gt;&lt;pre class=&quot;highlight&quot;&gt;&lt;code&gt;zero &amp;lt;- which(vapply(txtsp, length, 1) == 0)
+txtsp_ &amp;lt;- Filter(function(x) length(x) != 0, txtsp)
+&lt;/code&gt;&lt;/pre&gt;
+&lt;/div&gt;
+
+&lt;p&gt;Tokenize words, and create data_frame&lt;/p&gt;
+
+&lt;div class=&quot;highlighter-rouge&quot;&gt;&lt;pre class=&quot;highlight&quot;&gt;&lt;code&gt;wordz &amp;lt;- stats::setNames(
+  lapply(txtsp_, function(z) {
+    bind_rows(
+      if (is.null(try_tokenize(z$`ALEX GOLDMAN`))) {
+        data_frame()
+      } else {
+        data_frame(
+          name = &quot;Alex&quot;,
+          word = try_tokenize(z$`ALEX GOLDMAN`)
+        )
+      },
+      if (is.null(try_tokenize(z$PJ))) {
+        data_frame()
+      } else {
+        data_frame(
+          name = &quot;PJ&quot;,
+          word = try_tokenize(z$PJ)
+        )
+      }
+    )
+  }), epnames[-zero])
+&lt;/code&gt;&lt;/pre&gt;
+&lt;/div&gt;
+
+&lt;p&gt;Combine to single data_frame&lt;/p&gt;
+
+&lt;div class=&quot;highlighter-rouge&quot;&gt;&lt;pre class=&quot;highlight&quot;&gt;&lt;code&gt;(wordz_df &amp;lt;- bind_rows(wordz, .id = &quot;episode&quot;))
+#&amp;gt; # A tibble: 104,713 × 3
+#&amp;gt;       episode  name      word
+#&amp;gt;         &amp;lt;chr&amp;gt; &amp;lt;chr&amp;gt;     &amp;lt;chr&amp;gt;
+#&amp;gt; 1  73-sandbox  Alex      alex
+#&amp;gt; 2  73-sandbox  Alex   goldman
+#&amp;gt; 3  73-sandbox  Alex         i
+#&amp;gt; 4  73-sandbox  Alex generally
+#&amp;gt; 5  73-sandbox  Alex     don’t
+#&amp;gt; 6  73-sandbox  Alex      alex
+#&amp;gt; 7  73-sandbox  Alex    really
+#&amp;gt; 8  73-sandbox  Alex      alex
+#&amp;gt; 9  73-sandbox  Alex    groans
+#&amp;gt; 10 73-sandbox  Alex        so
+#&amp;gt; # ... with 104,703 more rows
+&lt;/code&gt;&lt;/pre&gt;
+&lt;/div&gt;
+
+&lt;p&gt;Calculate sentiment using &lt;code class=&quot;highlighter-rouge&quot;&gt;tidytext&lt;/code&gt;&lt;/p&gt;
+
+&lt;div class=&quot;highlighter-rouge&quot;&gt;&lt;pre class=&quot;highlight&quot;&gt;&lt;code&gt;bing &amp;lt;- sentiments %&amp;gt;%
+  filter(lexicon == &quot;bing&quot;) %&amp;gt;%
+  select(-score)
+sent &amp;lt;- wordz_df %&amp;gt;%
+  inner_join(bing) %&amp;gt;%
+  count(name, episode, sentiment) %&amp;gt;%
+  spread(sentiment, n, fill = 0) %&amp;gt;%
+  mutate(sentiment = positive - negative) %&amp;gt;%
+  ungroup() %&amp;gt;%
+  filter(!is.na(episode)) %&amp;gt;%
+  complete(episode, name) %&amp;gt;%
+  mutate(ep_no = as.numeric(strextract(episode, &quot;^[0-9]+&quot;)))
+sent
+#&amp;gt; # A tibble: 148 × 6
+#&amp;gt;                                        episode  name negative positive
+#&amp;gt;                                          &amp;lt;chr&amp;gt; &amp;lt;chr&amp;gt;    &amp;lt;dbl&amp;gt;    &amp;lt;dbl&amp;gt;
+#&amp;gt; 1  1-an-app-sends-a-stranger-to-say-i-love-you  Alex       19       30
+#&amp;gt; 2  1-an-app-sends-a-stranger-to-say-i-love-you    PJ       14       14
+#&amp;gt; 3                         10-french-connection  Alex       15       32
+#&amp;gt; 4                         10-french-connection    PJ       16       36
+#&amp;gt; 5     11-did-errol-morris-brother-invent-email  Alex       NA       NA
+#&amp;gt; 6     11-did-errol-morris-brother-invent-email    PJ       25       30
+#&amp;gt; 7                           12-backend-trouble  Alex       20       15
+#&amp;gt; 8                           12-backend-trouble    PJ       40       59
+#&amp;gt; 9                              13-love-is-lies  Alex       NA       NA
+#&amp;gt; 10                             13-love-is-lies    PJ       45       64
+#&amp;gt; # ... with 138 more rows, and 2 more variables: sentiment &amp;lt;dbl&amp;gt;,
+#&amp;gt; #   ep_no &amp;lt;dbl&amp;gt;
+&lt;/code&gt;&lt;/pre&gt;
+&lt;/div&gt;
+
+&lt;p&gt;Names separate&lt;/p&gt;
+
+&lt;div class=&quot;highlighter-rouge&quot;&gt;&lt;pre class=&quot;highlight&quot;&gt;&lt;code&gt;ggplot(sent, aes(ep_no, sentiment, fill = name)) +
+  geom_bar(stat = &quot;identity&quot;) +
+  facet_wrap(~name, ncol = 2, scales = &quot;free_x&quot;)
+&lt;/code&gt;&lt;/pre&gt;
+&lt;/div&gt;
+
+&lt;p&gt;&lt;img src=&quot;/public/img/2016-08-25-no-no-yes/unnamed-chunk-18-1.png&quot; alt=&quot;&quot; /&gt;&lt;/p&gt;
+
+&lt;p&gt;Compare for each episode&lt;/p&gt;
+
+&lt;div class=&quot;highlighter-rouge&quot;&gt;&lt;pre class=&quot;highlight&quot;&gt;&lt;code&gt;ggplot(sent, aes(ep_no, sentiment, fill = name)) +
+  geom_bar(stat = &quot;identity&quot;, position = position_dodge(width = 0.5), width = 0.6)
+&lt;/code&gt;&lt;/pre&gt;
+&lt;/div&gt;
+
+&lt;p&gt;&lt;img src=&quot;/public/img/2016-08-25-no-no-yes/unnamed-chunk-19-1.png&quot; alt=&quot;&quot; /&gt;&lt;/p&gt;
+
+&lt;h3 id=&quot;most-common-positive-and-negative-words&quot;&gt;Most common positive and negative words&lt;/h3&gt;
+
+&lt;p&gt;Clearly, the word &lt;code class=&quot;highlighter-rouge&quot;&gt;like&lt;/code&gt; is surely rarely used as a positive word
+meaning e.g., that they &lt;em&gt;like something&lt;/em&gt;, but rather as the colloquial
+&lt;code class=&quot;highlighter-rouge&quot;&gt;like, totally&lt;/code&gt; usage. So it’s removed.&lt;/p&gt;
+
+&lt;p&gt;Alex&lt;/p&gt;
+
+&lt;div class=&quot;highlighter-rouge&quot;&gt;&lt;pre class=&quot;highlight&quot;&gt;&lt;code&gt;sent_cont_plot(wordz_df, &quot;Alex&quot;)
+&lt;/code&gt;&lt;/pre&gt;
+&lt;/div&gt;
+
+&lt;p&gt;&lt;img src=&quot;/public/img/2016-08-25-no-no-yes/unnamed-chunk-20-1.png&quot; alt=&quot;&quot; /&gt;&lt;/p&gt;
+
+&lt;p&gt;PJ&lt;/p&gt;
+
+&lt;div class=&quot;highlighter-rouge&quot;&gt;&lt;pre class=&quot;highlight&quot;&gt;&lt;code&gt;sent_cont_plot(wordz_df, &quot;PJ&quot;)
+&lt;/code&gt;&lt;/pre&gt;
+&lt;/div&gt;
+
+&lt;p&gt;&lt;img src=&quot;/public/img/2016-08-25-no-no-yes/unnamed-chunk-21-1.png&quot; alt=&quot;&quot; /&gt;&lt;/p&gt;
+</content>
+ </entry>
+ 
+ <entry>
    <title>video editing notes</title>
    <link href="http://recology.info//2016/08/video-editing/"/>
-   <updated>2016-08-11T00:00:00-07:00</updated>
+   <updated>2016-08-12T00:00:00-07:00</updated>
    <id>http://recology.info//2016/08/video-editing</id>
-   <content type="html">&lt;ul&gt;
-  &lt;li&gt;import to iMovie&lt;/li&gt;
+   <content type="html">&lt;p&gt;This is how I edit videos of talks that I need to incorporate slides and video together&lt;/p&gt;
+
+&lt;p&gt;I’m on a Mac&lt;/p&gt;
+
+&lt;ul&gt;
+  &lt;li&gt;import to iMovie (using v10 something)&lt;/li&gt;
   &lt;li&gt;drop movie into editing section&lt;/li&gt;
-  &lt;li&gt;split pdf slides into individual files ``&lt;/li&gt;
-  &lt;li&gt;convert individual pdf slides into png ``&lt;/li&gt;
+  &lt;li&gt;split pdf slides into individual files &lt;code class=&quot;highlighter-rouge&quot;&gt;pdfseparate foobar.pdf %d.pdf&lt;/code&gt;&lt;/li&gt;
+  &lt;li&gt;convert individual pdf slides into png &lt;code class=&quot;highlighter-rouge&quot;&gt;sips -s format png --out &quot;${pdf%%.*}.png&quot; &quot;$pdf&quot;&lt;/code&gt;&lt;/li&gt;
   &lt;li&gt;import png’s into imovie&lt;/li&gt;
   &lt;li&gt;for each image, drop into editing area where you want it&lt;/li&gt;
   &lt;li&gt;when focused on the png of the slide:
@@ -34,8 +341,13 @@
     &lt;/ul&gt;
   &lt;/li&gt;
   &lt;li&gt;rinse and repeat for all slides&lt;/li&gt;
+  &lt;li&gt;export - via &lt;code class=&quot;highlighter-rouge&quot;&gt;File&lt;/code&gt; option&lt;/li&gt;
   &lt;li&gt;share to youtube&lt;/li&gt;
 &lt;/ul&gt;
+
+&lt;h3 id=&quot;eg-of-the-result&quot;&gt;e.g. of the result&lt;/h3&gt;
+
+&lt;iframe width=&quot;560&quot; height=&quot;315&quot; src=&quot;https://www.youtube.com/embed/MHWX0f3TG4I&quot; frameborder=&quot;0&quot; allowfullscreen=&quot;&quot;&gt;&lt;/iframe&gt;
 </content>
  </entry>
  

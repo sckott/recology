@@ -61,18 +61,329 @@
   
   <div class="post">
     <h1>
+      <a href="/2016/08/no-no-yes/">
+        nonoyes - text analysis of Reply All podcast transcripts
+      </a>
+    </h1>
+
+    <span class="post-date">25 Aug 2016</span>
+
+    <ul>
+  <li><a href="#setup">Setup</a></li>
+  <li><a href="#urls">URLs</a></li>
+  <li><a href="#episode-names">Episode names</a></li>
+  <li><a href="#transcripts">Transcripts</a></li>
+  <li><a href="#summary-word-usage">Summary word usage</a></li>
+  <li><a href="#sentiment">Sentiment</a>
+    <ul>
+      <li><a href="#most-common-positive-and-negative-words">Most common positive and negative
+words</a></li>
+    </ul>
+  </li>
+</ul>
+
+<p><a href="https://gimletmedia.com/show/reply-all/">Reply All</a> is a great podcast.
+I’ve been wanting to learn some text analysis tools, and transcripts
+from the podcast are on their site.</p>
+
+<p>Took some approaches outlined in the
+<a href="https://cran.rstudio.com/web/packages/tidytext/">tidytext</a> package in
+<a href="https://cran.rstudio.com/web/packages/tidytext/vignettes/tidytext.html">this
+vignette</a>,
+and used the
+<a href="https://cran.rstudio.com/web/packages/tokenizers">tokenizers</a> package,
+and some of the tidyverse.</p>
+
+<h2 id="setup">Setup</h2>
+
+<p>Load deps</p>
+
+<div class="highlighter-rouge"><pre class="highlight"><code>library("httr")
+library("xml2")
+library("stringi")
+library("dplyr")
+library("ggplot2")
+library("tokenizers")
+library("tidytext")
+library("tidyr")
+</code></pre>
+</div>
+
+<p>source helper functions</p>
+
+<div class="highlighter-rouge"><pre class="highlight"><code>source("funs.R")
+</code></pre>
+</div>
+
+<p>set base url</p>
+
+<div class="highlighter-rouge"><pre class="highlight"><code>ra_base &lt;- "https://gimletmedia.com/show/reply-all/episodes"
+</code></pre>
+</div>
+
+<h2 id="urls">URLs</h2>
+
+<p>Make all urls for each page of episodes</p>
+
+<div class="highlighter-rouge"><pre class="highlight"><code>urls &lt;- c(ra_base, file.path(ra_base, "page", 2:8))
+</code></pre>
+</div>
+
+<p>Get urls for each episode</p>
+
+<div class="highlighter-rouge"><pre class="highlight"><code>res &lt;- lapply(urls, get_urls)
+</code></pre>
+</div>
+
+<p>Remove those that are rebroadcasts, updates, or revisited</p>
+
+<div class="highlighter-rouge"><pre class="highlight"><code>res &lt;- grep("rebroadcast|update|revisited", unlist(res), value = TRUE, invert = TRUE)
+</code></pre>
+</div>
+
+<h2 id="episode-names">Episode names</h2>
+
+<p>Give some episodes numbers that don’t have them</p>
+
+<div class="highlighter-rouge"><pre class="highlight"><code>epnames &lt;- sub("/$", "", sub("https://gimletmedia.com/episode/", "", res))
+epnames &lt;- sub("the-anxiety-box", "8-the-anxiety-box", epnames)
+epnames &lt;- sub("french-connection", "10-french-connection", epnames)
+epnames &lt;- sub("ive-killed-people-and-i-have-hostages", "15-ive-killed-people-and-i-have-hostages", epnames)
+epnames &lt;- sub("6-this-proves-everything", "75-this-proves-everything", epnames)
+epnames &lt;- sub("zardulu", "56-zardulu", epnames)
+</code></pre>
+</div>
+
+<h2 id="transcripts">Transcripts</h2>
+
+<p>Get transcripts</p>
+
+<div class="highlighter-rouge"><pre class="highlight"><code>txts &lt;- lapply(res, transcript_fetch, sleep = 1)
+</code></pre>
+</div>
+
+<p>Parse transcripts</p>
+
+<div class="highlighter-rouge"><pre class="highlight"><code>txtsp &lt;- lapply(txts, transcript_parse)
+</code></pre>
+</div>
+
+<h2 id="summary-word-usage">Summary word usage</h2>
+
+<p>Summarise data for each transcript</p>
+
+<div class="highlighter-rouge"><pre class="highlight"><code>dat &lt;- stats::setNames(lapply(txtsp, function(m) {
+  bind_rows(lapply(m, function(v) {
+    tmp &lt;- unname(vapply(v, nchar, 1))
+    data_frame(
+      n = length(tmp),
+      mean = mean(tmp),
+      n_laugh = count_word(v, "laugh"),
+      n_groan = count_word(v, "groan")
+    )
+  }), .id = "name")
+}), epnames)
+</code></pre>
+</div>
+
+<p>Bind data together to single dataframe, and filter, summarise</p>
+
+<div class="highlighter-rouge"><pre class="highlight"><code>data &lt;- bind_rows(dat, .id = "episode") %&gt;%
+  filter(!is.na(episode)) %&gt;%
+  filter(grepl("^PJ$|^ALEX GOLDMAN$", name)) %&gt;%
+  mutate(ep_no = as.numeric(strextract(episode, "^[0-9]+"))) %&gt;%
+  group_by(ep_no) %&gt;%
+  mutate(nrow = NROW(ep_no)) %&gt;%
+  ungroup() %&gt;%
+  filter(nrow == 2)
+data
+#&gt; # A tibble: 114 × 8
+#&gt;                 episode         name     n      mean n_laugh n_groan ep_no
+#&gt;                   &lt;chr&gt;        &lt;chr&gt; &lt;int&gt;     &lt;dbl&gt;   &lt;int&gt;   &lt;int&gt; &lt;dbl&gt;
+#&gt; 1            73-sandbox           PJ    89 130.65169       9       0    73
+#&gt; 2            73-sandbox ALEX GOLDMAN    25  44.00000       1       1    73
+#&gt; 3       72-dead-is-paul           PJ   137  67.77372      17       0    72
+#&gt; 4       72-dead-is-paul ALEX GOLDMAN    90  61.82222       8       0    72
+#&gt; 5  71-the-picture-taker           PJ    74  77.70270       3       0    71
+#&gt; 6  71-the-picture-taker ALEX GOLDMAN    93 105.94624       6       0    71
+#&gt; 7        69-disappeared           PJ    72  76.50000       2       0    69
+#&gt; 8        69-disappeared ALEX GOLDMAN    50 135.90000       5       0    69
+#&gt; 9      68-vampire-rules           PJ   142  88.00704       6       0    68
+#&gt; 10     68-vampire-rules ALEX GOLDMAN   117  73.16239      13       0    68
+#&gt; # ... with 104 more rows, and 1 more variables: nrow &lt;int&gt;
+</code></pre>
+</div>
+
+<p>Number of words - seems PJ talks more, but didn’t do quantiative
+comparison</p>
+
+<div class="highlighter-rouge"><pre class="highlight"><code>ggplot(data, aes(ep_no, n, colour = name)) +
+  geom_point(size = 3, alpha = 0.5) +
+  geom_line(aes(group = ep_no), colour = "black") +
+  scale_color_discrete(labels = c('Alex', 'PJ'))
+</code></pre>
+</div>
+
+<p><img src="/public/img/2016-08-25-no-no-yes/unnamed-chunk-12-1.png" alt="" /></p>
+
+<p>Laughs per episode - take home: PJ laughs a lot</p>
+
+<div class="highlighter-rouge"><pre class="highlight"><code>ggplot(data, aes(ep_no, n_laugh, colour = name)) +
+  geom_point(size = 3, alpha = 0.5) +
+  geom_line(aes(group = ep_no), colour = "black") +
+  scale_color_discrete(labels = c('Alex', 'PJ'))
+</code></pre>
+</div>
+
+<p><img src="/public/img/2016-08-25-no-no-yes/unnamed-chunk-13-1.png" alt="" /></p>
+
+<h2 id="sentiment">Sentiment</h2>
+
+<div class="highlighter-rouge"><pre class="highlight"><code>zero &lt;- which(vapply(txtsp, length, 1) == 0)
+txtsp_ &lt;- Filter(function(x) length(x) != 0, txtsp)
+</code></pre>
+</div>
+
+<p>Tokenize words, and create data_frame</p>
+
+<div class="highlighter-rouge"><pre class="highlight"><code>wordz &lt;- stats::setNames(
+  lapply(txtsp_, function(z) {
+    bind_rows(
+      if (is.null(try_tokenize(z$`ALEX GOLDMAN`))) {
+        data_frame()
+      } else {
+        data_frame(
+          name = "Alex",
+          word = try_tokenize(z$`ALEX GOLDMAN`)
+        )
+      },
+      if (is.null(try_tokenize(z$PJ))) {
+        data_frame()
+      } else {
+        data_frame(
+          name = "PJ",
+          word = try_tokenize(z$PJ)
+        )
+      }
+    )
+  }), epnames[-zero])
+</code></pre>
+</div>
+
+<p>Combine to single data_frame</p>
+
+<div class="highlighter-rouge"><pre class="highlight"><code>(wordz_df &lt;- bind_rows(wordz, .id = "episode"))
+#&gt; # A tibble: 104,713 × 3
+#&gt;       episode  name      word
+#&gt;         &lt;chr&gt; &lt;chr&gt;     &lt;chr&gt;
+#&gt; 1  73-sandbox  Alex      alex
+#&gt; 2  73-sandbox  Alex   goldman
+#&gt; 3  73-sandbox  Alex         i
+#&gt; 4  73-sandbox  Alex generally
+#&gt; 5  73-sandbox  Alex     don’t
+#&gt; 6  73-sandbox  Alex      alex
+#&gt; 7  73-sandbox  Alex    really
+#&gt; 8  73-sandbox  Alex      alex
+#&gt; 9  73-sandbox  Alex    groans
+#&gt; 10 73-sandbox  Alex        so
+#&gt; # ... with 104,703 more rows
+</code></pre>
+</div>
+
+<p>Calculate sentiment using <code class="highlighter-rouge">tidytext</code></p>
+
+<div class="highlighter-rouge"><pre class="highlight"><code>bing &lt;- sentiments %&gt;%
+  filter(lexicon == "bing") %&gt;%
+  select(-score)
+sent &lt;- wordz_df %&gt;%
+  inner_join(bing) %&gt;%
+  count(name, episode, sentiment) %&gt;%
+  spread(sentiment, n, fill = 0) %&gt;%
+  mutate(sentiment = positive - negative) %&gt;%
+  ungroup() %&gt;%
+  filter(!is.na(episode)) %&gt;%
+  complete(episode, name) %&gt;%
+  mutate(ep_no = as.numeric(strextract(episode, "^[0-9]+")))
+sent
+#&gt; # A tibble: 148 × 6
+#&gt;                                        episode  name negative positive
+#&gt;                                          &lt;chr&gt; &lt;chr&gt;    &lt;dbl&gt;    &lt;dbl&gt;
+#&gt; 1  1-an-app-sends-a-stranger-to-say-i-love-you  Alex       19       30
+#&gt; 2  1-an-app-sends-a-stranger-to-say-i-love-you    PJ       14       14
+#&gt; 3                         10-french-connection  Alex       15       32
+#&gt; 4                         10-french-connection    PJ       16       36
+#&gt; 5     11-did-errol-morris-brother-invent-email  Alex       NA       NA
+#&gt; 6     11-did-errol-morris-brother-invent-email    PJ       25       30
+#&gt; 7                           12-backend-trouble  Alex       20       15
+#&gt; 8                           12-backend-trouble    PJ       40       59
+#&gt; 9                              13-love-is-lies  Alex       NA       NA
+#&gt; 10                             13-love-is-lies    PJ       45       64
+#&gt; # ... with 138 more rows, and 2 more variables: sentiment &lt;dbl&gt;,
+#&gt; #   ep_no &lt;dbl&gt;
+</code></pre>
+</div>
+
+<p>Names separate</p>
+
+<div class="highlighter-rouge"><pre class="highlight"><code>ggplot(sent, aes(ep_no, sentiment, fill = name)) +
+  geom_bar(stat = "identity") +
+  facet_wrap(~name, ncol = 2, scales = "free_x")
+</code></pre>
+</div>
+
+<p><img src="/public/img/2016-08-25-no-no-yes/unnamed-chunk-18-1.png" alt="" /></p>
+
+<p>Compare for each episode</p>
+
+<div class="highlighter-rouge"><pre class="highlight"><code>ggplot(sent, aes(ep_no, sentiment, fill = name)) +
+  geom_bar(stat = "identity", position = position_dodge(width = 0.5), width = 0.6)
+</code></pre>
+</div>
+
+<p><img src="/public/img/2016-08-25-no-no-yes/unnamed-chunk-19-1.png" alt="" /></p>
+
+<h3 id="most-common-positive-and-negative-words">Most common positive and negative words</h3>
+
+<p>Clearly, the word <code class="highlighter-rouge">like</code> is surely rarely used as a positive word
+meaning e.g., that they <em>like something</em>, but rather as the colloquial
+<code class="highlighter-rouge">like, totally</code> usage. So it’s removed.</p>
+
+<p>Alex</p>
+
+<div class="highlighter-rouge"><pre class="highlight"><code>sent_cont_plot(wordz_df, "Alex")
+</code></pre>
+</div>
+
+<p><img src="/public/img/2016-08-25-no-no-yes/unnamed-chunk-20-1.png" alt="" /></p>
+
+<p>PJ</p>
+
+<div class="highlighter-rouge"><pre class="highlight"><code>sent_cont_plot(wordz_df, "PJ")
+</code></pre>
+</div>
+
+<p><img src="/public/img/2016-08-25-no-no-yes/unnamed-chunk-21-1.png" alt="" /></p>
+
+  </div>
+  
+  <div class="post">
+    <h1>
       <a href="/2016/08/video-editing/">
         video editing notes
       </a>
     </h1>
 
-    <span class="post-date">11 Aug 2016</span>
+    <span class="post-date">12 Aug 2016</span>
 
-    <ul>
-  <li>import to iMovie</li>
+    <p>This is how I edit videos of talks that I need to incorporate slides and video together</p>
+
+<p>I’m on a Mac</p>
+
+<ul>
+  <li>import to iMovie (using v10 something)</li>
   <li>drop movie into editing section</li>
-  <li>split pdf slides into individual files ``</li>
-  <li>convert individual pdf slides into png ``</li>
+  <li>split pdf slides into individual files <code class="highlighter-rouge">pdfseparate foobar.pdf %d.pdf</code></li>
+  <li>convert individual pdf slides into png <code class="highlighter-rouge">sips -s format png --out "${pdf%%.*}.png" "$pdf"</code></li>
   <li>import png’s into imovie</li>
   <li>for each image, drop into editing area where you want it</li>
   <li>when focused on the png of the slide:
@@ -85,8 +396,13 @@
     </ul>
   </li>
   <li>rinse and repeat for all slides</li>
+  <li>export - via <code class="highlighter-rouge">File</code> option</li>
   <li>share to youtube</li>
 </ul>
+
+<h3 id="eg-of-the-result">e.g. of the result</h3>
+
+<iframe width="560" height="315" src="https://www.youtube.com/embed/MHWX0f3TG4I" frameborder="0" allowfullscreen=""></iframe>
 
   </div>
   
@@ -393,91 +709,6 @@ including remainder of URL). One way to deal with it is to reduce detail - simpl
 </span></code></pre>
 </div>
 
-
-  </div>
-  
-  <div class="post">
-    <h1>
-      <a href="/2016/04/atomize/">
-        atomize - make new packages from other packages
-      </a>
-    </h1>
-
-    <span class="post-date">07 Apr 2016</span>
-
-    <p>We (rOpenSci) just held our 3rd annual rOpenSci unconference (<a href="http://unconf16.ropensci.org/">http://unconf16.ropensci.org/</a>) in San Francisco. There were <a href="https://github.com/ropensci/unconf16/issues">a lot of ideas</a>, and lots of awesome projects from awesome people came out of the 2 day event.</p>
-
-<p>One weird idea I had comes from looking at the Node world, where there are lots of tiny packages, instead of the often larger packages we have in the R world. One reason for tiny in Node is that of course you want a library to be tiny if running in the browser for faster load times (esp. on mobile).</p>
-
-<p>So the idea is, what if we could separate all the functions in a package, or any particular function of your choice, into new packages, with all the internal functions and dependencies. And automatically as well, not manually.</p>
-
-<p>So what are the use cases? I can’t imagine this being used to create stable packages to disperse to the world on CRAN, but it could be really useful for development purposes, or for R users/analysts that want lighter weight dependencies (e.g., a package with just the one function needed from a larger package).</p>
-
-<p>This approach of course has drawbacks. The new created package is now broken apart from the original - however, beause it’s automated, you can just re-create it.</p>
-
-<p>Another pain point would surely be with packages that have C/C++ code in them.</p>
-
-<p>The package: <code class="highlighter-rouge">atomize</code>.</p>
-
-<p>The package was made possible by the awesome <a href="https://github.com/MangoTheCat/functionMap">functionMap</a> package by <a href="https://github.com/gaborcsardi">Gábor Csárdi</a>, and the more well-known <code class="highlighter-rouge">devtools</code>.</p>
-
-<p>Expect bugs, the package has no tests. Sorry :(</p>
-
-<h2 id="installation">Installation</h2>
-
-<div class="language-r highlighter-rouge"><pre class="highlight"><code><span class="n">devtools</span><span class="o">::</span><span class="n">install_github</span><span class="p">(</span><span class="s2">"ropenscilabs/atomize"</span><span class="p">)</span><span class="w">
-</span></code></pre>
-</div>
-
-<div class="language-r highlighter-rouge"><pre class="highlight"><code><span class="n">library</span><span class="p">(</span><span class="s2">"atomize"</span><span class="p">)</span><span class="w">
-</span></code></pre>
-</div>
-
-<h2 id="usage">usage</h2>
-
-<h3 id="atomize-a-fxn-into-separate-package">atomize a fxn into separate package</h3>
-
-<p>You can select one function, or many. Here, I’m using another package I maintain, <a href="https://github.com/ropenscilabs/rredlist">rredlist</a>, a pkg to interact with the <a href="http://apiv3.iucnredlist.org/api/v3/docs">IUCN Redlist API</a>.</p>
-
-<p>In this example, I want a new package called <code class="highlighter-rouge">foobar</code> with just the function <code class="highlighter-rouge">rl_citation()</code>. The function <code class="highlighter-rouge">atomize::atomizer()</code> takes the path for the package to extract from, then a path for the new package, then the function names.</p>
-
-<div class="language-r highlighter-rouge"><pre class="highlight"><code><span class="n">atomizer</span><span class="p">(</span><span class="n">path_ref</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"../rredlist"</span><span class="p">,</span><span class="w"> </span><span class="n">path_new</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"../foobar"</span><span class="p">,</span><span class="w"> </span><span class="n">funcs</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"rl_citation"</span><span class="p">)</span><span class="w">
-</span></code></pre>
-</div>
-
-<p>This creates a new package in the <code class="highlighter-rouge">path_new</code> directory</p>
-
-<h3 id="install">install</h3>
-
-<p>Now we need to install the new package, can do easily with <code class="highlighter-rouge">devtools::install()</code></p>
-
-<div class="language-r highlighter-rouge"><pre class="highlight"><code><span class="n">devtools</span><span class="o">::</span><span class="n">install</span><span class="p">(</span><span class="s2">"../foobar"</span><span class="p">)</span><span class="w">
-</span></code></pre>
-</div>
-
-<h3 id="load">load</h3>
-
-<p>Then load the new package</p>
-
-<div class="language-r highlighter-rouge"><pre class="highlight"><code><span class="n">library</span><span class="p">(</span><span class="s2">"foobar"</span><span class="p">)</span><span class="w">
-</span></code></pre>
-</div>
-
-<h3 id="call-function">call function</h3>
-
-<p>Now call the function in the new package</p>
-
-<div class="language-r highlighter-rouge"><pre class="highlight"><code><span class="n">foobar</span><span class="o">::</span><span class="n">rl_citation</span><span class="p">()</span><span class="w">
-</span><span class="c1">#&gt; [1] "IUCN 2015. IUCN Red List of Threatened Species. Version 2015-4 &lt;www.iucnredlist.org&gt;"
-</span></code></pre>
-</div>
-
-<p>it’s identical to the same function in the old package</p>
-
-<div class="language-r highlighter-rouge"><pre class="highlight"><code><span class="n">identical</span><span class="p">(</span><span class="n">rredlist</span><span class="o">::</span><span class="n">rl_citation</span><span class="p">(),</span><span class="w"> </span><span class="n">foobar</span><span class="o">::</span><span class="n">rl_citation</span><span class="p">())</span><span class="w">
-</span><span class="c1">#&gt; [1] TRUE
-</span></code></pre>
-</div>
 
   </div>
   

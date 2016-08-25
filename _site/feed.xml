@@ -5,12 +5,318 @@
 		<link>http://recology.info/</link>
 		
 			<item>
-				<title>video editing notes</title>
+				<title>nonoyes - text analysis of Reply All podcast transcripts</title>
 				<description>&lt;ul&gt;
-  &lt;li&gt;import to iMovie&lt;/li&gt;
+  &lt;li&gt;&lt;a href=&quot;#setup&quot;&gt;Setup&lt;/a&gt;&lt;/li&gt;
+  &lt;li&gt;&lt;a href=&quot;#urls&quot;&gt;URLs&lt;/a&gt;&lt;/li&gt;
+  &lt;li&gt;&lt;a href=&quot;#episode-names&quot;&gt;Episode names&lt;/a&gt;&lt;/li&gt;
+  &lt;li&gt;&lt;a href=&quot;#transcripts&quot;&gt;Transcripts&lt;/a&gt;&lt;/li&gt;
+  &lt;li&gt;&lt;a href=&quot;#summary-word-usage&quot;&gt;Summary word usage&lt;/a&gt;&lt;/li&gt;
+  &lt;li&gt;&lt;a href=&quot;#sentiment&quot;&gt;Sentiment&lt;/a&gt;
+    &lt;ul&gt;
+      &lt;li&gt;&lt;a href=&quot;#most-common-positive-and-negative-words&quot;&gt;Most common positive and negative
+words&lt;/a&gt;&lt;/li&gt;
+    &lt;/ul&gt;
+  &lt;/li&gt;
+&lt;/ul&gt;
+
+&lt;p&gt;&lt;a href=&quot;https://gimletmedia.com/show/reply-all/&quot;&gt;Reply All&lt;/a&gt; is a great podcast.
+I’ve been wanting to learn some text analysis tools, and transcripts
+from the podcast are on their site.&lt;/p&gt;
+
+&lt;p&gt;Took some approaches outlined in the
+&lt;a href=&quot;https://cran.rstudio.com/web/packages/tidytext/&quot;&gt;tidytext&lt;/a&gt; package in
+&lt;a href=&quot;https://cran.rstudio.com/web/packages/tidytext/vignettes/tidytext.html&quot;&gt;this
+vignette&lt;/a&gt;,
+and used the
+&lt;a href=&quot;https://cran.rstudio.com/web/packages/tokenizers&quot;&gt;tokenizers&lt;/a&gt; package,
+and some of the tidyverse.&lt;/p&gt;
+
+&lt;h2 id=&quot;setup&quot;&gt;Setup&lt;/h2&gt;
+
+&lt;p&gt;Load deps&lt;/p&gt;
+
+&lt;div class=&quot;highlighter-rouge&quot;&gt;&lt;pre class=&quot;highlight&quot;&gt;&lt;code&gt;library(&quot;httr&quot;)
+library(&quot;xml2&quot;)
+library(&quot;stringi&quot;)
+library(&quot;dplyr&quot;)
+library(&quot;ggplot2&quot;)
+library(&quot;tokenizers&quot;)
+library(&quot;tidytext&quot;)
+library(&quot;tidyr&quot;)
+&lt;/code&gt;&lt;/pre&gt;
+&lt;/div&gt;
+
+&lt;p&gt;source helper functions&lt;/p&gt;
+
+&lt;div class=&quot;highlighter-rouge&quot;&gt;&lt;pre class=&quot;highlight&quot;&gt;&lt;code&gt;source(&quot;funs.R&quot;)
+&lt;/code&gt;&lt;/pre&gt;
+&lt;/div&gt;
+
+&lt;p&gt;set base url&lt;/p&gt;
+
+&lt;div class=&quot;highlighter-rouge&quot;&gt;&lt;pre class=&quot;highlight&quot;&gt;&lt;code&gt;ra_base &amp;lt;- &quot;https://gimletmedia.com/show/reply-all/episodes&quot;
+&lt;/code&gt;&lt;/pre&gt;
+&lt;/div&gt;
+
+&lt;h2 id=&quot;urls&quot;&gt;URLs&lt;/h2&gt;
+
+&lt;p&gt;Make all urls for each page of episodes&lt;/p&gt;
+
+&lt;div class=&quot;highlighter-rouge&quot;&gt;&lt;pre class=&quot;highlight&quot;&gt;&lt;code&gt;urls &amp;lt;- c(ra_base, file.path(ra_base, &quot;page&quot;, 2:8))
+&lt;/code&gt;&lt;/pre&gt;
+&lt;/div&gt;
+
+&lt;p&gt;Get urls for each episode&lt;/p&gt;
+
+&lt;div class=&quot;highlighter-rouge&quot;&gt;&lt;pre class=&quot;highlight&quot;&gt;&lt;code&gt;res &amp;lt;- lapply(urls, get_urls)
+&lt;/code&gt;&lt;/pre&gt;
+&lt;/div&gt;
+
+&lt;p&gt;Remove those that are rebroadcasts, updates, or revisited&lt;/p&gt;
+
+&lt;div class=&quot;highlighter-rouge&quot;&gt;&lt;pre class=&quot;highlight&quot;&gt;&lt;code&gt;res &amp;lt;- grep(&quot;rebroadcast|update|revisited&quot;, unlist(res), value = TRUE, invert = TRUE)
+&lt;/code&gt;&lt;/pre&gt;
+&lt;/div&gt;
+
+&lt;h2 id=&quot;episode-names&quot;&gt;Episode names&lt;/h2&gt;
+
+&lt;p&gt;Give some episodes numbers that don’t have them&lt;/p&gt;
+
+&lt;div class=&quot;highlighter-rouge&quot;&gt;&lt;pre class=&quot;highlight&quot;&gt;&lt;code&gt;epnames &amp;lt;- sub(&quot;/$&quot;, &quot;&quot;, sub(&quot;https://gimletmedia.com/episode/&quot;, &quot;&quot;, res))
+epnames &amp;lt;- sub(&quot;the-anxiety-box&quot;, &quot;8-the-anxiety-box&quot;, epnames)
+epnames &amp;lt;- sub(&quot;french-connection&quot;, &quot;10-french-connection&quot;, epnames)
+epnames &amp;lt;- sub(&quot;ive-killed-people-and-i-have-hostages&quot;, &quot;15-ive-killed-people-and-i-have-hostages&quot;, epnames)
+epnames &amp;lt;- sub(&quot;6-this-proves-everything&quot;, &quot;75-this-proves-everything&quot;, epnames)
+epnames &amp;lt;- sub(&quot;zardulu&quot;, &quot;56-zardulu&quot;, epnames)
+&lt;/code&gt;&lt;/pre&gt;
+&lt;/div&gt;
+
+&lt;h2 id=&quot;transcripts&quot;&gt;Transcripts&lt;/h2&gt;
+
+&lt;p&gt;Get transcripts&lt;/p&gt;
+
+&lt;div class=&quot;highlighter-rouge&quot;&gt;&lt;pre class=&quot;highlight&quot;&gt;&lt;code&gt;txts &amp;lt;- lapply(res, transcript_fetch, sleep = 1)
+&lt;/code&gt;&lt;/pre&gt;
+&lt;/div&gt;
+
+&lt;p&gt;Parse transcripts&lt;/p&gt;
+
+&lt;div class=&quot;highlighter-rouge&quot;&gt;&lt;pre class=&quot;highlight&quot;&gt;&lt;code&gt;txtsp &amp;lt;- lapply(txts, transcript_parse)
+&lt;/code&gt;&lt;/pre&gt;
+&lt;/div&gt;
+
+&lt;h2 id=&quot;summary-word-usage&quot;&gt;Summary word usage&lt;/h2&gt;
+
+&lt;p&gt;Summarise data for each transcript&lt;/p&gt;
+
+&lt;div class=&quot;highlighter-rouge&quot;&gt;&lt;pre class=&quot;highlight&quot;&gt;&lt;code&gt;dat &amp;lt;- stats::setNames(lapply(txtsp, function(m) {
+  bind_rows(lapply(m, function(v) {
+    tmp &amp;lt;- unname(vapply(v, nchar, 1))
+    data_frame(
+      n = length(tmp),
+      mean = mean(tmp),
+      n_laugh = count_word(v, &quot;laugh&quot;),
+      n_groan = count_word(v, &quot;groan&quot;)
+    )
+  }), .id = &quot;name&quot;)
+}), epnames)
+&lt;/code&gt;&lt;/pre&gt;
+&lt;/div&gt;
+
+&lt;p&gt;Bind data together to single dataframe, and filter, summarise&lt;/p&gt;
+
+&lt;div class=&quot;highlighter-rouge&quot;&gt;&lt;pre class=&quot;highlight&quot;&gt;&lt;code&gt;data &amp;lt;- bind_rows(dat, .id = &quot;episode&quot;) %&amp;gt;%
+  filter(!is.na(episode)) %&amp;gt;%
+  filter(grepl(&quot;^PJ$|^ALEX GOLDMAN$&quot;, name)) %&amp;gt;%
+  mutate(ep_no = as.numeric(strextract(episode, &quot;^[0-9]+&quot;))) %&amp;gt;%
+  group_by(ep_no) %&amp;gt;%
+  mutate(nrow = NROW(ep_no)) %&amp;gt;%
+  ungroup() %&amp;gt;%
+  filter(nrow == 2)
+data
+#&amp;gt; # A tibble: 114 × 8
+#&amp;gt;                 episode         name     n      mean n_laugh n_groan ep_no
+#&amp;gt;                   &amp;lt;chr&amp;gt;        &amp;lt;chr&amp;gt; &amp;lt;int&amp;gt;     &amp;lt;dbl&amp;gt;   &amp;lt;int&amp;gt;   &amp;lt;int&amp;gt; &amp;lt;dbl&amp;gt;
+#&amp;gt; 1            73-sandbox           PJ    89 130.65169       9       0    73
+#&amp;gt; 2            73-sandbox ALEX GOLDMAN    25  44.00000       1       1    73
+#&amp;gt; 3       72-dead-is-paul           PJ   137  67.77372      17       0    72
+#&amp;gt; 4       72-dead-is-paul ALEX GOLDMAN    90  61.82222       8       0    72
+#&amp;gt; 5  71-the-picture-taker           PJ    74  77.70270       3       0    71
+#&amp;gt; 6  71-the-picture-taker ALEX GOLDMAN    93 105.94624       6       0    71
+#&amp;gt; 7        69-disappeared           PJ    72  76.50000       2       0    69
+#&amp;gt; 8        69-disappeared ALEX GOLDMAN    50 135.90000       5       0    69
+#&amp;gt; 9      68-vampire-rules           PJ   142  88.00704       6       0    68
+#&amp;gt; 10     68-vampire-rules ALEX GOLDMAN   117  73.16239      13       0    68
+#&amp;gt; # ... with 104 more rows, and 1 more variables: nrow &amp;lt;int&amp;gt;
+&lt;/code&gt;&lt;/pre&gt;
+&lt;/div&gt;
+
+&lt;p&gt;Number of words - seems PJ talks more, but didn’t do quantiative
+comparison&lt;/p&gt;
+
+&lt;div class=&quot;highlighter-rouge&quot;&gt;&lt;pre class=&quot;highlight&quot;&gt;&lt;code&gt;ggplot(data, aes(ep_no, n, colour = name)) +
+  geom_point(size = 3, alpha = 0.5) +
+  geom_line(aes(group = ep_no), colour = &quot;black&quot;) +
+  scale_color_discrete(labels = c(&#39;Alex&#39;, &#39;PJ&#39;))
+&lt;/code&gt;&lt;/pre&gt;
+&lt;/div&gt;
+
+&lt;p&gt;&lt;img src=&quot;/public/img/2016-08-25-no-no-yes/unnamed-chunk-12-1.png&quot; alt=&quot;&quot; /&gt;&lt;/p&gt;
+
+&lt;p&gt;Laughs per episode - take home: PJ laughs a lot&lt;/p&gt;
+
+&lt;div class=&quot;highlighter-rouge&quot;&gt;&lt;pre class=&quot;highlight&quot;&gt;&lt;code&gt;ggplot(data, aes(ep_no, n_laugh, colour = name)) +
+  geom_point(size = 3, alpha = 0.5) +
+  geom_line(aes(group = ep_no), colour = &quot;black&quot;) +
+  scale_color_discrete(labels = c(&#39;Alex&#39;, &#39;PJ&#39;))
+&lt;/code&gt;&lt;/pre&gt;
+&lt;/div&gt;
+
+&lt;p&gt;&lt;img src=&quot;/public/img/2016-08-25-no-no-yes/unnamed-chunk-13-1.png&quot; alt=&quot;&quot; /&gt;&lt;/p&gt;
+
+&lt;h2 id=&quot;sentiment&quot;&gt;Sentiment&lt;/h2&gt;
+
+&lt;div class=&quot;highlighter-rouge&quot;&gt;&lt;pre class=&quot;highlight&quot;&gt;&lt;code&gt;zero &amp;lt;- which(vapply(txtsp, length, 1) == 0)
+txtsp_ &amp;lt;- Filter(function(x) length(x) != 0, txtsp)
+&lt;/code&gt;&lt;/pre&gt;
+&lt;/div&gt;
+
+&lt;p&gt;Tokenize words, and create data_frame&lt;/p&gt;
+
+&lt;div class=&quot;highlighter-rouge&quot;&gt;&lt;pre class=&quot;highlight&quot;&gt;&lt;code&gt;wordz &amp;lt;- stats::setNames(
+  lapply(txtsp_, function(z) {
+    bind_rows(
+      if (is.null(try_tokenize(z$`ALEX GOLDMAN`))) {
+        data_frame()
+      } else {
+        data_frame(
+          name = &quot;Alex&quot;,
+          word = try_tokenize(z$`ALEX GOLDMAN`)
+        )
+      },
+      if (is.null(try_tokenize(z$PJ))) {
+        data_frame()
+      } else {
+        data_frame(
+          name = &quot;PJ&quot;,
+          word = try_tokenize(z$PJ)
+        )
+      }
+    )
+  }), epnames[-zero])
+&lt;/code&gt;&lt;/pre&gt;
+&lt;/div&gt;
+
+&lt;p&gt;Combine to single data_frame&lt;/p&gt;
+
+&lt;div class=&quot;highlighter-rouge&quot;&gt;&lt;pre class=&quot;highlight&quot;&gt;&lt;code&gt;(wordz_df &amp;lt;- bind_rows(wordz, .id = &quot;episode&quot;))
+#&amp;gt; # A tibble: 104,713 × 3
+#&amp;gt;       episode  name      word
+#&amp;gt;         &amp;lt;chr&amp;gt; &amp;lt;chr&amp;gt;     &amp;lt;chr&amp;gt;
+#&amp;gt; 1  73-sandbox  Alex      alex
+#&amp;gt; 2  73-sandbox  Alex   goldman
+#&amp;gt; 3  73-sandbox  Alex         i
+#&amp;gt; 4  73-sandbox  Alex generally
+#&amp;gt; 5  73-sandbox  Alex     don’t
+#&amp;gt; 6  73-sandbox  Alex      alex
+#&amp;gt; 7  73-sandbox  Alex    really
+#&amp;gt; 8  73-sandbox  Alex      alex
+#&amp;gt; 9  73-sandbox  Alex    groans
+#&amp;gt; 10 73-sandbox  Alex        so
+#&amp;gt; # ... with 104,703 more rows
+&lt;/code&gt;&lt;/pre&gt;
+&lt;/div&gt;
+
+&lt;p&gt;Calculate sentiment using &lt;code class=&quot;highlighter-rouge&quot;&gt;tidytext&lt;/code&gt;&lt;/p&gt;
+
+&lt;div class=&quot;highlighter-rouge&quot;&gt;&lt;pre class=&quot;highlight&quot;&gt;&lt;code&gt;bing &amp;lt;- sentiments %&amp;gt;%
+  filter(lexicon == &quot;bing&quot;) %&amp;gt;%
+  select(-score)
+sent &amp;lt;- wordz_df %&amp;gt;%
+  inner_join(bing) %&amp;gt;%
+  count(name, episode, sentiment) %&amp;gt;%
+  spread(sentiment, n, fill = 0) %&amp;gt;%
+  mutate(sentiment = positive - negative) %&amp;gt;%
+  ungroup() %&amp;gt;%
+  filter(!is.na(episode)) %&amp;gt;%
+  complete(episode, name) %&amp;gt;%
+  mutate(ep_no = as.numeric(strextract(episode, &quot;^[0-9]+&quot;)))
+sent
+#&amp;gt; # A tibble: 148 × 6
+#&amp;gt;                                        episode  name negative positive
+#&amp;gt;                                          &amp;lt;chr&amp;gt; &amp;lt;chr&amp;gt;    &amp;lt;dbl&amp;gt;    &amp;lt;dbl&amp;gt;
+#&amp;gt; 1  1-an-app-sends-a-stranger-to-say-i-love-you  Alex       19       30
+#&amp;gt; 2  1-an-app-sends-a-stranger-to-say-i-love-you    PJ       14       14
+#&amp;gt; 3                         10-french-connection  Alex       15       32
+#&amp;gt; 4                         10-french-connection    PJ       16       36
+#&amp;gt; 5     11-did-errol-morris-brother-invent-email  Alex       NA       NA
+#&amp;gt; 6     11-did-errol-morris-brother-invent-email    PJ       25       30
+#&amp;gt; 7                           12-backend-trouble  Alex       20       15
+#&amp;gt; 8                           12-backend-trouble    PJ       40       59
+#&amp;gt; 9                              13-love-is-lies  Alex       NA       NA
+#&amp;gt; 10                             13-love-is-lies    PJ       45       64
+#&amp;gt; # ... with 138 more rows, and 2 more variables: sentiment &amp;lt;dbl&amp;gt;,
+#&amp;gt; #   ep_no &amp;lt;dbl&amp;gt;
+&lt;/code&gt;&lt;/pre&gt;
+&lt;/div&gt;
+
+&lt;p&gt;Names separate&lt;/p&gt;
+
+&lt;div class=&quot;highlighter-rouge&quot;&gt;&lt;pre class=&quot;highlight&quot;&gt;&lt;code&gt;ggplot(sent, aes(ep_no, sentiment, fill = name)) +
+  geom_bar(stat = &quot;identity&quot;) +
+  facet_wrap(~name, ncol = 2, scales = &quot;free_x&quot;)
+&lt;/code&gt;&lt;/pre&gt;
+&lt;/div&gt;
+
+&lt;p&gt;&lt;img src=&quot;/public/img/2016-08-25-no-no-yes/unnamed-chunk-18-1.png&quot; alt=&quot;&quot; /&gt;&lt;/p&gt;
+
+&lt;p&gt;Compare for each episode&lt;/p&gt;
+
+&lt;div class=&quot;highlighter-rouge&quot;&gt;&lt;pre class=&quot;highlight&quot;&gt;&lt;code&gt;ggplot(sent, aes(ep_no, sentiment, fill = name)) +
+  geom_bar(stat = &quot;identity&quot;, position = position_dodge(width = 0.5), width = 0.6)
+&lt;/code&gt;&lt;/pre&gt;
+&lt;/div&gt;
+
+&lt;p&gt;&lt;img src=&quot;/public/img/2016-08-25-no-no-yes/unnamed-chunk-19-1.png&quot; alt=&quot;&quot; /&gt;&lt;/p&gt;
+
+&lt;h3 id=&quot;most-common-positive-and-negative-words&quot;&gt;Most common positive and negative words&lt;/h3&gt;
+
+&lt;p&gt;Clearly, the word &lt;code class=&quot;highlighter-rouge&quot;&gt;like&lt;/code&gt; is surely rarely used as a positive word
+meaning e.g., that they &lt;em&gt;like something&lt;/em&gt;, but rather as the colloquial
+&lt;code class=&quot;highlighter-rouge&quot;&gt;like, totally&lt;/code&gt; usage. So it’s removed.&lt;/p&gt;
+
+&lt;p&gt;Alex&lt;/p&gt;
+
+&lt;div class=&quot;highlighter-rouge&quot;&gt;&lt;pre class=&quot;highlight&quot;&gt;&lt;code&gt;sent_cont_plot(wordz_df, &quot;Alex&quot;)
+&lt;/code&gt;&lt;/pre&gt;
+&lt;/div&gt;
+
+&lt;p&gt;&lt;img src=&quot;/public/img/2016-08-25-no-no-yes/unnamed-chunk-20-1.png&quot; alt=&quot;&quot; /&gt;&lt;/p&gt;
+
+&lt;p&gt;PJ&lt;/p&gt;
+
+&lt;div class=&quot;highlighter-rouge&quot;&gt;&lt;pre class=&quot;highlight&quot;&gt;&lt;code&gt;sent_cont_plot(wordz_df, &quot;PJ&quot;)
+&lt;/code&gt;&lt;/pre&gt;
+&lt;/div&gt;
+
+&lt;p&gt;&lt;img src=&quot;/public/img/2016-08-25-no-no-yes/unnamed-chunk-21-1.png&quot; alt=&quot;&quot; /&gt;&lt;/p&gt;
+</description>
+				<published>2016-08-25 00:00:00 -0700</published>
+				<link>http://recology.info//2016/08/no-no-yes/</link>
+			</item>
+		
+			<item>
+				<title>video editing notes</title>
+				<description>&lt;p&gt;This is how I edit videos of talks that I need to incorporate slides and video together&lt;/p&gt;
+
+&lt;p&gt;I’m on a Mac&lt;/p&gt;
+
+&lt;ul&gt;
+  &lt;li&gt;import to iMovie (using v10 something)&lt;/li&gt;
   &lt;li&gt;drop movie into editing section&lt;/li&gt;
-  &lt;li&gt;split pdf slides into individual files ``&lt;/li&gt;
-  &lt;li&gt;convert individual pdf slides into png ``&lt;/li&gt;
+  &lt;li&gt;split pdf slides into individual files &lt;code class=&quot;highlighter-rouge&quot;&gt;pdfseparate foobar.pdf %d.pdf&lt;/code&gt;&lt;/li&gt;
+  &lt;li&gt;convert individual pdf slides into png &lt;code class=&quot;highlighter-rouge&quot;&gt;sips -s format png --out &quot;${pdf%%.*}.png&quot; &quot;$pdf&quot;&lt;/code&gt;&lt;/li&gt;
   &lt;li&gt;import png’s into imovie&lt;/li&gt;
   &lt;li&gt;for each image, drop into editing area where you want it&lt;/li&gt;
   &lt;li&gt;when focused on the png of the slide:
@@ -23,10 +329,15 @@
     &lt;/ul&gt;
   &lt;/li&gt;
   &lt;li&gt;rinse and repeat for all slides&lt;/li&gt;
+  &lt;li&gt;export - via &lt;code class=&quot;highlighter-rouge&quot;&gt;File&lt;/code&gt; option&lt;/li&gt;
   &lt;li&gt;share to youtube&lt;/li&gt;
 &lt;/ul&gt;
+
+&lt;h3 id=&quot;eg-of-the-result&quot;&gt;e.g. of the result&lt;/h3&gt;
+
+&lt;iframe width=&quot;560&quot; height=&quot;315&quot; src=&quot;https://www.youtube.com/embed/MHWX0f3TG4I&quot; frameborder=&quot;0&quot; allowfullscreen=&quot;&quot;&gt;&lt;/iframe&gt;
 </description>
-				<published>2016-08-11 00:00:00 -0700</published>
+				<published>2016-08-12 00:00:00 -0700</published>
 				<link>http://recology.info//2016/08/video-editing/</link>
 			</item>
 		
@@ -1841,175 +2152,6 @@ default position (Draft function started, but not exported, and commented out)&l
 </description>
 				<published>2015-11-30 00:00:00 -0800</published>
 				<link>http://recology.info//2015/11/crossref-clients/</link>
-			</item>
-		
-			<item>
-				<title>pygbif - GBIF client for Python</title>
-				<description>&lt;p&gt;I maintain an R client for the GBIF API, at &lt;a href=&quot;https://github.com/ropensci/rgbif&quot;&gt;rgbif&lt;/a&gt;. Been working on it for a few years, and recently been thinking that there should be a nice low level client for Python as well. I didn’t see one searching Github, etc. so I started working on one recently: &lt;a href=&quot;https://github.com/sckott/pygbif&quot;&gt;pygbif&lt;/a&gt;&lt;/p&gt;
-
-&lt;p&gt;It’s up on &lt;a href=&quot;https://pypi.python.org/pypi/pygbif/0.1.1&quot;&gt;pypi&lt;/a&gt;.&lt;/p&gt;
-
-&lt;p&gt;There’s not much in &lt;code class=&quot;highlighter-rouge&quot;&gt;pygbif&lt;/code&gt; yet - I wanted to get something up to start getting some users to more quickly make the library useful to people.&lt;/p&gt;
-
-&lt;p&gt;There’s three modules, with a few methods each:&lt;/p&gt;
-
-&lt;ul&gt;
-  &lt;li&gt;species
-    &lt;ul&gt;
-      &lt;li&gt;&lt;code class=&quot;highlighter-rouge&quot;&gt;name_backbone()&lt;/code&gt;&lt;/li&gt;
-      &lt;li&gt;&lt;code class=&quot;highlighter-rouge&quot;&gt;name_suggest()&lt;/code&gt;&lt;/li&gt;
-    &lt;/ul&gt;
-  &lt;/li&gt;
-  &lt;li&gt;registry
-    &lt;ul&gt;
-      &lt;li&gt;&lt;code class=&quot;highlighter-rouge&quot;&gt;nodes()&lt;/code&gt;&lt;/li&gt;
-      &lt;li&gt;&lt;code class=&quot;highlighter-rouge&quot;&gt;dataset_metrics()&lt;/code&gt;&lt;/li&gt;
-      &lt;li&gt;&lt;code class=&quot;highlighter-rouge&quot;&gt;datasets()&lt;/code&gt;&lt;/li&gt;
-    &lt;/ul&gt;
-  &lt;/li&gt;
-  &lt;li&gt;occurrences
-    &lt;ul&gt;
-      &lt;li&gt;&lt;code class=&quot;highlighter-rouge&quot;&gt;search()&lt;/code&gt;&lt;/li&gt;
-      &lt;li&gt;&lt;code class=&quot;highlighter-rouge&quot;&gt;get()&lt;/code&gt;&lt;/li&gt;
-      &lt;li&gt;&lt;code class=&quot;highlighter-rouge&quot;&gt;get_verbatim()&lt;/code&gt;&lt;/li&gt;
-      &lt;li&gt;&lt;code class=&quot;highlighter-rouge&quot;&gt;get_fragment()&lt;/code&gt;&lt;/li&gt;
-      &lt;li&gt;&lt;code class=&quot;highlighter-rouge&quot;&gt;count()&lt;/code&gt;&lt;/li&gt;
-      &lt;li&gt;&lt;code class=&quot;highlighter-rouge&quot;&gt;count_basisofrecord()&lt;/code&gt;&lt;/li&gt;
-      &lt;li&gt;&lt;code class=&quot;highlighter-rouge&quot;&gt;count_year()&lt;/code&gt;&lt;/li&gt;
-      &lt;li&gt;&lt;code class=&quot;highlighter-rouge&quot;&gt;count_datasets()&lt;/code&gt;&lt;/li&gt;
-      &lt;li&gt;&lt;code class=&quot;highlighter-rouge&quot;&gt;count_countries()&lt;/code&gt;&lt;/li&gt;
-      &lt;li&gt;&lt;code class=&quot;highlighter-rouge&quot;&gt;count_publishingcountries()&lt;/code&gt;&lt;/li&gt;
-      &lt;li&gt;&lt;code class=&quot;highlighter-rouge&quot;&gt;count_schema()&lt;/code&gt;&lt;/li&gt;
-    &lt;/ul&gt;
-  &lt;/li&gt;
-&lt;/ul&gt;
-
-&lt;p&gt;Here’s a quick intro (&lt;a href=&quot;https://github.com/sckott/pygbif/blob/master/demos/pygbif-intro.ipynb&quot;&gt;in a Jupyter notebook&lt;/a&gt;):&lt;/p&gt;
-
-&lt;h3 id=&quot;install&quot;&gt;Install&lt;/h3&gt;
-
-&lt;div class=&quot;language-python highlighter-rouge&quot;&gt;&lt;pre class=&quot;highlight&quot;&gt;&lt;code&gt;&lt;span class=&quot;n&quot;&gt;pip&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;install&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;pygbif&lt;/span&gt;
-&lt;/code&gt;&lt;/pre&gt;
-&lt;/div&gt;
-
-&lt;h3 id=&quot;registrydatasets&quot;&gt;Registry/datasets&lt;/h3&gt;
-
-&lt;div class=&quot;language-python highlighter-rouge&quot;&gt;&lt;pre class=&quot;highlight&quot;&gt;&lt;code&gt;&lt;span class=&quot;kn&quot;&gt;from&lt;/span&gt; &lt;span class=&quot;nn&quot;&gt;pygbif&lt;/span&gt; &lt;span class=&quot;kn&quot;&gt;import&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;registry&lt;/span&gt;
-&lt;span class=&quot;n&quot;&gt;registry&lt;/span&gt;&lt;span class=&quot;o&quot;&gt;.&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;dataset_metrics&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;uuid&lt;/span&gt;&lt;span class=&quot;o&quot;&gt;=&lt;/span&gt;&lt;span class=&quot;s&quot;&gt;&#39;3f8a1297-3259-4700-91fc-acc4170b27ce&#39;&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt;
-&lt;/code&gt;&lt;/pre&gt;
-&lt;/div&gt;
-
-&lt;div class=&quot;language-python highlighter-rouge&quot;&gt;&lt;pre class=&quot;highlight&quot;&gt;&lt;code&gt;&lt;span class=&quot;p&quot;&gt;{&lt;/span&gt;&lt;span class=&quot;s&quot;&gt;u&#39;colCoveragePct&#39;&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;:&lt;/span&gt; &lt;span class=&quot;mi&quot;&gt;79&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt;
- &lt;span class=&quot;s&quot;&gt;u&#39;colMatchingCount&#39;&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;:&lt;/span&gt; &lt;span class=&quot;mi&quot;&gt;24335&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt;
- &lt;span class=&quot;s&quot;&gt;u&#39;countByConstituent&#39;&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;:&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;{},&lt;/span&gt;
- &lt;span class=&quot;s&quot;&gt;u&#39;countByIssue&#39;&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;:&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;{&lt;/span&gt;&lt;span class=&quot;s&quot;&gt;u&#39;BACKBONE_MATCH_FUZZY&#39;&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;:&lt;/span&gt; &lt;span class=&quot;mi&quot;&gt;573&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt;
-  &lt;span class=&quot;s&quot;&gt;u&#39;BACKBONE_MATCH_NONE&#39;&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;:&lt;/span&gt; &lt;span class=&quot;mi&quot;&gt;1306&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt;
-  &lt;span class=&quot;s&quot;&gt;u&#39;VERNACULAR_NAME_INVALID&#39;&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;:&lt;/span&gt; &lt;span class=&quot;mi&quot;&gt;7777&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;},&lt;/span&gt;
- &lt;span class=&quot;s&quot;&gt;u&#39;countByKingdom&#39;&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;:&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;{&lt;/span&gt;&lt;span class=&quot;s&quot;&gt;u&#39;ANIMALIA&#39;&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;:&lt;/span&gt; &lt;span class=&quot;mi&quot;&gt;30&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt;
-  &lt;span class=&quot;s&quot;&gt;u&#39;FUNGI&#39;&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;:&lt;/span&gt; &lt;span class=&quot;mi&quot;&gt;3&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt;
-  &lt;span class=&quot;s&quot;&gt;u&#39;INCERTAE_SEDIS&#39;&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;:&lt;/span&gt; &lt;span class=&quot;mi&quot;&gt;26&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt;
-  &lt;span class=&quot;s&quot;&gt;u&#39;PLANTAE&#39;&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;:&lt;/span&gt; &lt;span class=&quot;mi&quot;&gt;10997&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt;
-  &lt;span class=&quot;s&quot;&gt;u&#39;PROTOZOA&#39;&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;:&lt;/span&gt; &lt;span class=&quot;mi&quot;&gt;1&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;},&lt;/span&gt;
- &lt;span class=&quot;o&quot;&gt;...&lt;/span&gt;
-&lt;span class=&quot;p&quot;&gt;}&lt;/span&gt;
-&lt;/code&gt;&lt;/pre&gt;
-&lt;/div&gt;
-
-&lt;h3 id=&quot;taxonomic-names&quot;&gt;Taxonomic names&lt;/h3&gt;
-
-&lt;div class=&quot;language-python highlighter-rouge&quot;&gt;&lt;pre class=&quot;highlight&quot;&gt;&lt;code&gt;&lt;span class=&quot;kn&quot;&gt;from&lt;/span&gt; &lt;span class=&quot;nn&quot;&gt;pygbif&lt;/span&gt; &lt;span class=&quot;kn&quot;&gt;import&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;species&lt;/span&gt;
-&lt;span class=&quot;n&quot;&gt;species&lt;/span&gt;&lt;span class=&quot;o&quot;&gt;.&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;name_suggest&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;q&lt;/span&gt;&lt;span class=&quot;o&quot;&gt;=&lt;/span&gt;&lt;span class=&quot;s&quot;&gt;&#39;Puma concolor&#39;&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;limit&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;=&lt;/span&gt; &lt;span class=&quot;mi&quot;&gt;1&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt;
-&lt;/code&gt;&lt;/pre&gt;
-&lt;/div&gt;
-
-&lt;div class=&quot;language-python highlighter-rouge&quot;&gt;&lt;pre class=&quot;highlight&quot;&gt;&lt;code&gt;&lt;span class=&quot;p&quot;&gt;{&lt;/span&gt;&lt;span class=&quot;s&quot;&gt;&#39;data&#39;&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;:&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;[{&lt;/span&gt;&lt;span class=&quot;s&quot;&gt;u&#39;canonicalName&#39;&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;:&lt;/span&gt; &lt;span class=&quot;s&quot;&gt;u&#39;Puma concolor&#39;&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt;
-   &lt;span class=&quot;s&quot;&gt;u&#39;class&#39;&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;:&lt;/span&gt; &lt;span class=&quot;s&quot;&gt;u&#39;Mammalia&#39;&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt;
-   &lt;span class=&quot;s&quot;&gt;u&#39;classKey&#39;&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;:&lt;/span&gt; &lt;span class=&quot;mi&quot;&gt;359&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt;
-   &lt;span class=&quot;s&quot;&gt;u&#39;family&#39;&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;:&lt;/span&gt; &lt;span class=&quot;s&quot;&gt;u&#39;Felidae&#39;&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt;
-   &lt;span class=&quot;s&quot;&gt;u&#39;familyKey&#39;&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;:&lt;/span&gt; &lt;span class=&quot;mi&quot;&gt;9703&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt;
-   &lt;span class=&quot;s&quot;&gt;u&#39;genus&#39;&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;:&lt;/span&gt; &lt;span class=&quot;s&quot;&gt;u&#39;Puma&#39;&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt;
-   &lt;span class=&quot;s&quot;&gt;u&#39;genusKey&#39;&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;:&lt;/span&gt; &lt;span class=&quot;mi&quot;&gt;2435098&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt;
-   &lt;span class=&quot;s&quot;&gt;u&#39;key&#39;&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;:&lt;/span&gt; &lt;span class=&quot;mi&quot;&gt;2435099&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt;
-   &lt;span class=&quot;s&quot;&gt;u&#39;kingdom&#39;&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;:&lt;/span&gt; &lt;span class=&quot;s&quot;&gt;u&#39;Animalia&#39;&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt;
-   &lt;span class=&quot;s&quot;&gt;u&#39;kingdomKey&#39;&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;:&lt;/span&gt; &lt;span class=&quot;mi&quot;&gt;1&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt;
-   &lt;span class=&quot;s&quot;&gt;u&#39;nubKey&#39;&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;:&lt;/span&gt; &lt;span class=&quot;mi&quot;&gt;2435099&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt;
-   &lt;span class=&quot;s&quot;&gt;u&#39;order&#39;&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;:&lt;/span&gt; &lt;span class=&quot;s&quot;&gt;u&#39;Carnivora&#39;&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt;
-   &lt;span class=&quot;s&quot;&gt;u&#39;orderKey&#39;&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;:&lt;/span&gt; &lt;span class=&quot;mi&quot;&gt;732&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt;
-   &lt;span class=&quot;s&quot;&gt;u&#39;parent&#39;&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;:&lt;/span&gt; &lt;span class=&quot;s&quot;&gt;u&#39;Puma&#39;&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt;
-   &lt;span class=&quot;s&quot;&gt;u&#39;parentKey&#39;&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;:&lt;/span&gt; &lt;span class=&quot;mi&quot;&gt;2435098&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt;
-   &lt;span class=&quot;s&quot;&gt;u&#39;phylum&#39;&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;:&lt;/span&gt; &lt;span class=&quot;s&quot;&gt;u&#39;Chordata&#39;&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt;
-   &lt;span class=&quot;s&quot;&gt;u&#39;phylumKey&#39;&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;:&lt;/span&gt; &lt;span class=&quot;mi&quot;&gt;44&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt;
-   &lt;span class=&quot;s&quot;&gt;u&#39;rank&#39;&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;:&lt;/span&gt; &lt;span class=&quot;s&quot;&gt;u&#39;SPECIES&#39;&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt;
-   &lt;span class=&quot;s&quot;&gt;u&#39;species&#39;&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;:&lt;/span&gt; &lt;span class=&quot;s&quot;&gt;u&#39;Puma concolor&#39;&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt;
-   &lt;span class=&quot;s&quot;&gt;u&#39;speciesKey&#39;&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;:&lt;/span&gt; &lt;span class=&quot;mi&quot;&gt;2435099&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;}],&lt;/span&gt;
- &lt;span class=&quot;s&quot;&gt;&#39;hierarchy&#39;&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;:&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;[{&lt;/span&gt;&lt;span class=&quot;s&quot;&gt;u&#39;1&#39;&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;:&lt;/span&gt; &lt;span class=&quot;s&quot;&gt;u&#39;Animalia&#39;&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt;
-   &lt;span class=&quot;s&quot;&gt;u&#39;2435098&#39;&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;:&lt;/span&gt; &lt;span class=&quot;s&quot;&gt;u&#39;Puma&#39;&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt;
-   &lt;span class=&quot;s&quot;&gt;u&#39;359&#39;&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;:&lt;/span&gt; &lt;span class=&quot;s&quot;&gt;u&#39;Mammalia&#39;&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt;
-   &lt;span class=&quot;s&quot;&gt;u&#39;44&#39;&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;:&lt;/span&gt; &lt;span class=&quot;s&quot;&gt;u&#39;Chordata&#39;&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt;
-   &lt;span class=&quot;s&quot;&gt;u&#39;732&#39;&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;:&lt;/span&gt; &lt;span class=&quot;s&quot;&gt;u&#39;Carnivora&#39;&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt;
-   &lt;span class=&quot;s&quot;&gt;u&#39;9703&#39;&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;:&lt;/span&gt; &lt;span class=&quot;s&quot;&gt;u&#39;Felidae&#39;&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;}]}&lt;/span&gt;
-&lt;/code&gt;&lt;/pre&gt;
-&lt;/div&gt;
-
-&lt;h3 id=&quot;occurrence-data&quot;&gt;Occurrence data&lt;/h3&gt;
-
-&lt;p&gt;Search&lt;/p&gt;
-
-&lt;div class=&quot;language-python highlighter-rouge&quot;&gt;&lt;pre class=&quot;highlight&quot;&gt;&lt;code&gt;&lt;span class=&quot;kn&quot;&gt;from&lt;/span&gt; &lt;span class=&quot;nn&quot;&gt;pygbif&lt;/span&gt; &lt;span class=&quot;kn&quot;&gt;import&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;occurrences&lt;/span&gt;
-&lt;span class=&quot;n&quot;&gt;res&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;=&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;occurrences&lt;/span&gt;&lt;span class=&quot;o&quot;&gt;.&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;search&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;taxonKey&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;=&lt;/span&gt; &lt;span class=&quot;mi&quot;&gt;3329049&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;limit&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;=&lt;/span&gt; &lt;span class=&quot;mi&quot;&gt;10&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt;
-&lt;span class=&quot;p&quot;&gt;[&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;x&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;[&lt;/span&gt;&lt;span class=&quot;s&quot;&gt;&#39;phylum&#39;&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;]&lt;/span&gt; &lt;span class=&quot;k&quot;&gt;for&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;x&lt;/span&gt; &lt;span class=&quot;ow&quot;&gt;in&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;res&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;[&lt;/span&gt;&lt;span class=&quot;s&quot;&gt;&#39;results&#39;&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;]&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;]&lt;/span&gt;
-&lt;/code&gt;&lt;/pre&gt;
-&lt;/div&gt;
-
-&lt;div class=&quot;language-python highlighter-rouge&quot;&gt;&lt;pre class=&quot;highlight&quot;&gt;&lt;code&gt;&lt;span class=&quot;p&quot;&gt;[&lt;/span&gt;&lt;span class=&quot;s&quot;&gt;u&#39;Basidiomycota&#39;&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt;
- &lt;span class=&quot;s&quot;&gt;u&#39;Basidiomycota&#39;&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt;
- &lt;span class=&quot;s&quot;&gt;u&#39;Basidiomycota&#39;&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt;
- &lt;span class=&quot;s&quot;&gt;u&#39;Basidiomycota&#39;&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt;
- &lt;span class=&quot;s&quot;&gt;u&#39;Basidiomycota&#39;&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt;
- &lt;span class=&quot;s&quot;&gt;u&#39;Basidiomycota&#39;&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt;
- &lt;span class=&quot;s&quot;&gt;u&#39;Basidiomycota&#39;&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt;
- &lt;span class=&quot;s&quot;&gt;u&#39;Basidiomycota&#39;&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt;
- &lt;span class=&quot;s&quot;&gt;u&#39;Basidiomycota&#39;&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt;
- &lt;span class=&quot;s&quot;&gt;u&#39;Basidiomycota&#39;&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;]&lt;/span&gt;
-&lt;/code&gt;&lt;/pre&gt;
-&lt;/div&gt;
-
-&lt;p&gt;Fetch specific occurrences&lt;/p&gt;
-
-&lt;div class=&quot;language-python highlighter-rouge&quot;&gt;&lt;pre class=&quot;highlight&quot;&gt;&lt;code&gt;&lt;span class=&quot;n&quot;&gt;occurrences&lt;/span&gt;&lt;span class=&quot;o&quot;&gt;.&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;get&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;key&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;=&lt;/span&gt; &lt;span class=&quot;mi&quot;&gt;252408386&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt;
-&lt;/code&gt;&lt;/pre&gt;
-&lt;/div&gt;
-
-&lt;div class=&quot;language-python highlighter-rouge&quot;&gt;&lt;pre class=&quot;highlight&quot;&gt;&lt;code&gt;&lt;span class=&quot;p&quot;&gt;{&lt;/span&gt;&lt;span class=&quot;s&quot;&gt;u&#39;basisOfRecord&#39;&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;:&lt;/span&gt; &lt;span class=&quot;s&quot;&gt;u&#39;OBSERVATION&#39;&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt;
- &lt;span class=&quot;s&quot;&gt;u&#39;catalogNumber&#39;&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;:&lt;/span&gt; &lt;span class=&quot;s&quot;&gt;u&#39;70875196&#39;&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt;
- &lt;span class=&quot;s&quot;&gt;u&#39;collectionCode&#39;&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;:&lt;/span&gt; &lt;span class=&quot;s&quot;&gt;u&#39;7472&#39;&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt;
- &lt;span class=&quot;s&quot;&gt;u&#39;continent&#39;&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;:&lt;/span&gt; &lt;span class=&quot;s&quot;&gt;u&#39;EUROPE&#39;&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt;
- &lt;span class=&quot;s&quot;&gt;u&#39;country&#39;&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;:&lt;/span&gt; &lt;span class=&quot;s&quot;&gt;u&#39;United Kingdom&#39;&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt;
- &lt;span class=&quot;s&quot;&gt;u&#39;countryCode&#39;&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;:&lt;/span&gt; &lt;span class=&quot;s&quot;&gt;u&#39;GB&#39;&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt;
- &lt;span class=&quot;s&quot;&gt;u&#39;datasetKey&#39;&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;:&lt;/span&gt; &lt;span class=&quot;s&quot;&gt;u&#39;26a49731-9457-45b2-9105-1b96063deb26&#39;&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt;
- &lt;span class=&quot;s&quot;&gt;u&#39;day&#39;&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;:&lt;/span&gt; &lt;span class=&quot;mi&quot;&gt;30&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt;
-&lt;span class=&quot;o&quot;&gt;...&lt;/span&gt;
-&lt;span class=&quot;p&quot;&gt;}&lt;/span&gt;
-&lt;/code&gt;&lt;/pre&gt;
-&lt;/div&gt;
-
-&lt;p&gt;Occurrence counts API&lt;/p&gt;
-
-&lt;div class=&quot;language-python highlighter-rouge&quot;&gt;&lt;pre class=&quot;highlight&quot;&gt;&lt;code&gt;&lt;span class=&quot;n&quot;&gt;occurrences&lt;/span&gt;&lt;span class=&quot;o&quot;&gt;.&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;count&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;isGeoreferenced&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;=&lt;/span&gt; &lt;span class=&quot;bp&quot;&gt;True&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt;
-&lt;/code&gt;&lt;/pre&gt;
-&lt;/div&gt;
-
-&lt;div class=&quot;language-python highlighter-rouge&quot;&gt;&lt;pre class=&quot;highlight&quot;&gt;&lt;code&gt;&lt;span class=&quot;mi&quot;&gt;500283031&lt;/span&gt;
-&lt;/code&gt;&lt;/pre&gt;
-&lt;/div&gt;
-
-&lt;h3 id=&quot;feedback&quot;&gt;feedback&lt;/h3&gt;
-
-&lt;p&gt;Would love any feedback…&lt;/p&gt;
-
-</description>
-				<published>2015-11-12 00:00:00 -0800</published>
-				<link>http://recology.info//2015/11/pygbif/</link>
 			</item>
 		
 	</channel>
