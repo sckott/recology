@@ -61,6 +61,121 @@
   
   <div class="post">
     <h1>
+      <a href="/2016/03/genbank-ids/">
+        GenBank IDs API - get, match, swap id types
+      </a>
+    </h1>
+
+    <span class="post-date">29 Mar 2016</span>
+
+    <p>GenBank IDs, accession numbers and GI identifiers, are the two types of identifiers for entries in GenBank. (see <a href="http://www.ncbi.nlm.nih.gov/Sitemap/sequenceIDs.html">this page</a> for why there are two types of identifiers). Actually, <a href="http://www.ncbi.nlm.nih.gov/news/03-02-2016-phase-out-of-GI-numbers/">recent news</a> from NCBI is that GI identifiers will be phased out by September this year, which affects what I’ll talk about below.</p>
+
+<p>There are a lot of sequences in GenBank. Sometimes you have identifiers and you want to check if they exist in GenBank, or want to get one type from another (accession from GI, or vice versa; although GI phase out will make this use case no longer needed), or just get a bunch of identifiers for software testing purposes perhaps.</p>
+
+<p>Currently, the ENTREZ web services aren’t super performant or easy to use for the above use cases. Thus, I’ve built out a RESTful API for these use cases, called <a href="https://github.com/sckott/gbids">gbids</a>.</p>
+
+<p><code class="highlighter-rouge">gbids</code> on GitHub: <a href="https://github.com/sckott/gbids">sckott/gbids</a></p>
+
+<p>Here’s the tech stack:</p>
+
+<ul>
+  <li>API: Ruby/Sinatra</li>
+  <li>Storage: MySQL</li>
+  <li>Caching: Redis
+    <ul>
+      <li>each key cached for 3 hours</li>
+    </ul>
+  </li>
+  <li>Server: Caddy
+    <ul>
+      <li>https</li>
+    </ul>
+  </li>
+  <li>Authentication: none</li>
+</ul>
+
+<p>Will soon have a cron job update when new dump is available every Sunday, but for now we’re about a month behind the current dump of identifiers. If usage of the API picks up, I’ll know it’s worth maintaining and make sure data is up to date.</p>
+
+<p>The base url is <a href="https://gbids.xyz">https://gbids.xyz</a>.</p>
+
+<p>Here’s a rundown of the API routes:</p>
+
+<ul>
+  <li><code class="highlighter-rouge">/</code> re-routes to <code class="highlighter-rouge">/heartbeat</code></li>
+  <li><code class="highlighter-rouge">/heartbeat</code> - list routes</li>
+  <li><code class="highlighter-rouge">/acc</code> - <code class="highlighter-rouge">GET</code> - list accession ids</li>
+  <li><code class="highlighter-rouge">/acc/:id,:id,...</code> - <code class="highlighter-rouge">GET</code> - submit many accession numbers, get back boolean (match or no match)</li>
+  <li><code class="highlighter-rouge">/acc</code> - <code class="highlighter-rouge">POST</code></li>
+  <li><code class="highlighter-rouge">/gi</code> - <code class="highlighter-rouge">GET</code> - list gi numbers</li>
+  <li><code class="highlighter-rouge">/gi/:id,:id,...</code> - <code class="highlighter-rouge">GET</code> - submit many gi numbers, get back boolean (match or no match)</li>
+  <li><code class="highlighter-rouge">/gi</code> - <code class="highlighter-rouge">POST</code></li>
+  <li><code class="highlighter-rouge">/acc2gi/:id,:id,...</code> - <code class="highlighter-rouge">GET</code> - get gi numbers from accession numbers</li>
+  <li><code class="highlighter-rouge">/acc2gi</code> - <code class="highlighter-rouge">POST</code></li>
+  <li><code class="highlighter-rouge">/gi2acc/:id,:id,...</code> - <code class="highlighter-rouge">GET</code> - get accession numbers from gi numbers</li>
+  <li><code class="highlighter-rouge">/gi2acc</code> - <code class="highlighter-rouge">POST</code></li>
+</ul>
+
+<p>Of course after GI identifiers are phased out, all <code class="highlighter-rouge">gi</code> routes will be removed.</p>
+
+<p>The API docs are at <a href="http://recology.info/gbidsdocs">recology.info/gbidsdocs</a> - let me know if you have any feedback on those.</p>
+
+<p>I also have a status page up at <a href="http://recology.info/gbidsstatus/">recology.info/gbidsstatus</a> - it’s not automated, I have to update the status manually, but I do update that page whenever I’m doing maintenance and the API will be down, or if it goes down due to any other reason.</p>
+
+<h2 id="examples">examples</h2>
+
+<p>Request to list accession identifiers, limit to 5</p>
+
+<div class="highlighter-rouge"><pre class="highlight"><code>curl 'https://gbids.xyz/acc?limit=5' | jq .
+{
+  "matched": 692006925,
+  "returned": 5,
+  "data": [
+    "A00002",
+    "A00003",
+    "X17276",
+    "X60065",
+    "CAA42669"
+  ],
+  "error": null
+}
+</code></pre>
+</div>
+
+<p>Request to match accession identifiers, some exist, while some do not</p>
+
+<div class="highlighter-rouge"><pre class="highlight"><code>curl 'https://gbids.xyz/acc/AACY024124486,AACY024124483,asdfd,asdf,AACY024124476' | jq .
+{
+  "matched": 3,
+  "returned": 5,
+  "data": {
+    "AACY024124486": true,
+    "AACY024124483": true,
+    "asdfd": false,
+    "asdf": false,
+    "AACY024124476": true
+  },
+  "error": null
+}
+</code></pre>
+</div>
+
+<h2 id="to-do">to do</h2>
+
+<p>I think it’d probably be worth adding routes for getting accession from taxonomy id and vice versa since that’s something that is currently not very easy. We could use the dumped accession2taxid data from ftp://ftp.ncbi.nih.gov/pub/taxonomy/accession2taxid/</p>
+
+<h2 id="feedback">feedback!</h2>
+
+<p>If you think this could be potentially useful, do try it out and send any feedback. I watch logs from the API, so I’m hoping for an increase in usage so I know people find it useful.</p>
+
+<p>Since servers aren’t free, costs add up, and if I don’t see usage pick up I’ll discontinue the service at some point. So do use it!</p>
+
+<p>And if anyone can offer free servers, I’d gladly take advantage of that. I’ve applied for AWS research grant, but won’t hear back for a few months.</p>
+
+
+  </div>
+  
+  <div class="post">
+    <h1>
       <a href="/2016/03/hey-there/">
         heythere - a robot to automate GitHub issue comments
       </a>
@@ -564,264 +679,6 @@ default position (Draft function started, but not exported, and commented out)</
 <h2 id="bugs-and-such">bugs and such</h2>
 
 <p>Report them in the <a href="https://github.com/ropenscilabs/scrubr/issues">scrubr issue tracker</a></p>
-
-  </div>
-  
-  <div class="post">
-    <h1>
-      <a href="/2016/01/request-hello-world/">
-        request - a high level HTTP client for R
-      </a>
-    </h1>
-
-    <span class="post-date">05 Jan 2016</span>
-
-    <p><code class="highlighter-rouge">request</code> is DSL for http requests for R, and is inspired by the CLI tool <a href="https://github.com/jakubroztocil/httpie">httpie</a>. It’s built on <code class="highlighter-rouge">httr</code>.</p>
-
-<p>The following were driving principles for this package:</p>
-
-<ul>
-  <li>The web is increasingly a JSON world, so we assume <code class="highlighter-rouge">applications/json</code> by default, but give back other types if not</li>
-  <li>The workflow follows logically, or at least should, from, <em>hey, I got this url</em>, to <em>i need to add some options</em>, to <em>execute request</em> - and functions support piping so that you can execute functions in this order</li>
-  <li>Whenever possible, we transform output to data.frame’s - facilitating downstream manipulation via <code class="highlighter-rouge">dplyr</code>, etc.</li>
-  <li>We do <code class="highlighter-rouge">GET</code> requests by default. Specify a different type if you don’t want <code class="highlighter-rouge">GET</code>. Given <code class="highlighter-rouge">GET</code> by default, this client is optimized for consumption of data, rather than creating new things on servers</li>
-  <li>You can use non-standard evaluation to easily pass in query parameters without worrying about <code class="highlighter-rouge">&amp;</code>’s, URL escaping, etc. (see <code class="highlighter-rouge">api_query()</code>)</li>
-  <li>Same for body params (see <code class="highlighter-rouge">api_body()</code>)</li>
-</ul>
-
-<p>The following is a brief demo of some of the package functionality:</p>
-
-<h2 id="install">Install</h2>
-
-<p>From CRAN</p>
-
-<div class="language-r highlighter-rouge"><pre class="highlight"><code><span class="n">install.packages</span><span class="p">(</span><span class="s2">"request"</span><span class="p">)</span><span class="w">
-</span></code></pre>
-</div>
-
-<p>Or from GitHub</p>
-
-<div class="language-r highlighter-rouge"><pre class="highlight"><code><span class="n">devtools</span><span class="o">::</span><span class="n">install_github</span><span class="p">(</span><span class="s2">"sckott/request"</span><span class="p">)</span><span class="w">
-</span></code></pre>
-</div>
-
-<div class="language-r highlighter-rouge"><pre class="highlight"><code><span class="n">library</span><span class="p">(</span><span class="s2">"request"</span><span class="p">)</span><span class="w">
-</span></code></pre>
-</div>
-
-<h2 id="execute-on-last-pipe">Execute on last pipe</h2>
-
-<p>When using pipes (<code class="highlighter-rouge">%&gt;%</code>) in <code class="highlighter-rouge">request</code>, we autodetect last piped command, and execute <code class="highlighter-rouge">http()</code> if it’s the last. If not the last, the output gets passed to the next command, and so on. This feature (and <code class="highlighter-rouge">magrittr</code>) were done by Stefan Milton Bache.</p>
-
-<p>This feature is really nice because a) it’s one less thing you need to do, and b) you only need to care about the request itself.</p>
-
-<p>You can escape auto-execution if you use the function <code class="highlighter-rouge">peep()</code>, which prints out a summary of the request you’ve created, but does not execute an HTTP request.</p>
-
-<h2 id="http-requests">HTTP Requests</h2>
-
-<p>A high level function <code class="highlighter-rouge">http()</code> wraps a lower level <code class="highlighter-rouge">R6</code> object <code class="highlighter-rouge">RequestIterator</code>, which holds a series of variables and functions to execute <code class="highlighter-rouge">GET</code> and <code class="highlighter-rouge">POST</code> requests, and will hold other HTTP verbs as well. In addition, it can hold state, which will allow us to do paging internally for you (see below). You have direct access to the <code class="highlighter-rouge">R6</code> object if you call <code class="highlighter-rouge">http_client()</code> instead of <code class="highlighter-rouge">http()</code>.</p>
-
-<h2 id="nse-and-se">NSE and SE</h2>
-
-<p>Most if not all functions in <code class="highlighter-rouge">request</code> support non-standard evaluation (NSE) as well as standard evaluation (SE). If a function supports both, there’s a version without an underscore for NSE, while a version with an underscore is for SE. For example, here, we make a HTTP request by passing a base URL, then a series of paths that get combined together. First the NSE version</p>
-
-<div class="language-r highlighter-rouge"><pre class="highlight"><code><span class="n">api</span><span class="p">(</span><span class="s1">'https://api.github.com/'</span><span class="p">)</span><span class="w"> </span><span class="o">%&gt;%</span><span class="w">
-  </span><span class="n">api_path</span><span class="p">(</span><span class="n">repos</span><span class="p">,</span><span class="w"> </span><span class="n">ropensci</span><span class="p">,</span><span class="w"> </span><span class="n">rgbif</span><span class="p">,</span><span class="w"> </span><span class="n">issues</span><span class="p">)</span><span class="w">
-</span></code></pre>
-</div>
-
-<p>Then the SE version</p>
-
-<div class="language-r highlighter-rouge"><pre class="highlight"><code><span class="n">api</span><span class="p">(</span><span class="s1">'https://api.github.com/'</span><span class="p">)</span><span class="w"> </span><span class="o">%&gt;%</span><span class="w">
-  </span><span class="n">api_path_</span><span class="p">(</span><span class="s1">'repos'</span><span class="p">,</span><span class="w"> </span><span class="s1">'ropensci'</span><span class="p">,</span><span class="w"> </span><span class="s1">'rgbif'</span><span class="p">,</span><span class="w"> </span><span class="s1">'issues'</span><span class="p">)</span><span class="w">
-</span></code></pre>
-</div>
-
-<h2 id="building-api-routes">Building API routes</h2>
-
-<p>The first thing you’ll want to do is lay out the base URL for your request. The function <code class="highlighter-rouge">api()</code> is your friend.</p>
-
-<p><code class="highlighter-rouge">api()</code> works with full or partial URLs:</p>
-
-<div class="language-r highlighter-rouge"><pre class="highlight"><code><span class="n">api</span><span class="p">(</span><span class="s1">'https://api.github.com/'</span><span class="p">)</span><span class="w">
-</span><span class="c1">#&gt; URL: https://api.github.com/
-</span><span class="n">api</span><span class="p">(</span><span class="s1">'http://api.gbif.org/v1'</span><span class="p">)</span><span class="w">
-</span><span class="c1">#&gt; URL: http://api.gbif.org/v1
-</span><span class="n">api</span><span class="p">(</span><span class="s1">'api.gbif.org/v1'</span><span class="p">)</span><span class="w">
-</span><span class="c1">#&gt; URL: api.gbif.org/v1
-</span></code></pre>
-</div>
-
-<p>And works with ports, full or partial</p>
-
-<div class="language-r highlighter-rouge"><pre class="highlight"><code><span class="n">api</span><span class="p">(</span><span class="s1">'http://localhost:9200'</span><span class="p">)</span><span class="w">
-</span><span class="c1">#&gt; URL: http://localhost:9200
-</span><span class="n">api</span><span class="p">(</span><span class="s1">'localhost:9200'</span><span class="p">)</span><span class="w">
-</span><span class="c1">#&gt; URL: http://localhost:9200
-</span><span class="n">api</span><span class="p">(</span><span class="s1">':9200'</span><span class="p">)</span><span class="w">
-</span><span class="c1">#&gt; URL: http://localhost:9200
-</span><span class="n">api</span><span class="p">(</span><span class="s1">'9200'</span><span class="p">)</span><span class="w">
-</span><span class="c1">#&gt; URL: http://localhost:9200
-</span><span class="n">api</span><span class="p">(</span><span class="s1">'9200/stuff'</span><span class="p">)</span><span class="w">
-</span><span class="c1">#&gt; URL: http://localhost:9200/stuff
-</span></code></pre>
-</div>
-
-<h2 id="make-http-requests">Make HTTP requests</h2>
-
-<p>The above examples with <code class="highlighter-rouge">api()</code> are not passed through a pipe, so only define a URL, but don’t do an HTTP request. To make an HTTP request, you can either pipe a url or partial url to e.g., <code class="highlighter-rouge">api()</code>, or call <code class="highlighter-rouge">http()</code> at the end of a string of function calls:</p>
-
-<div class="language-r highlighter-rouge"><pre class="highlight"><code><span class="s1">'https://api.github.com/'</span><span class="w"> </span><span class="o">%&gt;%</span><span class="w"> </span><span class="n">api</span><span class="p">()</span><span class="w">
-</span><span class="c1">#&gt; $current_user_url
-#&gt; [1] "https://api.github.com/user"
-#&gt;
-#&gt; $current_user_authorizations_html_url
-#&gt; [1] "https://github.com/settings/connections/applications{/client_id}"
-#&gt;
-#&gt; $authorizations_url
-#&gt; [1] "https://api.github.com/authorizations"
-#&gt;
-#&gt; $code_search_url
-</span><span class="n">...</span><span class="w">
-</span></code></pre>
-</div>
-
-<p>Or</p>
-
-<div class="language-r highlighter-rouge"><pre class="highlight"><code><span class="n">api</span><span class="p">(</span><span class="s1">'https://api.github.com/'</span><span class="p">)</span><span class="w"> </span><span class="o">%&gt;%</span><span class="w"> </span><span class="n">http</span><span class="p">()</span><span class="w">
-</span><span class="c1">#&gt; $current_user_url
-#&gt; [1] "https://api.github.com/user"
-#&gt;
-#&gt; $current_user_authorizations_html_url
-#&gt; [1] "https://github.com/settings/connections/applications{/client_id}"
-#&gt;
-#&gt; $authorizations_url
-#&gt; [1] "https://api.github.com/authorizations"
-#&gt;
-#&gt; $code_search_url
-</span><span class="n">...</span><span class="w">
-</span></code></pre>
-</div>
-
-<p><code class="highlighter-rouge">http()</code> is called at the end of a chain of piped commands, so no need to invoke it. However, you can if you like.</p>
-
-<h2 id="templating">Templating</h2>
-
-<div class="language-r highlighter-rouge"><pre class="highlight"><code><span class="n">repo_info</span><span class="w"> </span><span class="o">&lt;-</span><span class="w"> </span><span class="nf">list</span><span class="p">(</span><span class="n">username</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s1">'craigcitro'</span><span class="p">,</span><span class="w"> </span><span class="n">repo</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s1">'r-travis'</span><span class="p">)</span><span class="w">
-</span><span class="n">api</span><span class="p">(</span><span class="s1">'https://api.github.com/'</span><span class="p">)</span><span class="w"> </span><span class="o">%&gt;%</span><span class="w">
-  </span><span class="n">api_template</span><span class="p">(</span><span class="n">template</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s1">'repos///issues'</span><span class="p">,</span><span class="w"> </span><span class="n">data</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">repo_info</span><span class="p">)</span><span class="w">
-</span><span class="c1">#&gt; [[1]]
-#&gt; [[1]]$url
-#&gt; [1] "https://api.github.com/repos/craigcitro/r-travis/issues/164"
-#&gt;
-#&gt; [[1]]$labels_url
-#&gt; [1] "https://api.github.com/repos/craigcitro/r-travis/issues/164/labels{/name}"
-#&gt;
-#&gt; [[1]]$comments_url
-#&gt; [1] "https://api.github.com/repos/craigcitro/r-travis/issues/164/comments"
-#&gt; ...
-</span></code></pre>
-</div>
-
-<h2 id="set-paths">Set paths</h2>
-
-<p><code class="highlighter-rouge">api_path()</code> adds paths to the base URL</p>
-
-<div class="language-r highlighter-rouge"><pre class="highlight"><code><span class="n">api</span><span class="p">(</span><span class="s1">'https://api.github.com/'</span><span class="p">)</span><span class="w"> </span><span class="o">%&gt;%</span><span class="w">
-  </span><span class="n">api_path</span><span class="p">(</span><span class="n">repos</span><span class="p">,</span><span class="w"> </span><span class="n">ropensci</span><span class="p">,</span><span class="w"> </span><span class="n">rgbif</span><span class="p">,</span><span class="w"> </span><span class="n">issues</span><span class="p">)</span><span class="w"> </span><span class="o">%&gt;%</span><span class="w">
-  </span><span class="n">peep</span><span class="w">
-</span><span class="c1">#&gt; &lt;http request&gt;
-#&gt;   url: https://api.github.com/
-#&gt;   paths: repos/ropensci/rgbif/issues
-#&gt;   query:
-#&gt;   body:
-#&gt;   paging:
-#&gt;   headers:
-#&gt;   rate limit:
-#&gt;   retry (n/delay (s)): /
-#&gt;   error handler:
-#&gt;   config:
-</span></code></pre>
-</div>
-
-<h2 id="query">Query</h2>
-
-<div class="language-r highlighter-rouge"><pre class="highlight"><code><span class="n">api</span><span class="p">(</span><span class="s2">"http://api.plos.org/search"</span><span class="p">)</span><span class="w"> </span><span class="o">%&gt;%</span><span class="w">
-  </span><span class="n">api_query</span><span class="p">(</span><span class="n">q</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">ecology</span><span class="p">,</span><span class="w"> </span><span class="n">wt</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">json</span><span class="p">,</span><span class="w"> </span><span class="n">fl</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">journal</span><span class="p">)</span><span class="w"> </span><span class="o">%&gt;%</span><span class="w">
-  </span><span class="n">peep</span><span class="w">
-</span><span class="c1">#&gt; &lt;http request&gt;
-#&gt;   url: http://api.plos.org/search
-#&gt;   paths:
-#&gt;   query: q=ecology, wt=json, fl=journal
-#&gt;   body:
-#&gt;   paging:
-#&gt;   headers:
-#&gt;   rate limit:
-#&gt;   retry (n/delay (s)): /
-#&gt;   error handler:
-#&gt;   config:
-</span></code></pre>
-</div>
-
-<h2 id="headers">Headers</h2>
-
-<div class="language-r highlighter-rouge"><pre class="highlight"><code><span class="n">api</span><span class="p">(</span><span class="s1">'http://httpbin.org/headers'</span><span class="p">)</span><span class="w"> </span><span class="o">%&gt;%</span><span class="w">
-  </span><span class="n">api_headers</span><span class="p">(</span><span class="n">`X-FARGO-SEASON`</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="m">3</span><span class="p">,</span><span class="w"> </span><span class="n">`X-NARCOS-SEASON`</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="m">5</span><span class="p">)</span><span class="w"> </span><span class="o">%&gt;%</span><span class="w">
-  </span><span class="n">peep</span><span class="w">
-</span><span class="c1">#&gt; &lt;http request&gt;
-#&gt;   url: http://httpbin.org/headers
-#&gt;   paths:
-#&gt;   query:
-#&gt;   body:
-#&gt;   paging:
-#&gt;   headers:
-#&gt;     X-FARGO-SEASON: 3
-#&gt;     X-NARCOS-SEASON: 5
-#&gt;   rate limit:
-#&gt;   retry (n/delay (s)): /
-#&gt;   error handler:
-#&gt;   config:
-</span></code></pre>
-</div>
-
-<h2 id="curl-configuration">curl configuration</h2>
-
-<p><code class="highlighter-rouge">httr</code> is exported in <code class="highlighter-rouge">request</code>, so you can use <code class="highlighter-rouge">httr</code> functions like <code class="highlighter-rouge">verbose()</code> to get verbose curl output</p>
-
-<div class="language-r highlighter-rouge"><pre class="highlight"><code><span class="n">api</span><span class="p">(</span><span class="s1">'http://httpbin.org/headers'</span><span class="p">)</span><span class="w"> </span><span class="o">%&gt;%</span><span class="w">
-  </span><span class="n">api_config</span><span class="p">(</span><span class="n">verbose</span><span class="p">())</span><span class="w">
-</span><span class="c1">#&gt; -&gt; GET /headers HTTP/1.1
-#&gt; -&gt; Host: httpbin.org
-#&gt; -&gt; User-Agent: curl/7.43.0 curl/0.9.4 httr/1.0.0 request/0.1.0
-#&gt; -&gt; Accept-Encoding: gzip, deflate
-#&gt; -&gt; Accept: application/json, text/xml, application/xml, */*
-#&gt; -&gt;
-#&gt; &lt;- HTTP/1.1 200 OK
-#&gt; &lt;- Server: nginx
-#&gt; &lt;- Date: Sun, 03 Jan 2016 16:56:29 GMT
-#&gt; &lt;- Content-Type: application/json
-#&gt; &lt;- Content-Length: 227
-#&gt; &lt;- Connection: keep-alive
-#&gt; &lt;- Access-Control-Allow-Origin: *
-#&gt; &lt;- Access-Control-Allow-Credentials: true
-#&gt; &lt;-
-#&gt; $headers
-#&gt; $headers$Accept
-#&gt; [1] "application/json, text/xml, application/xml, */*"
-#&gt; ...
-</span></code></pre>
-</div>
-
-<h2 id="coming-soon">Coming soon</h2>
-
-<p>There’s a number of interesting features that should be coming soon to <code class="highlighter-rouge">request</code>.</p>
-
-<ul>
-  <li>Paging - a paging helper will make it easy to do paing, and will attempt to handle any parameters used for paging. Some user input will be required, like what parameter names are, and how many records you want returned  <a href="https://github.com/sckott/request/issues/2">sckott/request#2</a></li>
-  <li>Retry - a retry helper will make it easy to retry http requests on any failure, and execute a user defined function on failure <a href="https://github.com/sckott/request/issues/6">sckott/request#6</a></li>
-  <li>Rate limit - a rate limit helper will add info to a set of many requests - still in early design stages <a href="https://github.com/sckott/request/issues/5">sckott/request#5</a></li>
-  <li>Caching - a caching helper - may use in the background the in development <a href="https://github.com/ropensci/vcr">vcr R client</a> when on CRAN or perhaps <a href="https://github.com/richfitz/storr">storr</a>  <a href="https://github.com/sckott/request/issues/4">sckott/request#4</a></li>
-</ul>
 
   </div>
   

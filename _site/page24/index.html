@@ -61,6 +61,108 @@
   
   <div class="post">
     <h1>
+      <a href="/2013/06/geojson/">
+        R to GeoJSON
+      </a>
+    </h1>
+
+    <span class="post-date">30 Jun 2013</span>
+
+    <p><strong>UPDATE</strong> As you can see in Patrick’s comment below you can convert to GeoJSON format files with rgdal as an alternative to calling the Ogre web API described below. See <a href="https://github.com/patperu/write2geojson/blob/master/write-geojson.R">here</a> for example code for converting to GeoJSON with rgdal.</p>
+
+<hr />
+
+<p>GitHub recently introduced the ability to render <a href="http://en.wikipedia.org/wiki/GeoJSON">GeoJSON</a> files on their site as maps <a href="https://github.com/blog/1528-there-s-a-map-for-that">here</a>, and recently introduced <a href="https://github.com/blog/1541-geojson-rendering-improvements">here</a> support for <a href="https://github.com/mbostock/topojson">TopoJSON</a>, an extension of GeoJSON can be up to 80% smaller than GeoJSON, support for other file extensions (<code class="highlighter-rouge">.topojson</code> and <code class="highlighter-rouge">.json</code>), and you can embed the maps on other sites (so awesome). The underlying maps used on GitHub are <a href="http://www.openstreetmap.org/">Openstreet Maps</a>.</p>
+
+<p>A recent blog post showed how to convert .shp or .kml files to GeoJSON to then upload to GitHub <a href="http://ben.balter.com/2013/06/26/how-to-convert-shapefiles-to-geojson-for-use-on-github/">here</a>. The approach used Ruby on the command line locally to convert the geospatial files to GeoJSON.</p>
+
+<p>Can we do this in R? Perhaps others have already done this, but there’s more than one way to do anything, no?</p>
+
+<p>I’m not aware of a converter to GeoJSON within R, but there is a web service that can do this, called <a href="http://ogre.adc4gis.com/">Ogre</a>. The service lets you <code class="highlighter-rouge">POST</code> a file, which then converts to GeoJSON and gives it back to you. Ogre accepts many different file formats: BNA, CSV, DGN, DXF, zipped shapefiles, GeoConcept, GeoJSON, GeoRSS, GML, GMT, KML, MapInfo, and VRT.</p>
+
+<p>We can use the Ogre API to upload a local geospatial file of various formats and get the GeoJSON back, then put it up on GitHub, and they render the map for you. Sweetness.</p>
+
+<p>So here’s the protocol.</p>
+
+<hr />
+
+<h3 id="load-httr-what-is-httr-for-those-not-in-the-know-it-is-a-simpler-wrapper-around-rcurl-a-curl-interface-for-r">1. Load httr. What is httr? For those not in the know it is a simpler wrapper around RCurl, a curl interface for R.</h3>
+
+<figure class="highlight"><pre><code class="language-r" data-lang="r"><span class="c1"># install.packages('httr')
+</span><span class="n">library</span><span class="p">(</span><span class="n">httr</span><span class="p">)</span></code></pre></figure>
+
+<h3 id="here-is-a-function-to-convert-your-geospatial-files-to-geojson-with-roxygen-docs">2. Here is a function to convert your geospatial files to GeoJSON (with roxygen docs).</h3>
+
+<figure class="highlight"><pre><code class="language-r" data-lang="r"><span class="n">togeojson</span><span class="w"> </span><span class="o">&lt;-</span><span class="w"> </span><span class="k">function</span><span class="p">(</span><span class="n">file</span><span class="p">,</span><span class="w"> </span><span class="n">writepath</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"~"</span><span class="p">)</span><span class="w"> </span><span class="p">{</span><span class="w">
+    </span><span class="n">url</span><span class="w"> </span><span class="o">&lt;-</span><span class="w"> </span><span class="s2">"http://ogre.adc4gis.com/convert"</span><span class="w">
+    </span><span class="n">tt</span><span class="w"> </span><span class="o">&lt;-</span><span class="w"> </span><span class="n">POST</span><span class="p">(</span><span class="n">url</span><span class="p">,</span><span class="w"> </span><span class="n">body</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nf">list</span><span class="p">(</span><span class="n">upload</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">upload_file</span><span class="p">(</span><span class="n">file</span><span class="p">)))</span><span class="w">
+    </span><span class="n">out</span><span class="w"> </span><span class="o">&lt;-</span><span class="w"> </span><span class="n">content</span><span class="p">(</span><span class="n">tt</span><span class="p">,</span><span class="w"> </span><span class="n">as</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"text"</span><span class="p">)</span><span class="w">
+    </span><span class="n">fileConn</span><span class="w"> </span><span class="o">&lt;-</span><span class="w"> </span><span class="n">file</span><span class="p">(</span><span class="n">writepath</span><span class="p">)</span><span class="w">
+    </span><span class="n">writeLines</span><span class="p">(</span><span class="n">out</span><span class="p">,</span><span class="w"> </span><span class="n">fileConn</span><span class="p">)</span><span class="w">
+    </span><span class="n">close</span><span class="p">(</span><span class="n">fileConn</span><span class="p">)</span><span class="w">
+</span><span class="p">}</span></code></pre></figure>
+
+<h3 id="convert-a-file-to-geojson">3. Convert a file to GeoJSON</h3>
+
+<p><strong>KML</strong></p>
+
+<p>In the first line I specify the location of the file on my machine. In the second line the function <code class="highlighter-rouge">togeojson</code> reads in the file, sends the file to the API endpoint <em>http://ogre.adc4gis.com/convert</em>, collects the returned GeoJSON object, and saves the GeoJSON to a file that you specify. Here we are converting a KML file with point occurrences (data collected from <a href="http://bison.usgs.ornl.gov/">USGS’s BISON service</a>).</p>
+
+<figure class="highlight"><pre><code class="language-r" data-lang="r"><span class="n">file</span><span class="w"> </span><span class="o">&lt;-</span><span class="w"> </span><span class="s2">"~/github/sac/rgeojson/acer_spicatum.kml"</span><span class="w">
+</span><span class="n">togeojson</span><span class="p">(</span><span class="n">file</span><span class="p">,</span><span class="w"> </span><span class="s2">"~/github/sac/rgeojson/acer_spicatum.geojson"</span><span class="p">)</span></code></pre></figure>
+
+<p><strong>Shapefiles</strong></p>
+
+<p>Here, we are converting a zip file containing shape files for <em>Pinus contorta</em> (data collected from the USGS <a href="http://esp.cr.usgs.gov/data/little/">here</a>.</p>
+
+<figure class="highlight"><pre><code class="language-r" data-lang="r"><span class="n">file</span><span class="w"> </span><span class="o">&lt;-</span><span class="w"> </span><span class="s2">"~/github/sac/rgeojson/pinucont.zip"</span><span class="w">
+</span><span class="n">togeojson</span><span class="p">(</span><span class="n">file</span><span class="p">,</span><span class="w"> </span><span class="s2">"~/github/sac/rgeojson/pinus.geojson"</span><span class="p">)</span></code></pre></figure>
+
+<h3 id="then-commit-and-push-to-github-and-this-is-what-they-look-like-on-github">4. Then commit and push to GitHub. And this is what they look like on GitHub</h3>
+
+<p><em>Acer spicatum</em> distribution (points)</p>
+
+<!-- ![](/public/img/acer_spiacdtum_dist.png) -->
+<script src="https://embed.github.com/view/geojson/sckott/rgeojson/output/acer_spicatum.geojson"></script>
+
+<p><em>Pinus contorta</em> distribution (polygons)</p>
+
+<!-- ![](/public/img/pinus_dist.png) -->
+<script src="https://embed.github.com/view/geojson/sckott/rgeojson/output/pinus.geojson"></script>
+
+<hr />
+
+<p>If you want, you can clone a repo from my account. Then do the below. (of course, you must have git installed, and have a GitHub account…)</p>
+
+<p>First, fork my <code class="highlighter-rouge">rgeojson</code> repo <a href="https://github.com/sckott/rgeojson">here</a> to your GitHub account.</p>
+
+<p>Second, in your terminal/command line…</p>
+
+<figure class="highlight"><pre><code class="language-bash" data-lang="bash">git clone https://github.com/&lt;yourgithubusername&gt;/rgeojson.git
+<span class="nb">cd </span>rgeojson</code></pre></figure>
+
+<p>Third, in R specify the location of either the KML file or the zipped shape files, then call <code class="highlighter-rouge">togeojson</code> function to convert the KML file to a GeoJSON file (which should output a file <em>acer_spicatum.geojson</em>)</p>
+
+<figure class="highlight"><pre><code class="language-r" data-lang="r"><span class="n">file</span><span class="w"> </span><span class="o">&lt;-</span><span class="w"> </span><span class="s2">"/path/to/acer_spicatum.kml"</span><span class="w">
+</span><span class="n">togeojson</span><span class="p">(</span><span class="n">file</span><span class="p">,</span><span class="w"> </span><span class="s2">"~/path/to/write/to/acer_spicatum.geojson"</span><span class="p">)</span></code></pre></figure>
+
+<p>Fourth, back in the terminal…</p>
+
+<figure class="highlight"><pre><code class="language-bash" data-lang="bash">git add acer_spicatum.geojson
+git commit -a -m <span class="s1">'some cool commit message'</span>
+git push</code></pre></figure>
+
+<p>Fifth, go to your <em>rgeojson</em> repo on GitHub and click on the <em>acer_spicatum.geojson</em> file, and the map should render.</p>
+
+<hr />
+
+<p>Look for this functionality to come to the <a href="https://github.com/ropensci/rbison">rbison</a> and <a href="https://github.com/ropensci/rgbif">rgbif</a> R packages soon. Why is that cool?  Think of the workflow: Query for species occurrence data in the BISON or GBIF databases, convert the results to a GeoJSON file, push to GitHub, and you have an awesome interactive map on the web. Not too bad eh.</p>
+
+
+  </div>
+  
+  <div class="post">
+    <h1>
       <a href="/2013/06/sofa/">
         Put some cushions on the sofa
       </a>
@@ -268,296 +370,6 @@ $rev
 </ul>
 
 <p>That’s it. Let us know if you have any thoughts/comments.</p>
-
-
-  </div>
-  
-  <div class="post">
-    <h1>
-      <a href="/2013/06/couch/">
-        Stashing and playing with raw data locally from the web
-      </a>
-    </h1>
-
-    <span class="post-date">17 Jun 2013</span>
-
-    <p>It is getting easier to get data directly into R from the web. Often R packages that retrieve data from the web return useful R data structures to users like a data.frame. This is a good thing of course to make things user friendly.</p>
-
-<p>However, what if you want to drill down into the data that’s returned from a query to a database in R?  What if you want to get that nice data.frame in R, but you think you may want to look at the raw data later? The raw data from web queries are often JSON or XML data. This type of data, especially JSON, can be easily stored in schemaless so-called NoSQL databases, and queried later.</p>
-
-<p>A brief aside: What are JSON and XML? This is what JSON looks like (ps if you ever wonder if your JSON is correct, go <a href="http://jsonlint.com/">here</a>):</p>
-
-<figure class="highlight"><pre><code class="language-bash" data-lang="bash"><span class="o">{</span>
-  <span class="s2">"name"</span>: <span class="s2">"joe"</span>,
-  <span class="s2">"hobby"</span>: <span class="s2">"codemonkey"</span>,
-  <span class="s2">"lives"</span>: <span class="o">[</span>
-      <span class="o">{</span>
-          <span class="s2">"city"</span>: <span class="s2">"San Jose"</span>,
-          <span class="s2">"state"</span>: <span class="s2">"CA"</span>
-      <span class="o">}</span>
-  <span class="o">]</span>
-<span class="o">}</span></code></pre></figure>
-
-<p>This is what XML looks like:</p>
-
-<figure class="highlight"><pre><code class="language-bash" data-lang="bash">&lt;?xml <span class="nv">version</span><span class="o">=</span><span class="s2">"1.0"</span> <span class="nv">encoding</span><span class="o">=</span><span class="s2">"UTF-8"</span> ?&gt;
-  &lt;name&gt;joe&lt;/name&gt;
-	&lt;hobby&gt;codemonkey&lt;/hobby&gt;
-	&lt;lives&gt;
-		&lt;city&gt;San Jose&lt;/city&gt;
-		&lt;state&gt;CA&lt;/state&gt;
-	&lt;/lives&gt;</code></pre></figure>
-
-<p>But don’t worry if it looks complicated - the project I talk about below, sofa, tries to make the interface to JSON and XML easy. Web APIs almost always return either JSON or XML, so this is the raw data.</p>
-
-<p>So here’s the use case I imagine, or workflow:</p>
-
-<ul>
-  <li>Query a database on the web, and choose to write the raw data to a local database.</li>
-  <li>Do whatever you want with the output R object - analyze, visualize, etc.</li>
-  <li>Now you want to go back and search through some of the raw data. But, that query took an hour. Since you wrote it to a local database, you can search the data.</li>
-  <li>If you hadn’t written it locally, you would have to make a new web call.</li>
-</ul>
-
-<p>Note that if you are doing calls to web APIs that get small amounts of data you don’t need to worry too much as you can easily just do the call again.</p>
-
-<p>I’ve started an R package to interact with the NoSQL database <a href="http://couchdb.apache.org/">CouchDB</a>. CouchDB is a schemaless database that speaks JSON, so you can store JSON and get back JSON (don’t worry XML, we got you covered - we can just wrap the XML in JSON before putting it in CouchDB). What’s especially cool is you can interact with CouchDB via <a href="http://docs.couchdb.org/en/latest/api-basics.html">a RESTful API</a>. CouchDB doesn’t have full text search built in (though you can build map-reduce <em>Views</em>, basically preset queries on the database), so I added functions (and docs to help) to interact with the <a href="https://github.com/elasticsearch/elasticsearch-river-couchdb/blob/master/README.md">CouchDB River plugin</a> for <a href="http://www.elasticsearch.org/">Elasticsearch</a>, which provides powerful full text search via an API interface. But nevermind the tech details - all this just means you can search on the full text of your stored data.</p>
-
-<p>There are plenty of databases you can interact with from R, so why CouchDB? For one, it makes a lot of sense to write to a NoSQL database since this blog post is dealing with a use case writing JSON, which isn’t a good fit for databases like MySQL, SQLite, PostgreSQL, etc. (<a href="http://wiki.postgresql.org/wiki/What's_new_in_PostgreSQL_9.2#JSON_datatype">though postgres allows you to write JSON</a>). It didn’t have to be CouchDB, but at least to me it seems relatively easy to install, you can interact with it via an HTTP API (if you’re into that, which I am), and it has a nice web interface (navigate to <a href="http://localhost:5984/_utils/">http://localhost:5984/_utils/</a> after starting <code class="highlighter-rouge">couchdb</code>).</p>
-
-<p>Is this for the casual R user? Probably not. But, I imagine there are R users out there that want some more flexibility when it comes to interacting with web data in R. It is nice and tidy to get back an R data.frame from a web call, but having the raw data at your fingertips could be super powerful. I’ll describe using an R package to interact with a web database with <code class="highlighter-rouge">sofa</code> baked in, and discuss a bit about the functions within <code class="highlighter-rouge">sofa</code>.</p>
-
-<hr />
-
-<h3 id="first-start-couchdb-in-your-terminal">First start CouchDB in your terminal</h3>
-
-<p>You can do this from anywhere in your directory. See <a href="http://couchdb.apache.org/">here</a> for instructions on how to install CouchDB.</p>
-
-<div class="language-bash highlighter-rouge"><pre class="highlight"><code>couchdb
-</code></pre>
-</div>
-
-<h3 id="then-start-elasticsearch-in-your-terminal">Then start elasticsearch in your terminal</h3>
-
-<p>See <a href="https://github.com/sckott/sofa">here</a> for instructions on how to install Elasticsearch and the River CouchDB plugin.</p>
-
-<div class="language-bash highlighter-rouge"><pre class="highlight"><code><span class="nb">cd</span> /usr/local/elasticsearch
-bin/elasticsearch -f
-</code></pre>
-</div>
-
-<hr />
-
-<h3 id="install-sofa">Install sofa</h3>
-
-<figure class="highlight"><pre><code class="language-r" data-lang="r"><span class="c1"># Uncomment these lines if you don't have these packages installed
-# install.packages('devtools') library(devtools) install_github('sofa',
-# 'schamberlain') install_github('alm', 'ropensci', ref='couch')
-</span><span class="n">library</span><span class="p">(</span><span class="n">sofa</span><span class="p">)</span><span class="w">
-</span><span class="n">library</span><span class="p">(</span><span class="n">alm</span><span class="p">)</span></code></pre></figure>
-
-<hr />
-
-<h3 id="simultaneously-write-data-to-couchdb-along-with-api-calls-using-the-alm-package-to-get-altmetrics-data-on-plos-papers-ping-to-make-sure-couchdb-is-on">Simultaneously write data to CouchDB along with API calls using the alm package to get altmetrics data on PLoS papers. Ping to make sure CouchDB is on</h3>
-
-<figure class="highlight"><pre><code class="language-r" data-lang="r"><span class="n">sofa_ping</span><span class="p">()</span></code></pre></figure>
-
-<figure class="highlight"><pre><code class="language-text" data-lang="text">  couchdb   version 
-"Welcome"   "1.2.1" </code></pre></figure>
-
-<hr />
-
-<h3 id="create-a-new-database">Create a new database</h3>
-
-<figure class="highlight"><pre><code class="language-r" data-lang="r"><span class="n">sofa_createdb</span><span class="p">(</span><span class="n">dbname</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"alm_db"</span><span class="p">)</span></code></pre></figure>
-
-<figure class="highlight"><pre><code class="language-text" data-lang="text">  ok 
-TRUE </code></pre></figure>
-
-<hr />
-
-<h3 id="write-couchdb-database-name-to-options">Write couchdb database name to options</h3>
-
-<figure class="highlight"><pre><code class="language-r" data-lang="r"><span class="n">options</span><span class="p">(</span><span class="n">couch_db_name</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"alm_db"</span><span class="p">)</span></code></pre></figure>
-
-<hr />
-
-<h3 id="list-the-databases">List the databases</h3>
-
-<figure class="highlight"><pre><code class="language-r" data-lang="r"><span class="n">sofa_listdbs</span><span class="p">()</span></code></pre></figure>
-
-<figure class="highlight"><pre><code class="language-text" data-lang="text"> [1] "_replicator"                "_users"                    
- [3] "alm_couchdb"                "alm_db"                    
- [5] "dudedb"                     "example"                   
- [7] "poop"                       "rplos_db"                  
- [9] "shit"                       "shitty"                    
-[11] "shitty2"                    "test_suite_db"             
-[13] "test_suite_db/with_slashes" "test_suite_reports"        
-[15] "testr2couch"                "twitter_db"                </code></pre></figure>
-
-<hr />
-
-<h3 id="search-for-altmetrics-normally-wo-writing-to-a-database">Search for altmetrics normally, w/o writing to a database</h3>
-
-<figure class="highlight"><pre><code class="language-r" data-lang="r"><span class="n">head</span><span class="p">(</span><span class="n">alm</span><span class="p">(</span><span class="n">doi</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"10.1371/journal.pone.0029797"</span><span class="p">))</span></code></pre></figure>
-
-<figure class="highlight"><pre><code class="language-text" data-lang="text">          .id pdf html shares groups comments likes citations total
-1   bloglines  NA   NA     NA     NA       NA    NA         0     0
-2   citeulike  NA   NA      1     NA       NA    NA        NA     1
-3    connotea  NA   NA     NA     NA       NA    NA         0     0
-4    crossref  NA   NA     NA     NA       NA    NA         6     6
-5      nature  NA   NA     NA     NA       NA    NA         4     4
-6 postgenomic  NA   NA     NA     NA       NA    NA         0     0</code></pre></figure>
-
-<hr />
-
-<h3 id="search-for-altmetrics-normally-while-writing-to-a-database">Search for altmetrics normally, while writing to a database</h3>
-
-<figure class="highlight"><pre><code class="language-r" data-lang="r"><span class="n">head</span><span class="p">(</span><span class="n">alm</span><span class="p">(</span><span class="n">doi</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"10.1371/journal.pone.0029797"</span><span class="p">,</span><span class="w"> </span><span class="n">write2couch</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="kc">TRUE</span><span class="p">))</span></code></pre></figure>
-
-<figure class="highlight"><pre><code class="language-text" data-lang="text">          .id pdf html shares groups comments likes citations total
-1   bloglines  NA   NA     NA     NA       NA    NA         0     0
-2   citeulike  NA   NA      1     NA       NA    NA        NA     1
-3    connotea  NA   NA     NA     NA       NA    NA         0     0
-4    crossref  NA   NA     NA     NA       NA    NA         6     6
-5      nature  NA   NA     NA     NA       NA    NA         4     4
-6 postgenomic  NA   NA     NA     NA       NA    NA         0     0</code></pre></figure>
-
-<hr />
-
-<h3 id="make-lots-of-calls-and-write-them-simultaneously">Make lots of calls, and write them simultaneously</h3>
-
-<figure class="highlight"><pre><code class="language-r" data-lang="r"><span class="c1"># install_github('rplos', 'ropensci')
-</span><span class="n">library</span><span class="p">(</span><span class="n">rplos</span><span class="p">)</span><span class="w">
-</span><span class="n">dois</span><span class="w"> </span><span class="o">&lt;-</span><span class="w"> </span><span class="n">searchplos</span><span class="p">(</span><span class="n">terms</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"evolution"</span><span class="p">,</span><span class="w"> </span><span class="n">fields</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"id"</span><span class="p">,</span><span class="w"> </span><span class="n">limit</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="m">100</span><span class="p">)</span><span class="w">
-</span><span class="n">out</span><span class="w"> </span><span class="o">&lt;-</span><span class="w"> </span><span class="n">alm</span><span class="p">(</span><span class="n">doi</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nf">as.character</span><span class="p">(</span><span class="n">dois</span><span class="p">[,</span><span class="w"> </span><span class="m">1</span><span class="p">]),</span><span class="w"> </span><span class="n">write2couch</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="kc">TRUE</span><span class="p">)</span><span class="w">
-</span><span class="n">lapply</span><span class="p">(</span><span class="n">out</span><span class="p">[</span><span class="m">1</span><span class="o">:</span><span class="m">2</span><span class="p">],</span><span class="w"> </span><span class="n">head</span><span class="p">)</span></code></pre></figure>
-
-<figure class="highlight"><pre><code class="language-text" data-lang="text">$`01`
-          .id pdf html shares groups comments likes citations total
-1   bloglines  NA   NA     NA     NA       NA    NA         0     0
-2   citeulike  NA   NA      0     NA       NA    NA        NA     0
-3    connotea  NA   NA     NA     NA       NA    NA         0     0
-4    crossref  NA   NA     NA     NA       NA    NA         0     0
-5      nature  NA   NA     NA     NA       NA    NA         0     0
-6 postgenomic  NA   NA     NA     NA       NA    NA         0     0
-
-$`02`
-          .id pdf html shares groups comments likes citations total
-1   bloglines  NA   NA     NA     NA       NA    NA         0     0
-2   citeulike  NA   NA      1     NA       NA    NA        NA     1
-3    connotea  NA   NA     NA     NA       NA    NA         0     0
-4    crossref  NA   NA     NA     NA       NA    NA         2     2
-5      nature  NA   NA     NA     NA       NA    NA         0     0
-6 postgenomic  NA   NA     NA     NA       NA    NA         0     0</code></pre></figure>
-
-<hr />
-
-<h3 id="writing-data-to-couchdb-does-take-a-bit-longer">Writing data to CouchDB does take a bit longer</h3>
-
-<figure class="highlight"><pre><code class="language-r" data-lang="r"><span class="n">system.time</span><span class="p">(</span><span class="n">alm</span><span class="p">(</span><span class="n">doi</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nf">as.character</span><span class="p">(</span><span class="n">dois</span><span class="p">[,</span><span class="w"> </span><span class="m">1</span><span class="p">])[</span><span class="m">1</span><span class="o">:</span><span class="m">60</span><span class="p">],</span><span class="w"> </span><span class="n">write2couch</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="kc">FALSE</span><span class="p">))</span></code></pre></figure>
-
-<figure class="highlight"><pre><code class="language-text" data-lang="text">   user  system elapsed 
-  1.739   0.016   4.554 </code></pre></figure>
-
-<figure class="highlight"><pre><code class="language-r" data-lang="r"><span class="n">system.time</span><span class="p">(</span><span class="n">alm</span><span class="p">(</span><span class="n">doi</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nf">as.character</span><span class="p">(</span><span class="n">dois</span><span class="p">[,</span><span class="w"> </span><span class="m">1</span><span class="p">])[</span><span class="m">1</span><span class="o">:</span><span class="m">60</span><span class="p">],</span><span class="w"> </span><span class="n">write2couch</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="kc">TRUE</span><span class="p">))</span></code></pre></figure>
-
-<figure class="highlight"><pre><code class="language-text" data-lang="text">   user  system elapsed 
-  3.579   0.062   6.460 </code></pre></figure>
-
-<hr />
-
-<h3 id="search-using-elasticsearch">Search using elasticsearch</h3>
-<p>#### tell elasticsearch to start indexing your database</p>
-
-<figure class="highlight"><pre><code class="language-r" data-lang="r"><span class="n">elastic_start</span><span class="p">(</span><span class="n">dbname</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"alm_db"</span><span class="p">)</span></code></pre></figure>
-
-<figure class="highlight"><pre><code class="language-text" data-lang="text">$ok
-[1] TRUE</code></pre></figure>
-
-<hr />
-
-<h4 id="search-your-database">Search your database</h4>
-
-<figure class="highlight"><pre><code class="language-r" data-lang="r"><span class="n">out</span><span class="w"> </span><span class="o">&lt;-</span><span class="w"> </span><span class="n">elastic_search</span><span class="p">(</span><span class="n">dbname</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"alm_db"</span><span class="p">,</span><span class="w"> </span><span class="n">q</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"twitter"</span><span class="p">,</span><span class="w"> </span><span class="n">parse_</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="kc">TRUE</span><span class="p">)</span><span class="w">
-</span><span class="n">out</span><span class="o">$</span><span class="n">hits</span><span class="o">$</span><span class="n">total</span></code></pre></figure>
-
-<figure class="highlight"><pre><code class="language-text" data-lang="text">[1] 679</code></pre></figure>
-
-<hr />
-
-<h3 id="using-views">Using views</h3>
-
-<h4 id="write-a-view---here-letting-key-be-the-default-of-null">Write a view - here letting key be the default of null</h4>
-
-<figure class="highlight"><pre><code class="language-r" data-lang="r"><span class="n">sofa_view_put</span><span class="p">(</span><span class="n">dbname</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"alm_db"</span><span class="p">,</span><span class="w"> </span><span class="n">design_name</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"myview"</span><span class="p">,</span><span class="w"> </span><span class="n">value</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"doc.baseurl"</span><span class="p">)</span></code></pre></figure>
-
-<figure class="highlight"><pre><code class="language-text" data-lang="text">$ok
-[1] TRUE
-
-$id
-[1] "_design/myview"
-
-$rev
-[1] "1-e7c17cff1b96e4595c3781da53e16ad8"</code></pre></figure>
-
-<hr />
-
-<h4 id="get-info-on-your-new-view">Get info on your new view</h4>
-
-<figure class="highlight"><pre><code class="language-r" data-lang="r"><span class="n">sofa_view_get</span><span class="p">(</span><span class="n">dbname</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"alm_db"</span><span class="p">,</span><span class="w"> </span><span class="n">design_name</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"myview"</span><span class="p">)</span></code></pre></figure>
-
-<figure class="highlight"><pre><code class="language-text" data-lang="text">$`_id`
-[1] "_design/myview"
-
-$`_rev`
-[1] "1-e7c17cff1b96e4595c3781da53e16ad8"
-
-$views
-$views$foo
-                                    map 
-"function(doc){emit(null,doc.baseurl)}" </code></pre></figure>
-
-<hr />
-
-<h4 id="get-data-using-a-view">Get data using a view</h4>
-
-<figure class="highlight"><pre><code class="language-r" data-lang="r"><span class="n">out</span><span class="w"> </span><span class="o">&lt;-</span><span class="w"> </span><span class="n">sofa_view_search</span><span class="p">(</span><span class="n">dbname</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"alm_db"</span><span class="p">,</span><span class="w"> </span><span class="n">design_name</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"myview"</span><span class="p">)</span><span class="w">
-</span><span class="nf">length</span><span class="p">(</span><span class="n">out</span><span class="o">$</span><span class="n">rows</span><span class="p">)</span><span class="w">  </span><span class="err">#</span><span class="w"> </span><span class="m">160</span><span class="w"> </span><span class="n">results</span></code></pre></figure>
-
-<figure class="highlight"><pre><code class="language-text" data-lang="text">[1] 161</code></pre></figure>
-
-<figure class="highlight"><pre><code class="language-r" data-lang="r"><span class="n">sapply</span><span class="p">(</span><span class="n">out</span><span class="o">$</span><span class="n">rows</span><span class="p">,</span><span class="w"> </span><span class="k">function</span><span class="p">(</span><span class="n">x</span><span class="p">)</span><span class="w"> </span><span class="n">x</span><span class="o">$</span><span class="n">value</span><span class="p">)[</span><span class="m">1</span><span class="o">:</span><span class="m">5</span><span class="p">]</span><span class="w">  </span><span class="err">#</span><span class="w"> </span><span class="n">the</span><span class="w"> </span><span class="n">values</span><span class="p">,</span><span class="w"> </span><span class="n">just</span><span class="w"> </span><span class="n">the</span><span class="w"> </span><span class="n">API</span><span class="w"> </span><span class="n">call</span><span class="w"> </span><span class="n">URLs</span></code></pre></figure>
-
-<figure class="highlight"><pre><code class="language-text" data-lang="text">[1] "http://alm.plos.org/api/v3/articles"
-[2] "http://alm.plos.org/api/v3/articles"
-[3] "http://alm.plos.org/api/v3/articles"
-[4] "http://alm.plos.org/api/v3/articles"
-[5] "http://alm.plos.org/api/v3/articles"</code></pre></figure>
-
-<hr />
-
-<h4 id="delete-the-view">Delete the view</h4>
-
-<figure class="highlight"><pre><code class="language-r" data-lang="r"><span class="n">sofa_view_del</span><span class="p">(</span><span class="n">dbname</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"alm_db"</span><span class="p">,</span><span class="w"> </span><span class="n">design_name</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"myview"</span><span class="p">)</span></code></pre></figure>
-
-<figure class="highlight"><pre><code class="language-text" data-lang="text">[1] ""</code></pre></figure>
-
-<hr />
-
-<h2 id="what-now">What now?</h2>
-
-<p>Well, if no one uses this, then probably nothing. Though, if people think this could be useful:</p>
-
-<ul>
-  <li>It would be cool to make easy hooks into any package making web calls to allow users to write data to CouchDB if they choose to, sort of like the example above with rplos.</li>
-  <li>Perhaps automate some of the setup for CouchDB for users, making system calls so they don’t have to.</li>
-  <li>Performance: As shown above, simultaneously writing data to CouchDB takes longer than not doing so - removing this time difference will make writing to couch more palatable.</li>
-</ul>
-
-<h2 id="what-do-you-think">What do you think?</h2>
-
-<p>What is your reaction to this post?  Do you have a need for this sort of tool?  Do you have similar use cases that could be addressed with <code class="highlighter-rouge">sofa</code>?</p>
 
 
   </div>

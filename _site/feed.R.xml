@@ -6,6 +6,381 @@
 		<link>http://recology.info/</link>
 		
 			<item>
+				<title>USDA plants database API in R</title>
+				<description>&lt;p&gt;The USDA maintains a database of plant information, some of it trait data, some
+of it life history. Check it out at &lt;a href=&quot;http://plants.usda.gov/java/&quot;&gt;http://plants.usda.gov/java/&lt;/a&gt;&lt;/p&gt;
+
+&lt;p&gt;They’ve been talking about releasing an API for a long time, but have not done so.&lt;/p&gt;
+
+&lt;p&gt;Thus, since at least some version of their data is in the public web,
+I’ve created a RESTful API for the data:&lt;/p&gt;
+
+&lt;ul&gt;
+  &lt;li&gt;source code: &lt;a href=&quot;https://github.com/sckott/usdaplantsapi/&quot;&gt;https://github.com/sckott/usdaplantsapi/&lt;/a&gt;&lt;/li&gt;
+  &lt;li&gt;base URL: &lt;a href=&quot;https://plantsdb.xyz&quot;&gt;https://plantsdb.xyz&lt;/a&gt;&lt;/li&gt;
+&lt;/ul&gt;
+
+&lt;p&gt;Check out the API, and open issues for bugs/feature requests in the github repo.&lt;/p&gt;
+
+&lt;p&gt;The following is an example using it from R, but you can use it from anywhere,
+the command line, Ruby, Python, a browser, whatevs.&lt;/p&gt;
+
+&lt;p&gt;Here, we’ll use &lt;a href=&quot;https://github.com/sckott/request&quot;&gt;request&lt;/a&gt;, a higher level
+http client for R that I’ve been working on. A small quirk with &lt;code class=&quot;highlighter-rouge&quot;&gt;request&lt;/code&gt; is that
+when piping, you have to assign the output of the request to an object before you
+can do any further manipulation. But that’s probably good for avoiding too long
+pipe chains.&lt;/p&gt;
+
+&lt;blockquote&gt;
+  &lt;p&gt;note, that I’ve set &lt;code class=&quot;highlighter-rouge&quot;&gt;tibble.max_extra_cols = 15&lt;/code&gt; to not print the many 
+columns that are returned, for blog post brevity. When you run below
+you’ll get more columns.&lt;/p&gt;
+&lt;/blockquote&gt;
+
+&lt;p&gt;Install from CRAN&lt;/p&gt;
+
+&lt;div class=&quot;language-r highlighter-rouge&quot;&gt;&lt;pre class=&quot;highlight&quot;&gt;&lt;code&gt;&lt;span class=&quot;n&quot;&gt;install.packages&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;s2&quot;&gt;&quot;request&quot;&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt;&lt;span class=&quot;w&quot;&gt;
+&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;
+&lt;/div&gt;
+
+&lt;p&gt;There is a small improvement in the dev version of &lt;code class=&quot;highlighter-rouge&quot;&gt;request&lt;/code&gt; to make any data.frame’s
+tibble’s (which the below examples uses). To get that install from GitHub:&lt;/p&gt;
+
+&lt;div class=&quot;language-r highlighter-rouge&quot;&gt;&lt;pre class=&quot;highlight&quot;&gt;&lt;code&gt;&lt;span class=&quot;n&quot;&gt;devtools&lt;/span&gt;&lt;span class=&quot;o&quot;&gt;::&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;install_github&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;s2&quot;&gt;&quot;sckott/request&quot;&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt;&lt;span class=&quot;w&quot;&gt;
+&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;
+&lt;/div&gt;
+
+&lt;div class=&quot;language-r highlighter-rouge&quot;&gt;&lt;pre class=&quot;highlight&quot;&gt;&lt;code&gt;&lt;span class=&quot;n&quot;&gt;library&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;s1&quot;&gt;&#39;request&#39;&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt;&lt;span class=&quot;w&quot;&gt;
+&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;library&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;s1&quot;&gt;&#39;tibble&#39;&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt;&lt;span class=&quot;w&quot;&gt;
+&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;
+&lt;/div&gt;
+
+&lt;h3 id=&quot;heartbeat&quot;&gt;Heartbeat&lt;/h3&gt;
+
+&lt;p&gt;The simplest call to the API is to a route &lt;code class=&quot;highlighter-rouge&quot;&gt;/heartbeat&lt;/code&gt;,
+which just lists the available routes.&lt;/p&gt;
+
+&lt;p&gt;Set the base url we’ll use throughout the work below&lt;/p&gt;
+
+&lt;div class=&quot;language-r highlighter-rouge&quot;&gt;&lt;pre class=&quot;highlight&quot;&gt;&lt;code&gt;&lt;span class=&quot;n&quot;&gt;root&lt;/span&gt;&lt;span class=&quot;w&quot;&gt; &lt;/span&gt;&lt;span class=&quot;o&quot;&gt;&amp;lt;-&lt;/span&gt;&lt;span class=&quot;w&quot;&gt; &lt;/span&gt;&lt;span class=&quot;n&quot;&gt;api&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;s2&quot;&gt;&quot;https://plantsdb.xyz&quot;&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt;&lt;span class=&quot;w&quot;&gt;
+&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;
+&lt;/div&gt;
+
+&lt;div class=&quot;language-r highlighter-rouge&quot;&gt;&lt;pre class=&quot;highlight&quot;&gt;&lt;code&gt;&lt;span class=&quot;n&quot;&gt;root&lt;/span&gt;&lt;span class=&quot;w&quot;&gt; &lt;/span&gt;&lt;span class=&quot;o&quot;&gt;%&amp;gt;%&lt;/span&gt;&lt;span class=&quot;w&quot;&gt; &lt;/span&gt;&lt;span class=&quot;n&quot;&gt;api_path&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;heartbeat&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt;&lt;span class=&quot;w&quot;&gt;
+&lt;/span&gt;&lt;span class=&quot;c1&quot;&gt;#&amp;gt; $routes
+#&amp;gt; [1] &quot;/search (HEAD, GET)&quot; &quot;/heartbeat&quot;
+&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;
+&lt;/div&gt;
+
+&lt;p&gt;Okay, so there are just two routes, &lt;code class=&quot;highlighter-rouge&quot;&gt;/search&lt;/code&gt; and &lt;code class=&quot;highlighter-rouge&quot;&gt;/heartbeat&lt;/code&gt;.&lt;/p&gt;
+
+&lt;h2 id=&quot;search&quot;&gt;Search&lt;/h2&gt;
+
+&lt;p&gt;The search route suppports the following parameters:&lt;/p&gt;
+
+&lt;ul&gt;
+  &lt;li&gt;&lt;code class=&quot;highlighter-rouge&quot;&gt;fields&lt;/code&gt;, e.g., &lt;code class=&quot;highlighter-rouge&quot;&gt;fields=&#39;Genus,Species&#39;&lt;/code&gt; (default: all fields returned)&lt;/li&gt;
+  &lt;li&gt;&lt;code class=&quot;highlighter-rouge&quot;&gt;limit&lt;/code&gt;, e.g., &lt;code class=&quot;highlighter-rouge&quot;&gt;limit=10&lt;/code&gt; (default: 10)&lt;/li&gt;
+  &lt;li&gt;&lt;code class=&quot;highlighter-rouge&quot;&gt;offset&lt;/code&gt;, e.g., &lt;code class=&quot;highlighter-rouge&quot;&gt;offset=1&lt;/code&gt; (default: 0)&lt;/li&gt;
+  &lt;li&gt;search on any fields in the output, e.g, &lt;code class=&quot;highlighter-rouge&quot;&gt;Genus=Pinus&lt;/code&gt; or &lt;code class=&quot;highlighter-rouge&quot;&gt;Species=annua&lt;/code&gt;&lt;/li&gt;
+&lt;/ul&gt;
+
+&lt;h3 id=&quot;basic-search&quot;&gt;basic search&lt;/h3&gt;
+
+&lt;p&gt;Let’s first not pass any params&lt;/p&gt;
+
+&lt;div class=&quot;language-r highlighter-rouge&quot;&gt;&lt;pre class=&quot;highlight&quot;&gt;&lt;code&gt;&lt;span class=&quot;n&quot;&gt;root&lt;/span&gt;&lt;span class=&quot;w&quot;&gt; &lt;/span&gt;&lt;span class=&quot;o&quot;&gt;%&amp;gt;%&lt;/span&gt;&lt;span class=&quot;w&quot;&gt; &lt;/span&gt;&lt;span class=&quot;n&quot;&gt;api_path&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;search&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt;&lt;span class=&quot;w&quot;&gt;
+&lt;/span&gt;&lt;span class=&quot;c1&quot;&gt;#&amp;gt; $count
+#&amp;gt; [1] 92171
+#&amp;gt; 
+#&amp;gt; $returned
+#&amp;gt; [1] 10
+#&amp;gt; 
+#&amp;gt; $citation
+#&amp;gt; [1] &quot;USDA, NRCS. 2016. The PLANTS Database (http://plants.usda.gov, 12 July 2016). National Plant Data Team, Greensboro, NC 27401-4901 USA.&quot;
+#&amp;gt; 
+#&amp;gt; $terms
+#&amp;gt; [1] &quot;Our plant information, including the distribution maps, lists, and text, is not copyrighted and is free for any use.&quot;
+#&amp;gt; 
+#&amp;gt; $data
+#&amp;gt; # A tibble: 10 × 134
+#&amp;gt;       id Symbol Accepted_Symbol_x Synonym_Symbol_x
+#&amp;gt; *  &amp;lt;int&amp;gt;  &amp;lt;chr&amp;gt;             &amp;lt;chr&amp;gt;            &amp;lt;chr&amp;gt;
+#&amp;gt; 1      1   ABAB              ABAB                 
+#&amp;gt; 2      2  ABAB2             ABPR3            ABAB2
+#&amp;gt; 3      3  ABAB3              ABTH            ABAB3
+#&amp;gt; 4      4 ABAB70            ABAB70                 
+#&amp;gt; 5      5   ABAC             ABUMB             ABAC
+#&amp;gt; 6      6   ABAL              ABAL                 
+#&amp;gt; 7      7  ABAL2             ABUMU            ABAL2
+#&amp;gt; 8      8  ABAL3             ABAL3                 
+#&amp;gt; 9      9   ABAM              ABAM                 
+#&amp;gt; 10    10  ABAM2             ABAM2                 
+#&amp;gt; # ... with 130 more variables: Scientific_Name_x &amp;lt;chr&amp;gt;,
+#&amp;gt; #   Hybrid_Genus_Indicator &amp;lt;chr&amp;gt;, Hybrid_Species_Indicator &amp;lt;chr&amp;gt;,
+#&amp;gt; #   Species &amp;lt;chr&amp;gt;, Subspecies_Prefix &amp;lt;chr&amp;gt;,
+#&amp;gt; #   Hybrid_Subspecies_Indicator &amp;lt;chr&amp;gt;, Subspecies &amp;lt;chr&amp;gt;,
+#&amp;gt; #   Variety_Prefix &amp;lt;chr&amp;gt;, Hybrid_Variety_Indicator &amp;lt;chr&amp;gt;, Variety &amp;lt;chr&amp;gt;,
+#&amp;gt; #   Subvariety_Prefix &amp;lt;chr&amp;gt;, Subvariety &amp;lt;chr&amp;gt;, Forma_Prefix &amp;lt;chr&amp;gt;,
+#&amp;gt; #   Forma &amp;lt;chr&amp;gt;, Genera_Binomial_Author &amp;lt;chr&amp;gt;, ...
+#&amp;gt; 
+#&amp;gt; $error
+#&amp;gt; NULL
+&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;
+&lt;/div&gt;
+
+&lt;p&gt;You get slots:&lt;/p&gt;
+
+&lt;ul&gt;
+  &lt;li&gt;&lt;code class=&quot;highlighter-rouge&quot;&gt;count&lt;/code&gt;: number of results found&lt;/li&gt;
+  &lt;li&gt;&lt;code class=&quot;highlighter-rouge&quot;&gt;returned&lt;/code&gt;: numbef of results returned&lt;/li&gt;
+  &lt;li&gt;&lt;code class=&quot;highlighter-rouge&quot;&gt;citation&lt;/code&gt;: suggested citation, from USDA&lt;/li&gt;
+  &lt;li&gt;&lt;code class=&quot;highlighter-rouge&quot;&gt;terms&lt;/code&gt;: terms of use, from USDA&lt;/li&gt;
+  &lt;li&gt;&lt;code class=&quot;highlighter-rouge&quot;&gt;data&lt;/code&gt;: the results&lt;/li&gt;
+  &lt;li&gt;&lt;code class=&quot;highlighter-rouge&quot;&gt;error&lt;/code&gt;: if an error occurred, you’ll see the message here&lt;/li&gt;
+&lt;/ul&gt;
+
+&lt;p&gt;Note that if any data.frame’s are found, we make them into tibble’s, nicely
+formatted data.frame’s that make it easy to deal with large data.&lt;/p&gt;
+
+&lt;h3 id=&quot;pagination&quot;&gt;Pagination&lt;/h3&gt;
+
+&lt;p&gt;limit number of results&lt;/p&gt;
+
+&lt;div class=&quot;language-r highlighter-rouge&quot;&gt;&lt;pre class=&quot;highlight&quot;&gt;&lt;code&gt;&lt;span class=&quot;n&quot;&gt;root&lt;/span&gt;&lt;span class=&quot;w&quot;&gt; &lt;/span&gt;&lt;span class=&quot;o&quot;&gt;%&amp;gt;%&lt;/span&gt;&lt;span class=&quot;w&quot;&gt;
+  &lt;/span&gt;&lt;span class=&quot;n&quot;&gt;api_path&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;search&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt;&lt;span class=&quot;w&quot;&gt; &lt;/span&gt;&lt;span class=&quot;o&quot;&gt;%&amp;gt;%&lt;/span&gt;&lt;span class=&quot;w&quot;&gt;
+  &lt;/span&gt;&lt;span class=&quot;n&quot;&gt;api_query&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;limit&lt;/span&gt;&lt;span class=&quot;w&quot;&gt; &lt;/span&gt;&lt;span class=&quot;o&quot;&gt;=&lt;/span&gt;&lt;span class=&quot;w&quot;&gt; &lt;/span&gt;&lt;span class=&quot;m&quot;&gt;5&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt;&lt;span class=&quot;w&quot;&gt;
+&lt;/span&gt;&lt;span class=&quot;c1&quot;&gt;#&amp;gt; $count
+#&amp;gt; [1] 92171
+#&amp;gt; 
+#&amp;gt; $returned
+#&amp;gt; [1] 5
+#&amp;gt; 
+#&amp;gt; $citation
+#&amp;gt; [1] &quot;USDA, NRCS. 2016. The PLANTS Database (http://plants.usda.gov, 12 July 2016). National Plant Data Team, Greensboro, NC 27401-4901 USA.&quot;
+#&amp;gt; 
+#&amp;gt; $terms
+#&amp;gt; [1] &quot;Our plant information, including the distribution maps, lists, and text, is not copyrighted and is free for any use.&quot;
+#&amp;gt; 
+#&amp;gt; $data
+#&amp;gt; # A tibble: 5 × 134
+#&amp;gt;      id Symbol Accepted_Symbol_x Synonym_Symbol_x
+#&amp;gt; * &amp;lt;int&amp;gt;  &amp;lt;chr&amp;gt;             &amp;lt;chr&amp;gt;            &amp;lt;chr&amp;gt;
+#&amp;gt; 1     1   ABAB              ABAB                 
+#&amp;gt; 2     2  ABAB2             ABPR3            ABAB2
+#&amp;gt; 3     3  ABAB3              ABTH            ABAB3
+#&amp;gt; 4     4 ABAB70            ABAB70                 
+#&amp;gt; 5     5   ABAC             ABUMB             ABAC
+#&amp;gt; # ... with 130 more variables: Scientific_Name_x &amp;lt;chr&amp;gt;,
+#&amp;gt; #   Hybrid_Genus_Indicator &amp;lt;chr&amp;gt;, Hybrid_Species_Indicator &amp;lt;chr&amp;gt;,
+#&amp;gt; #   Species &amp;lt;chr&amp;gt;, Subspecies_Prefix &amp;lt;chr&amp;gt;,
+#&amp;gt; #   Hybrid_Subspecies_Indicator &amp;lt;chr&amp;gt;, Subspecies &amp;lt;chr&amp;gt;,
+#&amp;gt; #   Variety_Prefix &amp;lt;chr&amp;gt;, Hybrid_Variety_Indicator &amp;lt;chr&amp;gt;, Variety &amp;lt;chr&amp;gt;,
+#&amp;gt; #   Subvariety_Prefix &amp;lt;chr&amp;gt;, Subvariety &amp;lt;chr&amp;gt;, Forma_Prefix &amp;lt;chr&amp;gt;,
+#&amp;gt; #   Forma &amp;lt;chr&amp;gt;, Genera_Binomial_Author &amp;lt;chr&amp;gt;, ...
+#&amp;gt; 
+#&amp;gt; $error
+#&amp;gt; NULL
+&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;
+&lt;/div&gt;
+
+&lt;p&gt;change record to start at&lt;/p&gt;
+
+&lt;div class=&quot;language-r highlighter-rouge&quot;&gt;&lt;pre class=&quot;highlight&quot;&gt;&lt;code&gt;&lt;span class=&quot;n&quot;&gt;root&lt;/span&gt;&lt;span class=&quot;w&quot;&gt; &lt;/span&gt;&lt;span class=&quot;o&quot;&gt;%&amp;gt;%&lt;/span&gt;&lt;span class=&quot;w&quot;&gt;
+  &lt;/span&gt;&lt;span class=&quot;n&quot;&gt;api_path&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;search&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt;&lt;span class=&quot;w&quot;&gt; &lt;/span&gt;&lt;span class=&quot;o&quot;&gt;%&amp;gt;%&lt;/span&gt;&lt;span class=&quot;w&quot;&gt;
+  &lt;/span&gt;&lt;span class=&quot;n&quot;&gt;api_query&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;limit&lt;/span&gt;&lt;span class=&quot;w&quot;&gt; &lt;/span&gt;&lt;span class=&quot;o&quot;&gt;=&lt;/span&gt;&lt;span class=&quot;w&quot;&gt; &lt;/span&gt;&lt;span class=&quot;m&quot;&gt;5&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt;&lt;span class=&quot;w&quot;&gt; &lt;/span&gt;&lt;span class=&quot;n&quot;&gt;offset&lt;/span&gt;&lt;span class=&quot;w&quot;&gt; &lt;/span&gt;&lt;span class=&quot;o&quot;&gt;=&lt;/span&gt;&lt;span class=&quot;w&quot;&gt; &lt;/span&gt;&lt;span class=&quot;m&quot;&gt;10&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt;&lt;span class=&quot;w&quot;&gt;
+&lt;/span&gt;&lt;span class=&quot;c1&quot;&gt;#&amp;gt; $count
+#&amp;gt; [1] 92161
+#&amp;gt; 
+#&amp;gt; $returned
+#&amp;gt; [1] 5
+#&amp;gt; 
+#&amp;gt; $citation
+#&amp;gt; [1] &quot;USDA, NRCS. 2016. The PLANTS Database (http://plants.usda.gov, 12 July 2016). National Plant Data Team, Greensboro, NC 27401-4901 USA.&quot;
+#&amp;gt; 
+#&amp;gt; $terms
+#&amp;gt; [1] &quot;Our plant information, including the distribution maps, lists, and text, is not copyrighted and is free for any use.&quot;
+#&amp;gt; 
+#&amp;gt; $data
+#&amp;gt; # A tibble: 5 × 134
+#&amp;gt;      id Symbol Accepted_Symbol_x Synonym_Symbol_x
+#&amp;gt; * &amp;lt;int&amp;gt;  &amp;lt;chr&amp;gt;             &amp;lt;chr&amp;gt;            &amp;lt;chr&amp;gt;
+#&amp;gt; 1    11  ABAM3             ABAM3                 
+#&amp;gt; 2    12  ABAM4              NAAM            ABAM4
+#&amp;gt; 3    13  ABAM5              ABAB            ABAM5
+#&amp;gt; 4    14   ABAN              ABAN                 
+#&amp;gt; 5    15  ABANA              ABAN            ABANA
+#&amp;gt; # ... with 130 more variables: Scientific_Name_x &amp;lt;chr&amp;gt;,
+#&amp;gt; #   Hybrid_Genus_Indicator &amp;lt;chr&amp;gt;, Hybrid_Species_Indicator &amp;lt;chr&amp;gt;,
+#&amp;gt; #   Species &amp;lt;chr&amp;gt;, Subspecies_Prefix &amp;lt;chr&amp;gt;,
+#&amp;gt; #   Hybrid_Subspecies_Indicator &amp;lt;chr&amp;gt;, Subspecies &amp;lt;chr&amp;gt;,
+#&amp;gt; #   Variety_Prefix &amp;lt;chr&amp;gt;, Hybrid_Variety_Indicator &amp;lt;chr&amp;gt;, Variety &amp;lt;chr&amp;gt;,
+#&amp;gt; #   Subvariety_Prefix &amp;lt;chr&amp;gt;, Subvariety &amp;lt;chr&amp;gt;, Forma_Prefix &amp;lt;chr&amp;gt;,
+#&amp;gt; #   Forma &amp;lt;chr&amp;gt;, Genera_Binomial_Author &amp;lt;chr&amp;gt;, ...
+#&amp;gt; 
+#&amp;gt; $error
+#&amp;gt; NULL
+&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;
+&lt;/div&gt;
+
+&lt;h3 id=&quot;return-fields&quot;&gt;Return fields&lt;/h3&gt;
+
+&lt;p&gt;You can say what fields you want returned, useful when you just want a
+subset of fields&lt;/p&gt;
+
+&lt;div class=&quot;language-r highlighter-rouge&quot;&gt;&lt;pre class=&quot;highlight&quot;&gt;&lt;code&gt;&lt;span class=&quot;n&quot;&gt;root&lt;/span&gt;&lt;span class=&quot;w&quot;&gt; &lt;/span&gt;&lt;span class=&quot;o&quot;&gt;%&amp;gt;%&lt;/span&gt;&lt;span class=&quot;w&quot;&gt;
+  &lt;/span&gt;&lt;span class=&quot;n&quot;&gt;api_path&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;search&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt;&lt;span class=&quot;w&quot;&gt; &lt;/span&gt;&lt;span class=&quot;o&quot;&gt;%&amp;gt;%&lt;/span&gt;&lt;span class=&quot;w&quot;&gt;
+  &lt;/span&gt;&lt;span class=&quot;n&quot;&gt;api_query&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;fields&lt;/span&gt;&lt;span class=&quot;w&quot;&gt; &lt;/span&gt;&lt;span class=&quot;o&quot;&gt;=&lt;/span&gt;&lt;span class=&quot;w&quot;&gt; &lt;/span&gt;&lt;span class=&quot;s1&quot;&gt;&#39;Genus,Species,Symbol&#39;&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt;&lt;span class=&quot;w&quot;&gt;
+&lt;/span&gt;&lt;span class=&quot;c1&quot;&gt;#&amp;gt; $count
+#&amp;gt; [1] 92171
+#&amp;gt; 
+#&amp;gt; $returned
+#&amp;gt; [1] 10
+#&amp;gt; 
+#&amp;gt; $citation
+#&amp;gt; [1] &quot;USDA, NRCS. 2016. The PLANTS Database (http://plants.usda.gov, 12 July 2016). National Plant Data Team, Greensboro, NC 27401-4901 USA.&quot;
+#&amp;gt; 
+#&amp;gt; $terms
+#&amp;gt; [1] &quot;Our plant information, including the distribution maps, lists, and text, is not copyrighted and is free for any use.&quot;
+#&amp;gt; 
+#&amp;gt; $data
+#&amp;gt; # A tibble: 10 × 3
+#&amp;gt;    Symbol     Species       Genus
+#&amp;gt; *   &amp;lt;chr&amp;gt;       &amp;lt;chr&amp;gt;       &amp;lt;chr&amp;gt;
+#&amp;gt; 1    ABAB abutiloides    Abutilon
+#&amp;gt; 2   ABAB2       abrus       Abrus
+#&amp;gt; 3   ABAB3    abutilon    Abutilon
+#&amp;gt; 4  ABAB70    abietina Abietinella
+#&amp;gt; 5    ABAC   acutalata     Abronia
+#&amp;gt; 6    ABAL      alpina     Abronia
+#&amp;gt; 7   ABAL2        alba     Abronia
+#&amp;gt; 8   ABAL3        alba       Abies
+#&amp;gt; 9    ABAM    amabilis       Abies
+#&amp;gt; 10  ABAM2     ameliae     Abronia
+#&amp;gt; 
+#&amp;gt; $error
+#&amp;gt; NULL
+&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;
+&lt;/div&gt;
+
+&lt;h3 id=&quot;query&quot;&gt;Query&lt;/h3&gt;
+
+&lt;p&gt;You can query on individual fields&lt;/p&gt;
+
+&lt;div class=&quot;language-r highlighter-rouge&quot;&gt;&lt;pre class=&quot;highlight&quot;&gt;&lt;code&gt;&lt;span class=&quot;n&quot;&gt;root&lt;/span&gt;&lt;span class=&quot;w&quot;&gt; &lt;/span&gt;&lt;span class=&quot;o&quot;&gt;%&amp;gt;%&lt;/span&gt;&lt;span class=&quot;w&quot;&gt;
+  &lt;/span&gt;&lt;span class=&quot;n&quot;&gt;api_path&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;search&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt;&lt;span class=&quot;w&quot;&gt; &lt;/span&gt;&lt;span class=&quot;o&quot;&gt;%&amp;gt;%&lt;/span&gt;&lt;span class=&quot;w&quot;&gt;
+  &lt;/span&gt;&lt;span class=&quot;n&quot;&gt;api_query&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;Genus&lt;/span&gt;&lt;span class=&quot;w&quot;&gt; &lt;/span&gt;&lt;span class=&quot;o&quot;&gt;=&lt;/span&gt;&lt;span class=&quot;w&quot;&gt; &lt;/span&gt;&lt;span class=&quot;n&quot;&gt;Pinus&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt;&lt;span class=&quot;w&quot;&gt; &lt;/span&gt;&lt;span class=&quot;n&quot;&gt;fields&lt;/span&gt;&lt;span class=&quot;w&quot;&gt; &lt;/span&gt;&lt;span class=&quot;o&quot;&gt;=&lt;/span&gt;&lt;span class=&quot;w&quot;&gt; &lt;/span&gt;&lt;span class=&quot;s2&quot;&gt;&quot;Genus,Species&quot;&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt;&lt;span class=&quot;w&quot;&gt;
+&lt;/span&gt;&lt;span class=&quot;c1&quot;&gt;#&amp;gt; $count
+#&amp;gt; [1] 185
+#&amp;gt; 
+#&amp;gt; $returned
+#&amp;gt; [1] 10
+#&amp;gt; 
+#&amp;gt; $citation
+#&amp;gt; [1] &quot;USDA, NRCS. 2016. The PLANTS Database (http://plants.usda.gov, 12 July 2016). National Plant Data Team, Greensboro, NC 27401-4901 USA.&quot;
+#&amp;gt; 
+#&amp;gt; $terms
+#&amp;gt; [1] &quot;Our plant information, including the distribution maps, lists, and text, is not copyrighted and is free for any use.&quot;
+#&amp;gt; 
+#&amp;gt; $data
+#&amp;gt; # A tibble: 10 × 2
+#&amp;gt;       Species Genus
+#&amp;gt; *       &amp;lt;chr&amp;gt; &amp;lt;chr&amp;gt;
+#&amp;gt; 1  albicaulis Pinus
+#&amp;gt; 2    apacheca Pinus
+#&amp;gt; 3    aristata Pinus
+#&amp;gt; 4   arizonica Pinus
+#&amp;gt; 5    armandii Pinus
+#&amp;gt; 6   arizonica Pinus
+#&amp;gt; 7    aristata Pinus
+#&amp;gt; 8   arizonica Pinus
+#&amp;gt; 9   arizonica Pinus
+#&amp;gt; 10  attenuata Pinus
+#&amp;gt; 
+#&amp;gt; $error
+#&amp;gt; NULL
+&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;
+&lt;/div&gt;
+
+&lt;p&gt;Another query example&lt;/p&gt;
+
+&lt;div class=&quot;language-r highlighter-rouge&quot;&gt;&lt;pre class=&quot;highlight&quot;&gt;&lt;code&gt;&lt;span class=&quot;n&quot;&gt;root&lt;/span&gt;&lt;span class=&quot;w&quot;&gt; &lt;/span&gt;&lt;span class=&quot;o&quot;&gt;%&amp;gt;%&lt;/span&gt;&lt;span class=&quot;w&quot;&gt;
+  &lt;/span&gt;&lt;span class=&quot;n&quot;&gt;api_path&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;search&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt;&lt;span class=&quot;w&quot;&gt; &lt;/span&gt;&lt;span class=&quot;o&quot;&gt;%&amp;gt;%&lt;/span&gt;&lt;span class=&quot;w&quot;&gt;
+  &lt;/span&gt;&lt;span class=&quot;n&quot;&gt;api_query&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;Species&lt;/span&gt;&lt;span class=&quot;w&quot;&gt; &lt;/span&gt;&lt;span class=&quot;o&quot;&gt;=&lt;/span&gt;&lt;span class=&quot;w&quot;&gt; &lt;/span&gt;&lt;span class=&quot;n&quot;&gt;annua&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt;&lt;span class=&quot;w&quot;&gt; &lt;/span&gt;&lt;span class=&quot;n&quot;&gt;fields&lt;/span&gt;&lt;span class=&quot;w&quot;&gt; &lt;/span&gt;&lt;span class=&quot;o&quot;&gt;=&lt;/span&gt;&lt;span class=&quot;w&quot;&gt; &lt;/span&gt;&lt;span class=&quot;s2&quot;&gt;&quot;Genus,Species&quot;&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt;&lt;span class=&quot;w&quot;&gt;
+&lt;/span&gt;&lt;span class=&quot;c1&quot;&gt;#&amp;gt; $count
+#&amp;gt; [1] 30
+#&amp;gt; 
+#&amp;gt; $returned
+#&amp;gt; [1] 10
+#&amp;gt; 
+#&amp;gt; $citation
+#&amp;gt; [1] &quot;USDA, NRCS. 2016. The PLANTS Database (http://plants.usda.gov, 12 July 2016). National Plant Data Team, Greensboro, NC 27401-4901 USA.&quot;
+#&amp;gt; 
+#&amp;gt; $terms
+#&amp;gt; [1] &quot;Our plant information, including the distribution maps, lists, and text, is not copyrighted and is free for any use.&quot;
+#&amp;gt; 
+#&amp;gt; $data
+#&amp;gt; # A tibble: 10 × 2
+#&amp;gt;    Species         Genus
+#&amp;gt; *    &amp;lt;chr&amp;gt;         &amp;lt;chr&amp;gt;
+#&amp;gt; 1    annua        Adonis
+#&amp;gt; 2    annua     Artemisia
+#&amp;gt; 3    annua   Bulbostylis
+#&amp;gt; 4    annua    Castilleja
+#&amp;gt; 5    annua   Craniolaria
+#&amp;gt; 6    annua Dimorphotheca
+#&amp;gt; 7    annua       Drosera
+#&amp;gt; 8    annua    Eleocharis
+#&amp;gt; 9    annua  Fimbristylis
+#&amp;gt; 10   annua    Heliomeris
+#&amp;gt; 
+#&amp;gt; $error
+#&amp;gt; NULL
+&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;
+&lt;/div&gt;
+
+&lt;p&gt;And one more example, here we’re interested in finding taxa that are perennials&lt;/p&gt;
+
+&lt;div class=&quot;language-r highlighter-rouge&quot;&gt;&lt;pre class=&quot;highlight&quot;&gt;&lt;code&gt;&lt;span class=&quot;n&quot;&gt;root&lt;/span&gt;&lt;span class=&quot;w&quot;&gt; &lt;/span&gt;&lt;span class=&quot;o&quot;&gt;%&amp;gt;%&lt;/span&gt;&lt;span class=&quot;w&quot;&gt;
+  &lt;/span&gt;&lt;span class=&quot;n&quot;&gt;api_path&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;search&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt;&lt;span class=&quot;w&quot;&gt; &lt;/span&gt;&lt;span class=&quot;o&quot;&gt;%&amp;gt;%&lt;/span&gt;&lt;span class=&quot;w&quot;&gt;
+  &lt;/span&gt;&lt;span class=&quot;n&quot;&gt;api_query&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;Duration&lt;/span&gt;&lt;span class=&quot;w&quot;&gt; &lt;/span&gt;&lt;span class=&quot;o&quot;&gt;=&lt;/span&gt;&lt;span class=&quot;w&quot;&gt; &lt;/span&gt;&lt;span class=&quot;n&quot;&gt;Perennial&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt;&lt;span class=&quot;w&quot;&gt; &lt;/span&gt;&lt;span class=&quot;n&quot;&gt;fields&lt;/span&gt;&lt;span class=&quot;w&quot;&gt; &lt;/span&gt;&lt;span class=&quot;o&quot;&gt;=&lt;/span&gt;&lt;span class=&quot;w&quot;&gt; &lt;/span&gt;&lt;span class=&quot;s2&quot;&gt;&quot;Genus,Species,Symbol,Duration&quot;&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt;&lt;span class=&quot;w&quot;&gt;
+&lt;/span&gt;&lt;span class=&quot;c1&quot;&gt;#&amp;gt; $count
+#&amp;gt; [1] 25296
+#&amp;gt; 
+#&amp;gt; $returned
+#&amp;gt; [1] 10
+#&amp;gt; 
+#&amp;gt; $citation
+#&amp;gt; [1] &quot;USDA, NRCS. 2016. The PLANTS Database (http://plants.usda.gov, 12 July 2016). National Plant Data Team, Greensboro, NC 27401-4901 USA.&quot;
+#&amp;gt; 
+#&amp;gt; $terms
+#&amp;gt; [1] &quot;Our plant information, including the distribution maps, lists, and text, is not copyrighted and is free for any use.&quot;
+#&amp;gt; 
+#&amp;gt; $data
+#&amp;gt; # A tibble: 10 × 4
+#&amp;gt;    Symbol     Species  Duration    Genus
+#&amp;gt; *   &amp;lt;chr&amp;gt;       &amp;lt;chr&amp;gt;     &amp;lt;chr&amp;gt;    &amp;lt;chr&amp;gt;
+#&amp;gt; 1    ABAB abutiloides Perennial Abutilon
+#&amp;gt; 2    ABAL      alpina Perennial  Abronia
+#&amp;gt; 3   ABAL3        alba Perennial    Abies
+#&amp;gt; 4    ABAM    amabilis Perennial    Abies
+#&amp;gt; 5   ABAM2     ameliae Perennial  Abronia
+#&amp;gt; 6   ABAM3   ammophila Perennial  Abronia
+#&amp;gt; 7    ABAR   argillosa Perennial  Abronia
+#&amp;gt; 8    ABAU     auritum Perennial Abutilon
+#&amp;gt; 9    ABBA    balsamea Perennial    Abies
+#&amp;gt; 10  ABBAB    balsamea Perennial    Abies
+#&amp;gt; 
+#&amp;gt; $error
+#&amp;gt; NULL
+&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;
+&lt;/div&gt;
+</description>
+				<published>2016-10-19 00:00:00 -0700</published>
+				<link>http://recology.info//2016/10/usda-plants-database-r/</link>
+			</item>
+		
+			<item>
 				<title>nonoyes - text analysis of Reply All podcast transcripts</title>
 				<description>&lt;ul&gt;
   &lt;li&gt;&lt;a href=&quot;#setup&quot;&gt;Setup&lt;/a&gt;&lt;/li&gt;
@@ -2206,79 +2581,6 @@ within X km from the coordinate.&lt;/p&gt;
 </description>
 				<published>2015-10-19 00:00:00 -0700</published>
 				<link>http://recology.info//2015/10/open-source-metrics/</link>
-			</item>
-		
-			<item>
-				<title>analogsea - an R client for the Digital Ocean API</title>
-				<description>&lt;p&gt;&lt;code class=&quot;highlighter-rouge&quot;&gt;analogsea&lt;/code&gt; is now on CRAN. We started developing the pkg back in &lt;a href=&quot;https://github.com/sckott/analogsea/commit/b129164dd87969d2fc6bcf3b51576fe1da932fdb&quot;&gt;May 2014&lt;/a&gt;, but just 
-now getting the first version on CRAN. It’s a collaboration with &lt;a href=&quot;http://had.co.nz/&quot;&gt;Hadley&lt;/a&gt; and &lt;a href=&quot;https://github.com/wch/&quot;&gt;Winston Chang&lt;/a&gt;.&lt;/p&gt;
-
-&lt;p&gt;Most of &lt;code class=&quot;highlighter-rouge&quot;&gt;analogsea&lt;/code&gt; package is for interacting with the &lt;a href=&quot;https://developers.digitalocean.com/documentation/v2/&quot;&gt;Digital Ocean API&lt;/a&gt;, including:&lt;/p&gt;
-
-&lt;ul&gt;
-  &lt;li&gt;Manage domains&lt;/li&gt;
-  &lt;li&gt;Manage ssh keys&lt;/li&gt;
-  &lt;li&gt;Get actions&lt;/li&gt;
-  &lt;li&gt;Manage images&lt;/li&gt;
-  &lt;li&gt;Manage droplets (servers)&lt;/li&gt;
-&lt;/ul&gt;
-
-&lt;p&gt;A number of convenience functions are included for doing tasks (e.g., resizing 
-a droplet) that aren’t supported by Digital Ocean’s API out of the box (i.e., 
-there’s no API route for it).&lt;/p&gt;
-
-&lt;p&gt;In addition to wrapping their API routes, we provide other functionality, e.g.:&lt;/p&gt;
-
-&lt;ul&gt;
-  &lt;li&gt;execute shell commands on a droplet (server)&lt;/li&gt;
-  &lt;li&gt;execute R commands on a droplet&lt;/li&gt;
-  &lt;li&gt;install R&lt;/li&gt;
-  &lt;li&gt;install RStudio server&lt;/li&gt;
-  &lt;li&gt;install Shiny server&lt;/li&gt;
-&lt;/ul&gt;
-
-&lt;p&gt;Other functionality we’re working on, not yet available:&lt;/p&gt;
-
-&lt;ul&gt;
-  &lt;li&gt;install OpenCPU&lt;/li&gt;
-  &lt;li&gt;use &lt;code class=&quot;highlighter-rouge&quot;&gt;packrat&lt;/code&gt; to move projects from local to server, and vice versa&lt;/li&gt;
-&lt;/ul&gt;
-
-&lt;p&gt;See also: two previous blog posts on this package &lt;a href=&quot;http://recology.info/2014/05/analogsea/&quot;&gt;http://recology.info/2014/05/analogsea/&lt;/a&gt; and &lt;a href=&quot;http://recology.info/2014/06/analogsea-v01/&quot;&gt;http://recology.info/2014/06/analogsea-v01/&lt;/a&gt;&lt;/p&gt;
-
-&lt;h2 id=&quot;install&quot;&gt;Install&lt;/h2&gt;
-
-&lt;p&gt;Binaries are not yet on CRAN, but you can install from source.&lt;/p&gt;
-
-&lt;div class=&quot;language-r highlighter-rouge&quot;&gt;&lt;pre class=&quot;highlight&quot;&gt;&lt;code&gt;&lt;span class=&quot;c1&quot;&gt;# install.packages(&quot;analogsea&quot;) # when binaries available
-&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;install.packages&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;s2&quot;&gt;&quot;analogsea&quot;&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt;&lt;span class=&quot;w&quot;&gt; &lt;/span&gt;&lt;span class=&quot;n&quot;&gt;repos&lt;/span&gt;&lt;span class=&quot;w&quot;&gt; &lt;/span&gt;&lt;span class=&quot;o&quot;&gt;=&lt;/span&gt;&lt;span class=&quot;w&quot;&gt; &lt;/span&gt;&lt;span class=&quot;s2&quot;&gt;&quot;https://cran.r-project.org&quot;&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt;&lt;span class=&quot;w&quot;&gt; &lt;/span&gt;&lt;span class=&quot;n&quot;&gt;type&lt;/span&gt;&lt;span class=&quot;w&quot;&gt; &lt;/span&gt;&lt;span class=&quot;o&quot;&gt;=&lt;/span&gt;&lt;span class=&quot;w&quot;&gt; &lt;/span&gt;&lt;span class=&quot;s2&quot;&gt;&quot;source&quot;&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt;&lt;span class=&quot;w&quot;&gt;
-&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;
-&lt;/div&gt;
-
-&lt;p&gt;Or install development version from GitHub&lt;/p&gt;
-
-&lt;div class=&quot;language-r highlighter-rouge&quot;&gt;&lt;pre class=&quot;highlight&quot;&gt;&lt;code&gt;&lt;span class=&quot;n&quot;&gt;devtools&lt;/span&gt;&lt;span class=&quot;o&quot;&gt;::&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;install_github&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;s2&quot;&gt;&quot;sckott/analogsea&quot;&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt;&lt;span class=&quot;w&quot;&gt;
-&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;
-&lt;/div&gt;
-
-&lt;p&gt;Load &lt;code class=&quot;highlighter-rouge&quot;&gt;analogsea&lt;/code&gt;&lt;/p&gt;
-
-&lt;div class=&quot;language-r highlighter-rouge&quot;&gt;&lt;pre class=&quot;highlight&quot;&gt;&lt;code&gt;&lt;span class=&quot;n&quot;&gt;library&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;s2&quot;&gt;&quot;analogsea&quot;&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt;&lt;span class=&quot;w&quot;&gt;
-&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;
-&lt;/div&gt;
-
-&lt;h2 id=&quot;etc&quot;&gt;Etc.&lt;/h2&gt;
-
-&lt;p&gt;As this post is mostly to announce that this pkg is on CRAN now, I won’t go through examples, but instead point you to the package &lt;a href=&quot;https://github.com/sckott/analogsea/blob/master/README.md&quot;&gt;README&lt;/a&gt; and &lt;a href=&quot;https://github.com/sckott/analogsea/blob/master/vignettes/doapi.Rmd&quot;&gt;vignette&lt;/a&gt; in which we cover 
-creating a Digital Ocean account, authenticating, and have many examples.&lt;/p&gt;
-
-&lt;h2 id=&quot;feedback&quot;&gt;Feedback&lt;/h2&gt;
-
-&lt;p&gt;Let us know what you think. We’d love to hear about any problems, use cases, feature requests.&lt;/p&gt;
-
-</description>
-				<published>2015-10-02 00:00:00 -0700</published>
-				<link>http://recology.info//2015/10/analogsea-cran/</link>
 			</item>
 		
 	</channel>

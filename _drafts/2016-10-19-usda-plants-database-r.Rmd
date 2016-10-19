@@ -1,0 +1,171 @@
+---
+name: usda-plants-database-r
+layout: post
+title: USDA plants database API in R
+date: 2016-10-19
+author: Scott Chamberlain
+sourceslug: _posts/2016-10-19-usda-plants-database-r.md
+tags:
+- API
+- R
+- ecology
+- plants
+---
+
+```{r echo=FALSE}
+knitr::opts_chunk$set(
+  comment = "#>",
+  warning = FALSE,
+  message = FALSE,
+  collapse = TRUE
+)
+
+options(tibble.max_extra_cols = 15)
+```
+
+The USDA maintains a database of plant information, some of it trait data, some
+of it life history. Check it out at <http://plants.usda.gov/java/>
+
+They've been talking about releasing an API for a long time, but have not done so.
+
+Thus, since at least some version of their data is in the public web,
+I've created a RESTful API for the data:
+
+* source code: <https://github.com/sckott/usdaplantsapi/>
+* base URL: <https://plantsdb.xyz>
+
+Check out the API, and open issues for bugs/feature requests in the github repo.
+
+The following is an example using it from R, but you can use it from anywhere,
+the command line, Ruby, Python, a browser, whatevs.
+
+Here, we'll use [request](https://github.com/sckott/request), a higher level
+http client for R that I've been working on. A small quirk with `request` is that
+when piping, you have to assign the output of the request to an object before you
+can do any further manipulation. But that's probably good for avoiding too long
+pipe chains.
+
+> note, that I've set `tibble.max_extra_cols = 15` to not print the many 
+columns that are returned, for blog post brevity. When you run below
+you'll get more columns.
+
+Install from CRAN
+
+```{r eval=FALSE}
+install.packages("request")
+```
+
+There is a small improvement in the dev version of `request` to make any data.frame's
+tibble's (which the below examples uses). To get that install from GitHub:
+
+```{r eval=FALSE}
+devtools::install_github("sckott/request")
+```
+
+```{r}
+library('request')
+library('tibble')
+```
+
+### Heartbeat
+
+The simplest call to the API is to a route `/heartbeat`,
+which just lists the available routes.
+
+Set the base url we'll use throughout the work below
+
+```{r}
+root <- api("https://plantsdb.xyz")
+```
+
+```{r}
+root %>% api_path(heartbeat)
+```
+
+
+Okay, so there are just two routes, `/search` and `/heartbeat`.
+
+## Search
+
+The search route suppports the following parameters:
+
+- `fields`, e.g., `fields='Genus,Species'` (default: all fields returned)
+- `limit`, e.g., `limit=10` (default: 10)
+- `offset`, e.g., `offset=1` (default: 0)
+- search on any fields in the output, e.g, `Genus=Pinus` or `Species=annua`
+
+### basic search
+
+Let's first not pass any params
+
+```{r}
+root %>% api_path(search)
+```
+
+You get slots:
+
+* `count`: number of results found
+* `returned`: numbef of results returned
+* `citation`: suggested citation, from USDA
+* `terms`: terms of use, from USDA
+* `data`: the results
+* `error`: if an error occurred, you'll see the message here
+
+Note that if any data.frame's are found, we make them into tibble's, nicely
+formatted data.frame's that make it easy to deal with large data.
+
+### Pagination
+
+limit number of results
+
+```{r}
+root %>%
+  api_path(search) %>%
+  api_query(limit = 5)
+```
+
+change record to start at
+
+```{r}
+root %>%
+  api_path(search) %>%
+  api_query(limit = 5, offset = 10)
+```
+
+### Return fields
+
+You can say what fields you want returned, useful when you just want a
+subset of fields
+
+```{r}
+root %>%
+  api_path(search) %>%
+  api_query(fields = 'Genus,Species,Symbol')
+```
+
+
+### Query
+
+You can query on individual fields
+
+```{r}
+root %>%
+  api_path(search) %>%
+  api_query(Genus = Pinus, fields = "Genus,Species")
+```
+
+Another query example
+
+```{r}
+root %>%
+  api_path(search) %>%
+  api_query(Species = annua, fields = "Genus,Species")
+```
+
+And one more example, here we're interested in finding taxa that are perennials
+
+```{r}
+root %>%
+  api_path(search) %>%
+  api_query(Duration = Perennial, fields = "Genus,Species,Symbol,Duration")
+```

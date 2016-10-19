@@ -5,6 +5,381 @@
 		<link>http://recology.info/</link>
 		
 			<item>
+				<title>USDA plants database API in R</title>
+				<description>&lt;p&gt;The USDA maintains a database of plant information, some of it trait data, some
+of it life history. Check it out at &lt;a href=&quot;http://plants.usda.gov/java/&quot;&gt;http://plants.usda.gov/java/&lt;/a&gt;&lt;/p&gt;
+
+&lt;p&gt;They’ve been talking about releasing an API for a long time, but have not done so.&lt;/p&gt;
+
+&lt;p&gt;Thus, since at least some version of their data is in the public web,
+I’ve created a RESTful API for the data:&lt;/p&gt;
+
+&lt;ul&gt;
+  &lt;li&gt;source code: &lt;a href=&quot;https://github.com/sckott/usdaplantsapi/&quot;&gt;https://github.com/sckott/usdaplantsapi/&lt;/a&gt;&lt;/li&gt;
+  &lt;li&gt;base URL: &lt;a href=&quot;https://plantsdb.xyz&quot;&gt;https://plantsdb.xyz&lt;/a&gt;&lt;/li&gt;
+&lt;/ul&gt;
+
+&lt;p&gt;Check out the API, and open issues for bugs/feature requests in the github repo.&lt;/p&gt;
+
+&lt;p&gt;The following is an example using it from R, but you can use it from anywhere,
+the command line, Ruby, Python, a browser, whatevs.&lt;/p&gt;
+
+&lt;p&gt;Here, we’ll use &lt;a href=&quot;https://github.com/sckott/request&quot;&gt;request&lt;/a&gt;, a higher level
+http client for R that I’ve been working on. A small quirk with &lt;code class=&quot;highlighter-rouge&quot;&gt;request&lt;/code&gt; is that
+when piping, you have to assign the output of the request to an object before you
+can do any further manipulation. But that’s probably good for avoiding too long
+pipe chains.&lt;/p&gt;
+
+&lt;blockquote&gt;
+  &lt;p&gt;note, that I’ve set &lt;code class=&quot;highlighter-rouge&quot;&gt;tibble.max_extra_cols = 15&lt;/code&gt; to not print the many 
+columns that are returned, for blog post brevity. When you run below
+you’ll get more columns.&lt;/p&gt;
+&lt;/blockquote&gt;
+
+&lt;p&gt;Install from CRAN&lt;/p&gt;
+
+&lt;div class=&quot;language-r highlighter-rouge&quot;&gt;&lt;pre class=&quot;highlight&quot;&gt;&lt;code&gt;&lt;span class=&quot;n&quot;&gt;install.packages&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;s2&quot;&gt;&quot;request&quot;&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt;&lt;span class=&quot;w&quot;&gt;
+&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;
+&lt;/div&gt;
+
+&lt;p&gt;There is a small improvement in the dev version of &lt;code class=&quot;highlighter-rouge&quot;&gt;request&lt;/code&gt; to make any data.frame’s
+tibble’s (which the below examples uses). To get that install from GitHub:&lt;/p&gt;
+
+&lt;div class=&quot;language-r highlighter-rouge&quot;&gt;&lt;pre class=&quot;highlight&quot;&gt;&lt;code&gt;&lt;span class=&quot;n&quot;&gt;devtools&lt;/span&gt;&lt;span class=&quot;o&quot;&gt;::&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;install_github&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;s2&quot;&gt;&quot;sckott/request&quot;&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt;&lt;span class=&quot;w&quot;&gt;
+&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;
+&lt;/div&gt;
+
+&lt;div class=&quot;language-r highlighter-rouge&quot;&gt;&lt;pre class=&quot;highlight&quot;&gt;&lt;code&gt;&lt;span class=&quot;n&quot;&gt;library&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;s1&quot;&gt;&#39;request&#39;&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt;&lt;span class=&quot;w&quot;&gt;
+&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;library&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;s1&quot;&gt;&#39;tibble&#39;&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt;&lt;span class=&quot;w&quot;&gt;
+&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;
+&lt;/div&gt;
+
+&lt;h3 id=&quot;heartbeat&quot;&gt;Heartbeat&lt;/h3&gt;
+
+&lt;p&gt;The simplest call to the API is to a route &lt;code class=&quot;highlighter-rouge&quot;&gt;/heartbeat&lt;/code&gt;,
+which just lists the available routes.&lt;/p&gt;
+
+&lt;p&gt;Set the base url we’ll use throughout the work below&lt;/p&gt;
+
+&lt;div class=&quot;language-r highlighter-rouge&quot;&gt;&lt;pre class=&quot;highlight&quot;&gt;&lt;code&gt;&lt;span class=&quot;n&quot;&gt;root&lt;/span&gt;&lt;span class=&quot;w&quot;&gt; &lt;/span&gt;&lt;span class=&quot;o&quot;&gt;&amp;lt;-&lt;/span&gt;&lt;span class=&quot;w&quot;&gt; &lt;/span&gt;&lt;span class=&quot;n&quot;&gt;api&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;s2&quot;&gt;&quot;https://plantsdb.xyz&quot;&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt;&lt;span class=&quot;w&quot;&gt;
+&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;
+&lt;/div&gt;
+
+&lt;div class=&quot;language-r highlighter-rouge&quot;&gt;&lt;pre class=&quot;highlight&quot;&gt;&lt;code&gt;&lt;span class=&quot;n&quot;&gt;root&lt;/span&gt;&lt;span class=&quot;w&quot;&gt; &lt;/span&gt;&lt;span class=&quot;o&quot;&gt;%&amp;gt;%&lt;/span&gt;&lt;span class=&quot;w&quot;&gt; &lt;/span&gt;&lt;span class=&quot;n&quot;&gt;api_path&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;heartbeat&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt;&lt;span class=&quot;w&quot;&gt;
+&lt;/span&gt;&lt;span class=&quot;c1&quot;&gt;#&amp;gt; $routes
+#&amp;gt; [1] &quot;/search (HEAD, GET)&quot; &quot;/heartbeat&quot;
+&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;
+&lt;/div&gt;
+
+&lt;p&gt;Okay, so there are just two routes, &lt;code class=&quot;highlighter-rouge&quot;&gt;/search&lt;/code&gt; and &lt;code class=&quot;highlighter-rouge&quot;&gt;/heartbeat&lt;/code&gt;.&lt;/p&gt;
+
+&lt;h2 id=&quot;search&quot;&gt;Search&lt;/h2&gt;
+
+&lt;p&gt;The search route suppports the following parameters:&lt;/p&gt;
+
+&lt;ul&gt;
+  &lt;li&gt;&lt;code class=&quot;highlighter-rouge&quot;&gt;fields&lt;/code&gt;, e.g., &lt;code class=&quot;highlighter-rouge&quot;&gt;fields=&#39;Genus,Species&#39;&lt;/code&gt; (default: all fields returned)&lt;/li&gt;
+  &lt;li&gt;&lt;code class=&quot;highlighter-rouge&quot;&gt;limit&lt;/code&gt;, e.g., &lt;code class=&quot;highlighter-rouge&quot;&gt;limit=10&lt;/code&gt; (default: 10)&lt;/li&gt;
+  &lt;li&gt;&lt;code class=&quot;highlighter-rouge&quot;&gt;offset&lt;/code&gt;, e.g., &lt;code class=&quot;highlighter-rouge&quot;&gt;offset=1&lt;/code&gt; (default: 0)&lt;/li&gt;
+  &lt;li&gt;search on any fields in the output, e.g, &lt;code class=&quot;highlighter-rouge&quot;&gt;Genus=Pinus&lt;/code&gt; or &lt;code class=&quot;highlighter-rouge&quot;&gt;Species=annua&lt;/code&gt;&lt;/li&gt;
+&lt;/ul&gt;
+
+&lt;h3 id=&quot;basic-search&quot;&gt;basic search&lt;/h3&gt;
+
+&lt;p&gt;Let’s first not pass any params&lt;/p&gt;
+
+&lt;div class=&quot;language-r highlighter-rouge&quot;&gt;&lt;pre class=&quot;highlight&quot;&gt;&lt;code&gt;&lt;span class=&quot;n&quot;&gt;root&lt;/span&gt;&lt;span class=&quot;w&quot;&gt; &lt;/span&gt;&lt;span class=&quot;o&quot;&gt;%&amp;gt;%&lt;/span&gt;&lt;span class=&quot;w&quot;&gt; &lt;/span&gt;&lt;span class=&quot;n&quot;&gt;api_path&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;search&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt;&lt;span class=&quot;w&quot;&gt;
+&lt;/span&gt;&lt;span class=&quot;c1&quot;&gt;#&amp;gt; $count
+#&amp;gt; [1] 92171
+#&amp;gt; 
+#&amp;gt; $returned
+#&amp;gt; [1] 10
+#&amp;gt; 
+#&amp;gt; $citation
+#&amp;gt; [1] &quot;USDA, NRCS. 2016. The PLANTS Database (http://plants.usda.gov, 12 July 2016). National Plant Data Team, Greensboro, NC 27401-4901 USA.&quot;
+#&amp;gt; 
+#&amp;gt; $terms
+#&amp;gt; [1] &quot;Our plant information, including the distribution maps, lists, and text, is not copyrighted and is free for any use.&quot;
+#&amp;gt; 
+#&amp;gt; $data
+#&amp;gt; # A tibble: 10 × 134
+#&amp;gt;       id Symbol Accepted_Symbol_x Synonym_Symbol_x
+#&amp;gt; *  &amp;lt;int&amp;gt;  &amp;lt;chr&amp;gt;             &amp;lt;chr&amp;gt;            &amp;lt;chr&amp;gt;
+#&amp;gt; 1      1   ABAB              ABAB                 
+#&amp;gt; 2      2  ABAB2             ABPR3            ABAB2
+#&amp;gt; 3      3  ABAB3              ABTH            ABAB3
+#&amp;gt; 4      4 ABAB70            ABAB70                 
+#&amp;gt; 5      5   ABAC             ABUMB             ABAC
+#&amp;gt; 6      6   ABAL              ABAL                 
+#&amp;gt; 7      7  ABAL2             ABUMU            ABAL2
+#&amp;gt; 8      8  ABAL3             ABAL3                 
+#&amp;gt; 9      9   ABAM              ABAM                 
+#&amp;gt; 10    10  ABAM2             ABAM2                 
+#&amp;gt; # ... with 130 more variables: Scientific_Name_x &amp;lt;chr&amp;gt;,
+#&amp;gt; #   Hybrid_Genus_Indicator &amp;lt;chr&amp;gt;, Hybrid_Species_Indicator &amp;lt;chr&amp;gt;,
+#&amp;gt; #   Species &amp;lt;chr&amp;gt;, Subspecies_Prefix &amp;lt;chr&amp;gt;,
+#&amp;gt; #   Hybrid_Subspecies_Indicator &amp;lt;chr&amp;gt;, Subspecies &amp;lt;chr&amp;gt;,
+#&amp;gt; #   Variety_Prefix &amp;lt;chr&amp;gt;, Hybrid_Variety_Indicator &amp;lt;chr&amp;gt;, Variety &amp;lt;chr&amp;gt;,
+#&amp;gt; #   Subvariety_Prefix &amp;lt;chr&amp;gt;, Subvariety &amp;lt;chr&amp;gt;, Forma_Prefix &amp;lt;chr&amp;gt;,
+#&amp;gt; #   Forma &amp;lt;chr&amp;gt;, Genera_Binomial_Author &amp;lt;chr&amp;gt;, ...
+#&amp;gt; 
+#&amp;gt; $error
+#&amp;gt; NULL
+&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;
+&lt;/div&gt;
+
+&lt;p&gt;You get slots:&lt;/p&gt;
+
+&lt;ul&gt;
+  &lt;li&gt;&lt;code class=&quot;highlighter-rouge&quot;&gt;count&lt;/code&gt;: number of results found&lt;/li&gt;
+  &lt;li&gt;&lt;code class=&quot;highlighter-rouge&quot;&gt;returned&lt;/code&gt;: numbef of results returned&lt;/li&gt;
+  &lt;li&gt;&lt;code class=&quot;highlighter-rouge&quot;&gt;citation&lt;/code&gt;: suggested citation, from USDA&lt;/li&gt;
+  &lt;li&gt;&lt;code class=&quot;highlighter-rouge&quot;&gt;terms&lt;/code&gt;: terms of use, from USDA&lt;/li&gt;
+  &lt;li&gt;&lt;code class=&quot;highlighter-rouge&quot;&gt;data&lt;/code&gt;: the results&lt;/li&gt;
+  &lt;li&gt;&lt;code class=&quot;highlighter-rouge&quot;&gt;error&lt;/code&gt;: if an error occurred, you’ll see the message here&lt;/li&gt;
+&lt;/ul&gt;
+
+&lt;p&gt;Note that if any data.frame’s are found, we make them into tibble’s, nicely
+formatted data.frame’s that make it easy to deal with large data.&lt;/p&gt;
+
+&lt;h3 id=&quot;pagination&quot;&gt;Pagination&lt;/h3&gt;
+
+&lt;p&gt;limit number of results&lt;/p&gt;
+
+&lt;div class=&quot;language-r highlighter-rouge&quot;&gt;&lt;pre class=&quot;highlight&quot;&gt;&lt;code&gt;&lt;span class=&quot;n&quot;&gt;root&lt;/span&gt;&lt;span class=&quot;w&quot;&gt; &lt;/span&gt;&lt;span class=&quot;o&quot;&gt;%&amp;gt;%&lt;/span&gt;&lt;span class=&quot;w&quot;&gt;
+  &lt;/span&gt;&lt;span class=&quot;n&quot;&gt;api_path&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;search&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt;&lt;span class=&quot;w&quot;&gt; &lt;/span&gt;&lt;span class=&quot;o&quot;&gt;%&amp;gt;%&lt;/span&gt;&lt;span class=&quot;w&quot;&gt;
+  &lt;/span&gt;&lt;span class=&quot;n&quot;&gt;api_query&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;limit&lt;/span&gt;&lt;span class=&quot;w&quot;&gt; &lt;/span&gt;&lt;span class=&quot;o&quot;&gt;=&lt;/span&gt;&lt;span class=&quot;w&quot;&gt; &lt;/span&gt;&lt;span class=&quot;m&quot;&gt;5&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt;&lt;span class=&quot;w&quot;&gt;
+&lt;/span&gt;&lt;span class=&quot;c1&quot;&gt;#&amp;gt; $count
+#&amp;gt; [1] 92171
+#&amp;gt; 
+#&amp;gt; $returned
+#&amp;gt; [1] 5
+#&amp;gt; 
+#&amp;gt; $citation
+#&amp;gt; [1] &quot;USDA, NRCS. 2016. The PLANTS Database (http://plants.usda.gov, 12 July 2016). National Plant Data Team, Greensboro, NC 27401-4901 USA.&quot;
+#&amp;gt; 
+#&amp;gt; $terms
+#&amp;gt; [1] &quot;Our plant information, including the distribution maps, lists, and text, is not copyrighted and is free for any use.&quot;
+#&amp;gt; 
+#&amp;gt; $data
+#&amp;gt; # A tibble: 5 × 134
+#&amp;gt;      id Symbol Accepted_Symbol_x Synonym_Symbol_x
+#&amp;gt; * &amp;lt;int&amp;gt;  &amp;lt;chr&amp;gt;             &amp;lt;chr&amp;gt;            &amp;lt;chr&amp;gt;
+#&amp;gt; 1     1   ABAB              ABAB                 
+#&amp;gt; 2     2  ABAB2             ABPR3            ABAB2
+#&amp;gt; 3     3  ABAB3              ABTH            ABAB3
+#&amp;gt; 4     4 ABAB70            ABAB70                 
+#&amp;gt; 5     5   ABAC             ABUMB             ABAC
+#&amp;gt; # ... with 130 more variables: Scientific_Name_x &amp;lt;chr&amp;gt;,
+#&amp;gt; #   Hybrid_Genus_Indicator &amp;lt;chr&amp;gt;, Hybrid_Species_Indicator &amp;lt;chr&amp;gt;,
+#&amp;gt; #   Species &amp;lt;chr&amp;gt;, Subspecies_Prefix &amp;lt;chr&amp;gt;,
+#&amp;gt; #   Hybrid_Subspecies_Indicator &amp;lt;chr&amp;gt;, Subspecies &amp;lt;chr&amp;gt;,
+#&amp;gt; #   Variety_Prefix &amp;lt;chr&amp;gt;, Hybrid_Variety_Indicator &amp;lt;chr&amp;gt;, Variety &amp;lt;chr&amp;gt;,
+#&amp;gt; #   Subvariety_Prefix &amp;lt;chr&amp;gt;, Subvariety &amp;lt;chr&amp;gt;, Forma_Prefix &amp;lt;chr&amp;gt;,
+#&amp;gt; #   Forma &amp;lt;chr&amp;gt;, Genera_Binomial_Author &amp;lt;chr&amp;gt;, ...
+#&amp;gt; 
+#&amp;gt; $error
+#&amp;gt; NULL
+&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;
+&lt;/div&gt;
+
+&lt;p&gt;change record to start at&lt;/p&gt;
+
+&lt;div class=&quot;language-r highlighter-rouge&quot;&gt;&lt;pre class=&quot;highlight&quot;&gt;&lt;code&gt;&lt;span class=&quot;n&quot;&gt;root&lt;/span&gt;&lt;span class=&quot;w&quot;&gt; &lt;/span&gt;&lt;span class=&quot;o&quot;&gt;%&amp;gt;%&lt;/span&gt;&lt;span class=&quot;w&quot;&gt;
+  &lt;/span&gt;&lt;span class=&quot;n&quot;&gt;api_path&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;search&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt;&lt;span class=&quot;w&quot;&gt; &lt;/span&gt;&lt;span class=&quot;o&quot;&gt;%&amp;gt;%&lt;/span&gt;&lt;span class=&quot;w&quot;&gt;
+  &lt;/span&gt;&lt;span class=&quot;n&quot;&gt;api_query&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;limit&lt;/span&gt;&lt;span class=&quot;w&quot;&gt; &lt;/span&gt;&lt;span class=&quot;o&quot;&gt;=&lt;/span&gt;&lt;span class=&quot;w&quot;&gt; &lt;/span&gt;&lt;span class=&quot;m&quot;&gt;5&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt;&lt;span class=&quot;w&quot;&gt; &lt;/span&gt;&lt;span class=&quot;n&quot;&gt;offset&lt;/span&gt;&lt;span class=&quot;w&quot;&gt; &lt;/span&gt;&lt;span class=&quot;o&quot;&gt;=&lt;/span&gt;&lt;span class=&quot;w&quot;&gt; &lt;/span&gt;&lt;span class=&quot;m&quot;&gt;10&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt;&lt;span class=&quot;w&quot;&gt;
+&lt;/span&gt;&lt;span class=&quot;c1&quot;&gt;#&amp;gt; $count
+#&amp;gt; [1] 92161
+#&amp;gt; 
+#&amp;gt; $returned
+#&amp;gt; [1] 5
+#&amp;gt; 
+#&amp;gt; $citation
+#&amp;gt; [1] &quot;USDA, NRCS. 2016. The PLANTS Database (http://plants.usda.gov, 12 July 2016). National Plant Data Team, Greensboro, NC 27401-4901 USA.&quot;
+#&amp;gt; 
+#&amp;gt; $terms
+#&amp;gt; [1] &quot;Our plant information, including the distribution maps, lists, and text, is not copyrighted and is free for any use.&quot;
+#&amp;gt; 
+#&amp;gt; $data
+#&amp;gt; # A tibble: 5 × 134
+#&amp;gt;      id Symbol Accepted_Symbol_x Synonym_Symbol_x
+#&amp;gt; * &amp;lt;int&amp;gt;  &amp;lt;chr&amp;gt;             &amp;lt;chr&amp;gt;            &amp;lt;chr&amp;gt;
+#&amp;gt; 1    11  ABAM3             ABAM3                 
+#&amp;gt; 2    12  ABAM4              NAAM            ABAM4
+#&amp;gt; 3    13  ABAM5              ABAB            ABAM5
+#&amp;gt; 4    14   ABAN              ABAN                 
+#&amp;gt; 5    15  ABANA              ABAN            ABANA
+#&amp;gt; # ... with 130 more variables: Scientific_Name_x &amp;lt;chr&amp;gt;,
+#&amp;gt; #   Hybrid_Genus_Indicator &amp;lt;chr&amp;gt;, Hybrid_Species_Indicator &amp;lt;chr&amp;gt;,
+#&amp;gt; #   Species &amp;lt;chr&amp;gt;, Subspecies_Prefix &amp;lt;chr&amp;gt;,
+#&amp;gt; #   Hybrid_Subspecies_Indicator &amp;lt;chr&amp;gt;, Subspecies &amp;lt;chr&amp;gt;,
+#&amp;gt; #   Variety_Prefix &amp;lt;chr&amp;gt;, Hybrid_Variety_Indicator &amp;lt;chr&amp;gt;, Variety &amp;lt;chr&amp;gt;,
+#&amp;gt; #   Subvariety_Prefix &amp;lt;chr&amp;gt;, Subvariety &amp;lt;chr&amp;gt;, Forma_Prefix &amp;lt;chr&amp;gt;,
+#&amp;gt; #   Forma &amp;lt;chr&amp;gt;, Genera_Binomial_Author &amp;lt;chr&amp;gt;, ...
+#&amp;gt; 
+#&amp;gt; $error
+#&amp;gt; NULL
+&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;
+&lt;/div&gt;
+
+&lt;h3 id=&quot;return-fields&quot;&gt;Return fields&lt;/h3&gt;
+
+&lt;p&gt;You can say what fields you want returned, useful when you just want a
+subset of fields&lt;/p&gt;
+
+&lt;div class=&quot;language-r highlighter-rouge&quot;&gt;&lt;pre class=&quot;highlight&quot;&gt;&lt;code&gt;&lt;span class=&quot;n&quot;&gt;root&lt;/span&gt;&lt;span class=&quot;w&quot;&gt; &lt;/span&gt;&lt;span class=&quot;o&quot;&gt;%&amp;gt;%&lt;/span&gt;&lt;span class=&quot;w&quot;&gt;
+  &lt;/span&gt;&lt;span class=&quot;n&quot;&gt;api_path&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;search&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt;&lt;span class=&quot;w&quot;&gt; &lt;/span&gt;&lt;span class=&quot;o&quot;&gt;%&amp;gt;%&lt;/span&gt;&lt;span class=&quot;w&quot;&gt;
+  &lt;/span&gt;&lt;span class=&quot;n&quot;&gt;api_query&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;fields&lt;/span&gt;&lt;span class=&quot;w&quot;&gt; &lt;/span&gt;&lt;span class=&quot;o&quot;&gt;=&lt;/span&gt;&lt;span class=&quot;w&quot;&gt; &lt;/span&gt;&lt;span class=&quot;s1&quot;&gt;&#39;Genus,Species,Symbol&#39;&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt;&lt;span class=&quot;w&quot;&gt;
+&lt;/span&gt;&lt;span class=&quot;c1&quot;&gt;#&amp;gt; $count
+#&amp;gt; [1] 92171
+#&amp;gt; 
+#&amp;gt; $returned
+#&amp;gt; [1] 10
+#&amp;gt; 
+#&amp;gt; $citation
+#&amp;gt; [1] &quot;USDA, NRCS. 2016. The PLANTS Database (http://plants.usda.gov, 12 July 2016). National Plant Data Team, Greensboro, NC 27401-4901 USA.&quot;
+#&amp;gt; 
+#&amp;gt; $terms
+#&amp;gt; [1] &quot;Our plant information, including the distribution maps, lists, and text, is not copyrighted and is free for any use.&quot;
+#&amp;gt; 
+#&amp;gt; $data
+#&amp;gt; # A tibble: 10 × 3
+#&amp;gt;    Symbol     Species       Genus
+#&amp;gt; *   &amp;lt;chr&amp;gt;       &amp;lt;chr&amp;gt;       &amp;lt;chr&amp;gt;
+#&amp;gt; 1    ABAB abutiloides    Abutilon
+#&amp;gt; 2   ABAB2       abrus       Abrus
+#&amp;gt; 3   ABAB3    abutilon    Abutilon
+#&amp;gt; 4  ABAB70    abietina Abietinella
+#&amp;gt; 5    ABAC   acutalata     Abronia
+#&amp;gt; 6    ABAL      alpina     Abronia
+#&amp;gt; 7   ABAL2        alba     Abronia
+#&amp;gt; 8   ABAL3        alba       Abies
+#&amp;gt; 9    ABAM    amabilis       Abies
+#&amp;gt; 10  ABAM2     ameliae     Abronia
+#&amp;gt; 
+#&amp;gt; $error
+#&amp;gt; NULL
+&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;
+&lt;/div&gt;
+
+&lt;h3 id=&quot;query&quot;&gt;Query&lt;/h3&gt;
+
+&lt;p&gt;You can query on individual fields&lt;/p&gt;
+
+&lt;div class=&quot;language-r highlighter-rouge&quot;&gt;&lt;pre class=&quot;highlight&quot;&gt;&lt;code&gt;&lt;span class=&quot;n&quot;&gt;root&lt;/span&gt;&lt;span class=&quot;w&quot;&gt; &lt;/span&gt;&lt;span class=&quot;o&quot;&gt;%&amp;gt;%&lt;/span&gt;&lt;span class=&quot;w&quot;&gt;
+  &lt;/span&gt;&lt;span class=&quot;n&quot;&gt;api_path&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;search&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt;&lt;span class=&quot;w&quot;&gt; &lt;/span&gt;&lt;span class=&quot;o&quot;&gt;%&amp;gt;%&lt;/span&gt;&lt;span class=&quot;w&quot;&gt;
+  &lt;/span&gt;&lt;span class=&quot;n&quot;&gt;api_query&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;Genus&lt;/span&gt;&lt;span class=&quot;w&quot;&gt; &lt;/span&gt;&lt;span class=&quot;o&quot;&gt;=&lt;/span&gt;&lt;span class=&quot;w&quot;&gt; &lt;/span&gt;&lt;span class=&quot;n&quot;&gt;Pinus&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt;&lt;span class=&quot;w&quot;&gt; &lt;/span&gt;&lt;span class=&quot;n&quot;&gt;fields&lt;/span&gt;&lt;span class=&quot;w&quot;&gt; &lt;/span&gt;&lt;span class=&quot;o&quot;&gt;=&lt;/span&gt;&lt;span class=&quot;w&quot;&gt; &lt;/span&gt;&lt;span class=&quot;s2&quot;&gt;&quot;Genus,Species&quot;&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt;&lt;span class=&quot;w&quot;&gt;
+&lt;/span&gt;&lt;span class=&quot;c1&quot;&gt;#&amp;gt; $count
+#&amp;gt; [1] 185
+#&amp;gt; 
+#&amp;gt; $returned
+#&amp;gt; [1] 10
+#&amp;gt; 
+#&amp;gt; $citation
+#&amp;gt; [1] &quot;USDA, NRCS. 2016. The PLANTS Database (http://plants.usda.gov, 12 July 2016). National Plant Data Team, Greensboro, NC 27401-4901 USA.&quot;
+#&amp;gt; 
+#&amp;gt; $terms
+#&amp;gt; [1] &quot;Our plant information, including the distribution maps, lists, and text, is not copyrighted and is free for any use.&quot;
+#&amp;gt; 
+#&amp;gt; $data
+#&amp;gt; # A tibble: 10 × 2
+#&amp;gt;       Species Genus
+#&amp;gt; *       &amp;lt;chr&amp;gt; &amp;lt;chr&amp;gt;
+#&amp;gt; 1  albicaulis Pinus
+#&amp;gt; 2    apacheca Pinus
+#&amp;gt; 3    aristata Pinus
+#&amp;gt; 4   arizonica Pinus
+#&amp;gt; 5    armandii Pinus
+#&amp;gt; 6   arizonica Pinus
+#&amp;gt; 7    aristata Pinus
+#&amp;gt; 8   arizonica Pinus
+#&amp;gt; 9   arizonica Pinus
+#&amp;gt; 10  attenuata Pinus
+#&amp;gt; 
+#&amp;gt; $error
+#&amp;gt; NULL
+&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;
+&lt;/div&gt;
+
+&lt;p&gt;Another query example&lt;/p&gt;
+
+&lt;div class=&quot;language-r highlighter-rouge&quot;&gt;&lt;pre class=&quot;highlight&quot;&gt;&lt;code&gt;&lt;span class=&quot;n&quot;&gt;root&lt;/span&gt;&lt;span class=&quot;w&quot;&gt; &lt;/span&gt;&lt;span class=&quot;o&quot;&gt;%&amp;gt;%&lt;/span&gt;&lt;span class=&quot;w&quot;&gt;
+  &lt;/span&gt;&lt;span class=&quot;n&quot;&gt;api_path&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;search&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt;&lt;span class=&quot;w&quot;&gt; &lt;/span&gt;&lt;span class=&quot;o&quot;&gt;%&amp;gt;%&lt;/span&gt;&lt;span class=&quot;w&quot;&gt;
+  &lt;/span&gt;&lt;span class=&quot;n&quot;&gt;api_query&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;Species&lt;/span&gt;&lt;span class=&quot;w&quot;&gt; &lt;/span&gt;&lt;span class=&quot;o&quot;&gt;=&lt;/span&gt;&lt;span class=&quot;w&quot;&gt; &lt;/span&gt;&lt;span class=&quot;n&quot;&gt;annua&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt;&lt;span class=&quot;w&quot;&gt; &lt;/span&gt;&lt;span class=&quot;n&quot;&gt;fields&lt;/span&gt;&lt;span class=&quot;w&quot;&gt; &lt;/span&gt;&lt;span class=&quot;o&quot;&gt;=&lt;/span&gt;&lt;span class=&quot;w&quot;&gt; &lt;/span&gt;&lt;span class=&quot;s2&quot;&gt;&quot;Genus,Species&quot;&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt;&lt;span class=&quot;w&quot;&gt;
+&lt;/span&gt;&lt;span class=&quot;c1&quot;&gt;#&amp;gt; $count
+#&amp;gt; [1] 30
+#&amp;gt; 
+#&amp;gt; $returned
+#&amp;gt; [1] 10
+#&amp;gt; 
+#&amp;gt; $citation
+#&amp;gt; [1] &quot;USDA, NRCS. 2016. The PLANTS Database (http://plants.usda.gov, 12 July 2016). National Plant Data Team, Greensboro, NC 27401-4901 USA.&quot;
+#&amp;gt; 
+#&amp;gt; $terms
+#&amp;gt; [1] &quot;Our plant information, including the distribution maps, lists, and text, is not copyrighted and is free for any use.&quot;
+#&amp;gt; 
+#&amp;gt; $data
+#&amp;gt; # A tibble: 10 × 2
+#&amp;gt;    Species         Genus
+#&amp;gt; *    &amp;lt;chr&amp;gt;         &amp;lt;chr&amp;gt;
+#&amp;gt; 1    annua        Adonis
+#&amp;gt; 2    annua     Artemisia
+#&amp;gt; 3    annua   Bulbostylis
+#&amp;gt; 4    annua    Castilleja
+#&amp;gt; 5    annua   Craniolaria
+#&amp;gt; 6    annua Dimorphotheca
+#&amp;gt; 7    annua       Drosera
+#&amp;gt; 8    annua    Eleocharis
+#&amp;gt; 9    annua  Fimbristylis
+#&amp;gt; 10   annua    Heliomeris
+#&amp;gt; 
+#&amp;gt; $error
+#&amp;gt; NULL
+&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;
+&lt;/div&gt;
+
+&lt;p&gt;And one more example, here we’re interested in finding taxa that are perennials&lt;/p&gt;
+
+&lt;div class=&quot;language-r highlighter-rouge&quot;&gt;&lt;pre class=&quot;highlight&quot;&gt;&lt;code&gt;&lt;span class=&quot;n&quot;&gt;root&lt;/span&gt;&lt;span class=&quot;w&quot;&gt; &lt;/span&gt;&lt;span class=&quot;o&quot;&gt;%&amp;gt;%&lt;/span&gt;&lt;span class=&quot;w&quot;&gt;
+  &lt;/span&gt;&lt;span class=&quot;n&quot;&gt;api_path&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;search&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt;&lt;span class=&quot;w&quot;&gt; &lt;/span&gt;&lt;span class=&quot;o&quot;&gt;%&amp;gt;%&lt;/span&gt;&lt;span class=&quot;w&quot;&gt;
+  &lt;/span&gt;&lt;span class=&quot;n&quot;&gt;api_query&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;Duration&lt;/span&gt;&lt;span class=&quot;w&quot;&gt; &lt;/span&gt;&lt;span class=&quot;o&quot;&gt;=&lt;/span&gt;&lt;span class=&quot;w&quot;&gt; &lt;/span&gt;&lt;span class=&quot;n&quot;&gt;Perennial&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt;&lt;span class=&quot;w&quot;&gt; &lt;/span&gt;&lt;span class=&quot;n&quot;&gt;fields&lt;/span&gt;&lt;span class=&quot;w&quot;&gt; &lt;/span&gt;&lt;span class=&quot;o&quot;&gt;=&lt;/span&gt;&lt;span class=&quot;w&quot;&gt; &lt;/span&gt;&lt;span class=&quot;s2&quot;&gt;&quot;Genus,Species,Symbol,Duration&quot;&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt;&lt;span class=&quot;w&quot;&gt;
+&lt;/span&gt;&lt;span class=&quot;c1&quot;&gt;#&amp;gt; $count
+#&amp;gt; [1] 25296
+#&amp;gt; 
+#&amp;gt; $returned
+#&amp;gt; [1] 10
+#&amp;gt; 
+#&amp;gt; $citation
+#&amp;gt; [1] &quot;USDA, NRCS. 2016. The PLANTS Database (http://plants.usda.gov, 12 July 2016). National Plant Data Team, Greensboro, NC 27401-4901 USA.&quot;
+#&amp;gt; 
+#&amp;gt; $terms
+#&amp;gt; [1] &quot;Our plant information, including the distribution maps, lists, and text, is not copyrighted and is free for any use.&quot;
+#&amp;gt; 
+#&amp;gt; $data
+#&amp;gt; # A tibble: 10 × 4
+#&amp;gt;    Symbol     Species  Duration    Genus
+#&amp;gt; *   &amp;lt;chr&amp;gt;       &amp;lt;chr&amp;gt;     &amp;lt;chr&amp;gt;    &amp;lt;chr&amp;gt;
+#&amp;gt; 1    ABAB abutiloides Perennial Abutilon
+#&amp;gt; 2    ABAL      alpina Perennial  Abronia
+#&amp;gt; 3   ABAL3        alba Perennial    Abies
+#&amp;gt; 4    ABAM    amabilis Perennial    Abies
+#&amp;gt; 5   ABAM2     ameliae Perennial  Abronia
+#&amp;gt; 6   ABAM3   ammophila Perennial  Abronia
+#&amp;gt; 7    ABAR   argillosa Perennial  Abronia
+#&amp;gt; 8    ABAU     auritum Perennial Abutilon
+#&amp;gt; 9    ABBA    balsamea Perennial    Abies
+#&amp;gt; 10  ABBAB    balsamea Perennial    Abies
+#&amp;gt; 
+#&amp;gt; $error
+#&amp;gt; NULL
+&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;
+&lt;/div&gt;
+</description>
+				<published>2016-10-19 00:00:00 -0700</published>
+				<link>http://recology.info//2016/10/usda-plants-database-r/</link>
+			</item>
+		
+			<item>
 				<title>gbids - GenBank IDs API is back up!</title>
 				<description>&lt;h2 id=&quot;gbids-api-is-back&quot;&gt;GBIDS API is back&lt;/h2&gt;
 
@@ -1660,336 +2035,6 @@ default position (Draft function started, but not exported, and commented out)&l
 </description>
 				<published>2016-01-05 00:00:00 -0800</published>
 				<link>http://recology.info//2016/01/request-hello-world/</link>
-			</item>
-		
-			<item>
-				<title>binomen - Tools for slicing and dicing taxonomic names</title>
-				<description>&lt;p&gt;The first version of &lt;code class=&quot;highlighter-rouge&quot;&gt;binomen&lt;/code&gt; is now up on &lt;a href=&quot;https://cran.rstudio.com/web/packages/binomen&quot;&gt;CRAN&lt;/a&gt;. It provides various taxonomic classes for defining a single taxon, multiple taxa, and a taxonomic data.frame. It is designed as a companion to &lt;a href=&quot;https://github.com/ropensci/taxize&quot;&gt;taxize&lt;/a&gt;, where you can get taxonomic data on taxonomic names from the web.&lt;/p&gt;
-
-&lt;p&gt;The classes (S3):&lt;/p&gt;
-
-&lt;ul&gt;
-  &lt;li&gt;&lt;code class=&quot;highlighter-rouge&quot;&gt;taxon&lt;/code&gt;&lt;/li&gt;
-  &lt;li&gt;&lt;code class=&quot;highlighter-rouge&quot;&gt;taxonref&lt;/code&gt;&lt;/li&gt;
-  &lt;li&gt;&lt;code class=&quot;highlighter-rouge&quot;&gt;taxonrefs&lt;/code&gt;&lt;/li&gt;
-  &lt;li&gt;&lt;code class=&quot;highlighter-rouge&quot;&gt;binomial&lt;/code&gt;&lt;/li&gt;
-  &lt;li&gt;&lt;code class=&quot;highlighter-rouge&quot;&gt;grouping&lt;/code&gt; (i.e., classification - used different term to avoid conflict with classification in &lt;code class=&quot;highlighter-rouge&quot;&gt;taxize&lt;/code&gt;)&lt;/li&gt;
-&lt;/ul&gt;
-
-&lt;p&gt;For example, the &lt;code class=&quot;highlighter-rouge&quot;&gt;binomial&lt;/code&gt; class is defined by a genus, epithet, authority, and optional full species name and canonical version.&lt;/p&gt;
-
-&lt;div class=&quot;language-r highlighter-rouge&quot;&gt;&lt;pre class=&quot;highlight&quot;&gt;&lt;code&gt;&lt;span class=&quot;n&quot;&gt;binomial&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;s2&quot;&gt;&quot;Poa&quot;&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt;&lt;span class=&quot;w&quot;&gt; &lt;/span&gt;&lt;span class=&quot;s2&quot;&gt;&quot;annua&quot;&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt;&lt;span class=&quot;w&quot;&gt; &lt;/span&gt;&lt;span class=&quot;n&quot;&gt;authority&lt;/span&gt;&lt;span class=&quot;o&quot;&gt;=&lt;/span&gt;&lt;span class=&quot;s2&quot;&gt;&quot;L.&quot;&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt;&lt;span class=&quot;w&quot;&gt;
-&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;
-&lt;/div&gt;
-
-&lt;div class=&quot;language-r highlighter-rouge&quot;&gt;&lt;pre class=&quot;highlight&quot;&gt;&lt;code&gt;&lt;span class=&quot;o&quot;&gt;&amp;lt;&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;binomial&lt;/span&gt;&lt;span class=&quot;o&quot;&gt;&amp;gt;&lt;/span&gt;&lt;span class=&quot;w&quot;&gt;
-  &lt;/span&gt;&lt;span class=&quot;n&quot;&gt;genus&lt;/span&gt;&lt;span class=&quot;o&quot;&gt;:&lt;/span&gt;&lt;span class=&quot;w&quot;&gt; &lt;/span&gt;&lt;span class=&quot;n&quot;&gt;Poa&lt;/span&gt;&lt;span class=&quot;w&quot;&gt;
-  &lt;/span&gt;&lt;span class=&quot;n&quot;&gt;epithet&lt;/span&gt;&lt;span class=&quot;o&quot;&gt;:&lt;/span&gt;&lt;span class=&quot;w&quot;&gt; &lt;/span&gt;&lt;span class=&quot;n&quot;&gt;annua&lt;/span&gt;&lt;span class=&quot;w&quot;&gt;
-  &lt;/span&gt;&lt;span class=&quot;n&quot;&gt;canonical&lt;/span&gt;&lt;span class=&quot;o&quot;&gt;:&lt;/span&gt;&lt;span class=&quot;w&quot;&gt;
-  &lt;/span&gt;&lt;span class=&quot;n&quot;&gt;species&lt;/span&gt;&lt;span class=&quot;o&quot;&gt;:&lt;/span&gt;&lt;span class=&quot;w&quot;&gt;
-  &lt;/span&gt;&lt;span class=&quot;n&quot;&gt;authority&lt;/span&gt;&lt;span class=&quot;o&quot;&gt;:&lt;/span&gt;&lt;span class=&quot;w&quot;&gt; &lt;/span&gt;&lt;span class=&quot;n&quot;&gt;L.&lt;/span&gt;&lt;span class=&quot;w&quot;&gt;
-&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;
-&lt;/div&gt;
-
-&lt;p&gt;The package has a suite of functions to work on these taxonomic classes:&lt;/p&gt;
-
-&lt;ul&gt;
-  &lt;li&gt;&lt;code class=&quot;highlighter-rouge&quot;&gt;gethier()&lt;/code&gt; - get hierarchy from a &lt;code class=&quot;highlighter-rouge&quot;&gt;taxon&lt;/code&gt; class&lt;/li&gt;
-  &lt;li&gt;&lt;code class=&quot;highlighter-rouge&quot;&gt;scatter()&lt;/code&gt; - make each row in taxonomic data.frame (&lt;code class=&quot;highlighter-rouge&quot;&gt;taxondf&lt;/code&gt;) a separate &lt;code class=&quot;highlighter-rouge&quot;&gt;taxon&lt;/code&gt; object within a single &lt;code class=&quot;highlighter-rouge&quot;&gt;taxa&lt;/code&gt; object&lt;/li&gt;
-  &lt;li&gt;&lt;code class=&quot;highlighter-rouge&quot;&gt;assemble()&lt;/code&gt; - make a &lt;code class=&quot;highlighter-rouge&quot;&gt;taxa&lt;/code&gt; object into a &lt;code class=&quot;highlighter-rouge&quot;&gt;taxondf&lt;/code&gt; data.frame&lt;/li&gt;
-  &lt;li&gt;&lt;code class=&quot;highlighter-rouge&quot;&gt;pick()&lt;/code&gt; - pick out one or more taxonomic groups&lt;/li&gt;
-  &lt;li&gt;&lt;code class=&quot;highlighter-rouge&quot;&gt;pop()&lt;/code&gt; - pop out (drop) one or more taxonomic groups&lt;/li&gt;
-  &lt;li&gt;&lt;code class=&quot;highlighter-rouge&quot;&gt;span()&lt;/code&gt; - pick a range between two taxonomic groups (inclusive)&lt;/li&gt;
-  &lt;li&gt;&lt;code class=&quot;highlighter-rouge&quot;&gt;strain()&lt;/code&gt; - filter by taxonomic groups, like dplyr’s filter&lt;/li&gt;
-  &lt;li&gt;&lt;code class=&quot;highlighter-rouge&quot;&gt;name()&lt;/code&gt; - get the taxon name for each &lt;code class=&quot;highlighter-rouge&quot;&gt;taxonref&lt;/code&gt; object&lt;/li&gt;
-  &lt;li&gt;&lt;code class=&quot;highlighter-rouge&quot;&gt;uri()&lt;/code&gt; - get the reference uri for each &lt;code class=&quot;highlighter-rouge&quot;&gt;taxonref&lt;/code&gt; object&lt;/li&gt;
-  &lt;li&gt;&lt;code class=&quot;highlighter-rouge&quot;&gt;rank()&lt;/code&gt; - get the taxonomic rank for each &lt;code class=&quot;highlighter-rouge&quot;&gt;taxonref&lt;/code&gt; object&lt;/li&gt;
-  &lt;li&gt;&lt;code class=&quot;highlighter-rouge&quot;&gt;id()&lt;/code&gt; - get the reference uri for each &lt;code class=&quot;highlighter-rouge&quot;&gt;taxonref&lt;/code&gt; object&lt;/li&gt;
-&lt;/ul&gt;
-
-&lt;p&gt;The approach in this package I suppose is sort of like &lt;code class=&quot;highlighter-rouge&quot;&gt;split-apply-combine&lt;/code&gt; from &lt;code class=&quot;highlighter-rouge&quot;&gt;plyr&lt;/code&gt;/&lt;code class=&quot;highlighter-rouge&quot;&gt;dplyr&lt;/code&gt;, whereas this is aims to make it easy to do with taxonomic names.&lt;/p&gt;
-
-&lt;h2 id=&quot;install&quot;&gt;Install&lt;/h2&gt;
-
-&lt;p&gt;For examples below, you’ll need the development version:&lt;/p&gt;
-
-&lt;div class=&quot;language-r highlighter-rouge&quot;&gt;&lt;pre class=&quot;highlight&quot;&gt;&lt;code&gt;&lt;span class=&quot;n&quot;&gt;install.packages&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;s2&quot;&gt;&quot;binomen&quot;&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt;&lt;span class=&quot;w&quot;&gt;
-&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;
-&lt;/div&gt;
-
-&lt;div class=&quot;language-r highlighter-rouge&quot;&gt;&lt;pre class=&quot;highlight&quot;&gt;&lt;code&gt;&lt;span class=&quot;n&quot;&gt;library&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;s2&quot;&gt;&quot;binomen&quot;&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt;&lt;span class=&quot;w&quot;&gt;
-&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;
-&lt;/div&gt;
-
-&lt;h2 id=&quot;make-a-taxon&quot;&gt;Make a taxon&lt;/h2&gt;
-
-&lt;p&gt;Make a taxon object&lt;/p&gt;
-
-&lt;div class=&quot;language-r highlighter-rouge&quot;&gt;&lt;pre class=&quot;highlight&quot;&gt;&lt;code&gt;&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;obj&lt;/span&gt;&lt;span class=&quot;w&quot;&gt; &lt;/span&gt;&lt;span class=&quot;o&quot;&gt;&amp;lt;-&lt;/span&gt;&lt;span class=&quot;w&quot;&gt; &lt;/span&gt;&lt;span class=&quot;n&quot;&gt;make_taxon&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;genus&lt;/span&gt;&lt;span class=&quot;o&quot;&gt;=&lt;/span&gt;&lt;span class=&quot;s2&quot;&gt;&quot;Poa&quot;&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt;&lt;span class=&quot;w&quot;&gt; &lt;/span&gt;&lt;span class=&quot;n&quot;&gt;epithet&lt;/span&gt;&lt;span class=&quot;o&quot;&gt;=&lt;/span&gt;&lt;span class=&quot;s2&quot;&gt;&quot;annua&quot;&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt;&lt;span class=&quot;w&quot;&gt; &lt;/span&gt;&lt;span class=&quot;n&quot;&gt;authority&lt;/span&gt;&lt;span class=&quot;o&quot;&gt;=&lt;/span&gt;&lt;span class=&quot;s2&quot;&gt;&quot;L.&quot;&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt;&lt;span class=&quot;w&quot;&gt;
-  &lt;/span&gt;&lt;span class=&quot;n&quot;&gt;family&lt;/span&gt;&lt;span class=&quot;o&quot;&gt;=&lt;/span&gt;&lt;span class=&quot;s1&quot;&gt;&#39;Poaceae&#39;&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt;&lt;span class=&quot;w&quot;&gt; &lt;/span&gt;&lt;span class=&quot;n&quot;&gt;clazz&lt;/span&gt;&lt;span class=&quot;o&quot;&gt;=&lt;/span&gt;&lt;span class=&quot;s1&quot;&gt;&#39;Poales&#39;&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt;&lt;span class=&quot;w&quot;&gt; &lt;/span&gt;&lt;span class=&quot;n&quot;&gt;kingdom&lt;/span&gt;&lt;span class=&quot;o&quot;&gt;=&lt;/span&gt;&lt;span class=&quot;s1&quot;&gt;&#39;Plantae&#39;&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt;&lt;span class=&quot;w&quot;&gt; &lt;/span&gt;&lt;span class=&quot;n&quot;&gt;variety&lt;/span&gt;&lt;span class=&quot;o&quot;&gt;=&lt;/span&gt;&lt;span class=&quot;s1&quot;&gt;&#39;annua&#39;&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;))&lt;/span&gt;&lt;span class=&quot;w&quot;&gt;
-&lt;/span&gt;&lt;span class=&quot;c1&quot;&gt;#&amp;gt; &amp;lt;taxon&amp;gt;
-#&amp;gt;   binomial: Poa annua
-#&amp;gt;   grouping: 
-#&amp;gt;     kingdom: Plantae
-#&amp;gt;     clazz: Poales
-#&amp;gt;     family: Poaceae
-#&amp;gt;     genus: Poa
-#&amp;gt;     species: Poa annua
-#&amp;gt;     variety: annua
-&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;
-&lt;/div&gt;
-
-&lt;p&gt;Index to various parts of the object&lt;/p&gt;
-
-&lt;p&gt;The binomial&lt;/p&gt;
-
-&lt;div class=&quot;language-r highlighter-rouge&quot;&gt;&lt;pre class=&quot;highlight&quot;&gt;&lt;code&gt;&lt;span class=&quot;n&quot;&gt;obj&lt;/span&gt;&lt;span class=&quot;o&quot;&gt;$&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;binomial&lt;/span&gt;&lt;span class=&quot;w&quot;&gt;
-&lt;/span&gt;&lt;span class=&quot;c1&quot;&gt;#&amp;gt; &amp;lt;binomial&amp;gt;
-#&amp;gt;   genus: Poa
-#&amp;gt;   epithet: annua
-#&amp;gt;   canonical: Poa annua
-#&amp;gt;   species: Poa annua L.
-#&amp;gt;   authority: L.
-&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;
-&lt;/div&gt;
-
-&lt;p&gt;The authority&lt;/p&gt;
-
-&lt;div class=&quot;language-r highlighter-rouge&quot;&gt;&lt;pre class=&quot;highlight&quot;&gt;&lt;code&gt;&lt;span class=&quot;n&quot;&gt;obj&lt;/span&gt;&lt;span class=&quot;o&quot;&gt;$&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;binomial&lt;/span&gt;&lt;span class=&quot;o&quot;&gt;$&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;authority&lt;/span&gt;&lt;span class=&quot;w&quot;&gt;
-&lt;/span&gt;&lt;span class=&quot;c1&quot;&gt;#&amp;gt; [1] &quot;L.&quot;
-&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;
-&lt;/div&gt;
-
-&lt;p&gt;The classification&lt;/p&gt;
-
-&lt;div class=&quot;language-r highlighter-rouge&quot;&gt;&lt;pre class=&quot;highlight&quot;&gt;&lt;code&gt;&lt;span class=&quot;n&quot;&gt;obj&lt;/span&gt;&lt;span class=&quot;o&quot;&gt;$&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;grouping&lt;/span&gt;&lt;span class=&quot;w&quot;&gt;
-&lt;/span&gt;&lt;span class=&quot;c1&quot;&gt;#&amp;gt; &amp;lt;grouping&amp;gt;
-#&amp;gt;   kingdom: Plantae
-#&amp;gt;   clazz: Poales
-#&amp;gt;   family: Poaceae
-#&amp;gt;   genus: Poa
-#&amp;gt;   species: Poa annua
-#&amp;gt;   variety: annua
-&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;
-&lt;/div&gt;
-
-&lt;p&gt;The family&lt;/p&gt;
-
-&lt;div class=&quot;language-r highlighter-rouge&quot;&gt;&lt;pre class=&quot;highlight&quot;&gt;&lt;code&gt;&lt;span class=&quot;n&quot;&gt;obj&lt;/span&gt;&lt;span class=&quot;o&quot;&gt;$&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;grouping&lt;/span&gt;&lt;span class=&quot;o&quot;&gt;$&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;family&lt;/span&gt;&lt;span class=&quot;w&quot;&gt;
-&lt;/span&gt;&lt;span class=&quot;c1&quot;&gt;#&amp;gt; &amp;lt;taxonref&amp;gt;
-#&amp;gt;   rank: family
-#&amp;gt;   name: Poaceae
-#&amp;gt;   id: none
-#&amp;gt;   uri: none
-&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;
-&lt;/div&gt;
-
-&lt;h2 id=&quot;subset-taxon-objects&quot;&gt;Subset taxon objects&lt;/h2&gt;
-
-&lt;p&gt;Get one or more ranks via &lt;code class=&quot;highlighter-rouge&quot;&gt;pick()&lt;/code&gt;&lt;/p&gt;
-
-&lt;div class=&quot;language-r highlighter-rouge&quot;&gt;&lt;pre class=&quot;highlight&quot;&gt;&lt;code&gt;&lt;span class=&quot;n&quot;&gt;obj&lt;/span&gt;&lt;span class=&quot;w&quot;&gt; &lt;/span&gt;&lt;span class=&quot;o&quot;&gt;%&amp;gt;%&lt;/span&gt;&lt;span class=&quot;w&quot;&gt; &lt;/span&gt;&lt;span class=&quot;n&quot;&gt;pick&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;family&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt;&lt;span class=&quot;w&quot;&gt;
-&lt;/span&gt;&lt;span class=&quot;c1&quot;&gt;#&amp;gt; &amp;lt;taxon&amp;gt;
-#&amp;gt;   binomial: Poa annua
-#&amp;gt;   grouping: 
-#&amp;gt;     family: Poaceae
-&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;obj&lt;/span&gt;&lt;span class=&quot;w&quot;&gt; &lt;/span&gt;&lt;span class=&quot;o&quot;&gt;%&amp;gt;%&lt;/span&gt;&lt;span class=&quot;w&quot;&gt; &lt;/span&gt;&lt;span class=&quot;n&quot;&gt;pick&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;family&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt;&lt;span class=&quot;w&quot;&gt; &lt;/span&gt;&lt;span class=&quot;n&quot;&gt;genus&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt;&lt;span class=&quot;w&quot;&gt;
-&lt;/span&gt;&lt;span class=&quot;c1&quot;&gt;#&amp;gt; &amp;lt;taxon&amp;gt;
-#&amp;gt;   binomial: Poa annua
-#&amp;gt;   grouping: 
-#&amp;gt;     family: Poaceae
-#&amp;gt;     genus: Poa
-&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;
-&lt;/div&gt;
-
-&lt;p&gt;Drop one or more ranks via &lt;code class=&quot;highlighter-rouge&quot;&gt;pop()&lt;/code&gt;&lt;/p&gt;
-
-&lt;div class=&quot;language-r highlighter-rouge&quot;&gt;&lt;pre class=&quot;highlight&quot;&gt;&lt;code&gt;&lt;span class=&quot;n&quot;&gt;obj&lt;/span&gt;&lt;span class=&quot;w&quot;&gt; &lt;/span&gt;&lt;span class=&quot;o&quot;&gt;%&amp;gt;%&lt;/span&gt;&lt;span class=&quot;w&quot;&gt; &lt;/span&gt;&lt;span class=&quot;n&quot;&gt;pop&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;family&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt;&lt;span class=&quot;w&quot;&gt;
-&lt;/span&gt;&lt;span class=&quot;c1&quot;&gt;#&amp;gt; &amp;lt;taxon&amp;gt;
-#&amp;gt;   binomial: Poa annua
-#&amp;gt;   grouping: 
-#&amp;gt;     kingdom: Plantae
-#&amp;gt;     clazz: Poales
-#&amp;gt;     genus: Poa
-#&amp;gt;     species: Poa annua
-#&amp;gt;     variety: annua
-&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;obj&lt;/span&gt;&lt;span class=&quot;w&quot;&gt; &lt;/span&gt;&lt;span class=&quot;o&quot;&gt;%&amp;gt;%&lt;/span&gt;&lt;span class=&quot;w&quot;&gt; &lt;/span&gt;&lt;span class=&quot;n&quot;&gt;pop&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;family&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt;&lt;span class=&quot;w&quot;&gt; &lt;/span&gt;&lt;span class=&quot;n&quot;&gt;genus&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt;&lt;span class=&quot;w&quot;&gt;
-&lt;/span&gt;&lt;span class=&quot;c1&quot;&gt;#&amp;gt; &amp;lt;taxon&amp;gt;
-#&amp;gt;   binomial: Poa annua
-#&amp;gt;   grouping: 
-#&amp;gt;     kingdom: Plantae
-#&amp;gt;     clazz: Poales
-#&amp;gt;     species: Poa annua
-#&amp;gt;     variety: annua
-&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;
-&lt;/div&gt;
-
-&lt;p&gt;Get a range of ranks via &lt;code class=&quot;highlighter-rouge&quot;&gt;span()&lt;/code&gt;&lt;/p&gt;
-
-&lt;div class=&quot;language-r highlighter-rouge&quot;&gt;&lt;pre class=&quot;highlight&quot;&gt;&lt;code&gt;&lt;span class=&quot;n&quot;&gt;obj&lt;/span&gt;&lt;span class=&quot;w&quot;&gt; &lt;/span&gt;&lt;span class=&quot;o&quot;&gt;%&amp;gt;%&lt;/span&gt;&lt;span class=&quot;w&quot;&gt; &lt;/span&gt;&lt;span class=&quot;n&quot;&gt;span&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;kingdom&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt;&lt;span class=&quot;w&quot;&gt; &lt;/span&gt;&lt;span class=&quot;n&quot;&gt;family&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt;&lt;span class=&quot;w&quot;&gt;
-&lt;/span&gt;&lt;span class=&quot;c1&quot;&gt;#&amp;gt; &amp;lt;taxon&amp;gt;
-#&amp;gt;   binomial: Poa annua
-#&amp;gt;   grouping: 
-#&amp;gt;     kingdom: Plantae
-#&amp;gt;     clazz: Poales
-#&amp;gt;     family: Poaceae
-&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;
-&lt;/div&gt;
-
-&lt;p&gt;Extract classification as a &lt;code class=&quot;highlighter-rouge&quot;&gt;data.frame&lt;/code&gt;&lt;/p&gt;
-
-&lt;div class=&quot;language-r highlighter-rouge&quot;&gt;&lt;pre class=&quot;highlight&quot;&gt;&lt;code&gt;&lt;span class=&quot;n&quot;&gt;gethier&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;obj&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt;&lt;span class=&quot;w&quot;&gt;
-&lt;/span&gt;&lt;span class=&quot;c1&quot;&gt;#&amp;gt;      rank      name
-#&amp;gt; 1 kingdom   Plantae
-#&amp;gt; 2   clazz    Poales
-#&amp;gt; 3  family   Poaceae
-#&amp;gt; 4   genus       Poa
-#&amp;gt; 5 species Poa annua
-#&amp;gt; 6 variety     annua
-&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;
-&lt;/div&gt;
-
-&lt;h2 id=&quot;taxonomic-dataframes&quot;&gt;Taxonomic data.frame’s&lt;/h2&gt;
-
-&lt;p&gt;Make one&lt;/p&gt;
-
-&lt;div class=&quot;language-r highlighter-rouge&quot;&gt;&lt;pre class=&quot;highlight&quot;&gt;&lt;code&gt;&lt;span class=&quot;n&quot;&gt;df&lt;/span&gt;&lt;span class=&quot;w&quot;&gt; &lt;/span&gt;&lt;span class=&quot;o&quot;&gt;&amp;lt;-&lt;/span&gt;&lt;span class=&quot;w&quot;&gt; &lt;/span&gt;&lt;span class=&quot;n&quot;&gt;data.frame&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;order&lt;/span&gt;&lt;span class=&quot;w&quot;&gt; &lt;/span&gt;&lt;span class=&quot;o&quot;&gt;=&lt;/span&gt;&lt;span class=&quot;w&quot;&gt; &lt;/span&gt;&lt;span class=&quot;nf&quot;&gt;c&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;s1&quot;&gt;&#39;Asterales&#39;&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt;&lt;span class=&quot;s1&quot;&gt;&#39;Asterales&#39;&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt;&lt;span class=&quot;s1&quot;&gt;&#39;Fagales&#39;&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt;&lt;span class=&quot;s1&quot;&gt;&#39;Poales&#39;&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt;&lt;span class=&quot;s1&quot;&gt;&#39;Poales&#39;&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt;&lt;span class=&quot;s1&quot;&gt;&#39;Poales&#39;&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;),&lt;/span&gt;&lt;span class=&quot;w&quot;&gt;
-  &lt;/span&gt;&lt;span class=&quot;n&quot;&gt;family&lt;/span&gt;&lt;span class=&quot;w&quot;&gt; &lt;/span&gt;&lt;span class=&quot;o&quot;&gt;=&lt;/span&gt;&lt;span class=&quot;w&quot;&gt; &lt;/span&gt;&lt;span class=&quot;nf&quot;&gt;c&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;s1&quot;&gt;&#39;Asteraceae&#39;&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt;&lt;span class=&quot;s1&quot;&gt;&#39;Asteraceae&#39;&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt;&lt;span class=&quot;s1&quot;&gt;&#39;Fagaceae&#39;&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt;&lt;span class=&quot;s1&quot;&gt;&#39;Poaceae&#39;&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt;&lt;span class=&quot;s1&quot;&gt;&#39;Poaceae&#39;&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt;&lt;span class=&quot;s1&quot;&gt;&#39;Poaceae&#39;&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;),&lt;/span&gt;&lt;span class=&quot;w&quot;&gt;
-  &lt;/span&gt;&lt;span class=&quot;n&quot;&gt;genus&lt;/span&gt;&lt;span class=&quot;w&quot;&gt; &lt;/span&gt;&lt;span class=&quot;o&quot;&gt;=&lt;/span&gt;&lt;span class=&quot;w&quot;&gt; &lt;/span&gt;&lt;span class=&quot;nf&quot;&gt;c&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;s1&quot;&gt;&#39;Helianthus&#39;&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt;&lt;span class=&quot;s1&quot;&gt;&#39;Helianthus&#39;&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt;&lt;span class=&quot;s1&quot;&gt;&#39;Quercus&#39;&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt;&lt;span class=&quot;s1&quot;&gt;&#39;Poa&#39;&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt;&lt;span class=&quot;s1&quot;&gt;&#39;Festuca&#39;&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt;&lt;span class=&quot;s1&quot;&gt;&#39;Holodiscus&#39;&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;),&lt;/span&gt;&lt;span class=&quot;w&quot;&gt;
-  &lt;/span&gt;&lt;span class=&quot;n&quot;&gt;stringsAsFactors&lt;/span&gt;&lt;span class=&quot;w&quot;&gt; &lt;/span&gt;&lt;span class=&quot;o&quot;&gt;=&lt;/span&gt;&lt;span class=&quot;w&quot;&gt; &lt;/span&gt;&lt;span class=&quot;kc&quot;&gt;FALSE&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt;&lt;span class=&quot;w&quot;&gt;
-&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;df2&lt;/span&gt;&lt;span class=&quot;w&quot;&gt; &lt;/span&gt;&lt;span class=&quot;o&quot;&gt;&amp;lt;-&lt;/span&gt;&lt;span class=&quot;w&quot;&gt; &lt;/span&gt;&lt;span class=&quot;n&quot;&gt;taxon_df&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;df&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;))&lt;/span&gt;&lt;span class=&quot;w&quot;&gt;
-&lt;/span&gt;&lt;span class=&quot;c1&quot;&gt;#&amp;gt;       order     family      genus
-#&amp;gt; 1 Asterales Asteraceae Helianthus
-#&amp;gt; 2 Asterales Asteraceae Helianthus
-#&amp;gt; 3   Fagales   Fagaceae    Quercus
-#&amp;gt; 4    Poales    Poaceae        Poa
-#&amp;gt; 5    Poales    Poaceae    Festuca
-#&amp;gt; 6    Poales    Poaceae Holodiscus
-&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;
-&lt;/div&gt;
-
-&lt;p&gt;Parse - get rank order via &lt;code class=&quot;highlighter-rouge&quot;&gt;pick()&lt;/code&gt;&lt;/p&gt;
-
-&lt;div class=&quot;language-r highlighter-rouge&quot;&gt;&lt;pre class=&quot;highlight&quot;&gt;&lt;code&gt;&lt;span class=&quot;n&quot;&gt;df2&lt;/span&gt;&lt;span class=&quot;w&quot;&gt; &lt;/span&gt;&lt;span class=&quot;o&quot;&gt;%&amp;gt;%&lt;/span&gt;&lt;span class=&quot;w&quot;&gt; &lt;/span&gt;&lt;span class=&quot;n&quot;&gt;pick&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;order&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt;&lt;span class=&quot;w&quot;&gt;
-&lt;/span&gt;&lt;span class=&quot;c1&quot;&gt;#&amp;gt;       order
-#&amp;gt; 1 Asterales
-#&amp;gt; 2 Asterales
-#&amp;gt; 3   Fagales
-#&amp;gt; 4    Poales
-#&amp;gt; 5    Poales
-#&amp;gt; 6    Poales
-&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;
-&lt;/div&gt;
-
-&lt;p&gt;get ranks order, family, and genus via &lt;code class=&quot;highlighter-rouge&quot;&gt;pick()&lt;/code&gt;&lt;/p&gt;
-
-&lt;div class=&quot;language-r highlighter-rouge&quot;&gt;&lt;pre class=&quot;highlight&quot;&gt;&lt;code&gt;&lt;span class=&quot;n&quot;&gt;df2&lt;/span&gt;&lt;span class=&quot;w&quot;&gt; &lt;/span&gt;&lt;span class=&quot;o&quot;&gt;%&amp;gt;%&lt;/span&gt;&lt;span class=&quot;w&quot;&gt; &lt;/span&gt;&lt;span class=&quot;n&quot;&gt;pick&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;order&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt;&lt;span class=&quot;w&quot;&gt; &lt;/span&gt;&lt;span class=&quot;n&quot;&gt;family&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt;&lt;span class=&quot;w&quot;&gt; &lt;/span&gt;&lt;span class=&quot;n&quot;&gt;genus&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt;&lt;span class=&quot;w&quot;&gt;
-&lt;/span&gt;&lt;span class=&quot;c1&quot;&gt;#&amp;gt;       order     family      genus
-#&amp;gt; 1 Asterales Asteraceae Helianthus
-#&amp;gt; 2 Asterales Asteraceae Helianthus
-#&amp;gt; 3   Fagales   Fagaceae    Quercus
-#&amp;gt; 4    Poales    Poaceae        Poa
-#&amp;gt; 5    Poales    Poaceae    Festuca
-#&amp;gt; 6    Poales    Poaceae Holodiscus
-&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;
-&lt;/div&gt;
-
-&lt;p&gt;get range of names via &lt;code class=&quot;highlighter-rouge&quot;&gt;span()&lt;/code&gt;, from rank &lt;code class=&quot;highlighter-rouge&quot;&gt;X&lt;/code&gt; to rank &lt;code class=&quot;highlighter-rouge&quot;&gt;Y&lt;/code&gt;&lt;/p&gt;
-
-&lt;div class=&quot;language-r highlighter-rouge&quot;&gt;&lt;pre class=&quot;highlight&quot;&gt;&lt;code&gt;&lt;span class=&quot;n&quot;&gt;df2&lt;/span&gt;&lt;span class=&quot;w&quot;&gt; &lt;/span&gt;&lt;span class=&quot;o&quot;&gt;%&amp;gt;%&lt;/span&gt;&lt;span class=&quot;w&quot;&gt; &lt;/span&gt;&lt;span class=&quot;n&quot;&gt;span&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;family&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt;&lt;span class=&quot;w&quot;&gt; &lt;/span&gt;&lt;span class=&quot;n&quot;&gt;genus&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt;&lt;span class=&quot;w&quot;&gt;
-&lt;/span&gt;&lt;span class=&quot;c1&quot;&gt;#&amp;gt;       family      genus
-#&amp;gt; 1 Asteraceae Helianthus
-#&amp;gt; 2 Asteraceae Helianthus
-#&amp;gt; 3   Fagaceae    Quercus
-#&amp;gt; 4    Poaceae        Poa
-#&amp;gt; 5    Poaceae    Festuca
-#&amp;gt; 6    Poaceae Holodiscus
-&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;
-&lt;/div&gt;
-
-&lt;p&gt;Separate each row into a &lt;code class=&quot;highlighter-rouge&quot;&gt;taxon&lt;/code&gt; class (many &lt;code class=&quot;highlighter-rouge&quot;&gt;taxon&lt;/code&gt; objects are a &lt;code class=&quot;highlighter-rouge&quot;&gt;taxa&lt;/code&gt; class)&lt;/p&gt;
-
-&lt;div class=&quot;language-r highlighter-rouge&quot;&gt;&lt;pre class=&quot;highlight&quot;&gt;&lt;code&gt;&lt;span class=&quot;n&quot;&gt;scatter&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;df2&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt;&lt;span class=&quot;w&quot;&gt;
-&lt;/span&gt;&lt;span class=&quot;c1&quot;&gt;#&amp;gt; [[1]]
-#&amp;gt; &amp;lt;taxon&amp;gt;
-#&amp;gt;   binomial: Helianthus none
-#&amp;gt;   grouping: 
-#&amp;gt;     order: Asterales
-#&amp;gt;     family: Asteraceae
-#&amp;gt;     genus: Helianthus
-#&amp;gt;     species: Helianthus none
-#&amp;gt; 
-#&amp;gt; [[2]]
-#&amp;gt; &amp;lt;taxon&amp;gt;
-#&amp;gt;   binomial: Helianthus none
-#&amp;gt;   grouping: 
-#&amp;gt;     order: Asterales
-#&amp;gt;     family: Asteraceae
-#&amp;gt;     genus: Helianthus
-#&amp;gt;     species: Helianthus none
-#&amp;gt; 
-#&amp;gt; [[3]]
-#&amp;gt; &amp;lt;taxon&amp;gt;
-#&amp;gt;   binomial: Quercus none
-#&amp;gt;   grouping: 
-#&amp;gt;     order: Fagales
-#&amp;gt;     family: Fagaceae
-#&amp;gt;     genus: Quercus
-#&amp;gt;     species: Quercus none
-#&amp;gt; 
-#&amp;gt; [[4]]
-#&amp;gt; &amp;lt;taxon&amp;gt;
-#&amp;gt;   binomial: Poa none
-#&amp;gt;   grouping: 
-#&amp;gt;     order: Poales
-#&amp;gt;     family: Poaceae
-#&amp;gt;     genus: Poa
-#&amp;gt;     species: Poa none
-#&amp;gt; 
-#&amp;gt; [[5]]
-#&amp;gt; &amp;lt;taxon&amp;gt;
-#&amp;gt;   binomial: Festuca none
-#&amp;gt;   grouping: 
-#&amp;gt;     order: Poales
-#&amp;gt;     family: Poaceae
-#&amp;gt;     genus: Festuca
-#&amp;gt;     species: Festuca none
-#&amp;gt; 
-#&amp;gt; [[6]]
-#&amp;gt; &amp;lt;taxon&amp;gt;
-#&amp;gt;   binomial: Holodiscus none
-#&amp;gt;   grouping: 
-#&amp;gt;     order: Poales
-#&amp;gt;     family: Poaceae
-#&amp;gt;     genus: Holodiscus
-#&amp;gt;     species: Holodiscus none
-#&amp;gt; 
-#&amp;gt; attr(,&quot;class&quot;)
-#&amp;gt; [1] &quot;taxa&quot;
-&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;
-&lt;/div&gt;
-
-&lt;p&gt;And you can re-assemble a data.frame from the output of &lt;code class=&quot;highlighter-rouge&quot;&gt;scatter()&lt;/code&gt; with &lt;code class=&quot;highlighter-rouge&quot;&gt;assemble()&lt;/code&gt;&lt;/p&gt;
-
-&lt;div class=&quot;language-r highlighter-rouge&quot;&gt;&lt;pre class=&quot;highlight&quot;&gt;&lt;code&gt;&lt;span class=&quot;n&quot;&gt;out&lt;/span&gt;&lt;span class=&quot;w&quot;&gt; &lt;/span&gt;&lt;span class=&quot;o&quot;&gt;&amp;lt;-&lt;/span&gt;&lt;span class=&quot;w&quot;&gt; &lt;/span&gt;&lt;span class=&quot;n&quot;&gt;scatter&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;df2&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt;&lt;span class=&quot;w&quot;&gt;
-&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;assemble&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;out&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt;&lt;span class=&quot;w&quot;&gt;
-&lt;/span&gt;&lt;span class=&quot;c1&quot;&gt;#&amp;gt;       order     family      genus         species
-#&amp;gt; 1 Asterales Asteraceae Helianthus Helianthus none
-#&amp;gt; 2 Asterales Asteraceae Helianthus Helianthus none
-#&amp;gt; 3   Fagales   Fagaceae    Quercus    Quercus none
-#&amp;gt; 4    Poales    Poaceae        Poa        Poa none
-#&amp;gt; 5    Poales    Poaceae    Festuca    Festuca none
-#&amp;gt; 6    Poales    Poaceae Holodiscus Holodiscus none
-&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;
-&lt;/div&gt;
-
-&lt;h2 id=&quot;thoughts&quot;&gt;Thoughts?&lt;/h2&gt;
-
-&lt;p&gt;I’m really curious what people think of &lt;code class=&quot;highlighter-rouge&quot;&gt;binomen&lt;/code&gt;. I’m not sure how useful this will be in the wild. Try it. Let me know. Thanks much :)&lt;/p&gt;
-
-</description>
-				<published>2015-12-08 00:00:00 -0800</published>
-				<link>http://recology.info//2015/12/binomen-taxonomy-tools/</link>
 			</item>
 		
 	</channel>
