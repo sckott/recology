@@ -33,7 +33,7 @@
     <header class="masthead">
       <div class="masthead-inner">
         <h1>Recology</h1>
-        <!-- <h1> <a href="http://recology.info/">Recology</a></h1> -->
+        <!-- <h1> <a href="http://localhost:4000">Recology</a></h1> -->
         <p class="lead">R/etc.</p>
 
         <div class="colophon">
@@ -58,6 +58,24 @@
       <div class="posts">
   <a style="float:right;" href="/archives" data-toggle="tooltip" data-placement="bottom" title="Archives"><i class="fa fa-archive fa-lg"></i></a>
   <a style="float:right;" href="/tags"><i class="fa fa-tags fa-lg"></i></a>&nbsp;
+  
+  <div class="post">
+    <h1>
+      <a href="/2017/03/cascadiarconf/">
+        CascadiaRConf
+      </a>
+    </h1>
+
+    <span class="post-date">23 Mar 2017</span>
+
+    <h1 class="center">Save the date for CascadiaRConf!</h1>
+
+<p>Website: <a href="https://cascadiarconf.com/">https://cascadiarconf.com/</a></p>
+
+<p>Twitter: <a href="https://twitter.com/cascadiarconf/">https://twitter.com/cascadiarconf/</a></p>
+
+
+  </div>
   
   <div class="post">
     <h1>
@@ -516,317 +534,6 @@ subset of fields</p>
 </div>
 
 <p>There’s many more examples in the <a href="http://recology.info/gbidsdocs">API docs</a></p>
-
-  </div>
-  
-  <div class="post">
-    <h1>
-      <a href="/2016/08/no-no-yes/">
-        nonoyes - text analysis of Reply All podcast transcripts
-      </a>
-    </h1>
-
-    <span class="post-date">25 Aug 2016</span>
-
-    <ul>
-  <li><a href="#setup">Setup</a></li>
-  <li><a href="#urls">URLs</a></li>
-  <li><a href="#episode-names">Episode names</a></li>
-  <li><a href="#transcripts">Transcripts</a></li>
-  <li><a href="#summary-word-usage">Summary word usage</a></li>
-  <li><a href="#sentiment">Sentiment</a>
-    <ul>
-      <li><a href="#most-common-positive-and-negative-words">Most common positive and negative
-words</a></li>
-    </ul>
-  </li>
-</ul>
-
-<p><a href="https://gimletmedia.com/show/reply-all/">Reply All</a> is a great podcast.
-I’ve been wanting to learn some text analysis tools, and transcripts
-from the podcast are on their site.</p>
-
-<p>Took some approaches outlined in the
-<a href="https://cran.rstudio.com/web/packages/tidytext/">tidytext</a> package in
-<a href="https://cran.rstudio.com/web/packages/tidytext/vignettes/tidytext.html">this
-vignette</a>,
-and used the
-<a href="https://cran.rstudio.com/web/packages/tokenizers">tokenizers</a> package,
-and some of the tidyverse.</p>
-
-<p>Code on github at <a href="https://github.com/sckott/nonoyes">sckott/nonoyes</a></p>
-
-<p>Also check out the <a href="http://htmlpreview.github.io/?https://github.com/sckott/nonoyes/blob/master/script.html">html version</a></p>
-
-<h2 id="setup">Setup</h2>
-
-<p>Load deps</p>
-
-<div class="highlighter-rouge"><pre class="highlight"><code>library("httr")
-library("xml2")
-library("stringi")
-library("dplyr")
-library("ggplot2")
-library("tokenizers")
-library("tidytext")
-library("tidyr")
-</code></pre>
-</div>
-
-<p>source helper functions</p>
-
-<div class="highlighter-rouge"><pre class="highlight"><code>source("funs.R")
-</code></pre>
-</div>
-
-<p>set base url</p>
-
-<div class="highlighter-rouge"><pre class="highlight"><code>ra_base &lt;- "https://gimletmedia.com/show/reply-all/episodes"
-</code></pre>
-</div>
-
-<h2 id="urls">URLs</h2>
-
-<p>Make all urls for each page of episodes</p>
-
-<div class="highlighter-rouge"><pre class="highlight"><code>urls &lt;- c(ra_base, file.path(ra_base, "page", 2:8))
-</code></pre>
-</div>
-
-<p>Get urls for each episode</p>
-
-<div class="highlighter-rouge"><pre class="highlight"><code>res &lt;- lapply(urls, get_urls)
-</code></pre>
-</div>
-
-<p>Remove those that are rebroadcasts, updates, or revisited</p>
-
-<div class="highlighter-rouge"><pre class="highlight"><code>res &lt;- grep("rebroadcast|update|revisited", unlist(res), value = TRUE, invert = TRUE)
-</code></pre>
-</div>
-
-<h2 id="episode-names">Episode names</h2>
-
-<p>Give some episodes numbers that don’t have them</p>
-
-<div class="highlighter-rouge"><pre class="highlight"><code>epnames &lt;- sub("/$", "", sub("https://gimletmedia.com/episode/", "", res))
-epnames &lt;- sub("the-anxiety-box", "8-the-anxiety-box", epnames)
-epnames &lt;- sub("french-connection", "10-french-connection", epnames)
-epnames &lt;- sub("ive-killed-people-and-i-have-hostages", "15-ive-killed-people-and-i-have-hostages", epnames)
-epnames &lt;- sub("6-this-proves-everything", "75-this-proves-everything", epnames)
-epnames &lt;- sub("zardulu", "56-zardulu", epnames)
-</code></pre>
-</div>
-
-<h2 id="transcripts">Transcripts</h2>
-
-<p>Get transcripts</p>
-
-<div class="highlighter-rouge"><pre class="highlight"><code>txts &lt;- lapply(res, transcript_fetch, sleep = 1)
-</code></pre>
-</div>
-
-<p>Parse transcripts</p>
-
-<div class="highlighter-rouge"><pre class="highlight"><code>txtsp &lt;- lapply(txts, transcript_parse)
-</code></pre>
-</div>
-
-<h2 id="summary-word-usage">Summary word usage</h2>
-
-<p>Summarise data for each transcript</p>
-
-<div class="highlighter-rouge"><pre class="highlight"><code>dat &lt;- stats::setNames(lapply(txtsp, function(m) {
-  bind_rows(lapply(m, function(v) {
-    tmp &lt;- unname(vapply(v, nchar, 1))
-    data_frame(
-      n = length(tmp),
-      mean = mean(tmp),
-      n_laugh = count_word(v, "laugh"),
-      n_groan = count_word(v, "groan")
-    )
-  }), .id = "name")
-}), epnames)
-</code></pre>
-</div>
-
-<p>Bind data together to single dataframe, and filter, summarise</p>
-
-<div class="highlighter-rouge"><pre class="highlight"><code>data &lt;- bind_rows(dat, .id = "episode") %&gt;%
-  filter(!is.na(episode)) %&gt;%
-  filter(grepl("^PJ$|^ALEX GOLDMAN$", name)) %&gt;%
-  mutate(ep_no = as.numeric(strextract(episode, "^[0-9]+"))) %&gt;%
-  group_by(ep_no) %&gt;%
-  mutate(nrow = NROW(ep_no)) %&gt;%
-  ungroup() %&gt;%
-  filter(nrow == 2)
-data
-#&gt; # A tibble: 114 × 8
-#&gt;                 episode         name     n      mean n_laugh n_groan ep_no
-#&gt;                   &lt;chr&gt;        &lt;chr&gt; &lt;int&gt;     &lt;dbl&gt;   &lt;int&gt;   &lt;int&gt; &lt;dbl&gt;
-#&gt; 1            73-sandbox           PJ    89 130.65169       9       0    73
-#&gt; 2            73-sandbox ALEX GOLDMAN    25  44.00000       1       1    73
-#&gt; 3       72-dead-is-paul           PJ   137  67.77372      17       0    72
-#&gt; 4       72-dead-is-paul ALEX GOLDMAN    90  61.82222       8       0    72
-#&gt; 5  71-the-picture-taker           PJ    74  77.70270       3       0    71
-#&gt; 6  71-the-picture-taker ALEX GOLDMAN    93 105.94624       6       0    71
-#&gt; 7        69-disappeared           PJ    72  76.50000       2       0    69
-#&gt; 8        69-disappeared ALEX GOLDMAN    50 135.90000       5       0    69
-#&gt; 9      68-vampire-rules           PJ   142  88.00704       6       0    68
-#&gt; 10     68-vampire-rules ALEX GOLDMAN   117  73.16239      13       0    68
-#&gt; # ... with 104 more rows, and 1 more variables: nrow &lt;int&gt;
-</code></pre>
-</div>
-
-<p>Number of words - seems PJ talks more, but didn’t do quantiative
-comparison</p>
-
-<div class="highlighter-rouge"><pre class="highlight"><code>ggplot(data, aes(ep_no, n, colour = name)) +
-  geom_point(size = 3, alpha = 0.5) +
-  geom_line(aes(group = ep_no), colour = "black") +
-  scale_color_discrete(labels = c('Alex', 'PJ'))
-</code></pre>
-</div>
-
-<p><img src="/public/img/2016-08-25-no-no-yes/unnamed-chunk-12-1.png" alt="" /></p>
-
-<p>Laughs per episode - take home: PJ laughs a lot</p>
-
-<div class="highlighter-rouge"><pre class="highlight"><code>ggplot(data, aes(ep_no, n_laugh, colour = name)) +
-  geom_point(size = 3, alpha = 0.5) +
-  geom_line(aes(group = ep_no), colour = "black") +
-  scale_color_discrete(labels = c('Alex', 'PJ'))
-</code></pre>
-</div>
-
-<p><img src="/public/img/2016-08-25-no-no-yes/unnamed-chunk-13-1.png" alt="" /></p>
-
-<h2 id="sentiment">Sentiment</h2>
-
-<div class="highlighter-rouge"><pre class="highlight"><code>zero &lt;- which(vapply(txtsp, length, 1) == 0)
-txtsp_ &lt;- Filter(function(x) length(x) != 0, txtsp)
-</code></pre>
-</div>
-
-<p>Tokenize words, and create data_frame</p>
-
-<div class="highlighter-rouge"><pre class="highlight"><code>wordz &lt;- stats::setNames(
-  lapply(txtsp_, function(z) {
-    bind_rows(
-      if (is.null(try_tokenize(z$`ALEX GOLDMAN`))) {
-        data_frame()
-      } else {
-        data_frame(
-          name = "Alex",
-          word = try_tokenize(z$`ALEX GOLDMAN`)
-        )
-      },
-      if (is.null(try_tokenize(z$PJ))) {
-        data_frame()
-      } else {
-        data_frame(
-          name = "PJ",
-          word = try_tokenize(z$PJ)
-        )
-      }
-    )
-  }), epnames[-zero])
-</code></pre>
-</div>
-
-<p>Combine to single data_frame</p>
-
-<div class="highlighter-rouge"><pre class="highlight"><code>(wordz_df &lt;- bind_rows(wordz, .id = "episode"))
-#&gt; # A tibble: 104,713 × 3
-#&gt;       episode  name      word
-#&gt;         &lt;chr&gt; &lt;chr&gt;     &lt;chr&gt;
-#&gt; 1  73-sandbox  Alex      alex
-#&gt; 2  73-sandbox  Alex   goldman
-#&gt; 3  73-sandbox  Alex         i
-#&gt; 4  73-sandbox  Alex generally
-#&gt; 5  73-sandbox  Alex     don’t
-#&gt; 6  73-sandbox  Alex      alex
-#&gt; 7  73-sandbox  Alex    really
-#&gt; 8  73-sandbox  Alex      alex
-#&gt; 9  73-sandbox  Alex    groans
-#&gt; 10 73-sandbox  Alex        so
-#&gt; # ... with 104,703 more rows
-</code></pre>
-</div>
-
-<p>Calculate sentiment using <code class="highlighter-rouge">tidytext</code></p>
-
-<div class="highlighter-rouge"><pre class="highlight"><code>bing &lt;- sentiments %&gt;%
-  filter(lexicon == "bing") %&gt;%
-  select(-score)
-sent &lt;- wordz_df %&gt;%
-  inner_join(bing) %&gt;%
-  count(name, episode, sentiment) %&gt;%
-  spread(sentiment, n, fill = 0) %&gt;%
-  mutate(sentiment = positive - negative) %&gt;%
-  ungroup() %&gt;%
-  filter(!is.na(episode)) %&gt;%
-  complete(episode, name) %&gt;%
-  mutate(ep_no = as.numeric(strextract(episode, "^[0-9]+")))
-sent
-#&gt; # A tibble: 148 × 6
-#&gt;                                        episode  name negative positive
-#&gt;                                          &lt;chr&gt; &lt;chr&gt;    &lt;dbl&gt;    &lt;dbl&gt;
-#&gt; 1  1-an-app-sends-a-stranger-to-say-i-love-you  Alex       19       30
-#&gt; 2  1-an-app-sends-a-stranger-to-say-i-love-you    PJ       14       14
-#&gt; 3                         10-french-connection  Alex       15       32
-#&gt; 4                         10-french-connection    PJ       16       36
-#&gt; 5     11-did-errol-morris-brother-invent-email  Alex       NA       NA
-#&gt; 6     11-did-errol-morris-brother-invent-email    PJ       25       30
-#&gt; 7                           12-backend-trouble  Alex       20       15
-#&gt; 8                           12-backend-trouble    PJ       40       59
-#&gt; 9                              13-love-is-lies  Alex       NA       NA
-#&gt; 10                             13-love-is-lies    PJ       45       64
-#&gt; # ... with 138 more rows, and 2 more variables: sentiment &lt;dbl&gt;,
-#&gt; #   ep_no &lt;dbl&gt;
-</code></pre>
-</div>
-
-<p>Names separate</p>
-
-<div class="highlighter-rouge"><pre class="highlight"><code>ggplot(sent, aes(ep_no, sentiment, fill = name)) +
-  geom_bar(stat = "identity") +
-  facet_wrap(~name, ncol = 2, scales = "free_x")
-</code></pre>
-</div>
-
-<p><img src="/public/img/2016-08-25-no-no-yes/unnamed-chunk-18-1.png" alt="" /></p>
-
-<p>Compare for each episode</p>
-
-<div class="highlighter-rouge"><pre class="highlight"><code>ggplot(sent, aes(ep_no, sentiment, fill = name)) +
-  geom_bar(stat = "identity", position = position_dodge(width = 0.5), width = 0.6)
-</code></pre>
-</div>
-
-<p><img src="/public/img/2016-08-25-no-no-yes/unnamed-chunk-19-1.png" alt="" /></p>
-
-<h3 id="most-common-positive-and-negative-words">Most common positive and negative words</h3>
-
-<p>Clearly, the word <code class="highlighter-rouge">like</code> is surely rarely used as a positive word
-meaning e.g., that they <em>like something</em>, but rather as the colloquial
-<code class="highlighter-rouge">like, totally</code> usage. So it’s removed.</p>
-
-<p>Alex</p>
-
-<div class="highlighter-rouge"><pre class="highlight"><code>sent_cont_plot(wordz_df, "Alex")
-</code></pre>
-</div>
-
-<p><img src="/public/img/2016-08-25-no-no-yes/unnamed-chunk-20-1.png" alt="" /></p>
-
-<p>PJ</p>
-
-<div class="highlighter-rouge"><pre class="highlight"><code>sent_cont_plot(wordz_df, "PJ")
-</code></pre>
-</div>
-
-<p><img src="/public/img/2016-08-25-no-no-yes/unnamed-chunk-21-1.png" alt="" /></p>
 
   </div>
   

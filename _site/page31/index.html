@@ -33,7 +33,7 @@
     <header class="masthead">
       <div class="masthead-inner">
         <h1>Recology</h1>
-        <!-- <h1> <a href="http://recology.info/">Recology</a></h1> -->
+        <!-- <h1> <a href="http://localhost:4000">Recology</a></h1> -->
         <p class="lead">R/etc.</p>
 
         <div class="colophon">
@@ -61,6 +61,175 @@
   
   <div class="post">
     <h1>
+      <a href="/2012/10/phylogenetic-tree-balance/">
+        Exploring phylogenetic tree balance metrics
+      </a>
+    </h1>
+
+    <span class="post-date">10 Oct 2012</span>
+
+    I need to simulate balanced and unbalanced phylogenetic trees for some research I am doing.  In order to do this, I do rejection sampling: simulate a tree -> measure tree shape -> reject if not balanced or unbalanced __enough__.  But what is enough?  We need to define some cutoff value to determine what will be our set of balanced and unbalanced trees. 
+
+### A function to calculate shape metrics, and a custom theme for plottingn phylogenies.
+
+{% highlight r linenos %}
+foo <- function(x, metric = "colless") {
+    if (metric == "colless") {
+        xx <- as.treeshape(x)  # convert to apTreeshape format
+        colless(xx, "yule")  # calculate colless' metric
+    } else if (metric == "gamma") {
+        gammaStat(x)
+    } else stop("metric should be one of colless or gamma")
+}
+
+theme_myblank <- function() {
+    stopifnot(require(ggplot2))
+    theme_blank <- ggplot2::theme_blank
+    ggplot2::theme(panel.grid.major = element_blank(), panel.grid.minor = element_blank(), 
+        panel.background = element_blank(), plot.background = element_blank(), 
+        axis.title.x = element_text(colour = NA), axis.title.y = element_blank(), 
+        axis.text.x = element_blank(), axis.text.y = element_blank(), axis.line = element_blank(), 
+        axis.ticks = element_blank())
+}
+{% endhighlight %}
+
+
+### Simulate some trees
+
+{% highlight r linenos %}
+library(ape)
+library(phytools)
+
+numtrees <- 1000  # lets simulate 1000 trees
+trees <- pbtree(n = 50, nsim = numtrees, ape = F)  # simulate 500 pure-birth trees with 100 spp each, ape = F makes it run faster
+{% endhighlight %}
+
+
+### Calculate Colless' shape metric on each tree
+
+{% highlight r linenos %}
+library(plyr)
+library(apTreeshape)
+
+colless_df <- ldply(trees, foo, metric = "colless")  # calculate metric for each tree
+head(colless_df)
+{% endhighlight %}
+
+
+
+{% highlight text %}
+       V1
+1 -0.1761
+2  0.2839
+3  0.4639
+4  0.9439
+5 -0.6961
+6 -0.1161
+{% endhighlight %}
+
+
+
+{% highlight r linenos %}
+
+# Calculate the percent of trees that will fall into the cutoff for balanced and unbalanced trees
+col_percent_low <- round(length(colless_df[colless_df$V1 < -0.7, "V1"])/numtrees, 2) * 100
+col_percent_high <- round(length(colless_df[colless_df$V1 > 0.7, "V1"])/numtrees, 2) * 100
+{% endhighlight %}
+
+
+### Create a distribution of the metric values
+
+{% highlight r linenos %}
+library(ggplot2)
+
+a <- ggplot(colless_df, aes(V1)) +  # plot histogram of distribution of values
+	geom_histogram() + 
+	theme_bw(base_size=18) + 
+	scale_x_continuous(limits=c(-3,3), breaks=c(-3,-2,-1,0,1,2,3)) + 
+	geom_vline(xintercept = -0.7, colour="red", linetype = "longdash") +
+	geom_vline(xintercept = 0.7, colour="red", linetype = "longdash") +
+	ggtitle(paste0("Distribution of Colless' metric for 1000 trees, cutoffs at -0.7 and 0.7 results in\n ", col_percent_low, "% (", numtrees*(col_percent_low/100), ") 'balanced' trees (left) and ", col_percent_low, "% (", numtrees*(col_percent_low/100), ") 'unbalanced' trees (right)")) +  
+	labs(x = "Colless' Metric Value", y = "Number of phylogenetic trees") +
+	theme(plot.title  = element_text(size = 16))
+
+a
+{% endhighlight %}
+
+![center](/public/img/collesshist.png) 
+
+
+### Create phylogenies representing balanced and unbalanced trees (using the custom theme)
+
+{% highlight r linenos %}
+library(ggphylo)
+
+b <- ggphylo(trees[which.min(colless_df$V1)], do.plot = F) + theme_myblank()
+c <- ggphylo(trees[which.max(colless_df$V1)], do.plot = F) + theme_myblank()
+
+b
+{% endhighlight %}
+
+![center](/public/img/collessphylog.png) 
+
+
+### Now, put it all together in one plot using some gridExtra magic.
+
+{% highlight r linenos %}
+library(gridExtra)
+
+grid.newpage()
+pushViewport(viewport(layout = grid.layout(1, 1)))
+vpa_ <- viewport(width = 1, height = 1, x = 0.5, y = 0.49)
+vpb_ <- viewport(width = 0.35, height = 0.35, x = 0.23, y = 0.7)
+vpc_ <- viewport(width = 0.35, height = 0.35, x = 0.82, y = 0.7)
+print(a, vp = vpa_)
+print(b, vp = vpb_)
+print(c, vp = vpc_)
+{% endhighlight %}
+
+![center](/public/img/collessall.png) 
+
+
+### And the same for Gamma stat, which measures the distribution of nodes in time. 
+
+{% highlight r linenos %}
+gamma_df <- ldply(trees, foo, metric="gamma") # calculate metric for each tree
+gam_percent_low <- round(length(gamma_df[gamma_df$V1 < -1, "V1"])/numtrees, 2)*100
+gam_percent_high <- round(length(gamma_df[gamma_df$V1 > 1, "V1"])/numtrees, 2)*100
+a <- ggplot(gamma_df, aes(V1)) +  # plot histogram of distribution of values
+	geom_histogram() + 
+	theme_bw(base_size=18) + 
+	scale_x_continuous(breaks=c(-3,-2,-1,0,1,2,3)) + 
+	geom_vline(xintercept = -1, colour="red", linetype = "longdash") +
+	geom_vline(xintercept = 1, colour="red", linetype = "longdash") +
+	ggtitle(paste0("Distribution of Gamma metric for 1000 trees, cutoffs at -1 and 1 results in\n ", gam_percent_low, "% (", numtrees*(gam_percent_low/100), ") trees with deeper nodes (left) and ", gam_percent_high, "% (", numtrees*(gam_percent_high/100), ") trees with shallower nodes (right)")) +  
+	labs(x = "Gamma Metric Value", y = "Number of phylogenetic trees") +
+	theme(plot.title  = element_text(size = 16))
+b <- ggphylo(trees[which.min(gamma_df$V1)], do.plot=F) + theme_myblank()
+c <- ggphylo(trees[which.max(gamma_df$V1)], do.plot=F) + theme_myblank()
+
+grid.newpage()
+pushViewport(viewport(layout = grid.layout(1,1)))
+vpa_ <- viewport(width = 1, height = 1, x = 0.5, y = 0.49)
+vpb_ <- viewport(width = 0.35, height = 0.35, x = 0.23, y = 0.7)
+vpc_ <- viewport(width = 0.35, height = 0.35, x = 0.82, y = 0.7)
+print(a, vp = vpa_)
+print(b, vp = vpb_)
+print(c, vp = vpc_)
+{% endhighlight %}
+
+![center](/public/img/gammaall.png) 
+
+
+*********
+#### Get the .Rmd file used to create this post [at my github account](https://github.com/sckott/sckott.github.com/tree/master/_drafts/2012-10-10-phylogenetic-tree-balance.Rmd) - or [.md file](https://github.com/sckott/sckott.github.com/tree/master/_posts/2012-10-10-phylogenetic-tree-balance.md).
+
+#### Written in [Markdown](http://daringfireball.net/projects/markdown/), with help from [knitr](http://yihui.name/knitr/).
+
+  </div>
+  
+  <div class="post">
+    <h1>
       <a href="/2012/10/rgbif-newfxns/">
         GBIF biodiversity data from R - more functions
       </a>
@@ -68,43 +237,50 @@
 
     <span class="post-date">08 Oct 2012</span>
 
-    <h4 id="update-in-response-to-jarretts-query-i-laid-out-a-separate-use-case-in-which-you-may-want-to-query-by-higher-taxonomic-rankings-than-species-see-below--in-addition-added-examples-of-querying-by-location-in-reply-to-comments-by-seminym">UPDATE: In response to Jarrett’s query I laid out a separate use case in which you may want to query by higher taxonomic rankings than species. See below.  In addition, added examples of querying by location in reply to comments by seminym.</h4>
+    #### UPDATE: In response to Jarrett's query I laid out a separate use case in which you may want to query by higher taxonomic rankings than species. See below.  In addition, added examples of querying by location in reply to comments by seminym. 
 
-<hr />
+*****
 
-<p>We have been working on an R package to get GBIF data from R, with the stable version available through CRAN <a href="URL">here</a>, and the development version available on GitHub <a href="http://github.com/rgbif">here</a>.</p>
+We have been working on an R package to get GBIF data from R, with the stable version available through CRAN [here](URL), and the development version available on GitHub [here](http://github.com/rgbif). 
 
-<p>We had a Google Summer of code stuent work on the package this summer - you can see his work on the package over at his GitHub page <a href="">here</a>.  We have added some new functionality since his work, and would like to show it off.</p>
+We had a Google Summer of code stuent work on the package this summer - you can see his work on the package over at his GitHub page [here]().  We have added some new functionality since his work, and would like to show it off. 
 
-<h3 id="lets-install-rgbif-first">Lets install rgbif first.</h3>
+### Lets install rgbif first.
 
-<figure class="highlight"><pre><code class="language-r" data-lang="r"><table style="border-spacing: 0"><tbody><tr><td class="gutter gl" style="text-align: right"><pre class="lineno">1
-2
-3
-4
-5
-6
-7</pre></td><td class="code"><pre><span class="c1"># install_github('rgbif', 'ropensci') # uncomment if not already installed
-</span><span class="n">library</span><span class="p">(</span><span class="n">rgbif</span><span class="p">)</span><span class="w">
-</span><span class="n">library</span><span class="p">(</span><span class="n">plyr</span><span class="p">)</span><span class="w">
-</span><span class="n">library</span><span class="p">(</span><span class="n">XML</span><span class="p">)</span><span class="w">
-</span><span class="n">library</span><span class="p">(</span><span class="n">httr</span><span class="p">)</span><span class="w">
-</span><span class="n">library</span><span class="p">(</span><span class="n">maps</span><span class="p">)</span><span class="w">
-</span><span class="n">library</span><span class="p">(</span><span class="n">ggplot2</span><span class="p">)</span><span class="w">
-</span></pre></td></tr></tbody></table></code></pre></figure>
+{% highlight r linenos %}
+# install_github('rgbif', 'ropensci') # uncomment if not already installed
+library(rgbif)
+library(plyr)
+library(XML)
+library(httr)
+library(maps)
+library(ggplot2)
+{% endhighlight %}
 
-<h3 id="get-taxonomic-information-on-a-specific-taxon-or-taxa-in-gbif-by-their-taxon-concept-keys">Get taxonomic information on a specific taxon or taxa in GBIF by their taxon concept keys.</h3>
 
-<figure class="highlight"><pre><code class="language-r" data-lang="r"><table style="border-spacing: 0"><tbody><tr><td class="gutter gl" style="text-align: right"><pre class="lineno">1</pre></td><td class="code"><pre><span class="p">(</span><span class="n">keys</span><span class="w"> </span><span class="o">&lt;-</span><span class="w"> </span><span class="n">taxonsearch</span><span class="p">(</span><span class="n">scientificname</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"Puma concolor"</span><span class="p">))</span><span class="w">  </span><span class="err">#</span><span class="w"> </span><span class="n">many</span><span class="w"> </span><span class="n">matches</span><span class="w"> </span><span class="n">to</span><span class="w"> </span><span class="n">this</span><span class="w"> </span><span class="n">search</span><span class="w">
-</span></pre></td></tr></tbody></table></code></pre></figure>
+### Get taxonomic information on a specific taxon or taxa in GBIF by their taxon concept keys.
 
-<figure class="highlight"><pre><code class="language-text" data-lang="text"> [1] "51780668" "51758018" "50010499" "51773067" "51078815" "51798065"
- [7] "51088007" "50410780" "50305290" "51791438"</code></pre></figure>
+{% highlight r linenos %}
+(keys <- taxonsearch(scientificname = "Puma concolor"))  # many matches to this search
+{% endhighlight %}
 
-<figure class="highlight"><pre><code class="language-r" data-lang="r"><table style="border-spacing: 0"><tbody><tr><td class="gutter gl" style="text-align: right"><pre class="lineno">1</pre></td><td class="code"><pre><span class="n">taxonget</span><span class="p">(</span><span class="n">keys</span><span class="p">[[</span><span class="m">1</span><span class="p">]])</span><span class="w">  </span><span class="err">#</span><span class="w"> </span><span class="n">let</span><span class="err">'</span><span class="n">s</span><span class="w"> </span><span class="n">get</span><span class="w"> </span><span class="n">the</span><span class="w"> </span><span class="n">first</span><span class="w"> </span><span class="n">one</span><span class="w"> </span><span class="o">-</span><span class="w"> </span><span class="n">the</span><span class="w"> </span><span class="n">first</span><span class="w"> </span><span class="n">row</span><span class="w"> </span><span class="k">in</span><span class="w"> </span><span class="n">the</span><span class="w"> </span><span class="n">data.frame</span><span class="w"> </span><span class="n">is</span><span class="w"> </span><span class="n">the</span><span class="w"> </span><span class="n">one</span><span class="w"> </span><span class="n">we</span><span class="w"> </span><span class="n">searched</span><span class="w"> </span><span class="k">for</span><span class="w"> </span><span class="p">(</span><span class="m">51780668</span><span class="p">)</span><span class="w">
-</span></pre></td></tr></tbody></table></code></pre></figure>
 
-<figure class="highlight"><pre><code class="language-text" data-lang="text">[[1]]
+
+{% highlight text %}
+ [1] "51780668" "51758018" "50010499" "51773067" "51078815" "51798065"
+ [7] "51088007" "50410780" "50305290" "51791438"
+{% endhighlight %}
+
+
+
+{% highlight r linenos %}
+taxonget(keys[[1]])  # let's get the first one - the first row in the data.frame is the one we searched for (51780668)
+{% endhighlight %}
+
+
+
+{% highlight text %}
+[[1]]
                     sciname taxonconceptkeys       rank
 1             Puma concolor         51780668    species
 2                      Puma         51780667      genus
@@ -114,29 +290,41 @@
 6                  Chordata         51775774     phylum
 7                  Animalia         51775773    kingdom
 8 Puma concolor californica         51780669 subspecies
-9   Puma concolor improcera         51780670 subspecies</code></pre></figure>
+9   Puma concolor improcera         51780670 subspecies
 
-<h3 id="the-occurrencedensity-function-was-renamed-to-densitylist-because-it-is-in-the-density-api-service-not-the-occurrence-api-service--you-can-use-densitylist-to-get-a-dataframe-of-total-occurrence-counts-by-one-degree-cell-for-a-single-taxon-country-dataset-data-publisher-or-data-network--just-a-quick-reminder-of-what-the-function-can-do">The <code class="highlighter-rouge">occurrencedensity</code> function was renamed to <code class="highlighter-rouge">densitylist</code> because it is in the <code class="highlighter-rouge">density</code> API service, not the <code class="highlighter-rouge">occurrence</code> API service.  You can use <code class="highlighter-rouge">densitylist</code> to get a data.frame of total occurrence counts by one-degree cell for a single taxon, country, dataset, data publisher or data network.  Just a quick reminder of what the function can do:</h3>
+{% endhighlight %}
 
-<figure class="highlight"><pre><code class="language-r" data-lang="r"><table style="border-spacing: 0"><tbody><tr><td class="gutter gl" style="text-align: right"><pre class="lineno">1</pre></td><td class="code"><pre><span class="n">head</span><span class="p">(</span><span class="n">densitylist</span><span class="p">(</span><span class="n">originisocountrycode</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"CA"</span><span class="p">))</span><span class="w">
-</span></pre></td></tr></tbody></table></code></pre></figure>
 
-<figure class="highlight"><pre><code class="language-text" data-lang="text">  cellid minLatitude maxLatitude minLongitude maxLongitude count
+### The `occurrencedensity` function was renamed to `densitylist` because it is in the `density` API service, not the `occurrence` API service.  You can use `densitylist` to get a data.frame of total occurrence counts by one-degree cell for a single taxon, country, dataset, data publisher or data network.  Just a quick reminder of what the function can do:
+
+{% highlight r linenos %}
+head(densitylist(originisocountrycode = "CA"))
+{% endhighlight %}
+
+
+
+{% highlight text %}
+  cellid minLatitude maxLatitude minLongitude maxLongitude count
 1  46913          40          41          -67          -66    44
 2  46914          40          41          -66          -65   907
 3  46915          40          41          -65          -64   510
 4  46916          40          41          -64          -63   645
 5  46917          40          41          -63          -62    56
-6  46918          40          41          -62          -61   143</code></pre></figure>
+6  46918          40          41          -62          -61   143
+{% endhighlight %}
 
-<h3 id="using-a-related-function-densityspplist-you-can-get-a-species-list-by-one-degree-cell-as-well">Using a related function, <code class="highlighter-rouge">density_spplist</code>, you can get a species list by one-degree cell as well.</h3>
 
-<figure class="highlight"><pre><code class="language-r" data-lang="r"><table style="border-spacing: 0"><tbody><tr><td class="gutter gl" style="text-align: right"><pre class="lineno">1
-2</pre></td><td class="code"><pre><span class="c1"># Get a species list by cell, choosing one at random
-</span><span class="n">density_spplist</span><span class="p">(</span><span class="n">originisocountrycode</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"CO"</span><span class="p">,</span><span class="w"> </span><span class="n">spplist</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"random"</span><span class="p">)[</span><span class="m">1</span><span class="o">:</span><span class="m">10</span><span class="p">]</span><span class="w">
-</span></pre></td></tr></tbody></table></code></pre></figure>
+### Using a related function, `density_spplist`, you can get a species list by one-degree cell as well.
 
-<figure class="highlight"><pre><code class="language-text" data-lang="text"> [1] "Abarema laeta (Benth.) Barneby &amp; J.W.Grimes"
+{% highlight r linenos %}
+# Get a species list by cell, choosing one at random
+density_spplist(originisocountrycode = "CO", spplist = "random")[1:10]
+{% endhighlight %}
+
+
+
+{% highlight text %}
+ [1] "Abarema laeta (Benth.) Barneby & J.W.Grimes"
  [2] "Abuta grandifolia (Mart.) Sandwith"         
  [3] "Acalypha cuneata Poepp."                    
  [4] "Acalypha diversifolia Jacq."                
@@ -145,40 +333,48 @@
  [7] "Acanthoscelio acutus"                       
  [8] "Accipiter collaris"                         
  [9] "Actitis macularia"                          
-[10] "Adelobotrys klugii Wurdack"                 </code></pre></figure>
+[10] "Adelobotrys klugii Wurdack"                 
+{% endhighlight %}
 
-<figure class="highlight"><pre><code class="language-r" data-lang="r"><table style="border-spacing: 0"><tbody><tr><td class="gutter gl" style="text-align: right"><pre class="lineno">1
-2
-3
-4
-5
-6</pre></td><td class="code"><pre><span class="c1"># density_spplist(originisocountrycode = 'CO', spplist = 'r') # can
+
+
+{% highlight r linenos %}
+# density_spplist(originisocountrycode = 'CO', spplist = 'r') # can
 # abbreviate the `spplist` argument
-</span><span class="w">
-</span><span class="c1"># Get a species list by cell, choosing the one with the greatest no. of
-# records
-</span><span class="n">density_spplist</span><span class="p">(</span><span class="n">originisocountrycode</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"CO"</span><span class="p">,</span><span class="w"> </span><span class="n">spplist</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"great"</span><span class="p">)[</span><span class="m">1</span><span class="o">:</span><span class="m">10</span><span class="p">]</span><span class="w">  </span><span class="err">#</span><span class="w"> </span><span class="n">great</span><span class="w"> </span><span class="n">is</span><span class="w"> </span><span class="n">abbreviated</span><span class="w"> </span><span class="n">from</span><span class="w"> </span><span class="n">`greatest`</span><span class="w">
-</span></pre></td></tr></tbody></table></code></pre></figure>
 
-<figure class="highlight"><pre><code class="language-text" data-lang="text"> [1] "Acanthaceae Juss."                
+# Get a species list by cell, choosing the one with the greatest no. of
+# records
+density_spplist(originisocountrycode = "CO", spplist = "great")[1:10]  # great is abbreviated from `greatest`
+{% endhighlight %}
+
+
+
+{% highlight text %}
+ [1] "Acanthaceae Juss."                
  [2] "Accipitridae sp."                 
  [3] "Accipitriformes/Falconiformes sp."
  [4] "Apodidae sp."                     
  [5] "Apodidae sp. (large swift sp.)"   
  [6] "Apodidae sp. (small swift sp.)"   
  [7] "Arctiinae"                        
- [8] "Asteraceae Bercht. &amp; J. Presl"    
+ [8] "Asteraceae Bercht. & J. Presl"    
  [9] "Asteraceae sp. 1"                 
-[10] "Asteraceae sp. 6"                 </code></pre></figure>
+[10] "Asteraceae sp. 6"                 
+{% endhighlight %}
 
-<figure class="highlight"><pre><code class="language-r" data-lang="r"><table style="border-spacing: 0"><tbody><tr><td class="gutter gl" style="text-align: right"><pre class="lineno">1
-2
-3</pre></td><td class="code"><pre><span class="c1"># Can also get a data.frame with counts instead of the species list
-</span><span class="n">density_spplist</span><span class="p">(</span><span class="n">originisocountrycode</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"CO"</span><span class="p">,</span><span class="w"> </span><span class="n">spplist</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"great"</span><span class="p">,</span><span class="w"> </span><span class="n">listcount</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"counts"</span><span class="p">)[</span><span class="m">1</span><span class="o">:</span><span class="m">10</span><span class="p">,</span><span class="w"> 
-    </span><span class="p">]</span><span class="w">
-</span></pre></td></tr></tbody></table></code></pre></figure>
 
-<figure class="highlight"><pre><code class="language-text" data-lang="text">                              names_ count
+
+{% highlight r linenos %}
+
+# Can also get a data.frame with counts instead of the species list
+density_spplist(originisocountrycode = "CO", spplist = "great", listcount = "counts")[1:10, 
+    ]
+{% endhighlight %}
+
+
+
+{% highlight text %}
+                              names_ count
 1                  Acanthaceae Juss.     2
 2                   Accipitridae sp.     6
 3  Accipitriformes/Falconiformes sp.     2
@@ -186,111 +382,118 @@
 5     Apodidae sp. (large swift sp.)     8
 6     Apodidae sp. (small swift sp.)     5
 7                          Arctiinae     7
-8      Asteraceae Bercht. &amp; J. Presl     2
+8      Asteraceae Bercht. & J. Presl     2
 9                   Asteraceae sp. 1     6
-10                  Asteraceae sp. 6    10</code></pre></figure>
+10                  Asteraceae sp. 6    10
+{% endhighlight %}
 
-<h3 id="you-can-now-map-point-results-from-fxns-occurrencelist-and-those-from-densitylist-which-plots-them-as-points-or-as-tiles-respectively--point-map-using-output-from-occurrencelist">You can now map point results, from fxns <code class="highlighter-rouge">occurrencelist</code> and those from <code class="highlighter-rouge">densitylist</code>, which plots them as points or as tiles, respectively.  Point map, using output from occurrencelist.</h3>
 
-<figure class="highlight"><pre><code class="language-r" data-lang="r"><table style="border-spacing: 0"><tbody><tr><td class="gutter gl" style="text-align: right"><pre class="lineno">1
-2
-3</pre></td><td class="code"><pre><span class="n">out</span><span class="w"> </span><span class="o">&lt;-</span><span class="w"> </span><span class="n">occurrencelist</span><span class="p">(</span><span class="n">scientificname</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"Puma concolor"</span><span class="p">,</span><span class="w"> </span><span class="n">coordinatestatus</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="kc">TRUE</span><span class="p">,</span><span class="w"> 
-    </span><span class="n">maxresults</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="m">100</span><span class="p">,</span><span class="w"> </span><span class="n">latlongdf</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nb">T</span><span class="p">)</span><span class="w">
-</span><span class="n">gbifmap</span><span class="p">(</span><span class="n">input</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">out</span><span class="p">)</span><span class="w">  </span><span class="err">#</span><span class="w"> </span><span class="n">make</span><span class="w"> </span><span class="n">a</span><span class="w"> </span><span class="n">map</span><span class="p">,</span><span class="w"> </span><span class="n">plotting</span><span class="w"> </span><span class="n">on</span><span class="w"> </span><span class="n">world</span><span class="w"> </span><span class="n">map</span><span class="w">
-</span></pre></td></tr></tbody></table></code></pre></figure>
+### You can now map point results, from fxns `occurrencelist` and those from `densitylist`, which plots them as points or as tiles, respectively.  Point map, using output from occurrencelist.
 
-<p><img src="/public/img/gbifmap1.png" alt="center" /></p>
+{% highlight r linenos %}
+out <- occurrencelist(scientificname = "Puma concolor", coordinatestatus = TRUE, 
+    maxresults = 100, latlongdf = T)
+gbifmap(input = out)  # make a map, plotting on world map
+{% endhighlight %}
 
-<h3 id="point-map-using-output-from-occurrencelist-with-many-species-plotted-as-different-colors">Point map, using output from occurrencelist, with many species plotted as different colors</h3>
+![center](/public/img/gbifmap1.png) 
 
-<figure class="highlight"><pre><code class="language-r" data-lang="r"><table style="border-spacing: 0"><tbody><tr><td class="gutter gl" style="text-align: right"><pre class="lineno">1
-2
-3
-4</pre></td><td class="code"><pre><span class="n">splist</span><span class="w"> </span><span class="o">&lt;-</span><span class="w"> </span><span class="nf">c</span><span class="p">(</span><span class="s2">"Accipiter erythronemius"</span><span class="p">,</span><span class="w"> </span><span class="s2">"Junco hyemalis"</span><span class="p">,</span><span class="w"> </span><span class="s2">"Aix sponsa"</span><span class="p">,</span><span class="w"> </span><span class="s2">"Buteo regalis"</span><span class="p">)</span><span class="w">
-</span><span class="n">out</span><span class="w"> </span><span class="o">&lt;-</span><span class="w"> </span><span class="n">lapply</span><span class="p">(</span><span class="n">splist</span><span class="p">,</span><span class="w"> </span><span class="k">function</span><span class="p">(</span><span class="n">x</span><span class="p">)</span><span class="w"> </span><span class="n">occurrencelist</span><span class="p">(</span><span class="n">x</span><span class="p">,</span><span class="w"> </span><span class="n">coordinatestatus</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nb">T</span><span class="p">,</span><span class="w"> </span><span class="n">maxresults</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="m">100</span><span class="p">,</span><span class="w"> 
-    </span><span class="n">latlongdf</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nb">T</span><span class="p">))</span><span class="w">
-</span><span class="n">gbifmap</span><span class="p">(</span><span class="n">out</span><span class="p">)</span><span class="w">
-</span></pre></td></tr></tbody></table></code></pre></figure>
 
-<p><img src="/public/img/gbifmap2.png" alt="center" /></p>
+### Point map, using output from occurrencelist, with many species plotted as different colors
 
-<h3 id="tile-map-using-output-from-densitylist-using-results-in-canada-only">Tile map, using output from densitylist, using results in Canada only.</h3>
+{% highlight r linenos %}
+splist <- c("Accipiter erythronemius", "Junco hyemalis", "Aix sponsa", "Buteo regalis")
+out <- lapply(splist, function(x) occurrencelist(x, coordinatestatus = T, maxresults = 100, 
+    latlongdf = T))
+gbifmap(out)
+{% endhighlight %}
 
-<figure class="highlight"><pre><code class="language-r" data-lang="r"><table style="border-spacing: 0"><tbody><tr><td class="gutter gl" style="text-align: right"><pre class="lineno">1
-2</pre></td><td class="code"><pre><span class="n">out2</span><span class="w"> </span><span class="o">&lt;-</span><span class="w"> </span><span class="n">densitylist</span><span class="p">(</span><span class="n">originisocountrycode</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"CA"</span><span class="p">)</span><span class="w">  </span><span class="c1"># data for Canada
-</span><span class="n">gbifmap</span><span class="p">(</span><span class="n">out2</span><span class="p">)</span><span class="w">  </span><span class="err">#</span><span class="w"> </span><span class="n">on</span><span class="w"> </span><span class="n">world</span><span class="w"> </span><span class="n">map</span><span class="w">
-</span></pre></td></tr></tbody></table></code></pre></figure>
+![center](/public/img/gbifmap2.png) 
 
-<p><img src="/public/img/gbifmap31.png" alt="center" /></p>
 
-<figure class="highlight"><pre><code class="language-r" data-lang="r"><table style="border-spacing: 0"><tbody><tr><td class="gutter gl" style="text-align: right"><pre class="lineno">1</pre></td><td class="code"><pre><span class="n">gbifmap</span><span class="p">(</span><span class="n">out2</span><span class="p">,</span><span class="w"> </span><span class="n">region</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"Canada"</span><span class="p">)</span><span class="w">  </span><span class="err">#</span><span class="w"> </span><span class="n">on</span><span class="w"> </span><span class="n">Canada</span><span class="w"> </span><span class="n">map</span><span class="w">
-</span></pre></td></tr></tbody></table></code></pre></figure>
+### Tile map, using output from densitylist, using results in Canada only.
 
-<p><img src="/public/img/gbifmap32.png" alt="NA" /></p>
+{% highlight r linenos %}
+out2 <- densitylist(originisocountrycode = "CA")  # data for Canada
+gbifmap(out2)  # on world map
+{% endhighlight %}
 
-<hr />
+![center](/public/img/gbifmap31.png) 
 
-<h3 id="we-can-also-query-by-higher-taxonomic-rankings-and-map-all-lower-species-within-that-ranking-above-we-queried-by-scientificname-but-we-can-also-query-by-higher-taxonomy-7071443-is-the-taxonconceptkey-for-bacillariophyceae-a-class-which-includes-many-lower-species">We can also query by higher taxonomic rankings, and map all lower species within that ranking. Above we queried by scientificname, but we can also query by higher taxonomy. 7071443 is the taxonconceptkey for ‘Bacillariophyceae’, a Class which includes many lower species.</h3>
+{% highlight r linenos %}
+gbifmap(out2, region = "Canada")  # on Canada map
+{% endhighlight %}
 
-<figure class="highlight"><pre><code class="language-r" data-lang="r"><table style="border-spacing: 0"><tbody><tr><td class="gutter gl" style="text-align: right"><pre class="lineno">1
-2</pre></td><td class="code"><pre><span class="n">out</span><span class="w"> </span><span class="o">&lt;-</span><span class="w"> </span><span class="n">densitylist</span><span class="p">(</span><span class="n">taxonconceptKey</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="m">7071443</span><span class="p">)</span><span class="w">
-</span><span class="n">gbifmap</span><span class="p">(</span><span class="n">out</span><span class="p">)</span><span class="w">
-</span></pre></td></tr></tbody></table></code></pre></figure>
+![NA](/public/img/gbifmap32.png) 
 
-<p><img src="/public/img/algae.png" alt="center" /></p>
 
-<h3 id="seminym-asked-about-querying-by-area-you-can-query-by-area-though-slightly-differently-for-occurrencelist-and-densitylist-functions-for-occurrencelist-you-can-search-using-min-and-max-lat-and-long-values-and-min-an-max-altitude-pretty-cool-eh">seminym asked about querying by area. You can query by area, though slightly differently for occurrencelist and densitylist functions. For occurrencelist you can search using min and max lat and long values (and min an max altitude, pretty cool, eh).</h3>
+*****
 
-<figure class="highlight"><pre><code class="language-r" data-lang="r"><table style="border-spacing: 0"><tbody><tr><td class="gutter gl" style="text-align: right"><pre class="lineno">1
-2
-3
-4
-5
-6</pre></td><td class="code"><pre><span class="c1"># Get occurrences or density by area, using min/max lat/long coordinates
-</span><span class="n">out</span><span class="w"> </span><span class="o">&lt;-</span><span class="w"> </span><span class="n">occurrencelist</span><span class="p">(</span><span class="n">minlatitude</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="m">30</span><span class="p">,</span><span class="w"> </span><span class="n">maxlatitude</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="m">35</span><span class="p">,</span><span class="w"> </span><span class="n">minlongitude</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="m">-100</span><span class="p">,</span><span class="w"> 
-    </span><span class="n">maxlongitude</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="m">-95</span><span class="p">,</span><span class="w"> </span><span class="n">coordinatestatus</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nb">T</span><span class="p">,</span><span class="w"> </span><span class="n">maxresults</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="m">5000</span><span class="p">,</span><span class="w"> </span><span class="n">latlongdf</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nb">T</span><span class="p">)</span><span class="w">
+### We can also query by higher taxonomic rankings, and map all lower species within that ranking. Above we queried by scientificname, but we can also query by higher taxonomy. 7071443 is the taxonconceptkey for 'Bacillariophyceae', a Class which includes many lower species. 
 
-</span><span class="c1"># Using `geom_point`
-</span><span class="n">gbifmap</span><span class="p">(</span><span class="n">out</span><span class="p">,</span><span class="w"> </span><span class="s2">"state"</span><span class="p">,</span><span class="w"> </span><span class="s2">"texas"</span><span class="p">,</span><span class="w"> </span><span class="n">geom_point</span><span class="p">)</span><span class="w">
-</span></pre></td></tr></tbody></table></code></pre></figure>
+{% highlight r linenos %}
+out <- densitylist(taxonconceptKey = 7071443)
+gbifmap(out)
+{% endhighlight %}
 
-<p><img src="/public/img/byarea_occurr1.png" alt="center" /></p>
+![center](/public/img/algae.png) 
 
-<figure class="highlight"><pre><code class="language-r" data-lang="r"><table style="border-spacing: 0"><tbody><tr><td class="gutter gl" style="text-align: right"><pre class="lineno">1
-2</pre></td><td class="code"><pre><span class="c1"># Using geom_jitter to move the points apart from one another
-</span><span class="n">gbifmap</span><span class="p">(</span><span class="n">out</span><span class="p">,</span><span class="w"> </span><span class="s2">"state"</span><span class="p">,</span><span class="w"> </span><span class="s2">"texas"</span><span class="p">,</span><span class="w"> </span><span class="n">geom_jitter</span><span class="p">,</span><span class="w"> </span><span class="n">position_jitter</span><span class="p">(</span><span class="n">width</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="m">0.3</span><span class="p">,</span><span class="w"> </span><span class="n">height</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="m">0.3</span><span class="p">))</span><span class="w">
-</span></pre></td></tr></tbody></table></code></pre></figure>
 
-<p><img src="/public/img/byarea_occurr2.png" alt="NA" /></p>
+### seminym asked about querying by area. You can query by area, though slightly differently for occurrencelist and densitylist functions. For occurrencelist you can search using min and max lat and long values (and min an max altitude, pretty cool, eh).  
 
-<figure class="highlight"><pre><code class="language-r" data-lang="r"><table style="border-spacing: 0"><tbody><tr><td class="gutter gl" style="text-align: right"><pre class="lineno">1
-2</pre></td><td class="code"><pre><span class="c1"># And move points a lot
-</span><span class="n">gbifmap</span><span class="p">(</span><span class="n">out</span><span class="p">,</span><span class="w"> </span><span class="s2">"state"</span><span class="p">,</span><span class="w"> </span><span class="s2">"texas"</span><span class="p">,</span><span class="w"> </span><span class="n">geom_jitter</span><span class="p">,</span><span class="w"> </span><span class="n">position_jitter</span><span class="p">(</span><span class="n">width</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="m">1</span><span class="p">,</span><span class="w"> </span><span class="n">height</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="m">1</span><span class="p">))</span><span class="w">
-</span></pre></td></tr></tbody></table></code></pre></figure>
+{% highlight r linenos %}
+# Get occurrences or density by area, using min/max lat/long coordinates
+out <- occurrencelist(minlatitude = 30, maxlatitude = 35, minlongitude = -100, 
+    maxlongitude = -95, coordinatestatus = T, maxresults = 5000, latlongdf = T)
 
-<p><img src="/public/img/byarea_occurr3.png" alt="NA" /></p>
+# Using `geom_point`
+gbifmap(out, "state", "texas", geom_point)
+{% endhighlight %}
 
-<h3 id="and-you-can-query-by-area-in-densitylist-by-specifying-a-place-using-the-originisocountrycode-argument-as-done-in-an-above-example--just-showing-the-head-of-the-dataframe-here">And you can query by area in <code class="highlighter-rouge">densitylist</code> by specifying a place using the <code class="highlighter-rouge">originisocountrycode</code> argument (as done in an above example).  Just showing the head of the data.frame here.</h3>
+![center](/public/img/byarea_occurr1.png) 
 
-<figure class="highlight"><pre><code class="language-r" data-lang="r"><table style="border-spacing: 0"><tbody><tr><td class="gutter gl" style="text-align: right"><pre class="lineno">1
-2
-3</pre></td><td class="code"><pre><span class="c1"># Get density by place, note that you can't use the lat and long arguments
+{% highlight r linenos %}
+
+# Using geom_jitter to move the points apart from one another
+gbifmap(out, "state", "texas", geom_jitter, position_jitter(width = 0.3, height = 0.3))
+{% endhighlight %}
+
+![NA](/public/img/byarea_occurr2.png) 
+
+{% highlight r linenos %}
+
+# And move points a lot
+gbifmap(out, "state", "texas", geom_jitter, position_jitter(width = 1, height = 1))
+{% endhighlight %}
+
+![NA](/public/img/byarea_occurr3.png) 
+
+
+### And you can query by area in `densitylist` by specifying a place using the `originisocountrycode` argument (as done in an above example).  Just showing the head of the data.frame here.  
+
+{% highlight r linenos %}
+# Get density by place, note that you can't use the lat and long arguments
 # in densitylist
-</span><span class="n">head</span><span class="p">(</span><span class="n">densitylist</span><span class="p">(</span><span class="n">originisocountrycode</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"CA"</span><span class="p">))</span><span class="w">
-</span></pre></td></tr></tbody></table></code></pre></figure>
+head(densitylist(originisocountrycode = "CA"))
+{% endhighlight %}
 
-<figure class="highlight"><pre><code class="language-text" data-lang="text">  cellid minLatitude maxLatitude minLongitude maxLongitude count
+
+
+{% highlight text %}
+  cellid minLatitude maxLatitude minLongitude maxLongitude count
 1  46913          40          41          -67          -66    44
 2  46914          40          41          -66          -65   907
 3  46915          40          41          -65          -64   510
 4  46916          40          41          -64          -63   645
 5  46917          40          41          -63          -62    56
-6  46918          40          41          -62          -61   143</code></pre></figure>
+6  46918          40          41          -62          -61   143
+{% endhighlight %}
 
-<hr />
-<h4 id="get-the-rmd-file-used-to-create-this-post-at-my-github-accounthttpsgithubcomsckottsckottgithubcomtreemasterdrafts2012-10-08-rgbif-newfxnsrmd---or-md-filehttpsgithubcomsckottsckottgithubcomtreemasterposts2012-10-08-rgbif-newfxnsmd">Get the .Rmd file used to create this post <a href="https://github.com/sckott/sckott.github.com/tree/master/_drafts/2012-10-08-rgbif-newfxns.Rmd">at my github account</a> - or <a href="https://github.com/sckott/sckott.github.com/tree/master/_posts/2012-10-08-rgbif-newfxns.md">.md file</a>.</h4>
 
-<h4 id="written-in-markdownhttpdaringfireballnetprojectsmarkdown-with-help-from-knitrhttpyihuinameknitr">Written in <a href="http://daringfireball.net/projects/markdown/">Markdown</a>, with help from <a href="http://yihui.name/knitr/">knitr</a>.</h4>
+*********
+#### Get the .Rmd file used to create this post [at my github account](https://github.com/sckott/sckott.github.com/tree/master/_drafts/2012-10-08-rgbif-newfxns.Rmd) - or [.md file](https://github.com/sckott/sckott.github.com/tree/master/_posts/2012-10-08-rgbif-newfxns.md).
+
+#### Written in [Markdown](http://daringfireball.net/projects/markdown/), with help from [knitr](http://yihui.name/knitr/).
 
   </div>
   
@@ -303,132 +506,48 @@
 
     <span class="post-date">19 Sep 2012</span>
 
-    <p>We (<a href="http://ropensci.org/">rOpenSci</a>) started a repo to wrap the API for <a href="http://vertnet.org/index.php">VertNet</a>, an open access online database of vertebrate specimen records across many collection holders. Find the open source code <a href="https://github.com/ropensci/rvertnet">here</a> - please contribute if you are so inclined.  We had a great Google Summer of Code student, <a href="http://vijaybarve.wordpress.com/">Vijay Barve</a> contributing to the repo this summer, so it is getting close to being CRAN-able.</p>
+    We ([rOpenSci](http://ropensci.org/)) started a repo to wrap the API for [VertNet](http://vertnet.org/index.php), an open access online database of vertebrate specimen records across many collection holders. Find the open source code [here](https://github.com/ropensci/rvertnet) - please contribute if you are so inclined.  We had a great Google Summer of Code student, [Vijay Barve](http://vijaybarve.wordpress.com/) contributing to the repo this summer, so it is getting close to being CRAN-able. 
 
-<p>Most of the functions in the repo get you the raw data, but there were no functions to visualize the data.  Since much of the data records of latitude and longitude data, maps are a natural visualization to use.</p>
+Most of the functions in the repo get you the raw data, but there were no functions to visualize the data.  Since much of the data records of latitude and longitude data, maps are a natural visualization to use.  
 
-<p>What follows is a quick example of using the basic <code class="highlighter-rouge">vertmap</code> function.</p>
+What follows is a quick example of using the basic `vertmap` function.
 
-<h3 id="first-lets-install-rvertnet">First, let’s install <code class="highlighter-rouge">rvertnet</code></h3>
+### First, let's install `rvertnet`
 
-<figure class="highlight"><pre><code class="language-r" data-lang="r"><table style="border-spacing: 0"><tbody><tr><td class="gutter gl" style="text-align: right"><pre class="lineno">1
-2
-3</pre></td><td class="code"><pre><span class="c1"># install_github('rvertnet', 'ropensci') # uncomment if not installed
+{% highlight r linenos %}
+# install_github('rvertnet', 'ropensci') # uncomment if not installed
 # already
-</span><span class="n">library</span><span class="p">(</span><span class="n">rvertnet</span><span class="p">)</span><span class="w">
-</span></pre></td></tr></tbody></table></code></pre></figure>
+library(rvertnet)
+{% endhighlight %}
 
-<h3 id="first-lets-get-some-data-using-vertoccurrence">First, let’s get some data using <code class="highlighter-rouge">vertoccurrence</code></h3>
 
-<figure class="highlight"><pre><code class="language-r" data-lang="r"><table style="border-spacing: 0"><tbody><tr><td class="gutter gl" style="text-align: right"><pre class="lineno">1
-2</pre></td><td class="code"><pre><span class="n">out</span><span class="w"> </span><span class="o">&lt;-</span><span class="w"> </span><span class="n">vertoccurrence</span><span class="p">(</span><span class="n">q</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"larva"</span><span class="p">,</span><span class="w"> </span><span class="n">num</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="m">100</span><span class="p">)</span><span class="w">  </span><span class="c1"># get records on keyword 'larva', limit to 100
-</span><span class="n">nrow</span><span class="p">(</span><span class="n">out</span><span class="p">)</span><span class="w">  </span><span class="err">#</span><span class="w"> </span><span class="n">how</span><span class="w"> </span><span class="n">many</span><span class="w"> </span><span class="n">rows</span><span class="o">?</span><span class="w">
-</span></pre></td></tr></tbody></table></code></pre></figure>
+### First, let's get some data using `vertoccurrence`
 
-<figure class="highlight"><pre><code class="language-text" data-lang="text">[1] 100</code></pre></figure>
+{% highlight r linenos %}
+out <- vertoccurrence(q = "larva", num = 100)  # get records on keyword 'larva', limit to 100
+nrow(out)  # how many rows?
+{% endhighlight %}
 
-<h3 id="now-map-it-using-vertmap--this-is-a-very-basic-function-it-simply-cleans-up-the-input-dataframe-removing-rows-without-latlong-data-and-providing-warnings-when-the-input-dataframe-is-not-in-the-correct-format--vertmap-uses-the-ggplot2-framework-for-the-map--if-you-want-to-make-you-own-map-please-do-so----this-is-just-a-simple-fxn-to-get-you-started-if-you-want-to-take-a-quick-look-at-the-data">Now map it using <code class="highlighter-rouge">vertmap</code>.  This is a very basic function: it simply cleans up the input data.frame, removing rows without lat/long data, and providing warnings when the input data.frame is not in the correct format.  <code class="highlighter-rouge">vertmap</code> uses the <code class="highlighter-rouge">ggplot2</code> framework for the map.  If you want to make you own map please do so -  this is just a simple fxn to get you started if you want to take a quick look at the data.</h3>
 
-<figure class="highlight"><pre><code class="language-r" data-lang="r"><table style="border-spacing: 0"><tbody><tr><td class="gutter gl" style="text-align: right"><pre class="lineno">1</pre></td><td class="code"><pre><span class="n">vertmap</span><span class="p">(</span><span class="n">input</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">out</span><span class="p">)</span><span class="w">  </span><span class="err">#</span><span class="w"> </span><span class="n">make</span><span class="w"> </span><span class="n">a</span><span class="w"> </span><span class="n">map</span><span class="w"> </span><span class="n">using</span><span class="w"> </span><span class="n">vertmap</span><span class="w">
-</span></pre></td></tr></tbody></table></code></pre></figure>
 
-<p><img src="/public/img/vertmap.png" alt="center" /></p>
+{% highlight text %}
+[1] 100
+{% endhighlight %}
 
-<hr />
-<h4 id="get-the-rmd-file-used-to-create-this-post-at-my-github-accounthttpsgithubcomsckottsckottgithubcomtreemasterdrafts2012-09-19-rvertnetrmd---or-md-filehttpsgithubcomsckottsckottgithubcomtreemasterposts2012-09-19-rvertnetmd">Get the .Rmd file used to create this post <a href="https://github.com/sckott/sckott.github.com/tree/master/_drafts/2012-09-19-rvertnet.Rmd">at my github account</a> - or <a href="https://github.com/sckott/sckott.github.com/tree/master/_posts/2012-09-19-rvertnet.md">.md file</a>.</h4>
 
-<h4 id="written-in-markdownhttpdaringfireballnetprojectsmarkdown-with-help-from-knitrhttpyihuinameknitr-and-nice-knitr-highlightingetc-in-in-rstudiohttprstudioorg">Written in <a href="http://daringfireball.net/projects/markdown/">Markdown</a>, with help from <a href="http://yihui.name/knitr/">knitr</a>, and nice knitr highlighting/etc. in in <a href="http://rstudio.org/">RStudio</a>.</h4>
+### Now map it using `vertmap`.  This is a very basic function: it simply cleans up the input data.frame, removing rows without lat/long data, and providing warnings when the input data.frame is not in the correct format.  `vertmap` uses the `ggplot2` framework for the map.  If you want to make you own map please do so -  this is just a simple fxn to get you started if you want to take a quick look at the data. 
 
-  </div>
-  
-  <div class="post">
-    <h1>
-      <a href="/2012/09/getting-data/">
-        Getting data from figures in published papers
-      </a>
-    </h1>
+{% highlight r linenos %}
+vertmap(input = out)  # make a map using vertmap
+{% endhighlight %}
 
-    <span class="post-date">18 Sep 2012</span>
+![center](/public/img/vertmap.png) 
 
-    <h2 id="the-problem">The problem:</h2>
-<p>There are a lot of figures in published papers in the scholarly literature, like the below, from (Attwood <em>et. al.</em> 2012)):</p>
 
-<p><img src="/public/img/getfig2.png" alt="alt text" /></p>
+*********
+#### Get the .Rmd file used to create this post [at my github account](https://github.com/sckott/sckott.github.com/tree/master/_drafts/2012-09-19-rvertnet.Rmd) - or [.md file](https://github.com/sckott/sckott.github.com/tree/master/_posts/2012-09-19-rvertnet.md).
 
-<p>At some point, a scientist wants to ask a question for which they can synthesize the knowledge on that question by collecting data from the published literature.  This often requires something like the following workflow:</p>
-
-<ol>
-  <li>Search for relevant papers (e.g., via Google Scholar).</li>
-  <li>Collect the papers.</li>
-  <li>Decide which are appropriate for inclusion.</li>
-  <li>Collect data from the figures using software on a native application.  Examples include <a href="http://www.arizona-software.ch/graphclick/">GraphClick</a> and <a href="http://rsbweb.nih.gov/ij/">ImageJ</a>.</li>
-  <li>Proof data.</li>
-  <li>Analyze data &amp; publish paper.</li>
-</ol>
-
-<p>This workflow needs revamping, particularly in step number 3 - collecting the data.  This data remains private, moving from one closed source (original publication) to another (personal computer).  We can surely do better.</p>
-
-<h2 id="a-solution">A solution</h2>
-<p>The data collection process (Step 3 above) can make use of modern technology, and be based in the browser. Some benefits of a browser based data collection approach:</p>
-
-<ul>
-  <li>Cross-platform: a data digitization program that lives in the browser can be more easily cross-platform (Linux/Mac/Windows) than a native app.</li>
-  <li>Linked data: with the increasing abundance of APIs (application programming interfaces), we can link the data going into this app to anything of interest.  This is not so easy in a native app.</li>
-  <li>Automatic updates: a web based browser can be updated easily without requiring a user to go get updates.</li>
-  <li>User-based: a web based browser can easily integrate secure user login so that users can be associated with data collected, allowing for quantification of user-based error, and eventually user based scores/badges/etc. if so desired.</li>
-</ul>
-
-<p>For those concerned about a browser based approach to data collection from figures, it will likely be possible to make it work offline as well, then send data up to servers when connected to the web again.</p>
-
-<p>What would be great about having data be public by default is that the work would be reproducible easily, at least on the data side of things. Hopefully the researchers would make all their code available publicly to recreate their analyses.</p>
-
-<h2 id="question-why-would-this-idea-work">Question: Why would this idea work?</h2>
-<p>Better question: Why wouldn’t it work!</p>
-
-<p>I think this idea could be awesome.  The reason I think it could be is based on two observations:</p>
-
-<ol>
-  <li>There is a seemingly endless supply of academic papers with figures in them from which data can be extracted.**</li>
-  <li>There is increasing use of meta-analysis in science, which is fed by just this kind of data.</li>
-</ol>
-
-<p>** p.s. in the future, perhaps we will move to all SVG format figures or something even better, in which case data can be extracted from the underlying XML</p>
-
-<h2 id="okay-maybe-its-a-good-idea-but-who-owns-the-data-in-figures-in-published-papers">Okay, maybe it’s a good idea, but who owns the data in figures in published papers?</h2>
-<p>As far as I know, and I’ve checked with a few knowledgeable people, no one owns this data. So it’s ripe for the digitizing!</p>
-
-<h2 id="open-access">Open access</h2>
-<p>I want this project to be totally open access (and I hope you do too).  I love models like GitHub where everything is public by default (unless you are an enterprise user, exceptions, exceptions), and I think that is what this requires.  You may be thinking though: “But I am collecting data for my meta-analysis and I don’t want to share the data with anyone else”.  My answer: “I understand where you are coming from, but it doesn’t seem very likely that someone will be asking the exact same question as you and be looking for the data from the exact same papers”.  There will just be a huge database of data from figures, and all the appropriate metadata of course.  Anyone should be able to use this.</p>
-
-<h2 id="apis">APIs</h2>
-<p>It would be great to build this from the start having an API in mind.  That is, how do we need to structure the data to be easily served up in an API to other websites, or pulled down to someone’s local machine within Python or R to do data manipulation, analysis, and visualization?  We are going to need a key-value store database, such as MongoDB/CouchDB because ideally at least we would store the data collected, the figure itself, use information, etc.</p>
-
-<h2 id="what-is-being-done-about-this">What is being done about this?</h2>
-<p>I was fortunate enough to tag along with <a href="http://emhart.github.com/">Ted Hart</a>, a postdoc at <a href="PUTINLINKHERE">UBC</a>, on a recently submitted NCEAS working group proposal. Who knows if we’ll get it, but we are already working on a prototype, so we will hit the ground running if we get funded, and just hit the ground, but walk a bit slower if we don’t get the funding.</p>
-
-<h2 id="what-could-this-be-in-the-future">What could this be in the future?</h2>
-<p>At least in my mind, I think of this idea going the direction of gamification, including points, badges, etc., sort of like <a href="http://fold.it/portal/">FoldIt</a> or <a href="http://www.galaxyzoo.org/">GalaxyZoo</a>.  At first we need alpha-, then beta-testers, which I imagine will most likely be academics exracting data for a meta-analysis for example.  But in the future, it would be great to make the interface enjoyable enough to attract non-academics, which could greatly increase the speed of data collection.</p>
-
-<p>Once there are a lot of people collecting data we can get many data points for every single data point in a graph.  Whereas right now, someone clicks on each data point in a graph one, maybe two times if they are lucky.  In the future, we could have ten different users clicking on each mean and each error bar in each graph.  So exciting!  The following figure illustrates this.</p>
-
-<p><img src="/public/img/clicks.png" alt="center" /></p>
-
-<h2 id="what-do-you-think">What do you think?</h2>
-<p>Is this idea totally insane?  Is it do-able?  Is it worth doing?</p>
-
-<hr />
-<h4 id="get-the-rmd-file-used-to-create-this-post-at-my-github-accounthttpsgithubcomsckottsckottgithubcomtreemasterdrafts2012-09-18-getting-datarmd---or-md-filehttpsgithubcomsckottsckottgithubcomtreemasterposts2012-09-18-getting-datamd">Get the .Rmd file used to create this post <a href="https://github.com/sckott/sckott.github.com/tree/master/_drafts/2012-09-18-getting-data.Rmd">at my github account</a> - or <a href="https://github.com/sckott/sckott.github.com/tree/master/_posts/2012-09-18-getting-data.md">.md file</a>.</h4>
-
-<h4 id="written-in-markdownhttpdaringfireballnetprojectsmarkdown-with-help-from-knitrhttpyihuinameknitr-and-nice-knitr-highlightingetc-in-in-rstudiohttprstudioorg">Written in <a href="http://daringfireball.net/projects/markdown/">Markdown</a>, with help from <a href="http://yihui.name/knitr/">knitr</a>, and nice knitr highlighting/etc. in in <a href="http://rstudio.org/">RStudio</a>.</h4>
-
-<hr />
-<h4 id="references">References</h4>
-<p>Attwood AS, Scott-Samuel NE, Stothart G, Munafò MR and Laks J (2012).
-&ldquo;Glass Shape Influences Consumption Rate For Alcoholic Beverages.&rdquo;
-<em>Plos One</em>, <b>7</b>.
-<a href="http://dx.doi.org/10.1371/journal.pone.0043007">http://dx.doi.org/10.1371/journal.pone.0043007</a>.
-
-</p>
+#### Written in [Markdown](http://daringfireball.net/projects/markdown/), with help from [knitr](http://yihui.name/knitr/), and nice knitr highlighting/etc. in in [RStudio](http://rstudio.org/).
 
   </div>
   

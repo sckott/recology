@@ -33,7 +33,7 @@
     <header class="masthead">
       <div class="masthead-inner">
         <h1>Recology</h1>
-        <!-- <h1> <a href="http://recology.info/">Recology</a></h1> -->
+        <!-- <h1> <a href="http://localhost:4000">Recology</a></h1> -->
         <p class="lead">R/etc.</p>
 
         <div class="colophon">
@@ -61,6 +61,276 @@
   
   <div class="post">
     <h1>
+      <a href="/2016/08/no-no-yes/">
+        nonoyes - text analysis of Reply All podcast transcripts
+      </a>
+    </h1>
+
+    <span class="post-date">25 Aug 2016</span>
+
+    -   [Setup](#setup)
+-   [URLs](#urls)
+-   [Episode names](#episode-names)
+-   [Transcripts](#transcripts)
+-   [Summary word usage](#summary-word-usage)
+-   [Sentiment](#sentiment)
+    -   [Most common positive and negative
+        words](#most-common-positive-and-negative-words)
+
+[Reply All](https://gimletmedia.com/show/reply-all/) is a great podcast.
+I've been wanting to learn some text analysis tools, and transcripts
+from the podcast are on their site.
+
+Took some approaches outlined in the
+[tidytext](https://cran.rstudio.com/web/packages/tidytext/) package in
+[this
+vignette](https://cran.rstudio.com/web/packages/tidytext/vignettes/tidytext.html),
+and used the
+[tokenizers](https://cran.rstudio.com/web/packages/tokenizers) package,
+and some of the tidyverse.
+
+Code on github at [sckott/nonoyes](https://github.com/sckott/nonoyes)
+
+Also check out the [html version](http://htmlpreview.github.io/?https://github.com/sckott/nonoyes/blob/master/script.html)
+
+Setup
+-----
+
+Load deps
+
+    library("httr")
+    library("xml2")
+    library("stringi")
+    library("dplyr")
+    library("ggplot2")
+    library("tokenizers")
+    library("tidytext")
+    library("tidyr")
+
+source helper functions
+
+    source("funs.R")
+
+set base url
+
+    ra_base <- "https://gimletmedia.com/show/reply-all/episodes"
+
+URLs
+----
+
+Make all urls for each page of episodes
+
+    urls <- c(ra_base, file.path(ra_base, "page", 2:8))
+
+Get urls for each episode
+
+    res <- lapply(urls, get_urls)
+
+Remove those that are rebroadcasts, updates, or revisited
+
+    res <- grep("rebroadcast|update|revisited", unlist(res), value = TRUE, invert = TRUE)
+
+Episode names
+-------------
+
+Give some episodes numbers that don't have them
+
+    epnames <- sub("/$", "", sub("https://gimletmedia.com/episode/", "", res))
+    epnames <- sub("the-anxiety-box", "8-the-anxiety-box", epnames)
+    epnames <- sub("french-connection", "10-french-connection", epnames)
+    epnames <- sub("ive-killed-people-and-i-have-hostages", "15-ive-killed-people-and-i-have-hostages", epnames)
+    epnames <- sub("6-this-proves-everything", "75-this-proves-everything", epnames)
+    epnames <- sub("zardulu", "56-zardulu", epnames)
+
+Transcripts
+-----------
+
+Get transcripts
+
+    txts <- lapply(res, transcript_fetch, sleep = 1)
+
+Parse transcripts
+
+    txtsp <- lapply(txts, transcript_parse)
+
+Summary word usage
+------------------
+
+Summarise data for each transcript
+
+    dat <- stats::setNames(lapply(txtsp, function(m) {
+      bind_rows(lapply(m, function(v) {
+        tmp <- unname(vapply(v, nchar, 1))
+        data_frame(
+          n = length(tmp),
+          mean = mean(tmp),
+          n_laugh = count_word(v, "laugh"),
+          n_groan = count_word(v, "groan")
+        )
+      }), .id = "name")
+    }), epnames)
+
+Bind data together to single dataframe, and filter, summarise
+
+    data <- bind_rows(dat, .id = "episode") %>%
+      filter(!is.na(episode)) %>%
+      filter(grepl("^PJ$|^ALEX GOLDMAN$", name)) %>%
+      mutate(ep_no = as.numeric(strextract(episode, "^[0-9]+"))) %>%
+      group_by(ep_no) %>%
+      mutate(nrow = NROW(ep_no)) %>%
+      ungroup() %>%
+      filter(nrow == 2)
+    data
+    #> # A tibble: 114 × 8
+    #>                 episode         name     n      mean n_laugh n_groan ep_no
+    #>                   <chr>        <chr> <int>     <dbl>   <int>   <int> <dbl>
+    #> 1            73-sandbox           PJ    89 130.65169       9       0    73
+    #> 2            73-sandbox ALEX GOLDMAN    25  44.00000       1       1    73
+    #> 3       72-dead-is-paul           PJ   137  67.77372      17       0    72
+    #> 4       72-dead-is-paul ALEX GOLDMAN    90  61.82222       8       0    72
+    #> 5  71-the-picture-taker           PJ    74  77.70270       3       0    71
+    #> 6  71-the-picture-taker ALEX GOLDMAN    93 105.94624       6       0    71
+    #> 7        69-disappeared           PJ    72  76.50000       2       0    69
+    #> 8        69-disappeared ALEX GOLDMAN    50 135.90000       5       0    69
+    #> 9      68-vampire-rules           PJ   142  88.00704       6       0    68
+    #> 10     68-vampire-rules ALEX GOLDMAN   117  73.16239      13       0    68
+    #> # ... with 104 more rows, and 1 more variables: nrow <int>
+
+Number of words - seems PJ talks more, but didn't do quantiative
+comparison
+
+    ggplot(data, aes(ep_no, n, colour = name)) +
+      geom_point(size = 3, alpha = 0.5) +
+      geom_line(aes(group = ep_no), colour = "black") +
+      scale_color_discrete(labels = c('Alex', 'PJ'))
+
+![](/public/img/2016-08-25-no-no-yes/unnamed-chunk-12-1.png)
+
+Laughs per episode - take home: PJ laughs a lot
+
+    ggplot(data, aes(ep_no, n_laugh, colour = name)) +
+      geom_point(size = 3, alpha = 0.5) +
+      geom_line(aes(group = ep_no), colour = "black") +
+      scale_color_discrete(labels = c('Alex', 'PJ'))
+
+![](/public/img/2016-08-25-no-no-yes/unnamed-chunk-13-1.png)
+
+Sentiment
+---------
+
+    zero <- which(vapply(txtsp, length, 1) == 0)
+    txtsp_ <- Filter(function(x) length(x) != 0, txtsp)
+
+Tokenize words, and create data\_frame
+
+    wordz <- stats::setNames(
+      lapply(txtsp_, function(z) {
+        bind_rows(
+          if (is.null(try_tokenize(z$`ALEX GOLDMAN`))) {
+            data_frame()
+          } else {
+            data_frame(
+              name = "Alex",
+              word = try_tokenize(z$`ALEX GOLDMAN`)
+            )
+          },
+          if (is.null(try_tokenize(z$PJ))) {
+            data_frame()
+          } else {
+            data_frame(
+              name = "PJ",
+              word = try_tokenize(z$PJ)
+            )
+          }
+        )
+      }), epnames[-zero])
+
+Combine to single data\_frame
+
+    (wordz_df <- bind_rows(wordz, .id = "episode"))
+    #> # A tibble: 104,713 × 3
+    #>       episode  name      word
+    #>         <chr> <chr>     <chr>
+    #> 1  73-sandbox  Alex      alex
+    #> 2  73-sandbox  Alex   goldman
+    #> 3  73-sandbox  Alex         i
+    #> 4  73-sandbox  Alex generally
+    #> 5  73-sandbox  Alex     don’t
+    #> 6  73-sandbox  Alex      alex
+    #> 7  73-sandbox  Alex    really
+    #> 8  73-sandbox  Alex      alex
+    #> 9  73-sandbox  Alex    groans
+    #> 10 73-sandbox  Alex        so
+    #> # ... with 104,703 more rows
+
+Calculate sentiment using `tidytext`
+
+    bing <- sentiments %>%
+      filter(lexicon == "bing") %>%
+      select(-score)
+    sent <- wordz_df %>%
+      inner_join(bing) %>%
+      count(name, episode, sentiment) %>%
+      spread(sentiment, n, fill = 0) %>%
+      mutate(sentiment = positive - negative) %>%
+      ungroup() %>%
+      filter(!is.na(episode)) %>%
+      complete(episode, name) %>%
+      mutate(ep_no = as.numeric(strextract(episode, "^[0-9]+")))
+    sent
+    #> # A tibble: 148 × 6
+    #>                                        episode  name negative positive
+    #>                                          <chr> <chr>    <dbl>    <dbl>
+    #> 1  1-an-app-sends-a-stranger-to-say-i-love-you  Alex       19       30
+    #> 2  1-an-app-sends-a-stranger-to-say-i-love-you    PJ       14       14
+    #> 3                         10-french-connection  Alex       15       32
+    #> 4                         10-french-connection    PJ       16       36
+    #> 5     11-did-errol-morris-brother-invent-email  Alex       NA       NA
+    #> 6     11-did-errol-morris-brother-invent-email    PJ       25       30
+    #> 7                           12-backend-trouble  Alex       20       15
+    #> 8                           12-backend-trouble    PJ       40       59
+    #> 9                              13-love-is-lies  Alex       NA       NA
+    #> 10                             13-love-is-lies    PJ       45       64
+    #> # ... with 138 more rows, and 2 more variables: sentiment <dbl>,
+    #> #   ep_no <dbl>
+
+Names separate
+
+    ggplot(sent, aes(ep_no, sentiment, fill = name)) +
+      geom_bar(stat = "identity") +
+      facet_wrap(~name, ncol = 2, scales = "free_x")
+
+![](/public/img/2016-08-25-no-no-yes/unnamed-chunk-18-1.png)
+
+Compare for each episode
+
+    ggplot(sent, aes(ep_no, sentiment, fill = name)) +
+      geom_bar(stat = "identity", position = position_dodge(width = 0.5), width = 0.6)
+
+![](/public/img/2016-08-25-no-no-yes/unnamed-chunk-19-1.png)
+
+### Most common positive and negative words
+
+Clearly, the word `like` is surely rarely used as a positive word
+meaning e.g., that they *like something*, but rather as the colloquial
+`like, totally` usage. So it's removed.
+
+Alex
+
+    sent_cont_plot(wordz_df, "Alex")
+
+![](/public/img/2016-08-25-no-no-yes/unnamed-chunk-20-1.png)
+
+PJ
+
+    sent_cont_plot(wordz_df, "PJ")
+
+![](/public/img/2016-08-25-no-no-yes/unnamed-chunk-21-1.png)
+
+  </div>
+  
+  <div class="post">
+    <h1>
       <a href="/2016/08/video-editing/">
         video editing notes
       </a>
@@ -68,34 +338,29 @@
 
     <span class="post-date">12 Aug 2016</span>
 
-    <p>This is how I edit videos of talks that I need to incorporate slides and video together</p>
+    This is how I edit videos of talks that I need to incorporate slides and video together
 
-<p>I’m on a Mac</p>
+I'm on a Mac
 
-<ul>
-  <li>import to iMovie (using v10 something)</li>
-  <li>drop movie into editing section</li>
-  <li>split pdf slides into individual files <code class="highlighter-rouge">pdfseparate foobar.pdf %d.pdf</code></li>
-  <li>convert individual pdf slides into png <code class="highlighter-rouge">sips -s format png --out "${pdf%%.*}.png" "$pdf"</code></li>
-  <li>import png’s into imovie</li>
-  <li>for each image, drop into editing area where you want it</li>
-  <li>when focused on the png of the slide:
-    <ul>
-      <li>select crop, then - choose <code class="highlighter-rouge">fit</code>, say okay</li>
-      <li>select “add as overlay” (very most left symbol), then choose <code class="highlighter-rouge">picture in picture</code></li>
-      <li>then choose <code class="highlighter-rouge">swap</code></li>
-      <li>then move inset to where you want it</li>
-      <li>say okay</li>
-    </ul>
-  </li>
-  <li>rinse and repeat for all slides</li>
-  <li>export - via <code class="highlighter-rouge">File</code> option</li>
-  <li>share to youtube</li>
-</ul>
+* import to iMovie (using v10 something)
+* drop movie into editing section
+* split pdf slides into individual files `pdfseparate foobar.pdf %d.pdf`
+* convert individual pdf slides into png `sips -s format png --out "${pdf%%.*}.png" "$pdf"`
+* import png's into imovie
+* for each image, drop into editing area where you want it
+* when focused on the png of the slide:
+    * select crop, then - choose `fit`, say okay
+    * select "add as overlay" (very most left symbol), then choose `picture in picture`
+    * then choose `swap`
+    * then move inset to where you want it
+    * say okay
+* rinse and repeat for all slides
+* export - via `File` option
+* share to youtube
 
-<h3 id="eg-of-the-result">e.g. of the result</h3>
+### e.g. of the result
 
-<iframe width="560" height="315" src="https://www.youtube.com/embed/MHWX0f3TG4I" frameborder="0" allowfullscreen=""></iframe>
+<iframe width="560" height="315" src="https://www.youtube.com/embed/MHWX0f3TG4I" frameborder="0" allowfullscreen></iframe>
 
   </div>
   
@@ -108,385 +373,318 @@
 
     <span class="post-date">09 Jun 2016</span>
 
-    <blockquote>
-  <p>UPDATE: pkg API has changed - updated the post below to work with the current CRAN version, submitted 2016-08-02</p>
-</blockquote>
+    > UPDATE: pkg API has changed - updated the post below to work with the current CRAN version, submitted 2016-08-02
 
-<p>I was at a hackathon focused on Ocean Biogeographic Information System (OBIS) data back in November last year in Belgium. One project idea was to make it easier to get at data based on one or more marine regions. I was told that Marineregions.org is often used for shape files to get different regions to then do other work with.</p>
+I was at a hackathon focused on Ocean Biogeographic Information System (OBIS) data back in November last year in Belgium. One project idea was to make it easier to get at data based on one or more marine regions. I was told that Marineregions.org is often used for shape files to get different regions to then do other work with.
 
-<p>During the event I started a package <a href="https://github.com/ropenscilabs/mregions">mregions</a>. Here I’ll show how to get different marine regions, then use those outputs 
-to get species occurrence data.</p>
+During the event I started a package [mregions][mr]. Here I'll show how to get different marine regions, then use those outputs 
+to get species occurrence data.
 
-<p>We’ll use WKT (Well-Known Text) to define spatial dimensions in this post. If
-you don’t know what it is, Wikipedia to the rescue: <a href="https://en.wikipedia.org/wiki/Well-known_text">https://en.wikipedia.org/wiki/Well-known_text</a></p>
+We'll use WKT (Well-Known Text) to define spatial dimensions in this post. If
+you don't know what it is, Wikipedia to the rescue: [https://en.wikipedia.org/wiki/Well-known_text](https://en.wikipedia.org/wiki/Well-known_text)
 
-<h2 id="install">Install</h2>
+## Install
 
-<div class="language-r highlighter-rouge"><pre class="highlight"><code><span class="n">install.packages</span><span class="p">(</span><span class="s2">"mregions"</span><span class="p">)</span><span class="w">
-</span><span class="n">devtools</span><span class="o">::</span><span class="n">install_github</span><span class="p">(</span><span class="s2">"iobis/robis"</span><span class="p">)</span><span class="w">
-</span></code></pre>
-</div>
 
-<p>Or get the dev version</p>
+```r
+install.packages("mregions")
+devtools::install_github("iobis/robis")
+```
 
-<div class="language-r highlighter-rouge"><pre class="highlight"><code><span class="n">devtools</span><span class="o">::</span><span class="n">install_github</span><span class="p">(</span><span class="s2">"ropenscilabs/mregions"</span><span class="p">)</span><span class="w">
-</span></code></pre>
-</div>
+Or get the dev version
 
-<div class="language-r highlighter-rouge"><pre class="highlight"><code><span class="n">library</span><span class="p">(</span><span class="s2">"mregions"</span><span class="p">)</span><span class="w">
-</span></code></pre>
-</div>
 
-<h2 id="get-list-of-place-types">Get list of place types</h2>
+```r
+devtools::install_github("ropenscilabs/mregions")
+```
 
-<div class="language-r highlighter-rouge"><pre class="highlight"><code><span class="n">res</span><span class="w"> </span><span class="o">&lt;-</span><span class="w"> </span><span class="n">mr_place_types</span><span class="p">()</span><span class="w">
-</span><span class="n">head</span><span class="p">(</span><span class="n">res</span><span class="o">$</span><span class="n">type</span><span class="p">)</span><span class="w">
-</span><span class="c1">#&gt; [1] "Town"                      "Arrondissement"           
-#&gt; [3] "Department"                "Province (administrative)"
-#&gt; [5] "Country"                   "Continent"
-</span></code></pre>
-</div>
 
-<h2 id="get-marineregions-records-by-place-type">Get Marineregions records by place type</h2>
+```r
+library("mregions")
+```
 
-<div class="language-r highlighter-rouge"><pre class="highlight"><code><span class="n">res</span><span class="w"> </span><span class="o">&lt;-</span><span class="w"> </span><span class="n">mr_records_by_type</span><span class="p">(</span><span class="n">type</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"EEZ"</span><span class="p">)</span><span class="w">
-</span><span class="n">head</span><span class="p">(</span><span class="n">res</span><span class="p">)</span><span class="w">
-</span><span class="c1">#&gt;   MRGID                                            gazetteerSource
-#&gt; 1  3293 Maritime Boundaries Geodatabase, Flanders Marine Institute
-#&gt; 2  5668 Maritime Boundaries Geodatabase, Flanders Marine Institute
-#&gt; 3  5669 Maritime Boundaries Geodatabase, Flanders Marine Institute
-#&gt; 4  5670 Maritime Boundaries Geodatabase, Flanders Marine Institute
-#&gt; 5  5672 Maritime Boundaries Geodatabase, Flanders Marine Institute
-#&gt; 6  5673 Maritime Boundaries Geodatabase, Flanders Marine Institute
-#&gt;   placeType latitude longitude minLatitude minLongitude maxLatitude
-#&gt; 1       EEZ 51.46483  2.704458    51.09111     2.238118    51.87000
-#&gt; 2       EEZ 53.61508  4.190675    51.26203     2.539443    55.76500
-#&gt; 3       EEZ 54.55970  8.389231    53.24281     3.349999    55.91928
-#&gt; 4       EEZ 40.87030 19.147094    39.63863    18.461940    41.86124
-#&gt; 5       EEZ 42.94272 29.219062    41.97820    27.449580    43.74779
-#&gt; 6       EEZ 43.42847 15.650844    41.62201    13.001390    45.59079
-#&gt;   maxLongitude precision            preferredGazetteerName
-#&gt; 1     3.364907  58302.49   Belgian Exclusive Economic Zone
-#&gt; 2     7.208364 294046.10     Dutch Exclusive Economic Zone
-#&gt; 3    14.750000 395845.50    German Exclusive Economic Zone
-#&gt; 4    20.010030 139751.70  Albanian Exclusive Economic Zone
-#&gt; 5    31.345280 186792.50 Bulgarian Exclusive Economic Zone
-#&gt; 6    18.552360 313990.30  Croatian Exclusive Economic Zone
-#&gt;   preferredGazetteerNameLang   status accepted
-#&gt; 1                    English standard     3293
-#&gt; 2                    English standard     5668
-#&gt; 3                    English standard     5669
-#&gt; 4                    English standard     5670
-#&gt; 5                    English standard     5672
-#&gt; 6                    English standard     5673
-</span></code></pre>
-</div>
+## Get list of place types
 
-<h2 id="get-and-search-region-names">Get and search region names</h2>
 
-<div class="language-r highlighter-rouge"><pre class="highlight"><code><span class="p">(</span><span class="n">res</span><span class="w"> </span><span class="o">&lt;-</span><span class="w"> </span><span class="n">mr_names</span><span class="p">())</span><span class="w">
-</span><span class="c1">#&gt; # A tibble: 676 x 4
-#&gt;                              name
-#&gt;                             &lt;chr&gt;
-#&gt; 1           Morocco:elevation_10m
-#&gt; 2          Emodnet:emodnet1x1grid
-#&gt; 3                    Emodnet:grid
-#&gt; 4                     Morocco:dam
-#&gt; 5             WoRMS:azmp_sections
-#&gt; 6    Morocco:accomodationcapacity
-#&gt; 7          Morocco:admin_boundary
-#&gt; 8  Lifewatch:ovam_afvalverwerking
-#&gt; 9          Eurobis:eurobis_points
-#&gt; 10                  Morocco:roads
-#&gt; # ... with 666 more rows, and 3 more variables: title &lt;chr&gt;,
-#&gt; #   name_first &lt;chr&gt;, name_second &lt;chr&gt;
-</span><span class="n">mr_names_search</span><span class="p">(</span><span class="n">res</span><span class="p">,</span><span class="w"> </span><span class="n">q</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"IHO"</span><span class="p">)</span><span class="w">
-</span><span class="c1">#&gt; # A tibble: 5 x 4
-#&gt;                                   name
-#&gt;                                  &lt;chr&gt;
-#&gt; 1                    MarineRegions:iho
-#&gt; 2 MarineRegions:iho_quadrants_20150810
-#&gt; 3                     World:iosregions
-#&gt; 4       MarineRegions:eez_iho_union_v2
-#&gt; 5                   Belgium:vl_venivon
-#&gt; # ... with 3 more variables: title &lt;chr&gt;, name_first &lt;chr&gt;,
-#&gt; #   name_second &lt;chr&gt;
-</span></code></pre>
-</div>
+```r
+res <- mr_place_types()
+head(res$type)
+#> [1] "Town"                      "Arrondissement"           
+#> [3] "Department"                "Province (administrative)"
+#> [5] "Country"                   "Continent"
+```
 
-<h2 id="get-a-region---geojson">Get a region - geojson</h2>
+## Get Marineregions records by place type
 
-<div class="language-r highlighter-rouge"><pre class="highlight"><code><span class="n">res</span><span class="w"> </span><span class="o">&lt;-</span><span class="w"> </span><span class="n">mr_geojson</span><span class="p">(</span><span class="n">name</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"Turkmen Exclusive Economic Zone"</span><span class="p">)</span><span class="w">
-</span><span class="nf">class</span><span class="p">(</span><span class="n">res</span><span class="p">)</span><span class="w">
-</span><span class="c1">#&gt; [1] "mr_geojson"
-</span><span class="nf">names</span><span class="p">(</span><span class="n">res</span><span class="p">)</span><span class="w">
-</span><span class="c1">#&gt; [1] "type"          "totalFeatures" "features"      "crs"          
-#&gt; [5] "bbox"
-</span></code></pre>
-</div>
 
-<h2 id="get-a-region---shp">Get a region - shp</h2>
+```r
+res <- mr_records_by_type(type = "EEZ")
+head(res)
+#>   MRGID                                            gazetteerSource
+#> 1  3293 Maritime Boundaries Geodatabase, Flanders Marine Institute
+#> 2  5668 Maritime Boundaries Geodatabase, Flanders Marine Institute
+#> 3  5669 Maritime Boundaries Geodatabase, Flanders Marine Institute
+#> 4  5670 Maritime Boundaries Geodatabase, Flanders Marine Institute
+#> 5  5672 Maritime Boundaries Geodatabase, Flanders Marine Institute
+#> 6  5673 Maritime Boundaries Geodatabase, Flanders Marine Institute
+#>   placeType latitude longitude minLatitude minLongitude maxLatitude
+#> 1       EEZ 51.46483  2.704458    51.09111     2.238118    51.87000
+#> 2       EEZ 53.61508  4.190675    51.26203     2.539443    55.76500
+#> 3       EEZ 54.55970  8.389231    53.24281     3.349999    55.91928
+#> 4       EEZ 40.87030 19.147094    39.63863    18.461940    41.86124
+#> 5       EEZ 42.94272 29.219062    41.97820    27.449580    43.74779
+#> 6       EEZ 43.42847 15.650844    41.62201    13.001390    45.59079
+#>   maxLongitude precision            preferredGazetteerName
+#> 1     3.364907  58302.49   Belgian Exclusive Economic Zone
+#> 2     7.208364 294046.10     Dutch Exclusive Economic Zone
+#> 3    14.750000 395845.50    German Exclusive Economic Zone
+#> 4    20.010030 139751.70  Albanian Exclusive Economic Zone
+#> 5    31.345280 186792.50 Bulgarian Exclusive Economic Zone
+#> 6    18.552360 313990.30  Croatian Exclusive Economic Zone
+#>   preferredGazetteerNameLang   status accepted
+#> 1                    English standard     3293
+#> 2                    English standard     5668
+#> 3                    English standard     5669
+#> 4                    English standard     5670
+#> 5                    English standard     5672
+#> 6                    English standard     5673
+```
 
-<div class="language-r highlighter-rouge"><pre class="highlight"><code><span class="n">res</span><span class="w"> </span><span class="o">&lt;-</span><span class="w"> </span><span class="n">mr_shp</span><span class="p">(</span><span class="n">name</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"Belgian Exclusive Economic Zone"</span><span class="p">)</span><span class="w">
-</span><span class="nf">class</span><span class="p">(</span><span class="n">res</span><span class="p">)</span><span class="w">
-</span><span class="c1">#&gt; [1] "SpatialPolygonsDataFrame"
-#&gt; attr(,"package")
-#&gt; [1] "sp"
-</span></code></pre>
-</div>
+## Get and search region names
 
-<h2 id="get-obis-eez-id">Get OBIS EEZ ID</h2>
 
-<div class="language-r highlighter-rouge"><pre class="highlight"><code><span class="n">res</span><span class="w"> </span><span class="o">&lt;-</span><span class="w"> </span><span class="n">mr_names</span><span class="p">()</span><span class="w">
-</span><span class="n">res</span><span class="w"> </span><span class="o">&lt;-</span><span class="w"> </span><span class="n">res</span><span class="p">[</span><span class="n">grepl</span><span class="p">(</span><span class="s2">"eez"</span><span class="p">,</span><span class="w"> </span><span class="n">res</span><span class="o">$</span><span class="n">name</span><span class="p">,</span><span class="w"> </span><span class="n">ignore.case</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="kc">TRUE</span><span class="p">),]</span><span class="w">
-</span><span class="n">mr_obis_eez_id</span><span class="p">(</span><span class="n">res</span><span class="o">$</span><span class="n">title</span><span class="p">[</span><span class="m">2</span><span class="p">])</span><span class="w">
-</span><span class="c1">#&gt; [1] 84
-</span></code></pre>
-</div>
+```r
+(res <- mr_names())
+#> # A tibble: 676 x 4
+#>                              name
+#>                             <chr>
+#> 1           Morocco:elevation_10m
+#> 2          Emodnet:emodnet1x1grid
+#> 3                    Emodnet:grid
+#> 4                     Morocco:dam
+#> 5             WoRMS:azmp_sections
+#> 6    Morocco:accomodationcapacity
+#> 7          Morocco:admin_boundary
+#> 8  Lifewatch:ovam_afvalverwerking
+#> 9          Eurobis:eurobis_points
+#> 10                  Morocco:roads
+#> # ... with 666 more rows, and 3 more variables: title <chr>,
+#> #   name_first <chr>, name_second <chr>
+mr_names_search(res, q = "IHO")
+#> # A tibble: 5 x 4
+#>                                   name
+#>                                  <chr>
+#> 1                    MarineRegions:iho
+#> 2 MarineRegions:iho_quadrants_20150810
+#> 3                     World:iosregions
+#> 4       MarineRegions:eez_iho_union_v2
+#> 5                   Belgium:vl_venivon
+#> # ... with 3 more variables: title <chr>, name_first <chr>,
+#> #   name_second <chr>
+```
 
-<h2 id="convert-to-wkt">Convert to WKT</h2>
+## Get a region - geojson
 
-<p>From geojson or shp. Here, geojson</p>
 
-<div class="language-r highlighter-rouge"><pre class="highlight"><code><span class="n">res</span><span class="w"> </span><span class="o">&lt;-</span><span class="w"> </span><span class="n">mr_geojson</span><span class="p">(</span><span class="n">key</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"MarineRegions:eez_33176"</span><span class="p">)</span><span class="w">
-</span><span class="n">mr_as_wkt</span><span class="p">(</span><span class="n">res</span><span class="p">,</span><span class="w"> </span><span class="n">fmt</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="m">5</span><span class="p">)</span><span class="w">
-</span><span class="c1">#&gt; [1] "MULTIPOLYGON (((41.573732 -1.659444, 45.891882 ... cutoff
-</span></code></pre>
-</div>
+```r
+res <- mr_geojson(name = "Turkmen Exclusive Economic Zone")
+class(res)
+#> [1] "mr_geojson"
+names(res)
+#> [1] "type"          "totalFeatures" "features"      "crs"          
+#> [5] "bbox"
+```
 
-<h2 id="get-regions-then-obis-data">Get regions, then OBIS data</h2>
+## Get a region - shp
 
-<h3 id="using-well-known-text">Using Well-Known Text</h3>
 
-<p>Both shp and geojson data returned from <code class="highlighter-rouge">region_shp()</code> and <code class="highlighter-rouge">region_geojson()</code>, respectively, can be passed to <code class="highlighter-rouge">as_wkt()</code> to get WKT.</p>
+```r
+res <- mr_shp(name = "Belgian Exclusive Economic Zone")
+class(res)
+#> [1] "SpatialPolygonsDataFrame"
+#> attr(,"package")
+#> [1] "sp"
+```
 
-<div class="language-r highlighter-rouge"><pre class="highlight"><code><span class="n">shp</span><span class="w"> </span><span class="o">&lt;-</span><span class="w"> </span><span class="n">mr_shp</span><span class="p">(</span><span class="n">name</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"Belgian Exclusive Economic Zone"</span><span class="p">)</span><span class="w">
-</span><span class="n">wkt</span><span class="w"> </span><span class="o">&lt;-</span><span class="w"> </span><span class="n">mr_as_wkt</span><span class="p">(</span><span class="n">shp</span><span class="p">)</span><span class="w">
-</span><span class="n">library</span><span class="p">(</span><span class="s1">'httr'</span><span class="p">)</span><span class="w">
-</span><span class="n">library</span><span class="p">(</span><span class="s1">'data.table'</span><span class="p">)</span><span class="w">
-</span><span class="n">args</span><span class="w"> </span><span class="o">&lt;-</span><span class="w"> </span><span class="nf">list</span><span class="p">(</span><span class="n">scientificname</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"Abra alba"</span><span class="p">,</span><span class="w"> </span><span class="n">geometry</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">wkt</span><span class="p">,</span><span class="w"> </span><span class="n">limit</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="m">100</span><span class="p">)</span><span class="w">
-</span><span class="n">res</span><span class="w"> </span><span class="o">&lt;-</span><span class="w"> </span><span class="n">httr</span><span class="o">::</span><span class="n">GET</span><span class="p">(</span><span class="s1">'http://api.iobis.org/occurrence'</span><span class="p">,</span><span class="w"> </span><span class="n">query</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">args</span><span class="p">)</span><span class="w">
-</span><span class="n">xx</span><span class="w"> </span><span class="o">&lt;-</span><span class="w"> </span><span class="n">data.table</span><span class="o">::</span><span class="n">setDF</span><span class="p">(</span><span class="n">data.table</span><span class="o">::</span><span class="n">rbindlist</span><span class="p">(</span><span class="n">httr</span><span class="o">::</span><span class="n">content</span><span class="p">(</span><span class="n">res</span><span class="p">)</span><span class="o">$</span><span class="n">results</span><span class="p">,</span><span class="w"> </span><span class="n">use.names</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="kc">TRUE</span><span class="p">,</span><span class="w"> </span><span class="n">fill</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="kc">TRUE</span><span class="p">))</span><span class="w">
-</span><span class="n">xx</span><span class="w"> </span><span class="o">&lt;-</span><span class="w"> </span><span class="n">xx</span><span class="p">[,</span><span class="w"> </span><span class="nf">c</span><span class="p">(</span><span class="s1">'scientificName'</span><span class="p">,</span><span class="w"> </span><span class="s1">'decimalLongitude'</span><span class="p">,</span><span class="w"> </span><span class="s1">'decimalLatitude'</span><span class="p">)]</span><span class="w">
-</span><span class="nf">names</span><span class="p">(</span><span class="n">xx</span><span class="p">)[</span><span class="m">2</span><span class="o">:</span><span class="m">3</span><span class="p">]</span><span class="w"> </span><span class="o">&lt;-</span><span class="w"> </span><span class="nf">c</span><span class="p">(</span><span class="s1">'longitude'</span><span class="p">,</span><span class="w"> </span><span class="s1">'latitude'</span><span class="p">)</span><span class="w">
-</span></code></pre>
-</div>
+## Get OBIS EEZ ID
 
-<p>Plot</p>
 
-<div class="language-r highlighter-rouge"><pre class="highlight"><code><span class="n">library</span><span class="p">(</span><span class="s1">'leaflet'</span><span class="p">)</span><span class="w">
-</span><span class="n">leaflet</span><span class="p">()</span><span class="w"> </span><span class="o">%&gt;%</span><span class="w">
-  </span><span class="n">addTiles</span><span class="p">()</span><span class="w"> </span><span class="o">%&gt;%</span><span class="w">
-  </span><span class="n">addCircleMarkers</span><span class="p">(</span><span class="n">data</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">xx</span><span class="p">)</span><span class="w"> </span><span class="o">%&gt;%</span><span class="w">
-  </span><span class="n">addPolygons</span><span class="p">(</span><span class="n">data</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">shp</span><span class="p">)</span><span class="w">
-</span></code></pre>
-</div>
+```r
+res <- mr_names()
+res <- res[grepl("eez", res$name, ignore.case = TRUE),]
+mr_obis_eez_id(res$title[2])
+#> [1] 84
+```
 
-<p><img src="/public/img/2016-06-09-marine-regions/map1.png" alt="map1" /></p>
+## Convert to WKT
 
-<h3 id="using-eez-id">Using EEZ ID</h3>
+From geojson or shp. Here, geojson
 
-<p>EEZ is a Exclusive Economic Zone</p>
 
-<div class="language-r highlighter-rouge"><pre class="highlight"><code><span class="p">(</span><span class="n">eez</span><span class="w"> </span><span class="o">&lt;-</span><span class="w"> </span><span class="n">mr_obis_eez_id</span><span class="p">(</span><span class="s2">"Belgian Exclusive Economic Zone"</span><span class="p">))</span><span class="w">
-</span><span class="c1">#&gt; [1] 59
-</span></code></pre>
-</div>
+```r
+res <- mr_geojson(key = "MarineRegions:eez_33176")
+mr_as_wkt(res, fmt = 5)
+#> [1] "MULTIPOLYGON (((41.573732 -1.659444, 45.891882 ... cutoff
+```
 
-<p>You currently can’t search for OBIS occurrences by EEZ ID, but hopefully soon…</p>
+## Get regions, then OBIS data
 
-<h2 id="dealing-with-bigger-wkt">Dealing with bigger WKT</h2>
+### Using Well-Known Text
 
-<p>What if you’re WKT string is super long?  It’s often a problem because some online species 
+Both shp and geojson data returned from `region_shp()` and `region_geojson()`, respectively, can be passed to `as_wkt()` to get WKT.
+
+
+```r
+shp <- mr_shp(name = "Belgian Exclusive Economic Zone")
+wkt <- mr_as_wkt(shp)
+library('httr')
+library('data.table')
+args <- list(scientificname = "Abra alba", geometry = wkt, limit = 100)
+res <- httr::GET('http://api.iobis.org/occurrence', query = args)
+xx <- data.table::setDF(data.table::rbindlist(httr::content(res)$results, use.names = TRUE, fill = TRUE))
+xx <- xx[, c('scientificName', 'decimalLongitude', 'decimalLatitude')]
+names(xx)[2:3] <- c('longitude', 'latitude')
+```
+
+Plot
+
+
+```r
+library('leaflet')
+leaflet() %>%
+  addTiles() %>%
+  addCircleMarkers(data = xx) %>%
+  addPolygons(data = shp)
+```
+
+![map1](/public/img/2016-06-09-marine-regions/map1.png)
+
+### Using EEZ ID
+
+EEZ is a Exclusive Economic Zone
+
+
+```r
+(eez <- mr_obis_eez_id("Belgian Exclusive Economic Zone"))
+#> [1] 59
+```
+
+You currently can't search for OBIS occurrences by EEZ ID, but hopefully soon...
+
+## Dealing with bigger WKT
+
+What if you're WKT string is super long?  It's often a problem because some online species 
 occurrence databases that accept WKT to search by geometry bork due to
 limitations on length of URLs if your WKT string is too long (about 8000 characters,
-including remainder of URL). One way to deal with it is to reduce detail - simplify.</p>
-
-<div class="language-r highlighter-rouge"><pre class="highlight"><code><span class="n">install.packages</span><span class="p">(</span><span class="s2">"rmapshaper"</span><span class="p">)</span><span class="w">
-</span></code></pre>
-</div>
-
-<p>Using <code class="highlighter-rouge">rmapshaper</code> we can simplify a spatial object, then search with that.</p>
-
-<div class="language-r highlighter-rouge"><pre class="highlight"><code><span class="n">shp</span><span class="w"> </span><span class="o">&lt;-</span><span class="w"> </span><span class="n">mr_shp</span><span class="p">(</span><span class="n">name</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"Dutch Exclusive Economic Zone"</span><span class="p">)</span><span class="w">
-</span></code></pre>
-</div>
-
-<p>Visualize</p>
-
-<div class="language-r highlighter-rouge"><pre class="highlight"><code><span class="n">leaflet</span><span class="p">()</span><span class="w"> </span><span class="o">%&gt;%</span><span class="w">
-  </span><span class="n">addTiles</span><span class="p">()</span><span class="w"> </span><span class="o">%&gt;%</span><span class="w">
-  </span><span class="n">addPolygons</span><span class="p">(</span><span class="n">data</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">shp</span><span class="p">)</span><span class="w">
-</span></code></pre>
-</div>
-
-<p><img src="/public/img/2016-06-09-marine-regions/complex.png" alt="map2" /></p>
-
-<p>Simplify</p>
-
-<div class="language-r highlighter-rouge"><pre class="highlight"><code><span class="n">library</span><span class="p">(</span><span class="s2">"rmapshaper"</span><span class="p">)</span><span class="w">
-</span><span class="n">shp</span><span class="w"> </span><span class="o">&lt;-</span><span class="w"> </span><span class="n">ms_simplify</span><span class="p">(</span><span class="n">shp</span><span class="p">)</span><span class="w">
-</span></code></pre>
-</div>
-
-<p>It’s simplified:</p>
-
-<div class="language-r highlighter-rouge"><pre class="highlight"><code><span class="n">leaflet</span><span class="p">()</span><span class="w"> </span><span class="o">%&gt;%</span><span class="w">
-  </span><span class="n">addTiles</span><span class="p">()</span><span class="w"> </span><span class="o">%&gt;%</span><span class="w">
-  </span><span class="n">addPolygons</span><span class="p">(</span><span class="n">data</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">shp</span><span class="p">)</span><span class="w">
-</span></code></pre>
-</div>
-
-<p><img src="/public/img/2016-06-09-marine-regions/simple.png" alt="map3" /></p>
-
-<h2 id="pass-to-gbif">Pass to GBIF</h2>
-
-<div class="language-r highlighter-rouge"><pre class="highlight"><code><span class="k">if</span><span class="w"> </span><span class="p">(</span><span class="o">!</span><span class="n">requireNamespace</span><span class="p">(</span><span class="s2">"rgbif"</span><span class="p">))</span><span class="w"> </span><span class="p">{</span><span class="w">
-  </span><span class="n">install.packages</span><span class="p">(</span><span class="s2">"rgbif"</span><span class="p">)</span><span class="w">
-</span><span class="p">}</span><span class="w">
-</span><span class="n">library</span><span class="p">(</span><span class="s2">"rgbif"</span><span class="p">)</span><span class="w">
-</span><span class="n">occ_search</span><span class="p">(</span><span class="n">geometry</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">mr_as_wkt</span><span class="p">(</span><span class="n">shp</span><span class="p">),</span><span class="w"> </span><span class="n">limit</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="m">400</span><span class="p">)</span><span class="w">
-</span><span class="c1">#&gt; Records found [2395936] 
-#&gt; Records returned [400] 
-#&gt; No. unique hierarchies [17] 
-#&gt; No. media records [3] 
-#&gt; Args [geometry=POLYGON ((7.2083632399999997 53.2428091399999985,
-#&gt;      6.6974995100000001 53.4619365499999972, 5.89083650, limit=400,
-#&gt;      offset=0, fields=all] 
-#&gt; # A tibble: 400 x 102
-#&gt;                     name        key decimalLatitude decimalLongitude
-#&gt;                    &lt;chr&gt;      &lt;int&gt;           &lt;dbl&gt;            &lt;dbl&gt;
-#&gt; 1  Haematopus ostralegus 1265900666        52.13467          4.21306
-#&gt; 2          Limosa limosa 1265577408        53.03249          4.88665
-#&gt; 3       Corvus splendens 1269536058        51.98297          4.12982
-#&gt; 4       Corvus splendens 1269536065        51.98297          4.12982
-#&gt; 5       Lanius excubitor 1211320606        52.57223          4.62569
-#&gt; 6       Lanius excubitor 1211320862        52.67419          4.63645
-#&gt; 7       Lanius excubitor 1211320806        53.05790          4.72974
-#&gt; 8       Lanius excubitor 1211321040        52.57540          4.63651
-#&gt; 9       Lanius excubitor 1211320590        52.41180          5.19500
-#&gt; 10      Lanius excubitor 1211320401        52.57535          4.63654
-#&gt; # ... with 390 more rows, and 98 more variables: issues &lt;chr&gt;,
-#&gt; #   datasetKey &lt;chr&gt;, publishingOrgKey &lt;chr&gt;, publishingCountry &lt;chr&gt;,
-#&gt; #   protocol &lt;chr&gt;, lastCrawled &lt;chr&gt;, lastParsed &lt;chr&gt;, extensions &lt;chr&gt;,
-#&gt; #   basisOfRecord &lt;chr&gt;, taxonKey &lt;int&gt;, kingdomKey &lt;int&gt;,
-#&gt; #   phylumKey &lt;int&gt;, classKey &lt;int&gt;, orderKey &lt;int&gt;, familyKey &lt;int&gt;,
-#&gt; #   genusKey &lt;int&gt;, speciesKey &lt;int&gt;, scientificName &lt;chr&gt;, kingdom &lt;chr&gt;,
-#&gt; #   phylum &lt;chr&gt;, order &lt;chr&gt;, family &lt;chr&gt;, genus &lt;chr&gt;, species &lt;chr&gt;,
-#&gt; #   genericName &lt;chr&gt;, specificEpithet &lt;chr&gt;, taxonRank &lt;chr&gt;,
-#&gt; #   dateIdentified &lt;chr&gt;, coordinateUncertaintyInMeters &lt;dbl&gt;, year &lt;int&gt;,
-#&gt; #   month &lt;int&gt;, day &lt;int&gt;, eventDate &lt;chr&gt;, modified &lt;chr&gt;,
-#&gt; #   lastInterpreted &lt;chr&gt;, references &lt;chr&gt;, identifiers &lt;chr&gt;,
-#&gt; #   facts &lt;chr&gt;, relations &lt;chr&gt;, geodeticDatum &lt;chr&gt;, class &lt;chr&gt;,
-#&gt; #   countryCode &lt;chr&gt;, country &lt;chr&gt;, rightsHolder &lt;chr&gt;,
-#&gt; #   identifier &lt;chr&gt;, informationWithheld &lt;chr&gt;, verbatimEventDate &lt;chr&gt;,
-#&gt; #   datasetName &lt;chr&gt;, gbifID &lt;chr&gt;, collectionCode &lt;chr&gt;,
-#&gt; #   verbatimLocality &lt;chr&gt;, occurrenceID &lt;chr&gt;, taxonID &lt;chr&gt;,
-#&gt; #   license &lt;chr&gt;, recordedBy &lt;chr&gt;, catalogNumber &lt;chr&gt;,
-#&gt; #   http...unknown.org.occurrenceDetails &lt;chr&gt;, institutionCode &lt;chr&gt;,
-#&gt; #   rights &lt;chr&gt;, eventTime &lt;chr&gt;, identificationID &lt;chr&gt;,
-#&gt; #   individualCount &lt;int&gt;, continent &lt;chr&gt;, stateProvince &lt;chr&gt;,
-#&gt; #   nomenclaturalCode &lt;chr&gt;, locality &lt;chr&gt;, language &lt;chr&gt;,
-#&gt; #   taxonomicStatus &lt;chr&gt;, type &lt;chr&gt;, preparations &lt;chr&gt;,
-#&gt; #   disposition &lt;chr&gt;, originalNameUsage &lt;chr&gt;,
-#&gt; #   bibliographicCitation &lt;chr&gt;, identifiedBy &lt;chr&gt;, sex &lt;chr&gt;,
-#&gt; #   lifeStage &lt;chr&gt;, otherCatalogNumbers &lt;chr&gt;, habitat &lt;chr&gt;,
-#&gt; #   georeferencedBy &lt;chr&gt;, vernacularName &lt;chr&gt;, elevation &lt;dbl&gt;,
-#&gt; #   minimumDistanceAboveSurfaceInMeters &lt;chr&gt;, dynamicProperties &lt;chr&gt;,
-#&gt; #   samplingEffort &lt;chr&gt;, organismName &lt;chr&gt;, georeferencedDate &lt;chr&gt;,
-#&gt; #   georeferenceProtocol &lt;chr&gt;, georeferenceVerificationStatus &lt;chr&gt;,
-#&gt; #   organismID &lt;chr&gt;, ownerInstitutionCode &lt;chr&gt;, samplingProtocol &lt;chr&gt;,
-#&gt; #   datasetID &lt;chr&gt;, accessRights &lt;chr&gt;, georeferenceSources &lt;chr&gt;,
-#&gt; #   elevationAccuracy &lt;dbl&gt;, depth &lt;dbl&gt;, depthAccuracy &lt;dbl&gt;,
-#&gt; #   waterBody &lt;chr&gt;
-</span></code></pre>
-</div>
+including remainder of URL). One way to deal with it is to reduce detail - simplify.
 
 
-  </div>
-  
-  <div class="post">
-    <h1>
-      <a href="/2016/04/atomize/">
-        atomize - make new packages from other packages
-      </a>
-    </h1>
+```r
+install.packages("rmapshaper")
+```
 
-    <span class="post-date">07 Apr 2016</span>
+Using `rmapshaper` we can simplify a spatial object, then search with that.
 
-    <p>We (rOpenSci) just held our 3rd annual rOpenSci unconference (<a href="http://unconf16.ropensci.org/">http://unconf16.ropensci.org/</a>) in San Francisco. There were <a href="https://github.com/ropensci/unconf16/issues">a lot of ideas</a>, and lots of awesome projects from awesome people came out of the 2 day event.</p>
 
-<p>One weird idea I had comes from looking at the Node world, where there are lots of tiny packages, instead of the often larger packages we have in the R world. One reason for tiny in Node is that of course you want a library to be tiny if running in the browser for faster load times (esp. on mobile).</p>
+```r
+shp <- mr_shp(name = "Dutch Exclusive Economic Zone")
+```
 
-<p>So the idea is, what if we could separate all the functions in a package, or any particular function of your choice, into new packages, with all the internal functions and dependencies. And automatically as well, not manually.</p>
+Visualize
 
-<p>So what are the use cases? I can’t imagine this being used to create stable packages to disperse to the world on CRAN, but it could be really useful for development purposes, or for R users/analysts that want lighter weight dependencies (e.g., a package with just the one function needed from a larger package).</p>
 
-<p>This approach of course has drawbacks. The new created package is now broken apart from the original - however, beause it’s automated, you can just re-create it.</p>
+```r
+leaflet() %>%
+  addTiles() %>%
+  addPolygons(data = shp)
+```
 
-<p>Another pain point would surely be with packages that have C/C++ code in them.</p>
+![map2](/public/img/2016-06-09-marine-regions/complex.png)
 
-<p>The package: <code class="highlighter-rouge">atomize</code>.</p>
+Simplify
 
-<p>The package was made possible by the awesome <a href="https://github.com/MangoTheCat/functionMap">functionMap</a> package by <a href="https://github.com/gaborcsardi">Gábor Csárdi</a>, and the more well-known <code class="highlighter-rouge">devtools</code>.</p>
 
-<p>Expect bugs, the package has no tests. Sorry :(</p>
+```r
+library("rmapshaper")
+shp <- ms_simplify(shp)
+```
 
-<h2 id="installation">Installation</h2>
+It's simplified:
 
-<div class="language-r highlighter-rouge"><pre class="highlight"><code><span class="n">devtools</span><span class="o">::</span><span class="n">install_github</span><span class="p">(</span><span class="s2">"ropenscilabs/atomize"</span><span class="p">)</span><span class="w">
-</span></code></pre>
-</div>
 
-<div class="language-r highlighter-rouge"><pre class="highlight"><code><span class="n">library</span><span class="p">(</span><span class="s2">"atomize"</span><span class="p">)</span><span class="w">
-</span></code></pre>
-</div>
+```r
+leaflet() %>%
+  addTiles() %>%
+  addPolygons(data = shp)
+```
 
-<h2 id="usage">usage</h2>
+![map3](/public/img/2016-06-09-marine-regions/simple.png)
 
-<h3 id="atomize-a-fxn-into-separate-package">atomize a fxn into separate package</h3>
+## Pass to GBIF
 
-<p>You can select one function, or many. Here, I’m using another package I maintain, <a href="https://github.com/ropenscilabs/rredlist">rredlist</a>, a pkg to interact with the <a href="http://apiv3.iucnredlist.org/api/v3/docs">IUCN Redlist API</a>.</p>
 
-<p>In this example, I want a new package called <code class="highlighter-rouge">foobar</code> with just the function <code class="highlighter-rouge">rl_citation()</code>. The function <code class="highlighter-rouge">atomize::atomizer()</code> takes the path for the package to extract from, then a path for the new package, then the function names.</p>
+```r
+if (!requireNamespace("rgbif")) {
+  install.packages("rgbif")
+}
+library("rgbif")
+occ_search(geometry = mr_as_wkt(shp), limit = 400)
+#> Records found [2395936] 
+#> Records returned [400] 
+#> No. unique hierarchies [17] 
+#> No. media records [3] 
+#> Args [geometry=POLYGON ((7.2083632399999997 53.2428091399999985,
+#>      6.6974995100000001 53.4619365499999972, 5.89083650, limit=400,
+#>      offset=0, fields=all] 
+#> # A tibble: 400 x 102
+#>                     name        key decimalLatitude decimalLongitude
+#>                    <chr>      <int>           <dbl>            <dbl>
+#> 1  Haematopus ostralegus 1265900666        52.13467          4.21306
+#> 2          Limosa limosa 1265577408        53.03249          4.88665
+#> 3       Corvus splendens 1269536058        51.98297          4.12982
+#> 4       Corvus splendens 1269536065        51.98297          4.12982
+#> 5       Lanius excubitor 1211320606        52.57223          4.62569
+#> 6       Lanius excubitor 1211320862        52.67419          4.63645
+#> 7       Lanius excubitor 1211320806        53.05790          4.72974
+#> 8       Lanius excubitor 1211321040        52.57540          4.63651
+#> 9       Lanius excubitor 1211320590        52.41180          5.19500
+#> 10      Lanius excubitor 1211320401        52.57535          4.63654
+#> # ... with 390 more rows, and 98 more variables: issues <chr>,
+#> #   datasetKey <chr>, publishingOrgKey <chr>, publishingCountry <chr>,
+#> #   protocol <chr>, lastCrawled <chr>, lastParsed <chr>, extensions <chr>,
+#> #   basisOfRecord <chr>, taxonKey <int>, kingdomKey <int>,
+#> #   phylumKey <int>, classKey <int>, orderKey <int>, familyKey <int>,
+#> #   genusKey <int>, speciesKey <int>, scientificName <chr>, kingdom <chr>,
+#> #   phylum <chr>, order <chr>, family <chr>, genus <chr>, species <chr>,
+#> #   genericName <chr>, specificEpithet <chr>, taxonRank <chr>,
+#> #   dateIdentified <chr>, coordinateUncertaintyInMeters <dbl>, year <int>,
+#> #   month <int>, day <int>, eventDate <chr>, modified <chr>,
+#> #   lastInterpreted <chr>, references <chr>, identifiers <chr>,
+#> #   facts <chr>, relations <chr>, geodeticDatum <chr>, class <chr>,
+#> #   countryCode <chr>, country <chr>, rightsHolder <chr>,
+#> #   identifier <chr>, informationWithheld <chr>, verbatimEventDate <chr>,
+#> #   datasetName <chr>, gbifID <chr>, collectionCode <chr>,
+#> #   verbatimLocality <chr>, occurrenceID <chr>, taxonID <chr>,
+#> #   license <chr>, recordedBy <chr>, catalogNumber <chr>,
+#> #   http...unknown.org.occurrenceDetails <chr>, institutionCode <chr>,
+#> #   rights <chr>, eventTime <chr>, identificationID <chr>,
+#> #   individualCount <int>, continent <chr>, stateProvince <chr>,
+#> #   nomenclaturalCode <chr>, locality <chr>, language <chr>,
+#> #   taxonomicStatus <chr>, type <chr>, preparations <chr>,
+#> #   disposition <chr>, originalNameUsage <chr>,
+#> #   bibliographicCitation <chr>, identifiedBy <chr>, sex <chr>,
+#> #   lifeStage <chr>, otherCatalogNumbers <chr>, habitat <chr>,
+#> #   georeferencedBy <chr>, vernacularName <chr>, elevation <dbl>,
+#> #   minimumDistanceAboveSurfaceInMeters <chr>, dynamicProperties <chr>,
+#> #   samplingEffort <chr>, organismName <chr>, georeferencedDate <chr>,
+#> #   georeferenceProtocol <chr>, georeferenceVerificationStatus <chr>,
+#> #   organismID <chr>, ownerInstitutionCode <chr>, samplingProtocol <chr>,
+#> #   datasetID <chr>, accessRights <chr>, georeferenceSources <chr>,
+#> #   elevationAccuracy <dbl>, depth <dbl>, depthAccuracy <dbl>,
+#> #   waterBody <chr>
+```
 
-<div class="language-r highlighter-rouge"><pre class="highlight"><code><span class="n">atomizer</span><span class="p">(</span><span class="n">path_ref</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"../rredlist"</span><span class="p">,</span><span class="w"> </span><span class="n">path_new</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"../foobar"</span><span class="p">,</span><span class="w"> </span><span class="n">funcs</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"rl_citation"</span><span class="p">)</span><span class="w">
-</span></code></pre>
-</div>
-
-<p>This creates a new package in the <code class="highlighter-rouge">path_new</code> directory</p>
-
-<h3 id="install">install</h3>
-
-<p>Now we need to install the new package, can do easily with <code class="highlighter-rouge">devtools::install()</code></p>
-
-<div class="language-r highlighter-rouge"><pre class="highlight"><code><span class="n">devtools</span><span class="o">::</span><span class="n">install</span><span class="p">(</span><span class="s2">"../foobar"</span><span class="p">)</span><span class="w">
-</span></code></pre>
-</div>
-
-<h3 id="load">load</h3>
-
-<p>Then load the new package</p>
-
-<div class="language-r highlighter-rouge"><pre class="highlight"><code><span class="n">library</span><span class="p">(</span><span class="s2">"foobar"</span><span class="p">)</span><span class="w">
-</span></code></pre>
-</div>
-
-<h3 id="call-function">call function</h3>
-
-<p>Now call the function in the new package</p>
-
-<div class="language-r highlighter-rouge"><pre class="highlight"><code><span class="n">foobar</span><span class="o">::</span><span class="n">rl_citation</span><span class="p">()</span><span class="w">
-</span><span class="c1">#&gt; [1] "IUCN 2015. IUCN Red List of Threatened Species. Version 2015-4 &lt;www.iucnredlist.org&gt;"
-</span></code></pre>
-</div>
-
-<p>it’s identical to the same function in the old package</p>
-
-<div class="language-r highlighter-rouge"><pre class="highlight"><code><span class="n">identical</span><span class="p">(</span><span class="n">rredlist</span><span class="o">::</span><span class="n">rl_citation</span><span class="p">(),</span><span class="w"> </span><span class="n">foobar</span><span class="o">::</span><span class="n">rl_citation</span><span class="p">())</span><span class="w">
-</span><span class="c1">#&gt; [1] TRUE
-</span></code></pre>
-</div>
+[mr]: https://github.com/ropenscilabs/mregions
 
   </div>
   

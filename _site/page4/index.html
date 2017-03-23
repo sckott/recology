@@ -33,7 +33,7 @@
     <header class="masthead">
       <div class="masthead-inner">
         <h1>Recology</h1>
-        <!-- <h1> <a href="http://recology.info/">Recology</a></h1> -->
+        <!-- <h1> <a href="http://localhost:4000">Recology</a></h1> -->
         <p class="lead">R/etc.</p>
 
         <div class="colophon">
@@ -61,6 +61,395 @@
   
   <div class="post">
     <h1>
+      <a href="/2016/03/scrubr/">
+        scrubr - clean species occurrence records
+      </a>
+    </h1>
+
+    <span class="post-date">04 Mar 2016</span>
+
+    `scrubr` is an R library for cleaning species occurrence records. It's general purpose, and has the following approach:
+
+* We think using a piping workflow (`%>%`) makes code easier to build up, and easier to understand. However, you don't have to use pipes in this package.
+* All inputs and outputs are data.frame's - which makes the above point easier
+* Records trimmed off due to various filters are retained as attributes, so can still be accessed for later inspection, but don't get in the way of the data.frame that gets modified for downstream use
+* User interface vs. speed: This is the kind of package that surely can get faster. However, we're focusing on the UI first, then make speed improvements down the road. 
+* Since occurrence record datasets should all have columns with lat/long information, we automatically look for those columns for you. If identified, we use them, but you can supply lat/long column names manually as well.
+
+We have many packages that fetch species occurrence records from GBIF, iNaturalist, VertNet, iDigBio, Ecoengine, and more. `scrubr` fills a crucial missing niche as likely all uses of occurrence data requires cleaning of some kind. When using GBIF data via `rgbif`, that package has some utilities for cleaning data based on the issues returned with GBIF data - `scrubr` is a companion to do the rest of the cleaning.
+
+## scrubr use cases
+
+### Those covered
+
+- Impossible lat/long values: e.g., latitude 75
+- Incomplete cases: one or the other of lat/long missing
+- Unlikely lat/long values: e.g., points at 0,0
+- Deduplication: try to identify duplicates, esp. when pulling data from multiple sources, e.g., can try to use occurrence IDs, if provided
+- Date based cleaning
+- Outside political boundary: User input to check for points in the wrong country, or points outside of a known country
+- Taxonomic name based cleaning: via `taxize` (one method so far)
+
+### To be covered
+
+* Political centroids: unlikely that occurrences fall exactly on these points, more likely a
+default position (Draft function started, but not exported, and commented out)
+* Herbaria/Museums: many specimens may have location of the collection they are housed in
+* Habitat type filtering: e.g., fish should not be on land; marine fish should not be in fresh water
+* Check for contextually wrong values: That is, if 99 out of 100 lat/long coordinates are within the continental US, but 1 is in China, then perhaps something is wrong with that one point
+* and many more...
+
+What else do you want included? [Open an issue in the repo](https://github.com/ropenscilabs/scrubr/issues) to chat about use cases.
+
+
+## Install
+
+From CRAN (binaries may not be up yet, but source is)
+
+
+```r
+install.packages("scrubr")
+```
+
+Or from GitHub
+
+
+```r
+devtools::install_github("ropenscilabs/scrubr")
+```
+
+
+```r
+library("scrubr")
+```
+
+## dframe
+
+`dframe()` is a tool to convert your data.frame to a compact `dplyr` like data.frame so that you can get a quick peek at your data each time you call a function - BUT, you don't have to use it.
+
+Compare `mtcars`
+
+
+```r
+mtcars
+#>                      mpg cyl  disp  hp drat    wt  qsec vs am gear carb
+#> Mazda RX4           21.0   6 160.0 110 3.90 2.620 16.46  0  1    4    4
+#> Mazda RX4 Wag       21.0   6 160.0 110 3.90 2.875 17.02  0  1    4    4
+#> Datsun 710          22.8   4 108.0  93 3.85 2.320 18.61  1  1    4    1
+#> Hornet 4 Drive      21.4   6 258.0 110 3.08 3.215 19.44  1  0    3    1
+#> Hornet Sportabout   18.7   8 360.0 175 3.15 3.440 17.02  0  0    3    2
+#> Valiant             18.1   6 225.0 105 2.76 3.460 20.22  1  0    3    1
+#> Duster 360          14.3   8 360.0 245 3.21 3.570 15.84  0  0    3    4
+#> Merc 240D           24.4   4 146.7  62 3.69 3.190 20.00  1  0    4    2
+#> Merc 230            22.8   4 140.8  95 3.92 3.150 22.90  1  0    4    2
+#> Merc 280            19.2   6 167.6 123 3.92 3.440 18.30  1  0    4    4
+#> Merc 280C           17.8   6 167.6 123 3.92 3.440 18.90  1  0    4    4
+#> Merc 450SE          16.4   8 275.8 180 3.07 4.070 17.40  0  0    3    3
+#> Merc 450SL          17.3   8 275.8 180 3.07 3.730 17.60  0  0    3    3
+#> Merc 450SLC         15.2   8 275.8 180 3.07 3.780 18.00  0  0    3    3
+#> Cadillac Fleetwood  10.4   8 472.0 205 2.93 5.250 17.98  0  0    3    4
+#> Lincoln Continental 10.4   8 460.0 215 3.00 5.424 17.82  0  0    3    4
+#> Chrysler Imperial   14.7   8 440.0 230 3.23 5.345 17.42  0  0    3    4
+#> Fiat 128            32.4   4  78.7  66 4.08 2.200 19.47  1  1    4    1
+#> Honda Civic         30.4   4  75.7  52 4.93 1.615 18.52  1  1    4    2
+#> Toyota Corolla      33.9   4  71.1  65 4.22 1.835 19.90  1  1    4    1
+#> Toyota Corona       21.5   4 120.1  97 3.70 2.465 20.01  1  0    3    1
+#> Dodge Challenger    15.5   8 318.0 150 2.76 3.520 16.87  0  0    3    2
+#> AMC Javelin         15.2   8 304.0 150 3.15 3.435 17.30  0  0    3    2
+#> Camaro Z28          13.3   8 350.0 245 3.73 3.840 15.41  0  0    3    4
+#> Pontiac Firebird    19.2   8 400.0 175 3.08 3.845 17.05  0  0    3    2
+#> Fiat X1-9           27.3   4  79.0  66 4.08 1.935 18.90  1  1    4    1
+#> Porsche 914-2       26.0   4 120.3  91 4.43 2.140 16.70  0  1    5    2
+#> Lotus Europa        30.4   4  95.1 113 3.77 1.513 16.90  1  1    5    2
+#> Ford Pantera L      15.8   8 351.0 264 4.22 3.170 14.50  0  1    5    4
+#> Ferrari Dino        19.7   6 145.0 175 3.62 2.770 15.50  0  1    5    6
+#> Maserati Bora       15.0   8 301.0 335 3.54 3.570 14.60  0  1    5    8
+#> Volvo 142E          21.4   4 121.0 109 4.11 2.780 18.60  1  1    4    2
+```
+
+To
+
+
+```r
+dframe(mtcars)
+#> <scrubr dframe>
+#> Size: 32 X 11
+#> 
+#> 
+#>      mpg   cyl  disp    hp  drat    wt  qsec    vs    am  gear  carb
+#>    (dbl) (dbl) (dbl) (dbl) (dbl) (dbl) (dbl) (dbl) (dbl) (dbl) (dbl)
+#> 1   21.0     6 160.0   110  3.90 2.620 16.46     0     1     4     4
+#> 2   21.0     6 160.0   110  3.90 2.875 17.02     0     1     4     4
+#> 3   22.8     4 108.0    93  3.85 2.320 18.61     1     1     4     1
+#> 4   21.4     6 258.0   110  3.08 3.215 19.44     1     0     3     1
+#> 5   18.7     8 360.0   175  3.15 3.440 17.02     0     0     3     2
+#> 6   18.1     6 225.0   105  2.76 3.460 20.22     1     0     3     1
+#> 7   14.3     8 360.0   245  3.21 3.570 15.84     0     0     3     4
+#> 8   24.4     4 146.7    62  3.69 3.190 20.00     1     0     4     2
+#> 9   22.8     4 140.8    95  3.92 3.150 22.90     1     0     4     2
+#> 10  19.2     6 167.6   123  3.92 3.440 18.30     1     0     4     4
+#> ..   ...   ...   ...   ...   ...   ...   ...   ...   ...   ...   ...
+```
+
+## Coordinate based cleaning
+
+Load some sample data that comes with the package
+
+
+```r
+data("sampledata1")
+```
+
+Remove impossible coordinates (using sample data included in the pkg)
+
+
+```r
+dframe(sample_data_1) %>% coord_impossible()
+#> <scrubr dframe>
+#> Size: 1500 X 5
+#> Lat/Lon vars: latitude/longitude
+#> 
+#>                name  longitude latitude                date        key
+#>               (chr)      (dbl)    (dbl)              (time)      (int)
+#> 1  Ursus americanus  -79.68283 38.36662 2015-01-14 16:36:45 1065590124
+#> 2  Ursus americanus  -82.42028 35.73304 2015-01-13 00:25:39 1065588899
+#> 3  Ursus americanus  -99.09625 23.66893 2015-02-20 23:00:00 1098894889
+#> 4  Ursus americanus  -72.77432 43.94883 2015-02-13 16:16:41 1065611122
+#> 5  Ursus americanus  -72.34617 43.86464 2015-03-01 20:20:45 1088908315
+#> 6  Ursus americanus -108.53674 32.65219 2015-03-29 17:06:54 1088932238
+#> 7  Ursus americanus -108.53691 32.65237 2015-03-29 17:12:50 1088932273
+#> 8  Ursus americanus -123.82900 40.13240 2015-03-28 23:00:00 1132403409
+#> 9  Ursus americanus  -78.25027 36.93018 2015-03-20 21:11:24 1088923534
+#> 10 Ursus americanus  -76.78671 35.53079 2015-04-05 23:00:00 1088954559
+#> ..              ...        ...      ...                 ...        ...
+```
+
+Remove incomplete coordinates
+
+
+```r
+dframe(sample_data_1) %>% coord_incomplete()
+#> <scrubr dframe>
+#> Size: 1306 X 5
+#> Lat/Lon vars: latitude/longitude
+#> 
+#>                name  longitude latitude                date        key
+#>               (chr)      (dbl)    (dbl)              (time)      (int)
+#> 1  Ursus americanus  -79.68283 38.36662 2015-01-14 16:36:45 1065590124
+#> 2  Ursus americanus  -82.42028 35.73304 2015-01-13 00:25:39 1065588899
+#> 3  Ursus americanus  -99.09625 23.66893 2015-02-20 23:00:00 1098894889
+#> 4  Ursus americanus  -72.77432 43.94883 2015-02-13 16:16:41 1065611122
+#> 5  Ursus americanus  -72.34617 43.86464 2015-03-01 20:20:45 1088908315
+#> 6  Ursus americanus -108.53674 32.65219 2015-03-29 17:06:54 1088932238
+#> 7  Ursus americanus -108.53691 32.65237 2015-03-29 17:12:50 1088932273
+#> 8  Ursus americanus -123.82900 40.13240 2015-03-28 23:00:00 1132403409
+#> 9  Ursus americanus  -78.25027 36.93018 2015-03-20 21:11:24 1088923534
+#> 10 Ursus americanus  -76.78671 35.53079 2015-04-05 23:00:00 1088954559
+#> ..              ...        ...      ...                 ...        ...
+```
+
+Remove unlikely coordinates (e.g., those at 0,0)
+
+
+```r
+dframe(sample_data_1) %>% coord_unlikely()
+#> <scrubr dframe>
+#> Size: 1488 X 5
+#> Lat/Lon vars: latitude/longitude
+#> 
+#>                name  longitude latitude                date        key
+#>               (chr)      (dbl)    (dbl)              (time)      (int)
+#> 1  Ursus americanus  -79.68283 38.36662 2015-01-14 16:36:45 1065590124
+#> 2  Ursus americanus  -82.42028 35.73304 2015-01-13 00:25:39 1065588899
+#> 3  Ursus americanus  -99.09625 23.66893 2015-02-20 23:00:00 1098894889
+#> 4  Ursus americanus  -72.77432 43.94883 2015-02-13 16:16:41 1065611122
+#> 5  Ursus americanus  -72.34617 43.86464 2015-03-01 20:20:45 1088908315
+#> 6  Ursus americanus -108.53674 32.65219 2015-03-29 17:06:54 1088932238
+#> 7  Ursus americanus -108.53691 32.65237 2015-03-29 17:12:50 1088932273
+#> 8  Ursus americanus -123.82900 40.13240 2015-03-28 23:00:00 1132403409
+#> 9  Ursus americanus  -78.25027 36.93018 2015-03-20 21:11:24 1088923534
+#> 10 Ursus americanus  -76.78671 35.53079 2015-04-05 23:00:00 1088954559
+#> ..              ...        ...      ...                 ...        ...
+```
+
+Do all three
+
+
+```r
+dframe(sample_data_1) %>%
+  coord_impossible() %>%
+  coord_incomplete() %>%
+  coord_unlikely()
+#> <scrubr dframe>
+#> Size: 1294 X 5
+#> Lat/Lon vars: latitude/longitude
+#> 
+#>                name  longitude latitude                date        key
+#>               (chr)      (dbl)    (dbl)              (time)      (int)
+#> 1  Ursus americanus  -79.68283 38.36662 2015-01-14 16:36:45 1065590124
+#> 2  Ursus americanus  -82.42028 35.73304 2015-01-13 00:25:39 1065588899
+#> 3  Ursus americanus  -99.09625 23.66893 2015-02-20 23:00:00 1098894889
+#> 4  Ursus americanus  -72.77432 43.94883 2015-02-13 16:16:41 1065611122
+#> 5  Ursus americanus  -72.34617 43.86464 2015-03-01 20:20:45 1088908315
+#> 6  Ursus americanus -108.53674 32.65219 2015-03-29 17:06:54 1088932238
+#> 7  Ursus americanus -108.53691 32.65237 2015-03-29 17:12:50 1088932273
+#> 8  Ursus americanus -123.82900 40.13240 2015-03-28 23:00:00 1132403409
+#> 9  Ursus americanus  -78.25027 36.93018 2015-03-20 21:11:24 1088923534
+#> 10 Ursus americanus  -76.78671 35.53079 2015-04-05 23:00:00 1088954559
+#> ..              ...        ...      ...                 ...        ...
+```
+
+Do vs. don't drop bad data
+
+
+```r
+# do
+dframe(sample_data_1) %>% coord_incomplete(drop = TRUE) %>% NROW
+#> [1] 1306
+# don't
+dframe(sample_data_1) %>% coord_incomplete(drop = FALSE) %>% NROW
+#> [1] 1500
+```
+
+
+## Deduplicate
+
+Get a smaller subset of a data.frame
+
+
+```r
+smalldf <- sample_data_1[1:20, ]
+```
+
+create a duplicate record
+
+
+```r
+smalldf <- rbind(smalldf, smalldf[10,])
+row.names(smalldf) <- NULL
+```
+
+make it slightly different
+
+
+```r
+smalldf[21, "key"] <- 1088954555
+NROW(smalldf)
+#> [1] 21
+```
+
+It's 21 rows, including 1 duplicate. Do the deduplication
+
+
+```r
+(dp <- dframe(smalldf) %>% dedup())
+#> <scrubr dframe>
+#> Size: 20 X 5
+#> 
+#> 
+#>                name  longitude latitude                date        key
+#>               (chr)      (dbl)    (dbl)              (time)      (dbl)
+#> 1  Ursus americanus  -79.68283 38.36662 2015-01-14 16:36:45 1065590124
+#> 2  Ursus americanus  -82.42028 35.73304 2015-01-13 00:25:39 1065588899
+#> 3  Ursus americanus  -99.09625 23.66893 2015-02-20 23:00:00 1098894889
+#> 4  Ursus americanus  -72.77432 43.94883 2015-02-13 16:16:41 1065611122
+#> 5  Ursus americanus  -72.34617 43.86464 2015-03-01 20:20:45 1088908315
+#> 6  Ursus americanus -108.53674 32.65219 2015-03-29 17:06:54 1088932238
+#> 7  Ursus americanus -108.53691 32.65237 2015-03-29 17:12:50 1088932273
+#> 8  Ursus americanus -123.82900 40.13240 2015-03-28 23:00:00 1132403409
+#> 9  Ursus americanus  -78.25027 36.93018 2015-03-20 21:11:24 1088923534
+#> 10 Ursus americanus -103.30058 29.27042 2015-04-29 22:00:00 1088964797
+#> ..              ...        ...      ...                 ...        ...
+```
+
+Now its 20 rows, duplicate removed
+
+Here's the duplicates
+
+
+```r
+attr(dp, "dups")
+#> <scrubr dframe>
+#> Size: 1 X 5
+#> 
+#> 
+#>               name longitude latitude                date        key
+#>              (chr)     (dbl)    (dbl)              (time)      (dbl)
+#> 1 Ursus americanus -76.78671 35.53079 2015-04-05 23:00:00 1088954555
+```
+
+## Dates
+
+Standardize/convert dates
+
+
+```r
+df <- sample_data_1
+dframe(df) %>% 
+  date_standardize("%d%b%Y")
+#> <scrubr dframe>
+#> Size: 1500 X 5
+#> 
+#> 
+#>                name  longitude latitude      date        key
+#>               (chr)      (dbl)    (dbl)     (chr)      (int)
+#> 1  Ursus americanus  -79.68283 38.36662 14Jan2015 1065590124
+#> 2  Ursus americanus  -82.42028 35.73304 13Jan2015 1065588899
+#> 3  Ursus americanus  -99.09625 23.66893 20Feb2015 1098894889
+#> 4  Ursus americanus  -72.77432 43.94883 13Feb2015 1065611122
+#> 5  Ursus americanus  -72.34617 43.86464 01Mar2015 1088908315
+#> 6  Ursus americanus -108.53674 32.65219 29Mar2015 1088932238
+#> 7  Ursus americanus -108.53691 32.65237 29Mar2015 1088932273
+#> 8  Ursus americanus -123.82900 40.13240 28Mar2015 1132403409
+#> 9  Ursus americanus  -78.25027 36.93018 20Mar2015 1088923534
+#> 10 Ursus americanus  -76.78671 35.53079 05Apr2015 1088954559
+#> ..              ...        ...      ...       ...        ...
+```
+
+Drop records without dates
+
+
+```r
+NROW(df)
+#> [1] 1500
+NROW(dframe(df) %>% date_missing())
+#> [1] 1498
+```
+
+Create date field from other fields
+
+
+```r
+dframe(sample_data_2) %>% 
+  date_create(year, month, day)
+#> <scrubr dframe>
+#> Size: 1500 X 8
+#> 
+#> 
+#>                name  longitude latitude        key  year month   day
+#>               (chr)      (dbl)    (dbl)      (int) (chr) (chr) (chr)
+#> 1  Ursus americanus  -79.68283 38.36662 1065590124  2015    01    14
+#> 2  Ursus americanus  -82.42028 35.73304 1065588899  2015    01    13
+#> 3  Ursus americanus  -99.09625 23.66893 1098894889  2015    02    20
+#> 4  Ursus americanus  -72.77432 43.94883 1065611122  2015    02    13
+#> 5  Ursus americanus  -72.34617 43.86464 1088908315  2015    03    01
+#> 6  Ursus americanus -108.53674 32.65219 1088932238  2015    03    29
+#> 7  Ursus americanus -108.53691 32.65237 1088932273  2015    03    29
+#> 8  Ursus americanus -123.82900 40.13240 1132403409  2015    03    28
+#> 9  Ursus americanus  -78.25027 36.93018 1088923534  2015    03    20
+#> 10 Ursus americanus  -76.78671 35.53079 1088954559  2015    04    05
+#> ..              ...        ...      ...        ...   ...   ...   ...
+#> Variables not shown: date (chr).
+```
+
+## bugs and such
+
+Report them in the [scrubr issue tracker](https://github.com/ropenscilabs/scrubr/issues)
+
+  </div>
+  
+  <div class="post">
+    <h1>
       <a href="/2016/01/request-hello-world/">
         request - a high level HTTP client for R
       </a>
@@ -68,252 +457,261 @@
 
     <span class="post-date">05 Jan 2016</span>
 
-    <p><code class="highlighter-rouge">request</code> is DSL for http requests for R, and is inspired by the CLI tool <a href="https://github.com/jakubroztocil/httpie">httpie</a>. It’s built on <code class="highlighter-rouge">httr</code>.</p>
+    `request` is DSL for http requests for R, and is inspired by the CLI tool [httpie](https://github.com/jakubroztocil/httpie). It's built on `httr`.
 
-<p>The following were driving principles for this package:</p>
+The following were driving principles for this package:
 
-<ul>
-  <li>The web is increasingly a JSON world, so we assume <code class="highlighter-rouge">applications/json</code> by default, but give back other types if not</li>
-  <li>The workflow follows logically, or at least should, from, <em>hey, I got this url</em>, to <em>i need to add some options</em>, to <em>execute request</em> - and functions support piping so that you can execute functions in this order</li>
-  <li>Whenever possible, we transform output to data.frame’s - facilitating downstream manipulation via <code class="highlighter-rouge">dplyr</code>, etc.</li>
-  <li>We do <code class="highlighter-rouge">GET</code> requests by default. Specify a different type if you don’t want <code class="highlighter-rouge">GET</code>. Given <code class="highlighter-rouge">GET</code> by default, this client is optimized for consumption of data, rather than creating new things on servers</li>
-  <li>You can use non-standard evaluation to easily pass in query parameters without worrying about <code class="highlighter-rouge">&amp;</code>’s, URL escaping, etc. (see <code class="highlighter-rouge">api_query()</code>)</li>
-  <li>Same for body params (see <code class="highlighter-rouge">api_body()</code>)</li>
-</ul>
+* The web is increasingly a JSON world, so we assume `applications/json` by default, but give back other types if not
+* The workflow follows logically, or at least should, from, _hey, I got this url_, to _i need to add some options_, to _execute request_ - and functions support piping so that you can execute functions in this order
+* Whenever possible, we transform output to data.frame's - facilitating downstream manipulation via `dplyr`, etc.
+* We do `GET` requests by default. Specify a different type if you don't want `GET`. Given `GET` by default, this client is optimized for consumption of data, rather than creating new things on servers
+* You can use non-standard evaluation to easily pass in query parameters without worrying about `&`'s, URL escaping, etc. (see `api_query()`)
+* Same for body params (see `api_body()`)
 
-<p>The following is a brief demo of some of the package functionality:</p>
+The following is a brief demo of some of the package functionality:
 
-<h2 id="install">Install</h2>
+## Install
 
-<p>From CRAN</p>
+From CRAN
 
-<div class="language-r highlighter-rouge"><pre class="highlight"><code><span class="n">install.packages</span><span class="p">(</span><span class="s2">"request"</span><span class="p">)</span><span class="w">
-</span></code></pre>
-</div>
 
-<p>Or from GitHub</p>
+```r
+install.packages("request")
+```
 
-<div class="language-r highlighter-rouge"><pre class="highlight"><code><span class="n">devtools</span><span class="o">::</span><span class="n">install_github</span><span class="p">(</span><span class="s2">"sckott/request"</span><span class="p">)</span><span class="w">
-</span></code></pre>
-</div>
+Or from GitHub
 
-<div class="language-r highlighter-rouge"><pre class="highlight"><code><span class="n">library</span><span class="p">(</span><span class="s2">"request"</span><span class="p">)</span><span class="w">
-</span></code></pre>
-</div>
 
-<h2 id="execute-on-last-pipe">Execute on last pipe</h2>
+```r
+devtools::install_github("sckott/request")
+```
 
-<p>When using pipes (<code class="highlighter-rouge">%&gt;%</code>) in <code class="highlighter-rouge">request</code>, we autodetect last piped command, and execute <code class="highlighter-rouge">http()</code> if it’s the last. If not the last, the output gets passed to the next command, and so on. This feature (and <code class="highlighter-rouge">magrittr</code>) were done by Stefan Milton Bache.</p>
 
-<p>This feature is really nice because a) it’s one less thing you need to do, and b) you only need to care about the request itself.</p>
+```r
+library("request")
+```
 
-<p>You can escape auto-execution if you use the function <code class="highlighter-rouge">peep()</code>, which prints out a summary of the request you’ve created, but does not execute an HTTP request.</p>
+## Execute on last pipe
 
-<h2 id="http-requests">HTTP Requests</h2>
+When using pipes (`%>%`) in `request`, we autodetect last piped command, and execute `http()` if it's the last. If not the last, the output gets passed to the next command, and so on. This feature (and `magrittr`) were done by Stefan Milton Bache.
 
-<p>A high level function <code class="highlighter-rouge">http()</code> wraps a lower level <code class="highlighter-rouge">R6</code> object <code class="highlighter-rouge">RequestIterator</code>, which holds a series of variables and functions to execute <code class="highlighter-rouge">GET</code> and <code class="highlighter-rouge">POST</code> requests, and will hold other HTTP verbs as well. In addition, it can hold state, which will allow us to do paging internally for you (see below). You have direct access to the <code class="highlighter-rouge">R6</code> object if you call <code class="highlighter-rouge">http_client()</code> instead of <code class="highlighter-rouge">http()</code>.</p>
+This feature is really nice because a) it's one less thing you need to do, and b) you only need to care about the request itself.
 
-<h2 id="nse-and-se">NSE and SE</h2>
+You can escape auto-execution if you use the function `peep()`, which prints out a summary of the request you've created, but does not execute an HTTP request.
 
-<p>Most if not all functions in <code class="highlighter-rouge">request</code> support non-standard evaluation (NSE) as well as standard evaluation (SE). If a function supports both, there’s a version without an underscore for NSE, while a version with an underscore is for SE. For example, here, we make a HTTP request by passing a base URL, then a series of paths that get combined together. First the NSE version</p>
+## HTTP Requests
 
-<div class="language-r highlighter-rouge"><pre class="highlight"><code><span class="n">api</span><span class="p">(</span><span class="s1">'https://api.github.com/'</span><span class="p">)</span><span class="w"> </span><span class="o">%&gt;%</span><span class="w">
-  </span><span class="n">api_path</span><span class="p">(</span><span class="n">repos</span><span class="p">,</span><span class="w"> </span><span class="n">ropensci</span><span class="p">,</span><span class="w"> </span><span class="n">rgbif</span><span class="p">,</span><span class="w"> </span><span class="n">issues</span><span class="p">)</span><span class="w">
-</span></code></pre>
-</div>
+A high level function `http()` wraps a lower level `R6` object `RequestIterator`, which holds a series of variables and functions to execute `GET` and `POST` requests, and will hold other HTTP verbs as well. In addition, it can hold state, which will allow us to do paging internally for you (see below). You have direct access to the `R6` object if you call `http_client()` instead of `http()`.
 
-<p>Then the SE version</p>
+## NSE and SE
 
-<div class="language-r highlighter-rouge"><pre class="highlight"><code><span class="n">api</span><span class="p">(</span><span class="s1">'https://api.github.com/'</span><span class="p">)</span><span class="w"> </span><span class="o">%&gt;%</span><span class="w">
-  </span><span class="n">api_path_</span><span class="p">(</span><span class="s1">'repos'</span><span class="p">,</span><span class="w"> </span><span class="s1">'ropensci'</span><span class="p">,</span><span class="w"> </span><span class="s1">'rgbif'</span><span class="p">,</span><span class="w"> </span><span class="s1">'issues'</span><span class="p">)</span><span class="w">
-</span></code></pre>
-</div>
+Most if not all functions in `request` support non-standard evaluation (NSE) as well as standard evaluation (SE). If a function supports both, there's a version without an underscore for NSE, while a version with an underscore is for SE. For example, here, we make a HTTP request by passing a base URL, then a series of paths that get combined together. First the NSE version
 
-<h2 id="building-api-routes">Building API routes</h2>
 
-<p>The first thing you’ll want to do is lay out the base URL for your request. The function <code class="highlighter-rouge">api()</code> is your friend.</p>
+```r
+api('https://api.github.com/') %>%
+  api_path(repos, ropensci, rgbif, issues)
+```
 
-<p><code class="highlighter-rouge">api()</code> works with full or partial URLs:</p>
+Then the SE version
 
-<div class="language-r highlighter-rouge"><pre class="highlight"><code><span class="n">api</span><span class="p">(</span><span class="s1">'https://api.github.com/'</span><span class="p">)</span><span class="w">
-</span><span class="c1">#&gt; URL: https://api.github.com/
-</span><span class="n">api</span><span class="p">(</span><span class="s1">'http://api.gbif.org/v1'</span><span class="p">)</span><span class="w">
-</span><span class="c1">#&gt; URL: http://api.gbif.org/v1
-</span><span class="n">api</span><span class="p">(</span><span class="s1">'api.gbif.org/v1'</span><span class="p">)</span><span class="w">
-</span><span class="c1">#&gt; URL: api.gbif.org/v1
-</span></code></pre>
-</div>
 
-<p>And works with ports, full or partial</p>
+```r
+api('https://api.github.com/') %>%
+  api_path_('repos', 'ropensci', 'rgbif', 'issues')
+```
 
-<div class="language-r highlighter-rouge"><pre class="highlight"><code><span class="n">api</span><span class="p">(</span><span class="s1">'http://localhost:9200'</span><span class="p">)</span><span class="w">
-</span><span class="c1">#&gt; URL: http://localhost:9200
-</span><span class="n">api</span><span class="p">(</span><span class="s1">'localhost:9200'</span><span class="p">)</span><span class="w">
-</span><span class="c1">#&gt; URL: http://localhost:9200
-</span><span class="n">api</span><span class="p">(</span><span class="s1">':9200'</span><span class="p">)</span><span class="w">
-</span><span class="c1">#&gt; URL: http://localhost:9200
-</span><span class="n">api</span><span class="p">(</span><span class="s1">'9200'</span><span class="p">)</span><span class="w">
-</span><span class="c1">#&gt; URL: http://localhost:9200
-</span><span class="n">api</span><span class="p">(</span><span class="s1">'9200/stuff'</span><span class="p">)</span><span class="w">
-</span><span class="c1">#&gt; URL: http://localhost:9200/stuff
-</span></code></pre>
-</div>
+## Building API routes
 
-<h2 id="make-http-requests">Make HTTP requests</h2>
+The first thing you'll want to do is lay out the base URL for your request. The function `api()` is your friend.
 
-<p>The above examples with <code class="highlighter-rouge">api()</code> are not passed through a pipe, so only define a URL, but don’t do an HTTP request. To make an HTTP request, you can either pipe a url or partial url to e.g., <code class="highlighter-rouge">api()</code>, or call <code class="highlighter-rouge">http()</code> at the end of a string of function calls:</p>
+`api()` works with full or partial URLs:
 
-<div class="language-r highlighter-rouge"><pre class="highlight"><code><span class="s1">'https://api.github.com/'</span><span class="w"> </span><span class="o">%&gt;%</span><span class="w"> </span><span class="n">api</span><span class="p">()</span><span class="w">
-</span><span class="c1">#&gt; $current_user_url
-#&gt; [1] "https://api.github.com/user"
-#&gt;
-#&gt; $current_user_authorizations_html_url
-#&gt; [1] "https://github.com/settings/connections/applications{/client_id}"
-#&gt;
-#&gt; $authorizations_url
-#&gt; [1] "https://api.github.com/authorizations"
-#&gt;
-#&gt; $code_search_url
-</span><span class="n">...</span><span class="w">
-</span></code></pre>
-</div>
 
-<p>Or</p>
+```r
+api('https://api.github.com/')
+#> URL: https://api.github.com/
+api('http://api.gbif.org/v1')
+#> URL: http://api.gbif.org/v1
+api('api.gbif.org/v1')
+#> URL: api.gbif.org/v1
+```
 
-<div class="language-r highlighter-rouge"><pre class="highlight"><code><span class="n">api</span><span class="p">(</span><span class="s1">'https://api.github.com/'</span><span class="p">)</span><span class="w"> </span><span class="o">%&gt;%</span><span class="w"> </span><span class="n">http</span><span class="p">()</span><span class="w">
-</span><span class="c1">#&gt; $current_user_url
-#&gt; [1] "https://api.github.com/user"
-#&gt;
-#&gt; $current_user_authorizations_html_url
-#&gt; [1] "https://github.com/settings/connections/applications{/client_id}"
-#&gt;
-#&gt; $authorizations_url
-#&gt; [1] "https://api.github.com/authorizations"
-#&gt;
-#&gt; $code_search_url
-</span><span class="n">...</span><span class="w">
-</span></code></pre>
-</div>
+And works with ports, full or partial
 
-<p><code class="highlighter-rouge">http()</code> is called at the end of a chain of piped commands, so no need to invoke it. However, you can if you like.</p>
 
-<h2 id="templating">Templating</h2>
+```r
+api('http://localhost:9200')
+#> URL: http://localhost:9200
+api('localhost:9200')
+#> URL: http://localhost:9200
+api(':9200')
+#> URL: http://localhost:9200
+api('9200')
+#> URL: http://localhost:9200
+api('9200/stuff')
+#> URL: http://localhost:9200/stuff
+```
 
-<div class="language-r highlighter-rouge"><pre class="highlight"><code><span class="n">repo_info</span><span class="w"> </span><span class="o">&lt;-</span><span class="w"> </span><span class="nf">list</span><span class="p">(</span><span class="n">username</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s1">'craigcitro'</span><span class="p">,</span><span class="w"> </span><span class="n">repo</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s1">'r-travis'</span><span class="p">)</span><span class="w">
-</span><span class="n">api</span><span class="p">(</span><span class="s1">'https://api.github.com/'</span><span class="p">)</span><span class="w"> </span><span class="o">%&gt;%</span><span class="w">
-  </span><span class="n">api_template</span><span class="p">(</span><span class="n">template</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s1">'repos///issues'</span><span class="p">,</span><span class="w"> </span><span class="n">data</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">repo_info</span><span class="p">)</span><span class="w">
-</span><span class="c1">#&gt; [[1]]
-#&gt; [[1]]$url
-#&gt; [1] "https://api.github.com/repos/craigcitro/r-travis/issues/164"
-#&gt;
-#&gt; [[1]]$labels_url
-#&gt; [1] "https://api.github.com/repos/craigcitro/r-travis/issues/164/labels{/name}"
-#&gt;
-#&gt; [[1]]$comments_url
-#&gt; [1] "https://api.github.com/repos/craigcitro/r-travis/issues/164/comments"
-#&gt; ...
-</span></code></pre>
-</div>
+## Make HTTP requests
 
-<h2 id="set-paths">Set paths</h2>
+The above examples with `api()` are not passed through a pipe, so only define a URL, but don't do an HTTP request. To make an HTTP request, you can either pipe a url or partial url to e.g., `api()`, or call `http()` at the end of a string of function calls:
 
-<p><code class="highlighter-rouge">api_path()</code> adds paths to the base URL</p>
 
-<div class="language-r highlighter-rouge"><pre class="highlight"><code><span class="n">api</span><span class="p">(</span><span class="s1">'https://api.github.com/'</span><span class="p">)</span><span class="w"> </span><span class="o">%&gt;%</span><span class="w">
-  </span><span class="n">api_path</span><span class="p">(</span><span class="n">repos</span><span class="p">,</span><span class="w"> </span><span class="n">ropensci</span><span class="p">,</span><span class="w"> </span><span class="n">rgbif</span><span class="p">,</span><span class="w"> </span><span class="n">issues</span><span class="p">)</span><span class="w"> </span><span class="o">%&gt;%</span><span class="w">
-  </span><span class="n">peep</span><span class="w">
-</span><span class="c1">#&gt; &lt;http request&gt;
-#&gt;   url: https://api.github.com/
-#&gt;   paths: repos/ropensci/rgbif/issues
-#&gt;   query:
-#&gt;   body:
-#&gt;   paging:
-#&gt;   headers:
-#&gt;   rate limit:
-#&gt;   retry (n/delay (s)): /
-#&gt;   error handler:
-#&gt;   config:
-</span></code></pre>
-</div>
+```r
+'https://api.github.com/' %>% api()
+#> $current_user_url
+#> [1] "https://api.github.com/user"
+#>
+#> $current_user_authorizations_html_url
+#> [1] "https://github.com/settings/connections/applications{/client_id}"
+#>
+#> $authorizations_url
+#> [1] "https://api.github.com/authorizations"
+#>
+#> $code_search_url
+...
+```
 
-<h2 id="query">Query</h2>
+Or
 
-<div class="language-r highlighter-rouge"><pre class="highlight"><code><span class="n">api</span><span class="p">(</span><span class="s2">"http://api.plos.org/search"</span><span class="p">)</span><span class="w"> </span><span class="o">%&gt;%</span><span class="w">
-  </span><span class="n">api_query</span><span class="p">(</span><span class="n">q</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">ecology</span><span class="p">,</span><span class="w"> </span><span class="n">wt</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">json</span><span class="p">,</span><span class="w"> </span><span class="n">fl</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">journal</span><span class="p">)</span><span class="w"> </span><span class="o">%&gt;%</span><span class="w">
-  </span><span class="n">peep</span><span class="w">
-</span><span class="c1">#&gt; &lt;http request&gt;
-#&gt;   url: http://api.plos.org/search
-#&gt;   paths:
-#&gt;   query: q=ecology, wt=json, fl=journal
-#&gt;   body:
-#&gt;   paging:
-#&gt;   headers:
-#&gt;   rate limit:
-#&gt;   retry (n/delay (s)): /
-#&gt;   error handler:
-#&gt;   config:
-</span></code></pre>
-</div>
 
-<h2 id="headers">Headers</h2>
+```r
+api('https://api.github.com/') %>% http()
+#> $current_user_url
+#> [1] "https://api.github.com/user"
+#>
+#> $current_user_authorizations_html_url
+#> [1] "https://github.com/settings/connections/applications{/client_id}"
+#>
+#> $authorizations_url
+#> [1] "https://api.github.com/authorizations"
+#>
+#> $code_search_url
+...
+```
 
-<div class="language-r highlighter-rouge"><pre class="highlight"><code><span class="n">api</span><span class="p">(</span><span class="s1">'http://httpbin.org/headers'</span><span class="p">)</span><span class="w"> </span><span class="o">%&gt;%</span><span class="w">
-  </span><span class="n">api_headers</span><span class="p">(</span><span class="n">`X-FARGO-SEASON`</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="m">3</span><span class="p">,</span><span class="w"> </span><span class="n">`X-NARCOS-SEASON`</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="m">5</span><span class="p">)</span><span class="w"> </span><span class="o">%&gt;%</span><span class="w">
-  </span><span class="n">peep</span><span class="w">
-</span><span class="c1">#&gt; &lt;http request&gt;
-#&gt;   url: http://httpbin.org/headers
-#&gt;   paths:
-#&gt;   query:
-#&gt;   body:
-#&gt;   paging:
-#&gt;   headers:
-#&gt;     X-FARGO-SEASON: 3
-#&gt;     X-NARCOS-SEASON: 5
-#&gt;   rate limit:
-#&gt;   retry (n/delay (s)): /
-#&gt;   error handler:
-#&gt;   config:
-</span></code></pre>
-</div>
+`http()` is called at the end of a chain of piped commands, so no need to invoke it. However, you can if you like.
 
-<h2 id="curl-configuration">curl configuration</h2>
+## Templating
 
-<p><code class="highlighter-rouge">httr</code> is exported in <code class="highlighter-rouge">request</code>, so you can use <code class="highlighter-rouge">httr</code> functions like <code class="highlighter-rouge">verbose()</code> to get verbose curl output</p>
+```r
+repo_info <- list(username = 'craigcitro', repo = 'r-travis')
+api('https://api.github.com/') %>%
+  api_template(template = 'repos/{{username}}/{{repo}}/issues', data = repo_info)
+#> [[1]]
+#> [[1]]$url
+#> [1] "https://api.github.com/repos/craigcitro/r-travis/issues/164"
+#>
+#> [[1]]$labels_url
+#> [1] "https://api.github.com/repos/craigcitro/r-travis/issues/164/labels{/name}"
+#>
+#> [[1]]$comments_url
+#> [1] "https://api.github.com/repos/craigcitro/r-travis/issues/164/comments"
+#> ...
+```
 
-<div class="language-r highlighter-rouge"><pre class="highlight"><code><span class="n">api</span><span class="p">(</span><span class="s1">'http://httpbin.org/headers'</span><span class="p">)</span><span class="w"> </span><span class="o">%&gt;%</span><span class="w">
-  </span><span class="n">api_config</span><span class="p">(</span><span class="n">verbose</span><span class="p">())</span><span class="w">
-</span><span class="c1">#&gt; -&gt; GET /headers HTTP/1.1
-#&gt; -&gt; Host: httpbin.org
-#&gt; -&gt; User-Agent: curl/7.43.0 curl/0.9.4 httr/1.0.0 request/0.1.0
-#&gt; -&gt; Accept-Encoding: gzip, deflate
-#&gt; -&gt; Accept: application/json, text/xml, application/xml, */*
-#&gt; -&gt;
-#&gt; &lt;- HTTP/1.1 200 OK
-#&gt; &lt;- Server: nginx
-#&gt; &lt;- Date: Sun, 03 Jan 2016 16:56:29 GMT
-#&gt; &lt;- Content-Type: application/json
-#&gt; &lt;- Content-Length: 227
-#&gt; &lt;- Connection: keep-alive
-#&gt; &lt;- Access-Control-Allow-Origin: *
-#&gt; &lt;- Access-Control-Allow-Credentials: true
-#&gt; &lt;-
-#&gt; $headers
-#&gt; $headers$Accept
-#&gt; [1] "application/json, text/xml, application/xml, */*"
-#&gt; ...
-</span></code></pre>
-</div>
+## Set paths
 
-<h2 id="coming-soon">Coming soon</h2>
+`api_path()` adds paths to the base URL
 
-<p>There’s a number of interesting features that should be coming soon to <code class="highlighter-rouge">request</code>.</p>
 
-<ul>
-  <li>Paging - a paging helper will make it easy to do paing, and will attempt to handle any parameters used for paging. Some user input will be required, like what parameter names are, and how many records you want returned  <a href="https://github.com/sckott/request/issues/2">sckott/request#2</a></li>
-  <li>Retry - a retry helper will make it easy to retry http requests on any failure, and execute a user defined function on failure <a href="https://github.com/sckott/request/issues/6">sckott/request#6</a></li>
-  <li>Rate limit - a rate limit helper will add info to a set of many requests - still in early design stages <a href="https://github.com/sckott/request/issues/5">sckott/request#5</a></li>
-  <li>Caching - a caching helper - may use in the background the in development <a href="https://github.com/ropensci/vcr">vcr R client</a> when on CRAN or perhaps <a href="https://github.com/richfitz/storr">storr</a>  <a href="https://github.com/sckott/request/issues/4">sckott/request#4</a></li>
-</ul>
+```r
+api('https://api.github.com/') %>%
+  api_path(repos, ropensci, rgbif, issues) %>%
+  peep
+#> <http request>
+#>   url: https://api.github.com/
+#>   paths: repos/ropensci/rgbif/issues
+#>   query:
+#>   body:
+#>   paging:
+#>   headers:
+#>   rate limit:
+#>   retry (n/delay (s)): /
+#>   error handler:
+#>   config:
+```
+
+## Query
+
+
+```r
+api("http://api.plos.org/search") %>%
+  api_query(q = ecology, wt = json, fl = journal) %>%
+  peep
+#> <http request>
+#>   url: http://api.plos.org/search
+#>   paths:
+#>   query: q=ecology, wt=json, fl=journal
+#>   body:
+#>   paging:
+#>   headers:
+#>   rate limit:
+#>   retry (n/delay (s)): /
+#>   error handler:
+#>   config:
+```
+
+## Headers
+
+
+```r
+api('http://httpbin.org/headers') %>%
+  api_headers(`X-FARGO-SEASON` = 3, `X-NARCOS-SEASON` = 5) %>%
+  peep
+#> <http request>
+#>   url: http://httpbin.org/headers
+#>   paths:
+#>   query:
+#>   body:
+#>   paging:
+#>   headers:
+#>     X-FARGO-SEASON: 3
+#>     X-NARCOS-SEASON: 5
+#>   rate limit:
+#>   retry (n/delay (s)): /
+#>   error handler:
+#>   config:
+```
+
+## curl configuration
+
+`httr` is exported in `request`, so you can use `httr` functions like `verbose()` to get verbose curl output
+
+
+```r
+api('http://httpbin.org/headers') %>%
+  api_config(verbose())
+#> -> GET /headers HTTP/1.1
+#> -> Host: httpbin.org
+#> -> User-Agent: curl/7.43.0 curl/0.9.4 httr/1.0.0 request/0.1.0
+#> -> Accept-Encoding: gzip, deflate
+#> -> Accept: application/json, text/xml, application/xml, */*
+#> ->
+#> <- HTTP/1.1 200 OK
+#> <- Server: nginx
+#> <- Date: Sun, 03 Jan 2016 16:56:29 GMT
+#> <- Content-Type: application/json
+#> <- Content-Length: 227
+#> <- Connection: keep-alive
+#> <- Access-Control-Allow-Origin: *
+#> <- Access-Control-Allow-Credentials: true
+#> <-
+#> $headers
+#> $headers$Accept
+#> [1] "application/json, text/xml, application/xml, */*"
+#> ...
+```
+
+## Coming soon
+
+There's a number of interesting features that should be coming soon to `request`.
+
+* Paging - a paging helper will make it easy to do paing, and will attempt to handle any parameters used for paging. Some user input will be required, like what parameter names are, and how many records you want returned  [sckott/request#2](https://github.com/sckott/request/issues/2)
+* Retry - a retry helper will make it easy to retry http requests on any failure, and execute a user defined function on failure [sckott/request#6](https://github.com/sckott/request/issues/6)
+* Rate limit - a rate limit helper will add info to a set of many requests - still in early design stages [sckott/request#5](https://github.com/sckott/request/issues/5)
+* Caching - a caching helper - may use in the background the in development [vcr R client](https://github.com/ropensci/vcr) when on CRAN or perhaps [storr](https://github.com/richfitz/storr)  [sckott/request#4](https://github.com/sckott/request/issues/4)
 
   </div>
   
@@ -326,575 +724,343 @@
 
     <span class="post-date">08 Dec 2015</span>
 
-    <p>The first version of <code class="highlighter-rouge">binomen</code> is now up on <a href="https://cran.rstudio.com/web/packages/binomen">CRAN</a>. It provides various taxonomic classes for defining a single taxon, multiple taxa, and a taxonomic data.frame. It is designed as a companion to <a href="https://github.com/ropensci/taxize">taxize</a>, where you can get taxonomic data on taxonomic names from the web.</p>
-
-<p>The classes (S3):</p>
-
-<ul>
-  <li><code class="highlighter-rouge">taxon</code></li>
-  <li><code class="highlighter-rouge">taxonref</code></li>
-  <li><code class="highlighter-rouge">taxonrefs</code></li>
-  <li><code class="highlighter-rouge">binomial</code></li>
-  <li><code class="highlighter-rouge">grouping</code> (i.e., classification - used different term to avoid conflict with classification in <code class="highlighter-rouge">taxize</code>)</li>
-</ul>
-
-<p>For example, the <code class="highlighter-rouge">binomial</code> class is defined by a genus, epithet, authority, and optional full species name and canonical version.</p>
-
-<div class="language-r highlighter-rouge"><pre class="highlight"><code><span class="n">binomial</span><span class="p">(</span><span class="s2">"Poa"</span><span class="p">,</span><span class="w"> </span><span class="s2">"annua"</span><span class="p">,</span><span class="w"> </span><span class="n">authority</span><span class="o">=</span><span class="s2">"L."</span><span class="p">)</span><span class="w">
-</span></code></pre>
-</div>
-
-<div class="language-r highlighter-rouge"><pre class="highlight"><code><span class="o">&lt;</span><span class="n">binomial</span><span class="o">&gt;</span><span class="w">
-  </span><span class="n">genus</span><span class="o">:</span><span class="w"> </span><span class="n">Poa</span><span class="w">
-  </span><span class="n">epithet</span><span class="o">:</span><span class="w"> </span><span class="n">annua</span><span class="w">
-  </span><span class="n">canonical</span><span class="o">:</span><span class="w">
-  </span><span class="n">species</span><span class="o">:</span><span class="w">
-  </span><span class="n">authority</span><span class="o">:</span><span class="w"> </span><span class="n">L.</span><span class="w">
-</span></code></pre>
-</div>
-
-<p>The package has a suite of functions to work on these taxonomic classes:</p>
-
-<ul>
-  <li><code class="highlighter-rouge">gethier()</code> - get hierarchy from a <code class="highlighter-rouge">taxon</code> class</li>
-  <li><code class="highlighter-rouge">scatter()</code> - make each row in taxonomic data.frame (<code class="highlighter-rouge">taxondf</code>) a separate <code class="highlighter-rouge">taxon</code> object within a single <code class="highlighter-rouge">taxa</code> object</li>
-  <li><code class="highlighter-rouge">assemble()</code> - make a <code class="highlighter-rouge">taxa</code> object into a <code class="highlighter-rouge">taxondf</code> data.frame</li>
-  <li><code class="highlighter-rouge">pick()</code> - pick out one or more taxonomic groups</li>
-  <li><code class="highlighter-rouge">pop()</code> - pop out (drop) one or more taxonomic groups</li>
-  <li><code class="highlighter-rouge">span()</code> - pick a range between two taxonomic groups (inclusive)</li>
-  <li><code class="highlighter-rouge">strain()</code> - filter by taxonomic groups, like dplyr’s filter</li>
-  <li><code class="highlighter-rouge">name()</code> - get the taxon name for each <code class="highlighter-rouge">taxonref</code> object</li>
-  <li><code class="highlighter-rouge">uri()</code> - get the reference uri for each <code class="highlighter-rouge">taxonref</code> object</li>
-  <li><code class="highlighter-rouge">rank()</code> - get the taxonomic rank for each <code class="highlighter-rouge">taxonref</code> object</li>
-  <li><code class="highlighter-rouge">id()</code> - get the reference uri for each <code class="highlighter-rouge">taxonref</code> object</li>
-</ul>
-
-<p>The approach in this package I suppose is sort of like <code class="highlighter-rouge">split-apply-combine</code> from <code class="highlighter-rouge">plyr</code>/<code class="highlighter-rouge">dplyr</code>, whereas this is aims to make it easy to do with taxonomic names.</p>
-
-<h2 id="install">Install</h2>
-
-<p>For examples below, you’ll need the development version:</p>
-
-<div class="language-r highlighter-rouge"><pre class="highlight"><code><span class="n">install.packages</span><span class="p">(</span><span class="s2">"binomen"</span><span class="p">)</span><span class="w">
-</span></code></pre>
-</div>
-
-<div class="language-r highlighter-rouge"><pre class="highlight"><code><span class="n">library</span><span class="p">(</span><span class="s2">"binomen"</span><span class="p">)</span><span class="w">
-</span></code></pre>
-</div>
-
-<h2 id="make-a-taxon">Make a taxon</h2>
-
-<p>Make a taxon object</p>
-
-<div class="language-r highlighter-rouge"><pre class="highlight"><code><span class="p">(</span><span class="n">obj</span><span class="w"> </span><span class="o">&lt;-</span><span class="w"> </span><span class="n">make_taxon</span><span class="p">(</span><span class="n">genus</span><span class="o">=</span><span class="s2">"Poa"</span><span class="p">,</span><span class="w"> </span><span class="n">epithet</span><span class="o">=</span><span class="s2">"annua"</span><span class="p">,</span><span class="w"> </span><span class="n">authority</span><span class="o">=</span><span class="s2">"L."</span><span class="p">,</span><span class="w">
-  </span><span class="n">family</span><span class="o">=</span><span class="s1">'Poaceae'</span><span class="p">,</span><span class="w"> </span><span class="n">clazz</span><span class="o">=</span><span class="s1">'Poales'</span><span class="p">,</span><span class="w"> </span><span class="n">kingdom</span><span class="o">=</span><span class="s1">'Plantae'</span><span class="p">,</span><span class="w"> </span><span class="n">variety</span><span class="o">=</span><span class="s1">'annua'</span><span class="p">))</span><span class="w">
-</span><span class="c1">#&gt; &lt;taxon&gt;
-#&gt;   binomial: Poa annua
-#&gt;   grouping: 
-#&gt;     kingdom: Plantae
-#&gt;     clazz: Poales
-#&gt;     family: Poaceae
-#&gt;     genus: Poa
-#&gt;     species: Poa annua
-#&gt;     variety: annua
-</span></code></pre>
-</div>
-
-<p>Index to various parts of the object</p>
-
-<p>The binomial</p>
-
-<div class="language-r highlighter-rouge"><pre class="highlight"><code><span class="n">obj</span><span class="o">$</span><span class="n">binomial</span><span class="w">
-</span><span class="c1">#&gt; &lt;binomial&gt;
-#&gt;   genus: Poa
-#&gt;   epithet: annua
-#&gt;   canonical: Poa annua
-#&gt;   species: Poa annua L.
-#&gt;   authority: L.
-</span></code></pre>
-</div>
-
-<p>The authority</p>
-
-<div class="language-r highlighter-rouge"><pre class="highlight"><code><span class="n">obj</span><span class="o">$</span><span class="n">binomial</span><span class="o">$</span><span class="n">authority</span><span class="w">
-</span><span class="c1">#&gt; [1] "L."
-</span></code></pre>
-</div>
-
-<p>The classification</p>
-
-<div class="language-r highlighter-rouge"><pre class="highlight"><code><span class="n">obj</span><span class="o">$</span><span class="n">grouping</span><span class="w">
-</span><span class="c1">#&gt; &lt;grouping&gt;
-#&gt;   kingdom: Plantae
-#&gt;   clazz: Poales
-#&gt;   family: Poaceae
-#&gt;   genus: Poa
-#&gt;   species: Poa annua
-#&gt;   variety: annua
-</span></code></pre>
-</div>
-
-<p>The family</p>
-
-<div class="language-r highlighter-rouge"><pre class="highlight"><code><span class="n">obj</span><span class="o">$</span><span class="n">grouping</span><span class="o">$</span><span class="n">family</span><span class="w">
-</span><span class="c1">#&gt; &lt;taxonref&gt;
-#&gt;   rank: family
-#&gt;   name: Poaceae
-#&gt;   id: none
-#&gt;   uri: none
-</span></code></pre>
-</div>
-
-<h2 id="subset-taxon-objects">Subset taxon objects</h2>
-
-<p>Get one or more ranks via <code class="highlighter-rouge">pick()</code></p>
-
-<div class="language-r highlighter-rouge"><pre class="highlight"><code><span class="n">obj</span><span class="w"> </span><span class="o">%&gt;%</span><span class="w"> </span><span class="n">pick</span><span class="p">(</span><span class="n">family</span><span class="p">)</span><span class="w">
-</span><span class="c1">#&gt; &lt;taxon&gt;
-#&gt;   binomial: Poa annua
-#&gt;   grouping: 
-#&gt;     family: Poaceae
-</span><span class="n">obj</span><span class="w"> </span><span class="o">%&gt;%</span><span class="w"> </span><span class="n">pick</span><span class="p">(</span><span class="n">family</span><span class="p">,</span><span class="w"> </span><span class="n">genus</span><span class="p">)</span><span class="w">
-</span><span class="c1">#&gt; &lt;taxon&gt;
-#&gt;   binomial: Poa annua
-#&gt;   grouping: 
-#&gt;     family: Poaceae
-#&gt;     genus: Poa
-</span></code></pre>
-</div>
-
-<p>Drop one or more ranks via <code class="highlighter-rouge">pop()</code></p>
-
-<div class="language-r highlighter-rouge"><pre class="highlight"><code><span class="n">obj</span><span class="w"> </span><span class="o">%&gt;%</span><span class="w"> </span><span class="n">pop</span><span class="p">(</span><span class="n">family</span><span class="p">)</span><span class="w">
-</span><span class="c1">#&gt; &lt;taxon&gt;
-#&gt;   binomial: Poa annua
-#&gt;   grouping: 
-#&gt;     kingdom: Plantae
-#&gt;     clazz: Poales
-#&gt;     genus: Poa
-#&gt;     species: Poa annua
-#&gt;     variety: annua
-</span><span class="n">obj</span><span class="w"> </span><span class="o">%&gt;%</span><span class="w"> </span><span class="n">pop</span><span class="p">(</span><span class="n">family</span><span class="p">,</span><span class="w"> </span><span class="n">genus</span><span class="p">)</span><span class="w">
-</span><span class="c1">#&gt; &lt;taxon&gt;
-#&gt;   binomial: Poa annua
-#&gt;   grouping: 
-#&gt;     kingdom: Plantae
-#&gt;     clazz: Poales
-#&gt;     species: Poa annua
-#&gt;     variety: annua
-</span></code></pre>
-</div>
-
-<p>Get a range of ranks via <code class="highlighter-rouge">span()</code></p>
-
-<div class="language-r highlighter-rouge"><pre class="highlight"><code><span class="n">obj</span><span class="w"> </span><span class="o">%&gt;%</span><span class="w"> </span><span class="n">span</span><span class="p">(</span><span class="n">kingdom</span><span class="p">,</span><span class="w"> </span><span class="n">family</span><span class="p">)</span><span class="w">
-</span><span class="c1">#&gt; &lt;taxon&gt;
-#&gt;   binomial: Poa annua
-#&gt;   grouping: 
-#&gt;     kingdom: Plantae
-#&gt;     clazz: Poales
-#&gt;     family: Poaceae
-</span></code></pre>
-</div>
-
-<p>Extract classification as a <code class="highlighter-rouge">data.frame</code></p>
-
-<div class="language-r highlighter-rouge"><pre class="highlight"><code><span class="n">gethier</span><span class="p">(</span><span class="n">obj</span><span class="p">)</span><span class="w">
-</span><span class="c1">#&gt;      rank      name
-#&gt; 1 kingdom   Plantae
-#&gt; 2   clazz    Poales
-#&gt; 3  family   Poaceae
-#&gt; 4   genus       Poa
-#&gt; 5 species Poa annua
-#&gt; 6 variety     annua
-</span></code></pre>
-</div>
-
-<h2 id="taxonomic-dataframes">Taxonomic data.frame’s</h2>
-
-<p>Make one</p>
-
-<div class="language-r highlighter-rouge"><pre class="highlight"><code><span class="n">df</span><span class="w"> </span><span class="o">&lt;-</span><span class="w"> </span><span class="n">data.frame</span><span class="p">(</span><span class="n">order</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nf">c</span><span class="p">(</span><span class="s1">'Asterales'</span><span class="p">,</span><span class="s1">'Asterales'</span><span class="p">,</span><span class="s1">'Fagales'</span><span class="p">,</span><span class="s1">'Poales'</span><span class="p">,</span><span class="s1">'Poales'</span><span class="p">,</span><span class="s1">'Poales'</span><span class="p">),</span><span class="w">
-  </span><span class="n">family</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nf">c</span><span class="p">(</span><span class="s1">'Asteraceae'</span><span class="p">,</span><span class="s1">'Asteraceae'</span><span class="p">,</span><span class="s1">'Fagaceae'</span><span class="p">,</span><span class="s1">'Poaceae'</span><span class="p">,</span><span class="s1">'Poaceae'</span><span class="p">,</span><span class="s1">'Poaceae'</span><span class="p">),</span><span class="w">
-  </span><span class="n">genus</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nf">c</span><span class="p">(</span><span class="s1">'Helianthus'</span><span class="p">,</span><span class="s1">'Helianthus'</span><span class="p">,</span><span class="s1">'Quercus'</span><span class="p">,</span><span class="s1">'Poa'</span><span class="p">,</span><span class="s1">'Festuca'</span><span class="p">,</span><span class="s1">'Holodiscus'</span><span class="p">),</span><span class="w">
-  </span><span class="n">stringsAsFactors</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="kc">FALSE</span><span class="p">)</span><span class="w">
-</span><span class="p">(</span><span class="n">df2</span><span class="w"> </span><span class="o">&lt;-</span><span class="w"> </span><span class="n">taxon_df</span><span class="p">(</span><span class="n">df</span><span class="p">))</span><span class="w">
-</span><span class="c1">#&gt;       order     family      genus
-#&gt; 1 Asterales Asteraceae Helianthus
-#&gt; 2 Asterales Asteraceae Helianthus
-#&gt; 3   Fagales   Fagaceae    Quercus
-#&gt; 4    Poales    Poaceae        Poa
-#&gt; 5    Poales    Poaceae    Festuca
-#&gt; 6    Poales    Poaceae Holodiscus
-</span></code></pre>
-</div>
-
-<p>Parse - get rank order via <code class="highlighter-rouge">pick()</code></p>
-
-<div class="language-r highlighter-rouge"><pre class="highlight"><code><span class="n">df2</span><span class="w"> </span><span class="o">%&gt;%</span><span class="w"> </span><span class="n">pick</span><span class="p">(</span><span class="n">order</span><span class="p">)</span><span class="w">
-</span><span class="c1">#&gt;       order
-#&gt; 1 Asterales
-#&gt; 2 Asterales
-#&gt; 3   Fagales
-#&gt; 4    Poales
-#&gt; 5    Poales
-#&gt; 6    Poales
-</span></code></pre>
-</div>
-
-<p>get ranks order, family, and genus via <code class="highlighter-rouge">pick()</code></p>
-
-<div class="language-r highlighter-rouge"><pre class="highlight"><code><span class="n">df2</span><span class="w"> </span><span class="o">%&gt;%</span><span class="w"> </span><span class="n">pick</span><span class="p">(</span><span class="n">order</span><span class="p">,</span><span class="w"> </span><span class="n">family</span><span class="p">,</span><span class="w"> </span><span class="n">genus</span><span class="p">)</span><span class="w">
-</span><span class="c1">#&gt;       order     family      genus
-#&gt; 1 Asterales Asteraceae Helianthus
-#&gt; 2 Asterales Asteraceae Helianthus
-#&gt; 3   Fagales   Fagaceae    Quercus
-#&gt; 4    Poales    Poaceae        Poa
-#&gt; 5    Poales    Poaceae    Festuca
-#&gt; 6    Poales    Poaceae Holodiscus
-</span></code></pre>
-</div>
-
-<p>get range of names via <code class="highlighter-rouge">span()</code>, from rank <code class="highlighter-rouge">X</code> to rank <code class="highlighter-rouge">Y</code></p>
-
-<div class="language-r highlighter-rouge"><pre class="highlight"><code><span class="n">df2</span><span class="w"> </span><span class="o">%&gt;%</span><span class="w"> </span><span class="n">span</span><span class="p">(</span><span class="n">family</span><span class="p">,</span><span class="w"> </span><span class="n">genus</span><span class="p">)</span><span class="w">
-</span><span class="c1">#&gt;       family      genus
-#&gt; 1 Asteraceae Helianthus
-#&gt; 2 Asteraceae Helianthus
-#&gt; 3   Fagaceae    Quercus
-#&gt; 4    Poaceae        Poa
-#&gt; 5    Poaceae    Festuca
-#&gt; 6    Poaceae Holodiscus
-</span></code></pre>
-</div>
-
-<p>Separate each row into a <code class="highlighter-rouge">taxon</code> class (many <code class="highlighter-rouge">taxon</code> objects are a <code class="highlighter-rouge">taxa</code> class)</p>
-
-<div class="language-r highlighter-rouge"><pre class="highlight"><code><span class="n">scatter</span><span class="p">(</span><span class="n">df2</span><span class="p">)</span><span class="w">
-</span><span class="c1">#&gt; [[1]]
-#&gt; &lt;taxon&gt;
-#&gt;   binomial: Helianthus none
-#&gt;   grouping: 
-#&gt;     order: Asterales
-#&gt;     family: Asteraceae
-#&gt;     genus: Helianthus
-#&gt;     species: Helianthus none
-#&gt; 
-#&gt; [[2]]
-#&gt; &lt;taxon&gt;
-#&gt;   binomial: Helianthus none
-#&gt;   grouping: 
-#&gt;     order: Asterales
-#&gt;     family: Asteraceae
-#&gt;     genus: Helianthus
-#&gt;     species: Helianthus none
-#&gt; 
-#&gt; [[3]]
-#&gt; &lt;taxon&gt;
-#&gt;   binomial: Quercus none
-#&gt;   grouping: 
-#&gt;     order: Fagales
-#&gt;     family: Fagaceae
-#&gt;     genus: Quercus
-#&gt;     species: Quercus none
-#&gt; 
-#&gt; [[4]]
-#&gt; &lt;taxon&gt;
-#&gt;   binomial: Poa none
-#&gt;   grouping: 
-#&gt;     order: Poales
-#&gt;     family: Poaceae
-#&gt;     genus: Poa
-#&gt;     species: Poa none
-#&gt; 
-#&gt; [[5]]
-#&gt; &lt;taxon&gt;
-#&gt;   binomial: Festuca none
-#&gt;   grouping: 
-#&gt;     order: Poales
-#&gt;     family: Poaceae
-#&gt;     genus: Festuca
-#&gt;     species: Festuca none
-#&gt; 
-#&gt; [[6]]
-#&gt; &lt;taxon&gt;
-#&gt;   binomial: Holodiscus none
-#&gt;   grouping: 
-#&gt;     order: Poales
-#&gt;     family: Poaceae
-#&gt;     genus: Holodiscus
-#&gt;     species: Holodiscus none
-#&gt; 
-#&gt; attr(,"class")
-#&gt; [1] "taxa"
-</span></code></pre>
-</div>
-
-<p>And you can re-assemble a data.frame from the output of <code class="highlighter-rouge">scatter()</code> with <code class="highlighter-rouge">assemble()</code></p>
-
-<div class="language-r highlighter-rouge"><pre class="highlight"><code><span class="n">out</span><span class="w"> </span><span class="o">&lt;-</span><span class="w"> </span><span class="n">scatter</span><span class="p">(</span><span class="n">df2</span><span class="p">)</span><span class="w">
-</span><span class="n">assemble</span><span class="p">(</span><span class="n">out</span><span class="p">)</span><span class="w">
-</span><span class="c1">#&gt;       order     family      genus         species
-#&gt; 1 Asterales Asteraceae Helianthus Helianthus none
-#&gt; 2 Asterales Asteraceae Helianthus Helianthus none
-#&gt; 3   Fagales   Fagaceae    Quercus    Quercus none
-#&gt; 4    Poales    Poaceae        Poa        Poa none
-#&gt; 5    Poales    Poaceae    Festuca    Festuca none
-#&gt; 6    Poales    Poaceae Holodiscus Holodiscus none
-</span></code></pre>
-</div>
-
-<h2 id="thoughts">Thoughts?</h2>
-
-<p>I’m really curious what people think of <code class="highlighter-rouge">binomen</code>. I’m not sure how useful this will be in the wild. Try it. Let me know. Thanks much :)</p>
-
-
-  </div>
-  
-  <div class="post">
-    <h1>
-      <a href="/2015/11/crossref-clients/">
-        Crossref programmatic clients
-      </a>
-    </h1>
-
-    <span class="post-date">30 Nov 2015</span>
-
-    <p>I gave two talks recently at the annual <a href="http://www.crossref.org/annualmeeting/agenda.html">Crossref meeting</a>, one of which was a somewhat technical overview of programmatic clients for Crossref APIs. Check out the talk <a href="https://crossref.wistia.com/medias/8rh0jm5eda">here</a>. I talked about the motivation for working with Crossref data by writing code/etc. rather than going the GUI route, then went over the various clients, with brief examples.</p>
-
-<p>We (rOpenSci) have been working on the R client <a href="https://github.com/ropensci/rcrossref">rcrossref</a> for a while now, but I’m also working on the Python and Ruby clients for Crossref. In addition, the Ruby client has a CLI client inside. The Javascript client is worked on independently by <a href="https://science.ai/">ScienceAI</a>.</p>
-
-<p>The R, Ruby, and Python clients are useable but not feature complete yet, and would benefit from lots of users surfacing bugs and highlighting nice to have features.</p>
-
-<p>The main Crossref API used in all the clients is documented at <a href="https://github.com/CrossRef/rest-api-doc/blob/master/rest_api.md">api.crossref.org</a>.</p>
-
-<p>I’ve tried to make the APIs similar-ish across clients. Functions in each client match the main Crossref search API (api.crossref.org) routes:</p>
-
-<ul>
-  <li><code class="highlighter-rouge">/works</code></li>
-  <li><code class="highlighter-rouge">/members</code></li>
-  <li><code class="highlighter-rouge">/funders</code></li>
-  <li><code class="highlighter-rouge">/journals</code></li>
-  <li><code class="highlighter-rouge">/types</code></li>
-  <li><code class="highlighter-rouge">/licenses</code></li>
-</ul>
-
-<p>Other methods in all three clients:</p>
-
-<ul>
-  <li>Get DOI minting agency
-    <ul>
-      <li>Uses api.crossref.org API</li>
-    </ul>
-  </li>
-  <li>Get random DOIs
-    <ul>
-      <li>Uses api.crossref.org API</li>
-    </ul>
-  </li>
-  <li>Content negotiation
-    <ul>
-      <li>Documented at <a href="http://www.crosscite.org/cn">http://www.crosscite.org/cn</a></li>
-    </ul>
-  </li>
-  <li>Get full text
-    <ul>
-      <li>other clients in each language will focus on this use case</li>
-    </ul>
-  </li>
-  <li>Get citation count
-    <ul>
-      <li>Uses service at <a href="http://www.crossref.org/openurl">http://www.crossref.org/openurl</a> - though this functionality may be in the api.crossref.org API at some point</li>
-    </ul>
-  </li>
-</ul>
-
-<p>The following shows how to install, and then examples from each client for a few use cases.</p>
-
-<h2 id="installation">Installation</h2>
-
-<h3 id="python">Python</h3>
-
-<div class="language-sh highlighter-rouge"><pre class="highlight"><code>pip install habanero
-</code></pre>
-</div>
-
-<h3 id="ruby">Ruby</h3>
-
-<div class="language-sh highlighter-rouge"><pre class="highlight"><code>gem install serrano
-</code></pre>
-</div>
-
-<h3 id="r">R</h3>
-
-<p>Inside R:</p>
-
-<div class="language-R highlighter-rouge"><pre class="highlight"><code><span class="n">install.packages</span><span class="p">(</span><span class="s2">"rcrossref"</span><span class="p">)</span><span class="w">
-</span></code></pre>
-</div>
-
-<h3 id="javascript">Javascript</h3>
-
-<div class="language-sh highlighter-rouge"><pre class="highlight"><code>npm install crossref
-</code></pre>
-</div>
-
-<p>I won’t do any examples with the js library, as I don’t maintain it.</p>
-
-<h2 id="use-case-get-orcid-ids-for-authors">Use case: get ORCID IDs for authors</h2>
-
-<p>Python</p>
-
-<div class="language-python highlighter-rouge"><pre class="highlight"><code><span class="kn">from</span> <span class="nn">habanero</span> <span class="kn">import</span> <span class="n">Crossref</span>
-<span class="n">cr</span> <span class="o">=</span> <span class="n">Crossref</span><span class="p">()</span>
-<span class="n">res</span> <span class="o">=</span> <span class="n">cr</span><span class="o">.</span><span class="n">works</span><span class="p">(</span><span class="nb">filter</span> <span class="o">=</span> <span class="p">{</span><span class="s">'has_orcid'</span><span class="p">:</span> <span class="bp">True</span><span class="p">},</span> <span class="n">limit</span> <span class="o">=</span> <span class="mi">10</span><span class="p">)</span>
-<span class="n">res2</span> <span class="o">=</span> <span class="p">[</span> <span class="p">[</span> <span class="n">z</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s">'ORCID'</span><span class="p">)</span> <span class="k">for</span> <span class="n">z</span> <span class="ow">in</span> <span class="n">x</span><span class="p">[</span><span class="s">'author'</span><span class="p">]</span> <span class="p">]</span> <span class="k">for</span> <span class="n">x</span> <span class="ow">in</span> <span class="n">res</span><span class="o">.</span><span class="n">result</span><span class="p">[</span><span class="s">'message'</span><span class="p">][</span><span class="s">'items'</span><span class="p">]</span> <span class="p">]</span>
-<span class="nb">filter</span><span class="p">(</span><span class="bp">None</span><span class="p">,</span> <span class="nb">reduce</span><span class="p">(</span><span class="k">lambda</span> <span class="n">x</span><span class="p">,</span> <span class="n">y</span><span class="p">:</span> <span class="n">x</span><span class="o">+</span><span class="n">y</span><span class="p">,</span> <span class="n">res2</span><span class="p">))</span>
-</code></pre>
-</div>
-
-<div class="language-python highlighter-rouge"><pre class="highlight"><code><span class="p">[</span><span class="s">u'http://orcid.org/0000-0003-4087-8021'</span><span class="p">,</span>
- <span class="s">u'http://orcid.org/0000-0002-2076-5452'</span><span class="p">,</span>
- <span class="s">u'http://orcid.org/0000-0003-4087-8021'</span><span class="p">,</span>
- <span class="s">u'http://orcid.org/0000-0002-2076-5452'</span><span class="p">,</span>
- <span class="s">u'http://orcid.org/0000-0003-1710-1580'</span><span class="p">,</span>
- <span class="s">u'http://orcid.org/0000-0003-1710-1580'</span><span class="p">,</span>
- <span class="s">u'http://orcid.org/0000-0003-4637-238X'</span><span class="p">,</span>
- <span class="s">u'http://orcid.org/0000-0003-4637-238X'</span><span class="p">,</span>
- <span class="s">u'http://orcid.org/0000-0003-4637-238X'</span><span class="p">,</span>
- <span class="s">u'http://orcid.org/0000-0003-4637-238X'</span><span class="p">,</span>
- <span class="s">u'http://orcid.org/0000-0003-4637-238X'</span><span class="p">,</span>
- <span class="s">u'http://orcid.org/0000-0003-2510-4271'</span><span class="p">]</span>
-</code></pre>
-</div>
-
-<p>Ruby</p>
-
-<div class="language-ruby highlighter-rouge"><pre class="highlight"><code><span class="nb">require</span> <span class="s1">'serrano'</span>
-<span class="n">res</span> <span class="o">=</span> <span class="no">Serrano</span><span class="p">.</span><span class="nf">works</span><span class="p">(</span><span class="ss">filter: </span><span class="p">{</span><span class="s1">'has_orcid'</span><span class="p">:</span> <span class="kp">true</span><span class="p">},</span> <span class="ss">limit: </span><span class="mi">10</span><span class="p">)</span>
-<span class="n">res2</span> <span class="o">=</span> <span class="n">res</span><span class="p">[</span><span class="s1">'message'</span><span class="p">][</span><span class="s1">'items'</span><span class="p">].</span><span class="nf">collect</span> <span class="p">{</span> <span class="o">|</span><span class="n">x</span><span class="o">|</span> <span class="n">x</span><span class="p">[</span><span class="s1">'author'</span><span class="p">].</span><span class="nf">collect</span> <span class="p">{</span> <span class="o">|</span><span class="n">z</span><span class="o">|</span> <span class="n">z</span><span class="p">[</span><span class="s1">'ORCID'</span><span class="p">]</span> <span class="p">}</span> <span class="p">}</span>
-<span class="n">res2</span><span class="p">.</span><span class="nf">flatten</span><span class="p">.</span><span class="nf">compact</span>
-</code></pre>
-</div>
-
-<div class="language-ruby highlighter-rouge"><pre class="highlight"><code><span class="o">=&gt;</span> <span class="p">[</span><span class="s2">"http://orcid.org/0000-0003-4087-8021"</span><span class="p">,</span>
- <span class="s2">"http://orcid.org/0000-0002-2076-5452"</span><span class="p">,</span>
- <span class="s2">"http://orcid.org/0000-0003-4087-8021"</span><span class="p">,</span>
- <span class="s2">"http://orcid.org/0000-0002-2076-5452"</span><span class="p">,</span>
- <span class="s2">"http://orcid.org/0000-0003-1710-1580"</span><span class="p">,</span>
- <span class="s2">"http://orcid.org/0000-0003-1710-1580"</span><span class="p">,</span>
- <span class="s2">"http://orcid.org/0000-0003-4637-238X"</span><span class="p">,</span>
- <span class="s2">"http://orcid.org/0000-0003-4637-238X"</span><span class="p">,</span>
- <span class="s2">"http://orcid.org/0000-0003-4637-238X"</span><span class="p">,</span>
- <span class="s2">"http://orcid.org/0000-0003-4637-238X"</span><span class="p">,</span>
- <span class="s2">"http://orcid.org/0000-0003-4637-238X"</span><span class="p">,</span>
- <span class="s2">"http://orcid.org/0000-0003-2510-4271"</span><span class="p">]</span>
-</code></pre>
-</div>
-
-<p>R</p>
-
-<div class="language-R highlighter-rouge"><pre class="highlight"><code><span class="n">library</span><span class="p">(</span><span class="s2">"rcrossref"</span><span class="p">)</span><span class="w">
-</span><span class="n">res</span><span class="w"> </span><span class="o">&lt;-</span><span class="w"> </span><span class="n">cr_works</span><span class="p">(</span><span class="n">filter</span><span class="o">=</span><span class="nf">c</span><span class="p">(</span><span class="n">has_orcid</span><span class="o">=</span><span class="kc">TRUE</span><span class="p">),</span><span class="w"> </span><span class="n">limit</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="m">10</span><span class="p">)</span><span class="w">
-</span><span class="n">orcids</span><span class="w"> </span><span class="o">&lt;-</span><span class="w"> </span><span class="n">unlist</span><span class="p">(</span><span class="n">lapply</span><span class="p">(</span><span class="n">res</span><span class="o">$</span><span class="n">data</span><span class="o">$</span><span class="n">author</span><span class="p">,</span><span class="w"> </span><span class="k">function</span><span class="p">(</span><span class="n">z</span><span class="p">)</span><span class="w"> </span><span class="n">z</span><span class="o">$</span><span class="n">ORCID</span><span class="p">))</span><span class="w">
-</span><span class="n">Filter</span><span class="p">(</span><span class="k">function</span><span class="p">(</span><span class="n">x</span><span class="p">)</span><span class="w"> </span><span class="o">!</span><span class="nf">is.na</span><span class="p">(</span><span class="n">x</span><span class="p">),</span><span class="w"> </span><span class="n">orcids</span><span class="p">)</span><span class="w">
-</span></code></pre>
-</div>
-
-<div class="language-R highlighter-rouge"><pre class="highlight"><code><span class="w"> </span><span class="p">[</span><span class="m">1</span><span class="p">]</span><span class="w"> </span><span class="s2">"http://orcid.org/0000-0003-4087-8021"</span><span class="w">
- </span><span class="p">[</span><span class="m">2</span><span class="p">]</span><span class="w"> </span><span class="s2">"http://orcid.org/0000-0002-2076-5452"</span><span class="w">
- </span><span class="p">[</span><span class="m">3</span><span class="p">]</span><span class="w"> </span><span class="s2">"http://orcid.org/0000-0003-4087-8021"</span><span class="w">
- </span><span class="p">[</span><span class="m">4</span><span class="p">]</span><span class="w"> </span><span class="s2">"http://orcid.org/0000-0002-2076-5452"</span><span class="w">
- </span><span class="p">[</span><span class="m">5</span><span class="p">]</span><span class="w"> </span><span class="s2">"http://orcid.org/0000-0003-1710-1580"</span><span class="w">
- </span><span class="p">[</span><span class="m">6</span><span class="p">]</span><span class="w"> </span><span class="s2">"http://orcid.org/0000-0003-1710-1580"</span><span class="w">
- </span><span class="p">[</span><span class="m">7</span><span class="p">]</span><span class="w"> </span><span class="s2">"http://orcid.org/0000-0003-4637-238X"</span><span class="w">
- </span><span class="p">[</span><span class="m">8</span><span class="p">]</span><span class="w"> </span><span class="s2">"http://orcid.org/0000-0003-4637-238X"</span><span class="w">
- </span><span class="p">[</span><span class="m">9</span><span class="p">]</span><span class="w"> </span><span class="s2">"http://orcid.org/0000-0003-4637-238X"</span><span class="w">
-</span><span class="p">[</span><span class="m">10</span><span class="p">]</span><span class="w"> </span><span class="s2">"http://orcid.org/0000-0003-4637-238X"</span><span class="w">
-</span><span class="p">[</span><span class="m">11</span><span class="p">]</span><span class="w"> </span><span class="s2">"http://orcid.org/0000-0003-4637-238X"</span><span class="w">
-</span><span class="p">[</span><span class="m">12</span><span class="p">]</span><span class="w"> </span><span class="s2">"http://orcid.org/0000-0003-2510-4271"</span><span class="w">
-</span></code></pre>
-</div>
-
-<p>CLI</p>
-
-<div class="language-sh highlighter-rouge"><pre class="highlight"><code>serrano works --filter<span class="o">=</span>has_orcid:true --json --limit<span class="o">=</span>12 | jq <span class="s1">'.message.items[].author[].ORCID | select(. != null)'</span>
-</code></pre>
-</div>
-
-<div class="language-sh highlighter-rouge"><pre class="highlight"><code><span class="s2">"http://orcid.org/0000-0003-4087-8021"</span>
-<span class="s2">"http://orcid.org/0000-0002-2076-5452"</span>
-<span class="s2">"http://orcid.org/0000-0003-4087-8021"</span>
-<span class="s2">"http://orcid.org/0000-0002-2076-5452"</span>
-<span class="s2">"http://orcid.org/0000-0003-1710-1580"</span>
-<span class="s2">"http://orcid.org/0000-0003-1710-1580"</span>
-<span class="s2">"http://orcid.org/0000-0003-4637-238X"</span>
-<span class="s2">"http://orcid.org/0000-0003-4637-238X"</span>
-<span class="s2">"http://orcid.org/0000-0003-4637-238X"</span>
-<span class="s2">"http://orcid.org/0000-0003-4637-238X"</span>
-<span class="s2">"http://orcid.org/0000-0003-4637-238X"</span>
-<span class="s2">"http://orcid.org/0000-0003-2510-4271"</span>
-<span class="s2">"http://orcid.org/0000-0001-9408-8207"</span>
-<span class="s2">"http://orcid.org/0000-0002-2076-5452"</span>
-</code></pre>
-</div>
-
-<h2 id="use-case-content-negotation">Use case: content negotation</h2>
-
-<p>Python</p>
-
-<div class="language-python highlighter-rouge"><pre class="highlight"><code><span class="kn">from</span> <span class="nn">habanero</span> <span class="kn">import</span> <span class="n">cn</span>
-<span class="n">cn</span><span class="o">.</span><span class="n">content_negotiation</span><span class="p">(</span><span class="n">ids</span> <span class="o">=</span> <span class="s">'10.1126/science.169.3946.635'</span><span class="p">,</span> <span class="n">format</span> <span class="o">=</span> <span class="s">"text"</span><span class="p">)</span>
-</code></pre>
-</div>
-
-<div class="language-python highlighter-rouge"><pre class="highlight"><code><span class="s">u'Frank, H. S. (1970). The Structure of Ordinary Water: New data and interpretations are yielding new insights into this fascinating substance. Science, 169(3946), 635</span><span class="se">\xe2\x80\x93</span><span class="s">641. doi:10.1126/science.169.3946.635</span><span class="se">\n</span><span class="s">'</span>
-</code></pre>
-</div>
-
-<p>Ruby</p>
-
-<div class="language-ruby highlighter-rouge"><pre class="highlight"><code><span class="nb">require</span> <span class="s1">'serrano'</span>
-<span class="no">Serrano</span><span class="p">.</span><span class="nf">content_negotiation</span><span class="p">(</span><span class="ss">ids: </span><span class="s1">'10.1126/science.169.3946.635'</span><span class="p">,</span> <span class="ss">format: </span><span class="s2">"text"</span><span class="p">)</span>
-</code></pre>
-</div>
-
-<div class="language-ruby highlighter-rouge"><pre class="highlight"><code><span class="o">=&gt;</span> <span class="p">[</span><span class="s2">"Frank, H. S. (1970). The Structure of Ordinary Water: New data and interpretations are yielding new insights into this fascinating substance. Science, 169(3946), 635</span><span class="se">\xE2\x80\x93</span><span class="s2">641. doi:10.1126/science.169.3946.635</span><span class="se">\n</span><span class="s2">"</span><span class="p">]</span>
-</code></pre>
-</div>
-
-<p>R</p>
-
-<div class="language-r highlighter-rouge"><pre class="highlight"><code><span class="n">library</span><span class="p">(</span><span class="s2">"rcrossref"</span><span class="p">)</span><span class="w">
-</span><span class="n">cr_cn</span><span class="p">(</span><span class="n">dois</span><span class="o">=</span><span class="s2">"10.1126/science.169.3946.635"</span><span class="p">,</span><span class="w"> </span><span class="s2">"text"</span><span class="p">)</span><span class="w">
-</span></code></pre>
-</div>
-
-<div class="language-r highlighter-rouge"><pre class="highlight"><code><span class="p">[</span><span class="m">1</span><span class="p">]</span><span class="w"> </span><span class="s2">"Frank, H. S. (1970). The Structure of Ordinary Water: New data and interpretations are yielding new insights into this fascinating substance. Science, 169(3946), 635–641. doi:10.1126/science.169.3946.635"</span><span class="w">
-</span></code></pre>
-</div>
-
-<p>CLI</p>
-
-<div class="language-sh highlighter-rouge"><pre class="highlight"><code>serrano contneg 10.1890/13-0590.1 --format<span class="o">=</span>text
-</code></pre>
-</div>
-
-<div class="language-sh highlighter-rouge"><pre class="highlight"><code>Murtaugh, P. A. <span class="o">(</span>2014<span class="o">)</span>.  In defense of P values . Ecology, 95<span class="o">(</span>3<span class="o">)</span>, 611–617. doi:10.1890/13-0590.1
-</code></pre>
-</div>
-
-<h2 id="more">More</h2>
-
-<p>There are definitely issues with data in the Crossref search API, some of which I cover in my talks. However, it is still the best place to go for scholarly metadata.</p>
-
-<p>Let us know of other use cases - there are others not covered here for brevity sake.</p>
-
-<p>There are lots of examples in the docs for each client. If you can think of any doc improvements file an issue.</p>
-
-<p>If you find any bugs, please do file an issue.</p>
+    The first version of `binomen` is now up on [CRAN][binomencran]. It provides various taxonomic classes for defining a single taxon, multiple taxa, and a taxonomic data.frame. It is designed as a companion to [taxize](https://github.com/ropensci/taxize), where you can get taxonomic data on taxonomic names from the web.
 
+The classes (S3):
+
+* `taxon`
+* `taxonref`
+* `taxonrefs`
+* `binomial`
+* `grouping` (i.e., classification - used different term to avoid conflict with classification in `taxize`)
+
+For example, the `binomial` class is defined by a genus, epithet, authority, and optional full species name and canonical version.
+
+```r
+binomial("Poa", "annua", authority="L.")
+```
+
+```r
+<binomial>
+  genus: Poa
+  epithet: annua
+  canonical:
+  species:
+  authority: L.
+```
+
+The package has a suite of functions to work on these taxonomic classes:
+
+* `gethier()` - get hierarchy from a `taxon` class
+* `scatter()` - make each row in taxonomic data.frame (`taxondf`) a separate `taxon` object within a single `taxa` object
+* `assemble()` - make a `taxa` object into a `taxondf` data.frame
+* `pick()` - pick out one or more taxonomic groups
+* `pop()` - pop out (drop) one or more taxonomic groups
+* `span()` - pick a range between two taxonomic groups (inclusive)
+* `strain()` - filter by taxonomic groups, like dplyr's filter
+* `name()` - get the taxon name for each `taxonref` object
+* `uri()` - get the reference uri for each `taxonref` object
+* `rank()` - get the taxonomic rank for each `taxonref` object
+* `id()` - get the reference uri for each `taxonref` object
+
+The approach in this package I suppose is sort of like `split-apply-combine` from `plyr`/`dplyr`, whereas this is aims to make it easy to do with taxonomic names.
+
+## Install
+
+For examples below, you'll need the development version:
+
+
+```r
+install.packages("binomen")
+```
+
+
+```r
+library("binomen")
+```
+
+## Make a taxon
+
+Make a taxon object
+
+
+```r
+(obj <- make_taxon(genus="Poa", epithet="annua", authority="L.",
+  family='Poaceae', clazz='Poales', kingdom='Plantae', variety='annua'))
+#> <taxon>
+#>   binomial: Poa annua
+#>   grouping: 
+#>     kingdom: Plantae
+#>     clazz: Poales
+#>     family: Poaceae
+#>     genus: Poa
+#>     species: Poa annua
+#>     variety: annua
+```
+
+Index to various parts of the object
+
+The binomial
+
+
+```r
+obj$binomial
+#> <binomial>
+#>   genus: Poa
+#>   epithet: annua
+#>   canonical: Poa annua
+#>   species: Poa annua L.
+#>   authority: L.
+```
+
+The authority
+
+
+```r
+obj$binomial$authority
+#> [1] "L."
+```
+
+The classification
+
+
+```r
+obj$grouping
+#> <grouping>
+#>   kingdom: Plantae
+#>   clazz: Poales
+#>   family: Poaceae
+#>   genus: Poa
+#>   species: Poa annua
+#>   variety: annua
+```
+
+The family
+
+
+```r
+obj$grouping$family
+#> <taxonref>
+#>   rank: family
+#>   name: Poaceae
+#>   id: none
+#>   uri: none
+```
+
+## Subset taxon objects
+
+Get one or more ranks via `pick()`
+
+
+```r
+obj %>% pick(family)
+#> <taxon>
+#>   binomial: Poa annua
+#>   grouping: 
+#>     family: Poaceae
+obj %>% pick(family, genus)
+#> <taxon>
+#>   binomial: Poa annua
+#>   grouping: 
+#>     family: Poaceae
+#>     genus: Poa
+```
+
+Drop one or more ranks via `pop()`
+
+
+```r
+obj %>% pop(family)
+#> <taxon>
+#>   binomial: Poa annua
+#>   grouping: 
+#>     kingdom: Plantae
+#>     clazz: Poales
+#>     genus: Poa
+#>     species: Poa annua
+#>     variety: annua
+obj %>% pop(family, genus)
+#> <taxon>
+#>   binomial: Poa annua
+#>   grouping: 
+#>     kingdom: Plantae
+#>     clazz: Poales
+#>     species: Poa annua
+#>     variety: annua
+```
+
+Get a range of ranks via `span()`
+
+
+```r
+obj %>% span(kingdom, family)
+#> <taxon>
+#>   binomial: Poa annua
+#>   grouping: 
+#>     kingdom: Plantae
+#>     clazz: Poales
+#>     family: Poaceae
+```
+
+Extract classification as a `data.frame`
+
+
+```r
+gethier(obj)
+#>      rank      name
+#> 1 kingdom   Plantae
+#> 2   clazz    Poales
+#> 3  family   Poaceae
+#> 4   genus       Poa
+#> 5 species Poa annua
+#> 6 variety     annua
+```
+
+## Taxonomic data.frame's
+
+Make one
+
+
+```r
+df <- data.frame(order = c('Asterales','Asterales','Fagales','Poales','Poales','Poales'),
+  family = c('Asteraceae','Asteraceae','Fagaceae','Poaceae','Poaceae','Poaceae'),
+  genus = c('Helianthus','Helianthus','Quercus','Poa','Festuca','Holodiscus'),
+  stringsAsFactors = FALSE)
+(df2 <- taxon_df(df))
+#>       order     family      genus
+#> 1 Asterales Asteraceae Helianthus
+#> 2 Asterales Asteraceae Helianthus
+#> 3   Fagales   Fagaceae    Quercus
+#> 4    Poales    Poaceae        Poa
+#> 5    Poales    Poaceae    Festuca
+#> 6    Poales    Poaceae Holodiscus
+```
+
+Parse - get rank order via `pick()`
+
+
+```r
+df2 %>% pick(order)
+#>       order
+#> 1 Asterales
+#> 2 Asterales
+#> 3   Fagales
+#> 4    Poales
+#> 5    Poales
+#> 6    Poales
+```
+
+get ranks order, family, and genus via `pick()`
+
+
+```r
+df2 %>% pick(order, family, genus)
+#>       order     family      genus
+#> 1 Asterales Asteraceae Helianthus
+#> 2 Asterales Asteraceae Helianthus
+#> 3   Fagales   Fagaceae    Quercus
+#> 4    Poales    Poaceae        Poa
+#> 5    Poales    Poaceae    Festuca
+#> 6    Poales    Poaceae Holodiscus
+```
+
+get range of names via `span()`, from rank `X` to rank `Y`
+
+
+```r
+df2 %>% span(family, genus)
+#>       family      genus
+#> 1 Asteraceae Helianthus
+#> 2 Asteraceae Helianthus
+#> 3   Fagaceae    Quercus
+#> 4    Poaceae        Poa
+#> 5    Poaceae    Festuca
+#> 6    Poaceae Holodiscus
+```
+
+Separate each row into a `taxon` class (many `taxon` objects are a `taxa` class)
+
+
+```r
+scatter(df2)
+#> [[1]]
+#> <taxon>
+#>   binomial: Helianthus none
+#>   grouping: 
+#>     order: Asterales
+#>     family: Asteraceae
+#>     genus: Helianthus
+#>     species: Helianthus none
+#> 
+#> [[2]]
+#> <taxon>
+#>   binomial: Helianthus none
+#>   grouping: 
+#>     order: Asterales
+#>     family: Asteraceae
+#>     genus: Helianthus
+#>     species: Helianthus none
+#> 
+#> [[3]]
+#> <taxon>
+#>   binomial: Quercus none
+#>   grouping: 
+#>     order: Fagales
+#>     family: Fagaceae
+#>     genus: Quercus
+#>     species: Quercus none
+#> 
+#> [[4]]
+#> <taxon>
+#>   binomial: Poa none
+#>   grouping: 
+#>     order: Poales
+#>     family: Poaceae
+#>     genus: Poa
+#>     species: Poa none
+#> 
+#> [[5]]
+#> <taxon>
+#>   binomial: Festuca none
+#>   grouping: 
+#>     order: Poales
+#>     family: Poaceae
+#>     genus: Festuca
+#>     species: Festuca none
+#> 
+#> [[6]]
+#> <taxon>
+#>   binomial: Holodiscus none
+#>   grouping: 
+#>     order: Poales
+#>     family: Poaceae
+#>     genus: Holodiscus
+#>     species: Holodiscus none
+#> 
+#> attr(,"class")
+#> [1] "taxa"
+```
+
+And you can re-assemble a data.frame from the output of `scatter()` with `assemble()`
+
+
+```r
+out <- scatter(df2)
+assemble(out)
+#>       order     family      genus         species
+#> 1 Asterales Asteraceae Helianthus Helianthus none
+#> 2 Asterales Asteraceae Helianthus Helianthus none
+#> 3   Fagales   Fagaceae    Quercus    Quercus none
+#> 4    Poales    Poaceae        Poa        Poa none
+#> 5    Poales    Poaceae    Festuca    Festuca none
+#> 6    Poales    Poaceae Holodiscus Holodiscus none
+```
+
+## Thoughts?
+
+I'm really curious what people think of `binomen`. I'm not sure how useful this will be in the wild. Try it. Let me know. Thanks much :)
+
+[binomencran]: https://cran.rstudio.com/web/packages/binomen
 
   </div>
   

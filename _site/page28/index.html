@@ -33,7 +33,7 @@
     <header class="masthead">
       <div class="masthead-inner">
         <h1>Recology</h1>
-        <!-- <h1> <a href="http://recology.info/">Recology</a></h1> -->
+        <!-- <h1> <a href="http://localhost:4000">Recology</a></h1> -->
         <p class="lead">R/etc.</p>
 
         <div class="colophon">
@@ -61,6 +61,53 @@
   
   <div class="post">
     <h1>
+      <a href="/2013/01/api-token/">
+        Waiting for an API request to complete
+      </a>
+    </h1>
+
+    <span class="post-date">26 Jan 2013</span>
+
+    ### Dealing with API tokens in R
+
+In [my previous post](http://sckott.github.io/2013/01/tnrs-use-case/) I showed an example of calling the Phylotastic taxonomic name resolution API `Taxosaurus` [here](http://api.phylotastic.org/tnrs).  When you query their API they give you a token which you use later to retrieve the result (see examples on their page above). However, you don't know when the query will be done, so how do we know when to send the query to rerieve the data?
+
+***************
+
+As the time this takes depends on how big the query is and other things, we don't know when we can get the result. I struggled with this for a bit, but then settled on using a while loop. 
+
+***************
+
+So what does this look like?  Basically we just keep sending the request for data until we get it.
+
+
+{% highlight r %}
+iter <- 0  # make an iterator so each time we call
+output <- list()  # make an empty list to put data into
+timeout <- "wait"
+while (timeout == "wait") {
+    iter <- iter + 1  # increase the iterator each time
+    temp <- fromJSON(getURL(retrieve))  # send the request and parse the JSON
+    if (grepl("is still being processed", temp["message"]) == TRUE) {
+        timeout <- "wait"
+    } else {
+        output[[iter]] <- temp  # put result from query in the list
+        timeout <- "done"  # we got the result so timeout is now done, making the while loop stop
+    }
+}
+{% endhighlight %}
+
+
+***************
+
+#### Get the .Rmd file used to create this post [at my github account](https://github.com/sckott/sckott.github.com/tree/master/_drafts/2013-01-26-api-token.Rmd) - or [.md file](https://github.com/sckott/sckott.github.com/tree/master/_posts/2013-01-26-api-token.md).
+
+#### Written in [Markdown](http://daringfireball.net/projects/markdown/), with help from [knitr](http://yihui.name/knitr/).
+
+  </div>
+  
+  <div class="post">
+    <h1>
       <a href="/2013/01/tnrs-use-case/">
         Resolving species names when you have a lot of them
       </a>
@@ -68,61 +115,84 @@
 
     <span class="post-date">25 Jan 2013</span>
 
-    <h3 id="taxize-use-case-resolving-species-names-when-you-have-a-lot-of-them"><strong>taxize use case: Resolving species names when you have a lot of them</strong></h3>
+    ### __taxize use case: Resolving species names when you have a lot of them__
 
-<p>Species names can be a pain in the ass, especially if you are an ecologist. We ecologists aren’t trained in taxonomy, yet we often end up with huge species lists.  Of course we want to correct any spelling errors in the names, and get the newest names for our species, resolve any synonyms, etc.</p>
+Species names can be a pain in the ass, especially if you are an ecologist. We ecologists aren't trained in taxonomy, yet we often end up with huge species lists.  Of course we want to correct any spelling errors in the names, and get the newest names for our species, resolve any synonyms, etc. 
 
-<p>We are building tools into our R package <a href="http://ropensci.github.com/taxize_/"><code class="highlighter-rouge">taxize</code></a>, that will let you check your species names to make sure they are correct.</p>
+We are building tools into our R package [`taxize`](http://ropensci.github.com/taxize_/), that will let you check your species names to make sure they are correct. 
 
-<p>An important use case is when you have a lot of species. Someone wrote to us recently, saying that they had thousands of species, and they wanted to know how to check their species names efficiently in R.</p>
+An important use case is when you have a lot of species. Someone wrote to us recently, saying that they had thousands of species, and they wanted to know how to check their species names efficiently in R. 
 
-<p>Below is an example of how to do this.</p>
+Below is an example of how to do this. 
 
-<hr />
+***************
 
-<h4 id="install-taxize">Install taxize</h4>
+#### Install taxize
 
-<figure class="highlight"><pre><code class="language-r" data-lang="r"><span class="c1"># install_github('taxize_', 'ropensci') # install the GitHub version, not
+{% highlight r %}
+# install_github('taxize_', 'ropensci') # install the GitHub version, not
 # the CRAN version, uncomment if you don't have it installed
-</span><span class="n">library</span><span class="p">(</span><span class="n">taxize</span><span class="p">)</span></code></pre></figure>
+library(taxize)
+{% endhighlight %}
 
-<hr />
 
-<h4 id="get-some-species-in-this-case-all-species-in-the-scrophulariaceae-family-from-theplantlistorg">Get some species, in this case all species in the Scrophulariaceae family from theplantlist.org</h4>
+***************
 
-<figure class="highlight"><pre><code class="language-r" data-lang="r"><span class="n">tpl_get</span><span class="p">(</span><span class="n">dir_</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"~/foo2"</span><span class="p">,</span><span class="w"> </span><span class="n">family</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"Scrophulariaceae"</span><span class="p">)</span></code></pre></figure>
+#### Get some species, in this case all species in the Scrophulariaceae family from theplantlist.org
 
-<figure class="highlight"><pre><code class="language-text" data-lang="text">## Reading and writing csv files to ~/foo2...</code></pre></figure>
+{% highlight r %}
+tpl_get(dir_ = "~/foo2", family = "Scrophulariaceae")
+{% endhighlight %}
 
-<figure class="highlight"><pre><code class="language-r" data-lang="r"><span class="n">dat</span><span class="w"> </span><span class="o">&lt;-</span><span class="w"> </span><span class="n">read.csv</span><span class="p">(</span><span class="s2">"~/foo2/Scrophulariaceae.csv"</span><span class="p">)</span></code></pre></figure>
 
-<hr />
 
-<h4 id="lets-grab-the-species-and-concatenate-to-genusspecies">Lets grab the species and concatenate to genus_species</h4>
+{% highlight text %}
+## Reading and writing csv files to ~/foo2...
+{% endhighlight %}
 
-<figure class="highlight"><pre><code class="language-r" data-lang="r"><span class="n">species</span><span class="w"> </span><span class="o">&lt;-</span><span class="w"> </span><span class="nf">as.character</span><span class="p">(</span><span class="n">ddply</span><span class="p">(</span><span class="n">dat</span><span class="p">[,</span><span class="w"> </span><span class="nf">c</span><span class="p">(</span><span class="s2">"Genus"</span><span class="p">,</span><span class="w"> </span><span class="s2">"Species"</span><span class="p">)],</span><span class="w"> </span><span class="n">.</span><span class="p">(),</span><span class="w"> </span><span class="n">transform</span><span class="p">,</span><span class="w"> 
-    </span><span class="n">gen_sp</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">as.factor</span><span class="p">(</span><span class="n">paste</span><span class="p">(</span><span class="n">Genus</span><span class="p">,</span><span class="w"> </span><span class="n">Species</span><span class="p">,</span><span class="w"> </span><span class="n">sep</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">" "</span><span class="p">)))[,</span><span class="w"> </span><span class="m">4</span><span class="p">])</span></code></pre></figure>
 
-<hr />
+{% highlight r %}
+dat <- read.csv("~/foo2/Scrophulariaceae.csv")
+{% endhighlight %}
 
-<h4 id="its-better-to-do-many-smaller-calls-to-a-web-api-instead-of-few-big-ones-to-be-nice-to-the-database-maintainers">It’s better to do many smaller calls to a web API instead of few big ones to be nice to the database maintainers.</h4>
 
-<figure class="highlight"><pre><code class="language-r" data-lang="r"><span class="c1">## Define function to split up your species list into useable chuncks
-</span><span class="n">slice</span><span class="w"> </span><span class="o">&lt;-</span><span class="w"> </span><span class="k">function</span><span class="p">(</span><span class="n">input</span><span class="p">,</span><span class="w"> </span><span class="n">by</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="m">2</span><span class="p">)</span><span class="w"> </span><span class="p">{</span><span class="w">
-    </span><span class="n">starts</span><span class="w"> </span><span class="o">&lt;-</span><span class="w"> </span><span class="n">seq</span><span class="p">(</span><span class="m">1</span><span class="p">,</span><span class="w"> </span><span class="nf">length</span><span class="p">(</span><span class="n">input</span><span class="p">),</span><span class="w"> </span><span class="n">by</span><span class="p">)</span><span class="w">
-    </span><span class="n">tt</span><span class="w"> </span><span class="o">&lt;-</span><span class="w"> </span><span class="n">lapply</span><span class="p">(</span><span class="n">starts</span><span class="p">,</span><span class="w"> </span><span class="k">function</span><span class="p">(</span><span class="n">y</span><span class="p">)</span><span class="w"> </span><span class="n">input</span><span class="p">[</span><span class="n">y</span><span class="o">:</span><span class="p">(</span><span class="n">y</span><span class="w"> </span><span class="o">+</span><span class="w"> </span><span class="p">(</span><span class="n">by</span><span class="w"> </span><span class="o">-</span><span class="w"> </span><span class="m">1</span><span class="p">))])</span><span class="w">
-    </span><span class="n">llply</span><span class="p">(</span><span class="n">tt</span><span class="p">,</span><span class="w"> </span><span class="k">function</span><span class="p">(</span><span class="n">x</span><span class="p">)</span><span class="w"> </span><span class="n">x</span><span class="p">[</span><span class="o">!</span><span class="nf">is.na</span><span class="p">(</span><span class="n">x</span><span class="p">)])</span><span class="w">
-</span><span class="p">}</span><span class="w">
-</span><span class="n">species_split</span><span class="w"> </span><span class="o">&lt;-</span><span class="w"> </span><span class="n">slice</span><span class="p">(</span><span class="n">species</span><span class="p">,</span><span class="w"> </span><span class="n">by</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="m">100</span><span class="p">)</span></code></pre></figure>
+***************
 
-<hr />
+#### Lets grab the species and concatenate to genus_species
 
-<h4 id="query-for-your-large-species-list-with-pauses-between-calls-with-3-seconds-in-between-calls-to-not-hit-the-web-service-too-hard-using-post-method-here-instead-of-get---required-when-you-have-a-lot-of-species">Query for your large species list with pauses between calls, with 3 seconds in between calls to not hit the web service too hard. Using POST method here instead of GET - required when you have a lot of species.</h4>
+{% highlight r %}
+species <- as.character(ddply(dat[, c("Genus", "Species")], .(), transform, 
+    gen_sp = as.factor(paste(Genus, Species, sep = " ")))[, 4])
+{% endhighlight %}
 
-<figure class="highlight"><pre><code class="language-r" data-lang="r"><span class="n">tnrs_safe</span><span class="w"> </span><span class="o">&lt;-</span><span class="w"> </span><span class="n">failwith</span><span class="p">(</span><span class="kc">NULL</span><span class="p">,</span><span class="w"> </span><span class="n">tnrs</span><span class="p">)</span><span class="w">  </span><span class="c1"># in case some calls fail, will continue
-</span><span class="n">out</span><span class="w"> </span><span class="o">&lt;-</span><span class="w"> </span><span class="n">llply</span><span class="p">(</span><span class="n">species_split</span><span class="p">,</span><span class="w"> </span><span class="k">function</span><span class="p">(</span><span class="n">x</span><span class="p">)</span><span class="w"> </span><span class="n">tnrs_safe</span><span class="p">(</span><span class="n">x</span><span class="p">,</span><span class="w"> </span><span class="n">getpost</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"POST"</span><span class="p">,</span><span class="w"> </span><span class="n">sleep</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="m">3</span><span class="p">))</span></code></pre></figure>
 
-<figure class="highlight"><pre><code class="language-text" data-lang="text">Calling http://taxosaurus.org/retrieve/90fcd9ae425ad7c6103b06dd9fd78ae2
+***************
+
+#### It's better to do many smaller calls to a web API instead of few big ones to be nice to the database maintainers.
+
+{% highlight r %}
+## Define function to split up your species list into useable chuncks
+slice <- function(input, by = 2) {
+    starts <- seq(1, length(input), by)
+    tt <- lapply(starts, function(y) input[y:(y + (by - 1))])
+    llply(tt, function(x) x[!is.na(x)])
+}
+species_split <- slice(species, by = 100)
+{% endhighlight %}
+
+
+***************
+
+#### Query for your large species list with pauses between calls, with 3 seconds in between calls to not hit the web service too hard. Using POST method here instead of GET - required when you have a lot of species.
+
+{% highlight r %}
+tnrs_safe <- failwith(NULL, tnrs)  # in case some calls fail, will continue
+out <- llply(species_split, function(x) tnrs_safe(x, getpost = "POST", sleep = 3))
+{% endhighlight %}
+
+
+{% highlight text %}
+Calling http://taxosaurus.org/retrieve/90fcd9ae425ad7c6103b06dd9fd78ae2
 Calling http://taxosaurus.org/retrieve/223f73b83fcddcb8b6187966963660a8
 Calling http://taxosaurus.org/retrieve/72bacdbb8938316e321d4c709c8cdd09
 Calling http://taxosaurus.org/retrieve/979ce9cc4dec376710f61de162e1294e
@@ -132,12 +202,21 @@ Calling http://taxosaurus.org/retrieve/a9a9bdde6fda7e325d80120e27ccb480
 Calling http://taxosaurus.org/retrieve/215ccdcf2b00362278bf19d1942e1395
 Calling http://taxosaurus.org/retrieve/9d43c0b99b4dfb5ea1b435adab17b980
 Calling http://taxosaurus.org/retrieve/42e166f8e43f1fb349e36459cd5938b3
-Calling http://taxosaurus.org/retrieve/2c42e4b5227c5464f9bfeeafcdf0651d</code></pre></figure>
+Calling http://taxosaurus.org/retrieve/2c42e4b5227c5464f9bfeeafcdf0651d
+{% endhighlight %}
 
-<figure class="highlight"><pre><code class="language-r" data-lang="r"><span class="c1"># Looks like we got some data back for each element of our species list
-</span><span class="n">lapply</span><span class="p">(</span><span class="n">out</span><span class="p">,</span><span class="w"> </span><span class="n">head</span><span class="p">)[</span><span class="m">1</span><span class="o">:</span><span class="m">2</span><span class="p">]</span><span class="w">  </span><span class="err">#</span><span class="w"> </span><span class="n">just</span><span class="w"> </span><span class="n">look</span><span class="w"> </span><span class="n">at</span><span class="w"> </span><span class="n">the</span><span class="w"> </span><span class="n">first</span><span class="w"> </span><span class="n">two</span></code></pre></figure>
 
-<figure class="highlight"><pre><code class="language-text" data-lang="text">[[1]]
+
+{% highlight r %}
+
+# Looks like we got some data back for each element of our species list
+lapply(out, head)[1:2]  # just look at the first two
+{% endhighlight %}
+
+
+
+{% highlight text %}
+[[1]]
                  submittedName                 acceptedName    sourceId
 1        Aptosimum welwitschii                              iPlant_TNRS
 2        Anticharis ebracteata        Anticharis ebracteata iPlant_TNRS
@@ -148,7 +227,7 @@ Calling http://taxosaurus.org/retrieve/2c42e4b5227c5464f9bfeeafcdf0651d</code></
   score                  matchedName     annotations
 1     1        Aptosimum welwitschii                
 2     1        Anticharis ebracteata          Schinz
-3     1            Aptosimum lineare Marloth &amp; Engl.
+3     1            Aptosimum lineare Marloth & Engl.
 4     1     Antherothamnus pearsonii        N.E. Br.
 5     1 Barthlottia madagascariensis      Eb. Fisch.
 6     1         Agathelpis mucronata                
@@ -171,8 +250,8 @@ Calling http://taxosaurus.org/retrieve/2c42e4b5227c5464f9bfeeafcdf0651d</code></
   score            matchedName        annotations
 1   0.9 Buddleja pichinchensis              Kunth
 2   1.0       Buddleja soratae           Kraenzl.
-3   1.0    Buddleja euryphylla Standl. &amp; Steyerm.
-4   1.0        Buddleja incana        Ruiz &amp; Pav.
+3   1.0    Buddleja euryphylla Standl. & Steyerm.
+4   1.0        Buddleja incana        Ruiz & Pav.
 5   1.0        Buddleja incana               none
 6   1.0          Buddleja nana              Diels
                                           uri
@@ -181,13 +260,22 @@ Calling http://taxosaurus.org/retrieve/2c42e4b5227c5464f9bfeeafcdf0651d</code></
 3       http://www.tropicos.org/Name/19000790
 4       http://www.tropicos.org/Name/19000596
 5 http://www.ncbi.nlm.nih.gov/taxonomy/405077
-6       http://www.tropicos.org/Name/19001133</code></pre></figure>
+6       http://www.tropicos.org/Name/19001133
+{% endhighlight %}
 
-<figure class="highlight"><pre><code class="language-r" data-lang="r"><span class="c1"># Now we can put them back together as so into one data.frame if you like
-</span><span class="n">outdf</span><span class="w"> </span><span class="o">&lt;-</span><span class="w"> </span><span class="n">ldply</span><span class="p">(</span><span class="n">out</span><span class="p">)</span><span class="w">
-</span><span class="n">head</span><span class="p">(</span><span class="n">outdf</span><span class="p">)</span></code></pre></figure>
 
-<figure class="highlight"><pre><code class="language-text" data-lang="text">                 submittedName                 acceptedName    sourceId
+
+{% highlight r %}
+
+# Now we can put them back together as so into one data.frame if you like
+outdf <- ldply(out)
+head(outdf)
+{% endhighlight %}
+
+
+
+{% highlight text %}
+                 submittedName                 acceptedName    sourceId
 1        Aptosimum welwitschii                              iPlant_TNRS
 2        Anticharis ebracteata        Anticharis ebracteata iPlant_TNRS
 3            Aptosimum lineare            Aptosimum lineare iPlant_TNRS
@@ -197,7 +285,7 @@ Calling http://taxosaurus.org/retrieve/2c42e4b5227c5464f9bfeeafcdf0651d</code></
   score                  matchedName     annotations
 1     1        Aptosimum welwitschii                
 2     1        Anticharis ebracteata          Schinz
-3     1            Aptosimum lineare Marloth &amp; Engl.
+3     1            Aptosimum lineare Marloth & Engl.
 4     1     Antherothamnus pearsonii        N.E. Br.
 5     1 Barthlottia madagascariensis      Eb. Fisch.
 6     1         Agathelpis mucronata                
@@ -207,28 +295,42 @@ Calling http://taxosaurus.org/retrieve/2c42e4b5227c5464f9bfeeafcdf0651d</code></
 3 http://www.tropicos.org/Name/29202525
 4 http://www.tropicos.org/Name/29202728
 5 http://www.tropicos.org/Name/50089700
-6</code></pre></figure>
+6
+{% endhighlight %}
 
-<p>Note that there are multiple names for some species because data sources have different names for the same species (resulting in more than one row in the data.frame ‘outdf’ for a species). We are leaving this up to the user to decide which to use. For example, for the species <em>Buddleja montana</em> there are two names for in the output</p>
 
-<figure class="highlight"><pre><code class="language-r" data-lang="r"><span class="n">data</span><span class="w"> </span><span class="o">&lt;-</span><span class="w"> </span><span class="n">ddply</span><span class="p">(</span><span class="n">outdf</span><span class="p">,</span><span class="w"> </span><span class="n">.</span><span class="p">(</span><span class="n">submittedName</span><span class="p">),</span><span class="w"> </span><span class="n">summarize</span><span class="p">,</span><span class="w"> </span><span class="nf">length</span><span class="p">(</span><span class="n">submittedName</span><span class="p">))</span><span class="w">
-</span><span class="n">outdf</span><span class="p">[</span><span class="n">outdf</span><span class="o">$</span><span class="n">submittedName</span><span class="w"> </span><span class="o">%in%</span><span class="w"> </span><span class="nf">as.character</span><span class="p">(</span><span class="n">data</span><span class="p">[</span><span class="n">data</span><span class="o">$</span><span class="n">.</span><span class="m">.1</span><span class="w"> </span><span class="o">&gt;</span><span class="w"> </span><span class="m">1</span><span class="p">,</span><span class="w"> </span><span class="p">][</span><span class="m">6</span><span class="p">,</span><span class="w"> </span><span class="s2">"submittedName"</span><span class="p">]),</span><span class="w"> 
-    </span><span class="p">]</span></code></pre></figure>
+Note that there are multiple names for some species because data sources have different names for the same species (resulting in more than one row in the data.frame 'outdf' for a species). We are leaving this up to the user to decide which to use. For example, for the species _Buddleja montana_ there are two names for in the output
 
-<figure class="highlight"><pre><code class="language-text" data-lang="text">       submittedName     acceptedName    sourceId score      matchedName
+{% highlight r %}
+data <- ddply(outdf, .(submittedName), summarize, length(submittedName))
+outdf[outdf$submittedName %in% as.character(data[data$..1 > 1, ][6, "submittedName"]), 
+    ]
+{% endhighlight %}
+
+
+
+{% highlight text %}
+       submittedName     acceptedName    sourceId score      matchedName
 123 Buddleja montana Buddleja montana iPlant_TNRS     1 Buddleja montana
 124 Buddleja montana          Montana        NCBI     1 Buddleja montana
          annotations                                         uri
 123 Britton ex Rusby       http://www.tropicos.org/Name/19000601
-124             none http://www.ncbi.nlm.nih.gov/taxonomy/441235</code></pre></figure>
+124             none http://www.ncbi.nlm.nih.gov/taxonomy/441235
+{% endhighlight %}
 
-<p>The source iPlant matched the name, but NCBI actually gave back a genus of cricket (follow the link under the column uri for <em>Montana</em>). If you look at the page for <em>Buddleja</em> on NCBI <a href="http://www.ncbi.nlm.nih.gov/Taxonomy/Browser/wwwtax.cgi?id=26473">here</a> there is no <em>Buddleja montana</em> at all.</p>
 
-<p>Another thing we could do is look at the score that is returned. Let’s look at those that are less than 1 (i.e., )</p>
+The source iPlant matched the name, but NCBI actually gave back a genus of cricket (follow the link under the column uri for _Montana_). If you look at the page for _Buddleja_ on NCBI [here](http://www.ncbi.nlm.nih.gov/Taxonomy/Browser/wwwtax.cgi?id=26473) there is no _Buddleja montana_ at all. 
 
-<figure class="highlight"><pre><code class="language-r" data-lang="r"><span class="n">outdf</span><span class="p">[</span><span class="n">outdf</span><span class="o">$</span><span class="n">score</span><span class="w"> </span><span class="o">&lt;</span><span class="w"> </span><span class="m">1</span><span class="p">,</span><span class="w"> </span><span class="p">]</span></code></pre></figure>
+Another thing we could do is look at the score that is returned. Let's look at those that are less than 1 (i.e., )
 
-<figure class="highlight"><pre><code class="language-text" data-lang="text">                        submittedName           acceptedName    sourceId
+{% highlight r %}
+outdf[outdf$score < 1, ]
+{% endhighlight %}
+
+
+
+{% highlight text %}
+                        submittedName           acceptedName    sourceId
 94   Buddleja pichinchensis x bullata Buddleja pichinchensis iPlant_TNRS
 340                Diascia ellaphieae                        iPlant_TNRS
 495              Eremophila decipiens                        iPlant_TNRS
@@ -254,19 +356,22 @@ Calling http://taxosaurus.org/retrieve/2c42e4b5227c5464f9bfeeafcdf0651d</code></
 808                                       
 1051 http://www.tropicos.org/Name/40023766
 1081 http://www.tropicos.org/Name/40023766
-1097 http://www.tropicos.org/Name/40023766</code></pre></figure>
+1097 http://www.tropicos.org/Name/40023766
+{% endhighlight %}
 
-<p>As we got this speies list from <a href="http://www.theplantlist.org/">theplantlist.org</a>, there aren’t that many mistakes, but if it was my species list you know there would be many :)</p>
 
-<hr />
+As we got this speies list from [theplantlist.org](http://www.theplantlist.org/), there aren't that many mistakes, but if it was my species list you know there would be many :)
 
-<h3 id="thats-it--try-it-out-and-let-us-know-if-you-have-any-questions-at-inforopensciorgmailtoinforopensciorg-or-ask-questionsreport-problems-at-githubhttpsgithubcomropenscitaxizeissues">That’s it.  Try it out and let us know if you have any questions at <a href="mailto:info@ropensci.org">info@ropensci.org</a>, or <a href="https://github.com/ropensci/taxize_/issues">ask questions/report problems at GitHub</a>.</h3>
 
-<hr />
+***************
 
-<h4 id="get-the-rmd-file-used-to-create-this-post-at-my-github-accounthttpsgithubcomsckottsckottgithubcomtreemaster2013-01-25-tnrs-use-casermd---or-md-filehttpsgithubcomsckottsckottgithubcomtreemasterposts2013-01-25-tnrs-use-casemd">Get the .Rmd file used to create this post <a href="https://github.com/sckott/sckott.github.com/tree/master/2013-01-25-tnrs-use-case.Rmd">at my github account</a> - or <a href="https://github.com/sckott/sckott.github.com/tree/master/_posts/2013-01-25-tnrs-use-case.md">.md file</a>.</h4>
+### That's it.  Try it out and let us know if you have any questions at [info@ropensci.org](mailto:info@ropensci.org), or [ask questions/report problems at GitHub](https://github.com/ropensci/taxize_/issues).
 
-<h4 id="written-in-markdownhttpdaringfireballnetprojectsmarkdown-with-help-from-knitrhttpyihuinameknitr">Written in <a href="http://daringfireball.net/projects/markdown/">Markdown</a>, with help from <a href="http://yihui.name/knitr/">knitr</a>.</h4>
+***************
+
+#### Get the .Rmd file used to create this post [at my github account](https://github.com/sckott/sckott.github.com/tree/master/2013-01-25-tnrs-use-case.Rmd) - or [.md file](https://github.com/sckott/sckott.github.com/tree/master/_posts/2013-01-25-tnrs-use-case.md).
+
+#### Written in [Markdown](http://daringfireball.net/projects/markdown/), with help from [knitr](http://yihui.name/knitr/).
 
   </div>
   
@@ -279,149 +384,64 @@ Calling http://taxosaurus.org/retrieve/2c42e4b5227c5464f9bfeeafcdf0651d</code></
 
     <span class="post-date">08 Jan 2013</span>
 
-    <p><img src="https://raw.github.com/sckott/sckott.github.com/master/public/img/ropensci_challenge.png" alt="center" /></p>
+    ![center](https://raw.github.com/sckott/sckott.github.com/master/public/img/ropensci_challenge.png)
 
-<hr />
+***************
 
-<h3 id="open-science"><strong>Open Science</strong></h3>
+### __Open Science__
 
-<p>Science is becoming more open in many areas: publishing, data sharing, lab notebooks, and software. There are many benefits to open science. For example, sharing research data alongside your publications leads to increased citation rate (Piwowar <em>et. al.</em> 2007). In addition, data is becoming easier to share and reuse thanks to efforts like <a href="http://figshare.com/">FigShare</a> and <a href="http://datadryad.org/">Dryad</a>.</p>
+Science is becoming more open in many areas: publishing, data sharing, lab notebooks, and software. There are many benefits to open science. For example, sharing research data alongside your publications leads to increased citation rate (Piwowar _et. al._ 2007). In addition, data is becoming easier to share and reuse thanks to efforts like [FigShare](http://figshare.com/) and [Dryad](http://datadryad.org/). 
 
-<p>If you don’t understand the problem we are currently facing due to lack of open science, watch this video:</p>
+If you don't understand the problem we are currently facing due to lack of open science, watch this video:
 
-<iframe width="560" height="315" src="http://www.youtube.com/embed/N2zK3sAtr-4" frameborder="0" allowfullscreen=""></iframe>
+<iframe width="560" height="315" src="http://www.youtube.com/embed/N2zK3sAtr-4" frameborder="0" allowfullscreen></iframe>
 
-<hr />
+***************
 
-<h3 id="i-just-want-data"><strong>I just want Data</strong></h3>
+### __I just want Data__
 
-<p>Another way to look at this challenge is to think about how you can get data more easily. Right now you probably go to a website that has an interface to a database. You do a search, and then download a .csv file perhaps. Then you open it in Excel, and do some pivot tables to get the data in the right format. Only then will you bring the data in to R.</p>
+Another way to look at this challenge is to think about how you can get data more easily. Right now you probably go to a website that has an interface to a database. You do a search, and then download a .csv file perhaps. Then you open it in Excel, and do some pivot tables to get the data in the right format. Only then will you bring the data in to R. 
 
-<p>The advantage of using our packages is that they allow you to do that data collection part in a few lines of code. Therefore, you can easily do all those steps in the above paragraph using a few lines of code in one R file. Why does this matter? You can more easily reproduce your own work months later after that summer vacation. In addition, others can reproduce your research more easily.</p>
+The advantage of using our packages is that they allow you to do that data collection part in a few lines of code. Therefore, you can easily do all those steps in the above paragraph using a few lines of code in one R file. Why does this matter? You can more easily reproduce your own work months later after that summer vacation. In addition, others can reproduce your research more easily. 
 
-<hr />
+***************
 
-<h3 id="the-challenge"><strong>The challenge</strong></h3>
+### __The challenge__
 
-<p>We (<a href="http://ropensci.org/">ropensci</a>) have just kicked off the <a href="http://ropensci.org/open-science-challenge/">rOpenSci Open Science Challenge</a>. If you aren’t familiar with rOpenSci, it is a software collective connecting scientists to open science data on the web. Since R is the most popular programming language for life scientists, it made sense to do this in R (instead of Python e.g.).</p>
+We ([ropensci](http://ropensci.org/)) have just kicked off the [rOpenSci Open Science Challenge](http://ropensci.org/open-science-challenge/). If you aren't familiar with rOpenSci, it is a software collective connecting scientists to open science data on the web. Since R is the most popular programming language for life scientists, it made sense to do this in R (instead of Python e.g.). 
 
-<hr />
+***************
 
-<h3 id="what-is-the-challenge-about"><strong>What is the challenge about?</strong></h3>
+### __What is the challenge about?__
 
-<p>At rOpenSci, we create R software to make getting open source text from publications and open source data easy. An important result of this is that we are facilitating open science. Why? Because R is an open source programming language, and all of our software is open source. . This challenge asks you to propose a project using one or more of our packages - or perhaps you want to propose a new dataset to connect to R. The rOpenSci core developer team will help you with any problems using our packages, and attempt to modify packages according to feedback from participants. Do you use one or more of our R packages? If you do, great. If not, check out our packages <a href="http://ropensci.org/packages/index.html">here</a>.</p>
+At rOpenSci, we create R software to make getting open source text from publications and open source data easy. An important result of this is that we are facilitating open science. Why? Because R is an open source programming language, and all of our software is open source. . This challenge asks you to propose a project using one or more of our packages - or perhaps you want to propose a new dataset to connect to R. The rOpenSci core developer team will help you with any problems using our packages, and attempt to modify packages according to feedback from participants. Do you use one or more of our R packages? If you do, great. If not, check out our packages [here](http://ropensci.org/packages/index.html). 
 
-<hr />
+***************
 
-<h3 id="how-to-apply"><strong>How to apply</strong></h3>
+### __How to apply__ 
 
-<p>Just send an email to <a href="mailto:info@ropensci.org?subject=rOpenSci Open Science Challenge">info@ropensci.org</a>.</p>
+Just send an email to [info@ropensci.org](mailto:info@ropensci.org?subject=rOpenSci Open Science Challenge). 
 
-<hr />
+***************
 
-<h3 id="the-deadline"><strong>The deadline</strong></h3>
+### __The deadline__ 
 
-<p>January 31, 2013</p>
+January 31, 2013
 
-<hr />
+***************
 
-<h4 id="get-the-rmd-file-used-to-create-this-post-at-my-github-accounthttpsgithubcomsckottsckottgithubcomtreemasterdrafts2013-01-08-open-science-challengermd---or-md-filehttpsgithubcomsckottsckottgithubcomtreemasterposts2013-01-08-open-science-challengemd">Get the .Rmd file used to create this post <a href="https://github.com/sckott/sckott.github.com/tree/master/_drafts/2013-01-08-open-science-challenge.Rmd">at my github account</a> - or <a href="https://github.com/sckott/sckott.github.com/tree/master/_posts/2013-01-08-open-science-challenge.md">.md file</a>.</h4>
+#### Get the .Rmd file used to create this post [at my github account](https://github.com/sckott/sckott.github.com/tree/master/_drafts/2013-01-08-open-science-challenge.Rmd) - or [.md file](https://github.com/sckott/sckott.github.com/tree/master/_posts/2013-01-08-open-science-challenge.md).
 
-<h4 id="written-in-markdownhttpdaringfireballnetprojectsmarkdown-with-help-from-knitrhttpyihuinameknitr-and-knitcitationshttpsgithubcomcboettigknitcitations-from-carl-boettigerhttpwwwcarlboettigerinfo">Written in <a href="http://daringfireball.net/projects/markdown/">Markdown</a>, with help from <a href="http://yihui.name/knitr/">knitr</a>, and <a href="https://github.com/cboettig/knitcitations">knitcitations</a> from <a href="http://www.carlboettiger.info/">Carl Boettiger</a>.</h4>
+#### Written in [Markdown](http://daringfireball.net/projects/markdown/), with help from [knitr](http://yihui.name/knitr/), and [knitcitations](https://github.com/cboettig/knitcitations) from [Carl Boettiger](http://www.carlboettiger.info/).
 
-<hr />
+***************
 
-<h4 id="references">References</h4>
+#### References
 <p>Piwowar HA, Day RS, Fridsma DB and Ioannidis J (2007).
 &ldquo;Sharing Detailed Research Data is Associated With Increased Citation Rate.&rdquo;
-<em>Plos One</em>, <b>2</b>.
+<EM>Plos One</EM>, <B>2</B>.
 <a href="http://dx.doi.org/10.1371/journal.pone.0000308">http://dx.doi.org/10.1371/journal.pone.0000308</a>.
 
-</p>
-
-  </div>
-  
-  <div class="post">
-    <h1>
-      <a href="/2012/12/is-invasive/">
-        Is invasive?
-      </a>
-    </h1>
-
-    <span class="post-date">13 Dec 2012</span>
-
-    <p>The Global Invasive Species Database (GISD) (see their website for more info <a href="http://www.issg.org/database/welcome/">here</a>) has data on the invasiveness status of many species. From <code class="highlighter-rouge">taxize</code> you can now query the GISD database.</p>
-
-<p>Introducing the function <code class="highlighter-rouge">gisd_isinvasive</code>. This function was contributed to <code class="highlighter-rouge">taxize</code> by <a href="http://www.bartomeus.cat/es/ignasi/">Ignasi Bartomeus</a>, a postdoc at the Swedish University Agricultural Sciences.</p>
-
-<p>There are two possible outputs from using <code class="highlighter-rouge">gisd_isinvasive</code>: “Invasive” or “Not in GISD”. If you use <code class="highlighter-rouge">simplify=TRUE</code> in the function you get “Invasive” or “Not in GISD”, but if you use <code class="highlighter-rouge">simplify=FALSE</code> you get verbose description of the invasive species instead of just “Invasive” (and you still just get “Not in GISD”).</p>
-
-<hr />
-
-<p><img src="http://sckott.github.io/public/img/gisd_small.png" alt="center" /></p>
-
-<hr />
-
-<h3 id="install-taxize-from-github">Install taxize from GitHub</h3>
-
-<figure class="highlight"><pre><code class="language-r" data-lang="r"><span class="c1"># install_github('taxize_', 'ropensci') # install if you don't already
-# have the GitHub version
-</span><span class="n">library</span><span class="p">(</span><span class="n">taxize</span><span class="p">)</span></code></pre></figure>
-
-<hr />
-
-<h3 id="make-a-vector-of-species">Make a vector of species</h3>
-
-<figure class="highlight"><pre><code class="language-r" data-lang="r"><span class="n">sp</span><span class="w"> </span><span class="o">&lt;-</span><span class="w"> </span><span class="nf">c</span><span class="p">(</span><span class="s2">"Carpobrotus edulis"</span><span class="p">,</span><span class="w"> </span><span class="s2">"Rosmarinus officinalis"</span><span class="p">,</span><span class="w"> </span><span class="s2">"Nasua nasua"</span><span class="p">,</span><span class="w"> </span><span class="s2">"Martes melampus"</span><span class="p">,</span><span class="w"> 
-    </span><span class="s2">"Centaurea solstitialis"</span><span class="p">)</span></code></pre></figure>
-
-<h3 id="using-the-function-gisdisinvasive-you-can-query-the-gisd-database-for-the-invasiveness-status-of-your-species-at-least-according-to-gisd-calling-gisdisinvasive-with-the-second-parameter-set-to-default-simplifyfalse-you-get-verbose-output-with-details-on-the-species">Using the function <code class="highlighter-rouge">gisd_isinvasive</code> you can query the GISD database for the invasiveness status of your species, at least according to GISD. Calling <code class="highlighter-rouge">gisd_isinvasive</code> with the second parameter set to default <code class="highlighter-rouge">simplify=FALSE</code>, you get verbose output, with details on the species.</h3>
-
-<figure class="highlight"><pre><code class="language-r" data-lang="r"><span class="n">gisd_isinvasive</span><span class="p">(</span><span class="n">sp</span><span class="p">)</span></code></pre></figure>
-
-<figure class="highlight"><pre><code class="language-text" data-lang="text">Checking species 1
-Checking species 2
-Checking species 3
-Checking species 4
-Checking species 5
-Done
-
-                 species
-1     Carpobrotus edulis
-2 Rosmarinus officinalis
-3            Nasua nasua
-4        Martes melampus
-5 Centaurea solstitialis
-                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                               status
-1                                                                                                                                                                                                                                                  You searched for invasive species named Carpobrotus edulis:     1.  Carpobrotus edulis (succulent)        Carpobrotus edulis is a mat-forming succulent native to South Africa which is invasive primarily in coastal habitats in many parts of the world. It was often introduced as an ornamental plant or used for planting along roadsides, from which it has spread to become invasive. Its main impacts are smothering, reduced regeneration of native flora and changes to soil pH and nutrient regimes.\r\nCommon Names: balsamo, Cape fig, figue marine, freeway iceplant, ghaukum, ghoenavy, highway ice plant, higo del Cabo, higo marino, Hottentosvy, hottentot fig, Hottentottenfeige, iceplant, ikhambi-lamabulawo, Kaapsevy, patata frita, perdevy, pigface, rankvy, sea fig, sour fig, suurvy, umgongozi, vyerank\r\nSynonyms: Mesembryanthemum edule L., Mesembryanthemum edulis
-2                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         Not in GISD
-3                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            You searched for invasive species named Nasua nasua:1.  Nasua nasua (mammal)             Interim profile, incomplete informationCommon Names: Achuni, Coatí, South American Coati, Tejón
-4                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                       You searched for invasive species named Martes melampus:1.  Martes melampus (mammal)             Interim profile, incomplete informationCommon Names: Japanese Marten, Tsushima Island Marten
-5 You searched for invasive species named Centaurea solstitialis:     1.  Centaurea solstitialis (herb)        Centaurea solstitialis is a winter annual that can form dense impenetrable stands that displace desirable vegetation in natural areas, rangelands, and other places. It is best adapted to open grasslands with deep, well-drained soils and an annual precipitation range of 25 to 150cm per year. It is intolerant of shade. Although populations can occur at elevations as high as 2,400 m, most large infestations are found below 1,500 m. Human activities are the primary mechanisms for the long distance movement of C. solstitialis seed. The short, stiff, pappus bristles are covered with barbs that readily adhere to clothing, hair, and fur.  The movement of contaminated hay and uncertified seed are also important long distance transportation mechanisms. Wind disperses seeds over short distances.\r\nCommon Names: geeldissel, golden star thistle, sonnwend-Flockenblume, St. Barnaby's thistle, yellow centaury, yellow cockspur, yellow star thistle\r\nSynonyms: Leucantha solstitialis (L.) A.&amp; D. Löve</code></pre></figure>
-
-<h3 id="simpler-output-just-the-invasive-status">Simpler output, just the invasive status.</h3>
-
-<figure class="highlight"><pre><code class="language-r" data-lang="r"><span class="n">gisd_isinvasive</span><span class="p">(</span><span class="n">sp</span><span class="p">,</span><span class="w"> </span><span class="n">simplify</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="kc">TRUE</span><span class="p">)</span></code></pre></figure>
-
-<figure class="highlight"><pre><code class="language-text" data-lang="text">Checking species 1
-Checking species 2
-Checking species 3
-Checking species 4
-Checking species 5
-Done
-
-                 species      status
-1     Carpobrotus edulis    Invasive
-2 Rosmarinus officinalis Not in GISD
-3            Nasua nasua    Invasive
-4        Martes melampus    Invasive
-5 Centaurea solstitialis    Invasive</code></pre></figure>
-
-<hr />
-
-<h4 id="get-the-rmd-file-used-to-create-this-post-at-my-github-accounthttpsgithubcomsckottsckottgithubcomtreemasterdrafts2012-12-13-is-invasivermd---or-md-filehttpsgithubcomsckottsckottgithubcomtreemasterposts2012-12-13-is-invasivemd">Get the .Rmd file used to create this post <a href="https://github.com/sckott/sckott.github.com/tree/master/_drafts/2012-12-13-is-invasive.Rmd">at my github account</a> - or <a href="https://github.com/sckott/sckott.github.com/tree/master/_posts/2012-12-13-is-invasive.md">.md file</a>.</h4>
-
-<h4 id="written-in-markdownhttpdaringfireballnetprojectsmarkdown-with-help-from-knitrhttpyihuinameknitr">Written in <a href="http://daringfireball.net/projects/markdown/">Markdown</a>, with help from <a href="http://yihui.name/knitr/">knitr</a>.</h4>
 
   </div>
   

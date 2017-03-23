@@ -33,7 +33,7 @@
     <header class="masthead">
       <div class="masthead-inner">
         <h1>Recology</h1>
-        <!-- <h1> <a href="http://recology.info/">Recology</a></h1> -->
+        <!-- <h1> <a href="http://localhost:4000">Recology</a></h1> -->
         <p class="lead">R/etc.</p>
 
         <div class="colophon">
@@ -61,6 +61,831 @@
   
   <div class="post">
     <h1>
+      <a href="/2015/01/elasticsearch/">
+        elastic - Elasticsearch from R
+      </a>
+    </h1>
+
+    <span class="post-date">29 Jan 2015</span>
+
+    We've (ropensci) been working on an R client for interacting with [Elasticsearch](http://www.elasticsearch.org/) for a while now, first commit was November 2013.
+
+Elasticsearch is a document database built on the JVM. `elastic` interacts with the Elasticsearch HTTP API, and includes functions for setting connection details to Elasticsearch instances, loading bulk data, searching for documents with both HTTP query variables and JSON based body requests. In addition, `elastic` provides functions for interacting with APIs for indices, documents, nodes, clusters, an interface to the cat API, and more.
+
+Here's a few examples of what you can do.
+
+Note: `elastic` was just pushed to CRAN. It just got accepted, so binaries may not be available, try again soon, or install from Github, or install from source from CRAN like `install.packages("http://cran.r-project.org/src/contrib/elastic_0.3.0.tar.gz", repos=NULL, type="source")`.
+
+## Installation
+
+
+```r
+install.packages("elastic")
+```
+
+Or install development version:
+
+
+```r
+install.packages("devtools")
+devtools::install_github("ropensci/elastic")
+```
+
+Then load package
+
+
+```r
+library("elastic")
+```
+
+
+## Install Elasticsearch
+
+* [Elasticsearch installation help](http://www.elasticsearch.org/guide/en/elasticsearch/reference/current/_installation.html)
+
+__Unix (linux/osx)__
+
+Replace `1.4.1` with the version you are working with.
+
++ Download zip or tar file from Elasticsearch [see here for download](http://www.elasticsearch.org/overview/elkdownloads/), e.g., `curl -L -O https://download.elasticsearch.org/elasticsearch/elasticsearch/elasticsearch-1.4.1.tar.gz`
++ Uncompress it: `tar -xvf elasticsearch-1.4.1.tar.gz`
++ Move it: `sudo mv /path/to/elasticsearch-1.4.1 /usr/local`
++ Navigate to /usr/local: `cd /usr/local`
++ Add shortcut: `sudo ln -s elasticsearch-1.4.1 elasticsearch`
+
+On OSX, you can install via Homebrew: `brew install elasticsearch`
+
+__Windows__
+
+Windows users can follow the above, but unzip the zip file instead of uncompressing the tar file.
+
+## Start Elasticsearch
+
+* Navigate to elasticsearch: `cd /usr/local/elasticsearch`
+* Start elasticsearch: `bin/elasticsearch`
+
+I create a little bash shortcut called `es` that does both of the above commands in one step (`cd /usr/local/elasticsearch && bin/elasticsearch`).
+
+__Note:__ Windows users should run the `elasticsearch.bat` file
+
+## Initialize connection
+
+The function `connect()` is used before doing anything else to set the connection details to your remote or local elasticsearch store. The details created by `connect()` are written to your options for the current session, and are used by `elastic` functions.
+
+
+```r
+connect()
+```
+
+On package load, your base url and port are set to `http://127.0.0.1` and `9200`, respectively. You can of course override these settings per session or for all sessions.
+
+## Get data
+
+Elasticsearch has a bulk load API to load data in fast. The format is pretty weird though. It's sort of JSON, but would pass no JSON linter. I include a few data sets in `elastic` so it's easy to get up and running, and so when you run examples in this package they'll actually run the same way (hopefully).
+
+### Shakespeare data
+
+Elasticsearch provides some data on Shakespeare plays. I've provided a subset of this data in this package. Get the path for the file specific to your machine:
+
+
+```r
+shakespeare <- system.file("examples", "shakespeare_data.json", package = "elastic")
+```
+
+Then load the data into Elasticsearch:
+
+
+```r
+docs_bulk(shakespeare)
+```
+
+### Public Library of Science (PLOS) data
+
+A dataset inluded in the `elastic` package is metadata for PLOS scholarly articles.
+
+
+```r
+plosdat <- system.file("examples", "plos_data.json", package = "elastic")
+docs_bulk(plosdat)
+```
+
+### Global Biodiversity Information Facility (GBIF) data
+
+A dataset inluded in the `elastic` package is data for GBIF species occurrence records. Get the file path, then load:
+
+
+```r
+gbifdat <- system.file("examples", "gbif_data.json", package = "elastic")
+docs_bulk(gbifdat)
+```
+
+GBIF geo data with a coordinates element to allow `geo_shape` queries
+
+
+```r
+gbifgeo <- system.file("examples", "gbif_geo.json", package = "elastic")
+docs_bulk(gbifgeo)
+```
+
+## The Search function
+
+The main interface to searching documents in your Elasticsearch store is the function `Search()`. I nearly always develop R software using all lowercase, but R has a function called `search()`, and I wanted to avoid collision with that function.
+
+`Search()` is an interface to both the HTTP search API (in which queries are passed in the URI of the request, meaning queries have to be relatively simple), as well as the POST API, or the Query DSL, in which queries are passed in the body of the request (so can be much more complex).
+
+There are a huge amount of ways you can search Elasticsearch documents - this tutorial covers some of them, and highlights the ways in which you interact with the R outputs.
+
+### Search an index
+
+
+```r
+out <- Search(index="shakespeare")
+out$hits$total
+#> [1] 5000
+```
+
+
+```r
+out$hits$hits[[1]]
+#> $`_index`
+#> [1] "shakespeare"
+#> 
+#> $`_type`
+#> [1] "line"
+#> 
+#> $`_id`
+#> [1] "4"
+#> 
+#> $`_version`
+#> [1] 1
+#> 
+#> $`_score`
+#> [1] 1
+#> 
+#> $`_source`
+#> $`_source`$line_id
+#> [1] 5
+#> 
+#> $`_source`$play_name
+#> [1] "Henry IV"
+#> 
+#> $`_source`$speech_number
+#> [1] 1
+#> 
+#> $`_source`$line_number
+#> [1] "1.1.2"
+#> 
+#> $`_source`$speaker
+#> [1] "KING HENRY IV"
+#> 
+#> $`_source`$text_entry
+#> [1] "Find we a time for frighted peace to pant,"
+```
+
+### Search an index by type
+
+
+```r
+Search(index="shakespeare", type="act")$hits$hits[[1]]
+#> $`_index`
+#> [1] "shakespeare"
+#> 
+#> $`_type`
+#> [1] "act"
+#> 
+#> $`_id`
+#> [1] "2227"
+#> 
+#> $`_version`
+#> [1] 1
+#> 
+#> $`_score`
+#> [1] 1
+#> 
+#> $`_source`
+#> $`_source`$line_id
+#> [1] 2228
+#> 
+#> $`_source`$play_name
+#> [1] "Henry IV"
+#> 
+#> $`_source`$speech_number
+#> [1] 81
+#> 
+#> $`_source`$line_number
+#> [1] ""
+#> 
+#> $`_source`$speaker
+#> [1] "FALSTAFF"
+#> 
+#> $`_source`$text_entry
+#> [1] "ACT IV"
+```
+
+### Return certain fields
+
+
+```r
+Search(index="shakespeare", fields=c('play_name','speaker'))$hits$hits[[1]]
+#> $`_index`
+#> [1] "shakespeare"
+#> 
+#> $`_type`
+#> [1] "line"
+#> 
+#> $`_id`
+#> [1] "4"
+#> 
+#> $`_version`
+#> [1] 1
+#> 
+#> $`_score`
+#> [1] 1
+#> 
+#> $fields
+#> $fields$speaker
+#> $fields$speaker[[1]]
+#> [1] "KING HENRY IV"
+#> 
+#> 
+#> $fields$play_name
+#> $fields$play_name[[1]]
+#> [1] "Henry IV"
+```
+
+### Sorting
+
+
+```r
+Search(index="shakespeare", type="act", sort="text_entry")$hits$hits[1:2]
+#> [[1]]
+#> [[1]]$`_index`
+#> [1] "shakespeare"
+#> 
+#> [[1]]$`_type`
+#> [1] "act"
+#> 
+#> [[1]]$`_id`
+#> [1] "2227"
+#> 
+#> [[1]]$`_version`
+#> [1] 1
+#> 
+#> [[1]]$`_score`
+#> NULL
+#> 
+#> [[1]]$`_source`
+#> [[1]]$`_source`$line_id
+#> [1] 2228
+#> 
+#> [[1]]$`_source`$play_name
+#> [1] "Henry IV"
+#> 
+#> [[1]]$`_source`$speech_number
+#> [1] 81
+#> 
+#> [[1]]$`_source`$line_number
+#> [1] ""
+#> 
+#> [[1]]$`_source`$speaker
+#> [1] "FALSTAFF"
+#> 
+#> [[1]]$`_source`$text_entry
+#> [1] "ACT IV"
+#> 
+#> 
+#> [[1]]$sort
+#> [[1]]$sort[[1]]
+#> [1] "act"
+#> 
+#> 
+#> 
+#> [[2]]
+#> [[2]]$`_index`
+#> [1] "shakespeare"
+#> 
+#> [[2]]$`_type`
+#> [1] "act"
+#> 
+#> [[2]]$`_id`
+#> [1] "2633"
+#> 
+#> [[2]]$`_version`
+#> [1] 1
+#> 
+#> [[2]]$`_score`
+#> NULL
+#> 
+#> [[2]]$`_source`
+#> [[2]]$`_source`$line_id
+#> [1] 2634
+#> 
+#> [[2]]$`_source`$play_name
+#> [1] "Henry IV"
+#> 
+#> [[2]]$`_source`$speech_number
+#> [1] 9
+#> 
+#> [[2]]$`_source`$line_number
+#> [1] ""
+#> 
+#> [[2]]$`_source`$speaker
+#> [1] "ARCHBISHOP OF YORK"
+#> 
+#> [[2]]$`_source`$text_entry
+#> [1] "ACT V"
+#> 
+#> 
+#> [[2]]$sort
+#> [[2]]$sort[[1]]
+#> [1] "act"
+```
+
+### Paging
+
+
+```r
+Search(index="shakespeare", size=1, from=1, fields='text_entry')$hits
+#> $total
+#> [1] 5000
+#> 
+#> $max_score
+#> [1] 1
+#> 
+#> $hits
+#> $hits[[1]]
+#> $hits[[1]]$`_index`
+#> [1] "shakespeare"
+#> 
+#> $hits[[1]]$`_type`
+#> [1] "line"
+#> 
+#> $hits[[1]]$`_id`
+#> [1] "9"
+#> 
+#> $hits[[1]]$`_version`
+#> [1] 1
+#> 
+#> $hits[[1]]$`_score`
+#> [1] 1
+#> 
+#> $hits[[1]]$fields
+#> $hits[[1]]$fields$text_entry
+#> $hits[[1]]$fields$text_entry[[1]]
+#> [1] "Nor more shall trenching war channel her fields,"
+```
+
+### Queries
+
+Using the `q` parameter you can pass in a query, which gets passed in the URI of the query. This type of query is less powerful than the below query passed in the body of the request, using the `body` parameter.
+
+
+```r
+Search(index="shakespeare", type="act", q="speaker:KING HENRY IV")$hits$total
+#> [1] 9
+```
+
+### Query DSL searches - queries sent in the body of the request
+
+Pass in as an R list
+
+
+```r
+aggs <- list(aggs = list(stats = list(terms = list(field = "text_entry"))))
+Search(index="shakespeare", body=aggs)$hits$hits[[1]]
+#> $`_index`
+#> [1] "shakespeare"
+#> 
+#> $`_type`
+#> [1] "line"
+#> 
+#> $`_id`
+#> [1] "4"
+#> 
+#> $`_version`
+#> [1] 1
+#> 
+#> $`_score`
+#> [1] 1
+#> 
+#> $`_source`
+#> $`_source`$line_id
+#> [1] 5
+#> 
+#> $`_source`$play_name
+#> [1] "Henry IV"
+#> 
+#> $`_source`$speech_number
+#> [1] 1
+#> 
+#> $`_source`$line_number
+#> [1] "1.1.2"
+#> 
+#> $`_source`$speaker
+#> [1] "KING HENRY IV"
+#> 
+#> $`_source`$text_entry
+#> [1] "Find we a time for frighted peace to pant,"
+```
+
+Or pass in as json query with newlines, easy to read
+
+
+```r
+aggs <- '{
+    "aggs": {
+        "stats" : {
+            "terms" : {
+                "field" : "text_entry"
+            }
+        }
+    }
+}'
+Search(index="shakespeare", body=aggs)$hits$hits[[1]]
+#> $`_index`
+#> [1] "shakespeare"
+#> 
+#> $`_type`
+#> [1] "line"
+#> 
+#> $`_id`
+#> [1] "4"
+#> 
+#> $`_version`
+#> [1] 1
+#> 
+#> $`_score`
+#> [1] 1
+#> 
+#> $`_source`
+#> $`_source`$line_id
+#> [1] 5
+#> 
+#> $`_source`$play_name
+#> [1] "Henry IV"
+#> 
+#> $`_source`$speech_number
+#> [1] 1
+#> 
+#> $`_source`$line_number
+#> [1] "1.1.2"
+#> 
+#> $`_source`$speaker
+#> [1] "KING HENRY IV"
+#> 
+#> $`_source`$text_entry
+#> [1] "Find we a time for frighted peace to pant,"
+```
+
+Or pass in collapsed json string
+
+
+```r
+aggs <- '{"aggs":{"stats":{"terms":{"field":"text_entry"}}}}'
+Search(index="shakespeare", body=aggs)$hits$hits[[1]]
+#> $`_index`
+#> [1] "shakespeare"
+#> 
+#> $`_type`
+#> [1] "line"
+#> 
+#> $`_id`
+#> [1] "4"
+#> 
+#> $`_version`
+#> [1] 1
+#> 
+#> $`_score`
+#> [1] 1
+#> 
+#> $`_source`
+#> $`_source`$line_id
+#> [1] 5
+#> 
+#> $`_source`$play_name
+#> [1] "Henry IV"
+#> 
+#> $`_source`$speech_number
+#> [1] 1
+#> 
+#> $`_source`$line_number
+#> [1] "1.1.2"
+#> 
+#> $`_source`$speaker
+#> [1] "KING HENRY IV"
+#> 
+#> $`_source`$text_entry
+#> [1] "Find we a time for frighted peace to pant,"
+```
+
+### Fuzzy query
+
+Fuzzy query on numerics
+
+
+```r
+fuzzy <- list(query = list(fuzzy = list(speech_number = 7)))
+Search(index="shakespeare", body=fuzzy)$hits$total
+#> [1] 523
+```
+
+
+```r
+fuzzy <- list(query = list(fuzzy = list(speech_number = list(value = 7, fuzziness = 4))))
+Search(index="shakespeare", body=fuzzy)$hits$total
+#> [1] 1499
+```
+
+### Range query
+
+With numeric
+
+
+```r
+body <- list(query=list(range=list(decimalLongitude=list(gte=1, lte=3))))
+Search('gbif', body=body)$hits$total
+#> [1] 24
+```
+
+
+```r
+body <- list(query=list(range=list(decimalLongitude=list(gte=2.9, lte=10))))
+Search('gbif', body=body)$hits$total
+#> [1] 166
+```
+
+With dates
+
+
+```r
+body <- list(query=list(range=list(eventDate=list(gte="2012-01-01", lte="now"))))
+Search('gbif', body=body)$hits$total
+#> [1] 899
+```
+
+
+```r
+body <- list(query=list(range=list(eventDate=list(gte="2014-01-01", lte="now"))))
+Search('gbif', body=body)$hits$total
+#> [1] 685
+```
+
+### Highlighting
+
+
+```r
+body <- '{
+ "query": {
+   "query_string": {
+     "query" : "cell"
+   }
+ },
+ "highlight": {
+   "fields": {
+     "title": {"number_of_fragments": 2}
+   }
+ }
+}'
+out <- Search('plos', 'article', body=body)
+out$hits$total
+#> [1] 57
+```
+
+
+```r
+sapply(out$hits$hits, function(x) x$highlight$title[[1]])[8:10]
+#> [1] "c-FLIP Protects Eosinophils from TNF-α-Mediated <em>Cell</em> Death In Vivo"                          
+#> [2] "DUSP1 Is a Novel Target for Enhancing Pancreatic Cancer <em>Cell</em> Sensitivity to Gemcitabine"     
+#> [3] "Carbon Ion Radiation Inhibits Glioma and Endothelial <em>Cell</em> Migration Induced by Secreted VEGF"
+```
+
+### Scrolling search - instead of paging
+
+
+```r
+Search('shakespeare', q="a*")$hits$total
+#> [1] 2747
+res <- Search(index = 'shakespeare', q="a*", scroll="1m")
+res <- Search(index = 'shakespeare', q="a*", scroll="1m", search_type = "scan")
+length(scroll(scroll_id = res$`_scroll_id`)$hits$hits)
+#> [1] 50
+```
+
+
+```r
+res <- Search(index = 'shakespeare', q="a*", scroll="5m", search_type = "scan")
+out <- list()
+hits <- 1
+while(hits != 0){
+  res <- scroll(scroll_id = res$`_scroll_id`)
+  hits <- length(res$hits$hits)
+  if(hits > 0)
+    out <- c(out, res$hits$hits)
+}
+length(out)
+#> [1] 2747
+```
+
+Woohoo! Collected all 2747 documents in very little time.
+
+## The cat API
+
+List cat methods
+
+
+```r
+cat_()
+#> =^.^=
+#> /_cat/allocation
+#> /_cat/shards
+#> /_cat/shards/{index}
+#> /_cat/master
+#> /_cat/nodes
+#> /_cat/indices
+#> /_cat/indices/{index}
+#> /_cat/segments
+#> /_cat/segments/{index}
+#> /_cat/count
+#> /_cat/count/{index}
+#> /_cat/recovery
+#> /_cat/recovery/{index}
+#> /_cat/health
+#> /_cat/pending_tasks
+#> /_cat/aliases
+#> /_cat/aliases/{alias}
+#> /_cat/thread_pool
+#> /_cat/plugins
+#> /_cat/fielddata
+#> /_cat/fielddata/{fields}
+```
+
+Get aliases
+
+
+```r
+cat_aliases()
+#> things plos - - - 
+#> stuff  plos - - -
+```
+
+Get indices
+
+
+```r
+cat_indices()
+#> yellow open plosmore     5 1  1000  0   3.5mb   3.5mb 
+#> yellow open leotheadfadf 5 1     0  0    575b    575b 
+#> red    open alsothat     3 2                          
+#> yellow open gbif         5 1   899  0     1mb     1mb 
+#> yellow open gbifgeopoint 5 1     0  0    575b    575b 
+#> yellow open gbifnewgeo   5 1     2  0   5.8kb   5.8kb 
+#> yellow open plos         5 1  1202 39  14.2mb  14.2mb 
+#> yellow open leothedog    5 1     0  0    575b    575b 
+#> yellow open shakespeare  5 1  5000  0     1mb     1mb 
+#> yellow open gbifgeo      5 1   600  0 861.9kb 861.9kb 
+#> yellow open plosbigdata  5 1 20000  0  53.6mb  53.6mb 
+#> yellow open mapuris      5 1    31  0  34.4kb  34.4kb 
+#> yellow open leothelion   5 1     0  0    575b    575b
+```
+
+Get nodes
+
+
+```r
+cat_nodes()
+#> Scotts-MacBook-Pro.local 192.168.1.104 6 79 3.44 d * Hellfire
+```
+
+## Work with indices
+
+
+```r
+out <- index_get(index='shakespeare')
+names(out$shakespeare$mappings)
+#> [1] "line"  "scene" "act"
+```
+
+Check for index existence
+
+
+```r
+index_exists(index='shakespeare')
+#> [1] TRUE
+```
+
+Delete an index
+
+
+```r
+index_delete(index='plos')
+#> $acknowledged
+#> [1] TRUE
+```
+
+Create an index
+
+
+```r
+index_create(index='twitter')
+#> $acknowledged
+#> [1] TRUE
+```
+
+## Work with documents
+
+Get a document
+
+
+```r
+docs_get(index='shakespeare', type='line', id=10)
+#> $`_index`
+#> [1] "shakespeare"
+#> 
+#> $`_type`
+#> [1] "line"
+#> 
+#> $`_id`
+#> [1] "10"
+#> 
+#> $`_version`
+#> [1] 1
+#> 
+#> $found
+#> [1] TRUE
+#> 
+#> $`_source`
+#> $`_source`$line_id
+#> [1] 11
+#> 
+#> $`_source`$play_name
+#> [1] "Henry IV"
+#> 
+#> $`_source`$speech_number
+#> [1] 1
+#> 
+#> $`_source`$line_number
+#> [1] "1.1.8"
+#> 
+#> $`_source`$speaker
+#> [1] "KING HENRY IV"
+#> 
+#> $`_source`$text_entry
+#> [1] "Nor bruise her flowerets with the armed hoofs"
+```
+
+Get certain fields
+
+
+```r
+docs_get(index='shakespeare', type='line', id=10, fields=c('play_name','speaker'))
+#> $`_index`
+#> [1] "shakespeare"
+#> 
+#> $`_type`
+#> [1] "line"
+#> 
+#> $`_id`
+#> [1] "10"
+#> 
+#> $`_version`
+#> [1] 1
+#> 
+#> $found
+#> [1] TRUE
+#> 
+#> $fields
+#> $fields$play_name
+#> $fields$play_name[[1]]
+#> [1] "Henry IV"
+#> 
+#> 
+#> $fields$speaker
+#> $fields$speaker[[1]]
+#> [1] "KING HENRY IV"
+```
+
+Test for existence of the document
+
+
+```r
+docs_get(index='plos', type='article', id=1, exists=TRUE)
+#> [1] FALSE
+```
+
+
+```r
+docs_get(index='plos', type='article', id=123456, exists=TRUE)
+#> [1] FALSE
+```
+
+## Thats it
+
+Let us know if you have any feedback!
+
+  </div>
+  
+  <div class="post">
+    <h1>
       <a href="/2015/01/binomen/">
         binomen - taxonomic classes and parsing
       </a>
@@ -68,189 +893,203 @@
 
     <span class="post-date">19 Jan 2015</span>
 
-    <p>I maintain, along with other <a href="https://github.com/ropensci/taxize/graphs/contributors">awesome people</a>, the <a href="https://github.com/ropensci/taxize">taxize</a> R package - a taxonomic toolbelt for R, for interacting with taxonomic data sources on the web.</p>
+    I maintain, along with other [awesome people](https://github.com/ropensci/taxize/graphs/contributors), the [taxize](https://github.com/ropensci/taxize) R package - a taxonomic toolbelt for R, for interacting with taxonomic data sources on the web. 
 
-<p>Taxonomy data is not standardized, but there are a lot of common elements, and there is a finite list of taxonomic ranks, and finite number of major taxonomic data sets. Thus, I’ve been interested in attempting to define a pseudo standard for expressing taxonomic data in R. The conversation <a href="https://github.com/ropensci/taxize/issues/261">started a while back</a> in a GitHub issue, and hasn’t moved very far.</p>
+Taxonomy data is not standardized, but there are a lot of common elements, and there is a finite list of taxonomic ranks, and finite number of major taxonomic data sets. Thus, I've been interested in attempting to define a pseudo standard for expressing taxonomic data in R. The conversation [started a while back](https://github.com/ropensci/taxize/issues/261) in a GitHub issue, and hasn't moved very far. 
 
-<p>I decided to start playing with this more, which is easier to do in a separate pacakge. Thus: <code class="highlighter-rouge">binomen</code>. It’s an attempt to define a set of taxonomic classes/objects in R, along with a suite of functions to help construct and parse these objects.</p>
+I decided to start playing with this more, which is easier to do in a separate pacakge. Thus: `binomen`. It's an attempt to define a set of taxonomic classes/objects in R, along with a suite of functions to help construct and parse these objects.
 
-<p>Would love any/all feedback.</p>
+Would love any/all feedback. 
 
-<p>Here’s some examples:</p>
+Here's some examples:
 
-<h2 id="install">Install</h2>
+## Install
 
-<p>Install <code class="highlighter-rouge">binomen</code></p>
+Install `binomen` 
 
-<div class="language-r highlighter-rouge"><pre class="highlight"><code><span class="n">install.packages</span><span class="p">(</span><span class="s2">"devtools"</span><span class="p">)</span><span class="w">
-</span><span class="n">devtools</span><span class="o">::</span><span class="n">install_github</span><span class="p">(</span><span class="s2">"ropensci/binomen"</span><span class="p">)</span><span class="w">
-</span></code></pre>
-</div>
 
-<div class="language-r highlighter-rouge"><pre class="highlight"><code><span class="n">library</span><span class="p">(</span><span class="s2">"binomen"</span><span class="p">)</span><span class="w">
-</span></code></pre>
-</div>
+```r
+install.packages("devtools")
+devtools::install_github("ropensci/binomen")
+```
 
-<h2 id="make-a-taxon">Make a taxon</h2>
 
-<p>Make a taxon object</p>
+```r
+library("binomen")
+```
 
-<div class="language-r highlighter-rouge"><pre class="highlight"><code><span class="p">(</span><span class="n">obj</span><span class="w"> </span><span class="o">&lt;-</span><span class="w"> </span><span class="n">make_taxon</span><span class="p">(</span><span class="n">genus</span><span class="o">=</span><span class="s2">"Poa"</span><span class="p">,</span><span class="w"> </span><span class="n">epithet</span><span class="o">=</span><span class="s2">"annua"</span><span class="p">,</span><span class="w"> </span><span class="n">authority</span><span class="o">=</span><span class="s2">"L."</span><span class="p">,</span><span class="w">
-                   </span><span class="n">family</span><span class="o">=</span><span class="s1">'Poaceae'</span><span class="p">,</span><span class="w"> </span><span class="n">clazz</span><span class="o">=</span><span class="s1">'Poales'</span><span class="p">,</span><span class="w"> 
-                   </span><span class="n">kingdom</span><span class="o">=</span><span class="s1">'Plantae'</span><span class="p">,</span><span class="w"> </span><span class="n">variety</span><span class="o">=</span><span class="s1">'annua'</span><span class="p">))</span><span class="w">
-</span><span class="c1">#&gt; &lt;taxon&gt;
-#&gt;   binomial: Poa annua
-#&gt;   classification: 
-#&gt;     kingdom: Plantae
-#&gt;     clazz: Poales
-#&gt;     family: Poaceae
-#&gt;     genus: Poa
-#&gt;     species: Poa annua
-#&gt;     variety: annua
-</span></code></pre>
-</div>
+## Make a taxon
 
-<p>Index to various parts of the object</p>
+Make a taxon object
 
-<p>The binomial</p>
 
-<div class="language-r highlighter-rouge"><pre class="highlight"><code><span class="n">obj</span><span class="o">$</span><span class="n">binomial</span><span class="w">
-</span><span class="c1">#&gt; &lt;binomial&gt;
-#&gt;   genus: Poa
-#&gt;   epithet: annua
-#&gt;   canonical: Poa annua
-#&gt;   species: Poa annua L.
-#&gt;   authority: L.
-</span></code></pre>
-</div>
+```r
+(obj <- make_taxon(genus="Poa", epithet="annua", authority="L.",
+                   family='Poaceae', clazz='Poales', 
+                   kingdom='Plantae', variety='annua'))
+#> <taxon>
+#>   binomial: Poa annua
+#>   classification: 
+#>     kingdom: Plantae
+#>     clazz: Poales
+#>     family: Poaceae
+#>     genus: Poa
+#>     species: Poa annua
+#>     variety: annua
+```
 
-<p>The authority</p>
+Index to various parts of the object
 
-<div class="language-r highlighter-rouge"><pre class="highlight"><code><span class="n">obj</span><span class="o">$</span><span class="n">binomial</span><span class="o">$</span><span class="n">authority</span><span class="w">
-</span><span class="c1">#&gt; [1] "L."
-</span></code></pre>
-</div>
+The binomial
 
-<p>The classification</p>
 
-<div class="language-r highlighter-rouge"><pre class="highlight"><code><span class="n">obj</span><span class="o">$</span><span class="n">classification</span><span class="w">
-</span><span class="c1">#&gt; &lt;classification&gt;
-#&gt;     kingdom: Plantae
-#&gt;     clazz: Poales
-#&gt;     family: Poaceae
-#&gt;     genus: Poa
-#&gt;     species: Poa annua
-#&gt;     variety: annua
-</span></code></pre>
-</div>
+```r
+obj$binomial
+#> <binomial>
+#>   genus: Poa
+#>   epithet: annua
+#>   canonical: Poa annua
+#>   species: Poa annua L.
+#>   authority: L.
+```
 
-<p>The family</p>
+The authority
 
-<div class="language-r highlighter-rouge"><pre class="highlight"><code><span class="n">obj</span><span class="o">$</span><span class="n">classification</span><span class="o">$</span><span class="n">family</span><span class="w">
-</span><span class="c1">#&gt; &lt;taxonref&gt;
-#&gt;   rank: family
-#&gt;   name: Poaceae
-#&gt;   id: none
-#&gt;   uri: none
-</span></code></pre>
-</div>
 
-<h2 id="subset-taxon-objects">Subset taxon objects</h2>
+```r
+obj$binomial$authority
+#> [1] "L."
+```
 
-<p>Get a single rank</p>
+The classification
 
-<div class="language-r highlighter-rouge"><pre class="highlight"><code><span class="n">obj</span><span class="w"> </span><span class="o">%&gt;%</span><span class="w"> </span><span class="n">select</span><span class="p">(</span><span class="n">family</span><span class="p">)</span><span class="w">
-</span><span class="c1">#&gt; &lt;taxonref&gt;
-#&gt;   rank: family
-#&gt;   name: Poaceae
-#&gt;   id: none
-#&gt;   uri: none
-</span></code></pre>
-</div>
 
-<p>Get a range of ranks</p>
+```r
+obj$classification
+#> <classification>
+#>     kingdom: Plantae
+#>     clazz: Poales
+#>     family: Poaceae
+#>     genus: Poa
+#>     species: Poa annua
+#>     variety: annua
+```
 
-<div class="language-r highlighter-rouge"><pre class="highlight"><code><span class="n">obj</span><span class="w"> </span><span class="o">%&gt;%</span><span class="w"> </span><span class="nf">range</span><span class="p">(</span><span class="n">kingdom</span><span class="p">,</span><span class="w"> </span><span class="n">family</span><span class="p">)</span><span class="w">
-</span><span class="c1">#&gt; $kingdom
-#&gt; &lt;taxonref&gt;
-#&gt;   rank: kingdom
-#&gt;   name: Plantae
-#&gt;   id: none
-#&gt;   uri: none
-#&gt; 
-#&gt; $clazz
-#&gt; &lt;taxonref&gt;
-#&gt;   rank: clazz
-#&gt;   name: Poales
-#&gt;   id: none
-#&gt;   uri: none
-#&gt; 
-#&gt; $family
-#&gt; &lt;taxonref&gt;
-#&gt;   rank: family
-#&gt;   name: Poaceae
-#&gt;   id: none
-#&gt;   uri: none
-</span></code></pre>
-</div>
+The family
 
-<p>Extract classification as a <code class="highlighter-rouge">data.frame</code></p>
 
-<div class="language-r highlighter-rouge"><pre class="highlight"><code><span class="n">gethier</span><span class="p">(</span><span class="n">obj</span><span class="p">)</span><span class="w">
-</span><span class="c1">#&gt;      rank      name
-#&gt; 1 kingdom   Plantae
-#&gt; 2   clazz    Poales
-#&gt; 3  family   Poaceae
-#&gt; 4   genus       Poa
-#&gt; 5 species Poa annua
-#&gt; 6 variety     annua
-</span></code></pre>
-</div>
+```r
+obj$classification$family
+#> <taxonref>
+#>   rank: family
+#>   name: Poaceae
+#>   id: none
+#>   uri: none
+```
 
-<h2 id="taxonomic-dataframes">Taxonomic data.frame’s</h2>
+## Subset taxon objects
 
-<p>Make one</p>
+Get a single rank
 
-<div class="language-r highlighter-rouge"><pre class="highlight"><code><span class="n">df</span><span class="w"> </span><span class="o">&lt;-</span><span class="w"> </span><span class="n">data.frame</span><span class="p">(</span><span class="w">
-  </span><span class="n">order</span><span class="o">=</span><span class="nf">c</span><span class="p">(</span><span class="s1">'Asterales'</span><span class="p">,</span><span class="s1">'Asterales'</span><span class="p">,</span><span class="s1">'Fagales'</span><span class="p">,</span><span class="s1">'Poales'</span><span class="p">,</span><span class="s1">'Poales'</span><span class="p">,</span><span class="s1">'Poales'</span><span class="p">),</span><span class="w">
-  </span><span class="n">family</span><span class="o">=</span><span class="nf">c</span><span class="p">(</span><span class="s1">'Asteraceae'</span><span class="p">,</span><span class="s1">'Asteraceae'</span><span class="p">,</span><span class="s1">'Fagaceae'</span><span class="p">,</span><span class="s1">'Poaceae'</span><span class="p">,</span><span class="s1">'Poaceae'</span><span class="p">,</span><span class="s1">'Poaceae'</span><span class="p">),</span><span class="w">
-  </span><span class="n">genus</span><span class="o">=</span><span class="nf">c</span><span class="p">(</span><span class="s1">'Helianthus'</span><span class="p">,</span><span class="s1">'Helianthus'</span><span class="p">,</span><span class="s1">'Quercus'</span><span class="p">,</span><span class="s1">'Poa'</span><span class="p">,</span><span class="s1">'Festuca'</span><span class="p">,</span><span class="s1">'Holodiscus'</span><span class="p">),</span><span class="w">
-  </span><span class="n">stringsAsFactors</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="kc">FALSE</span><span class="p">)</span><span class="w">
-</span><span class="p">(</span><span class="n">df2</span><span class="w"> </span><span class="o">&lt;-</span><span class="w"> </span><span class="n">taxon_df</span><span class="p">(</span><span class="n">df</span><span class="p">))</span><span class="w">
-</span><span class="c1">#&gt;       order     family      genus
-#&gt; 1 Asterales Asteraceae Helianthus
-#&gt; 2 Asterales Asteraceae Helianthus
-#&gt; 3   Fagales   Fagaceae    Quercus
-#&gt; 4    Poales    Poaceae        Poa
-#&gt; 5    Poales    Poaceae    Festuca
-#&gt; 6    Poales    Poaceae Holodiscus
-</span></code></pre>
-</div>
 
-<p>Parse - get rank order matching <em>Fagales</em></p>
+```r
+obj %>% select(family)
+#> <taxonref>
+#>   rank: family
+#>   name: Poaceae
+#>   id: none
+#>   uri: none
+```
 
-<div class="language-r highlighter-rouge"><pre class="highlight"><code><span class="n">df2</span><span class="w"> </span><span class="o">%&gt;%</span><span class="w"> </span><span class="n">select</span><span class="p">(</span><span class="n">order</span><span class="p">,</span><span class="w"> </span><span class="n">Fagales</span><span class="p">)</span><span class="w">
-</span><span class="c1">#&gt;     order   family   genus
-#&gt; 3 Fagales Fagaceae Quercus
-</span></code></pre>
-</div>
+Get a range of ranks
 
-<p>get rank family matching <em>Asteraceae</em></p>
 
-<div class="language-r highlighter-rouge"><pre class="highlight"><code><span class="n">df2</span><span class="w"> </span><span class="o">%&gt;%</span><span class="w"> </span><span class="n">select</span><span class="p">(</span><span class="n">family</span><span class="p">,</span><span class="w"> </span><span class="n">Asteraceae</span><span class="p">)</span><span class="w">
-</span><span class="c1">#&gt;       order     family      genus
-#&gt; 1 Asterales Asteraceae Helianthus
-#&gt; 2 Asterales Asteraceae Helianthus
-</span></code></pre>
-</div>
+```r
+obj %>% range(kingdom, family)
+#> $kingdom
+#> <taxonref>
+#>   rank: kingdom
+#>   name: Plantae
+#>   id: none
+#>   uri: none
+#> 
+#> $clazz
+#> <taxonref>
+#>   rank: clazz
+#>   name: Poales
+#>   id: none
+#>   uri: none
+#> 
+#> $family
+#> <taxonref>
+#>   rank: family
+#>   name: Poaceae
+#>   id: none
+#>   uri: none
+```
 
-<p>get rank genus matching <em>Poa</em></p>
+Extract classification as a `data.frame`
 
-<div class="language-r highlighter-rouge"><pre class="highlight"><code><span class="n">df2</span><span class="w"> </span><span class="o">%&gt;%</span><span class="w"> </span><span class="n">select</span><span class="p">(</span><span class="n">genus</span><span class="p">,</span><span class="w"> </span><span class="n">Poa</span><span class="p">)</span><span class="w">
-</span><span class="c1">#&gt;    order  family genus
-#&gt; 4 Poales Poaceae   Poa
-</span></code></pre>
-</div>
+
+```r
+gethier(obj)
+#>      rank      name
+#> 1 kingdom   Plantae
+#> 2   clazz    Poales
+#> 3  family   Poaceae
+#> 4   genus       Poa
+#> 5 species Poa annua
+#> 6 variety     annua
+```
+
+## Taxonomic data.frame's
+
+Make one
+
+
+```r
+df <- data.frame(
+  order=c('Asterales','Asterales','Fagales','Poales','Poales','Poales'),
+  family=c('Asteraceae','Asteraceae','Fagaceae','Poaceae','Poaceae','Poaceae'),
+  genus=c('Helianthus','Helianthus','Quercus','Poa','Festuca','Holodiscus'),
+  stringsAsFactors = FALSE)
+(df2 <- taxon_df(df))
+#>       order     family      genus
+#> 1 Asterales Asteraceae Helianthus
+#> 2 Asterales Asteraceae Helianthus
+#> 3   Fagales   Fagaceae    Quercus
+#> 4    Poales    Poaceae        Poa
+#> 5    Poales    Poaceae    Festuca
+#> 6    Poales    Poaceae Holodiscus
+```
+
+Parse - get rank order matching _Fagales_
+
+
+```r
+df2 %>% select(order, Fagales)
+#>     order   family   genus
+#> 3 Fagales Fagaceae Quercus
+```
+
+get rank family matching _Asteraceae_
+
+
+```r
+df2 %>% select(family, Asteraceae)
+#>       order     family      genus
+#> 1 Asterales Asteraceae Helianthus
+#> 2 Asterales Asteraceae Helianthus
+```
+
+get rank genus matching _Poa_
+
+
+```r
+df2 %>% select(genus, Poa)
+#>    order  family genus
+#> 4 Poales Poaceae   Poa
+```
 
   </div>
   
@@ -263,558 +1102,194 @@
 
     <span class="post-date">15 Jan 2015</span>
 
-    <p><a href="http://www.discourse.org/">Discourse</a> is a great discussion forum application. It’s another thing from <a href="https://en.wikipedia.org/wiki/Jeff_Atwood">Jeff Atwood</a>, the co-founder of <a href="http://stackoverflow.com/">Stackoverflow/Stackexchange</a>. The installation is epecially easy with their dockerized installation setup on DigitalOcean ([instructions here][https://www.digitalocean.com/community/tutorials/how-to-install-discourse-on-ubuntu-14-04]).</p>
+    [Discourse][disc] is a great discussion forum application. It's another thing from [Jeff Atwood](https://en.wikipedia.org/wiki/Jeff_Atwood), the co-founder of [Stackoverflow/Stackexchange](http://stackoverflow.com/). The installation is epecially easy with their dockerized installation setup on DigitalOcean ([instructions here][https://www.digitalocean.com/community/tutorials/how-to-install-discourse-on-ubuntu-14-04]). 
 
-<p>In <a href="http://ropensci.org/">rOpenSci</a>, we’ve been using a Google Groups mailing list, which is sufficient I guess, but doesn’t support Markdown, and we all know <a href="http://www.slate.com/articles/technology/technology/2013/03/google_reader_why_did_everyone_s_favorite_rss_program_die_what_free_web.html">Google can kill products any day</a>, so it makes sense to use something with which we have more control. We’ve set up our own Discourse installation to have rOpenSci discussions - find it at <a href="https://meta.discourse.org/">discuss.ropensci.org</a>. Check it out if you want to discuss anything rOpenSci related, or general open science, open source software, etc. You can login with email, Mozilla Persona, Twitter, or GitHub.</p>
+In [rOpenSci](http://ropensci.org/), we've been using a Google Groups mailing list, which is sufficient I guess, but doesn't support Markdown, and we all know [Google can kill products any day](http://www.slate.com/articles/technology/technology/2013/03/google_reader_why_did_everyone_s_favorite_rss_program_die_what_free_web.html), so it makes sense to use something with which we have more control. We've set up our own Discourse installation to have rOpenSci discussions - find it at [discuss.ropensci.org][metadisc]. Check it out if you want to discuss anything rOpenSci related, or general open science, open source software, etc. You can login with email, Mozilla Persona, Twitter, or GitHub. 
 
-<p>Discourse does have a RESTful API, which I found through the <a href="https://github.com/discourse/discourse_api/">Ruby gem</a>. Why not interact with the API via R?</p>
+Discourse does have a RESTful API, which I found through the [Ruby gem](https://github.com/discourse/discourse_api/). Why not interact with the API via R?
 
-<h2 id="install">Install</h2>
+## Install
 
-<p>Install <code class="highlighter-rouge">discgolf</code></p>
+Install `discgolf` 
 
-<div class="language-r highlighter-rouge"><pre class="highlight"><code><span class="n">install.packages</span><span class="p">(</span><span class="s2">"devtools"</span><span class="p">)</span><span class="w">
-</span><span class="n">devtools</span><span class="o">::</span><span class="n">install_github</span><span class="p">(</span><span class="s2">"sckott/discgolf"</span><span class="p">)</span><span class="w">
-</span></code></pre>
-</div>
 
-<div class="language-r highlighter-rouge"><pre class="highlight"><code><span class="n">library</span><span class="p">(</span><span class="s2">"discgolf"</span><span class="p">)</span><span class="w">
-</span></code></pre>
-</div>
+```r
+install.packages("devtools")
+devtools::install_github("sckott/discgolf")
+```
 
-<h2 id="authentication">Authentication</h2>
 
-<p>The Discourse API is based on using a specific installation of Discourse (as far as I know), which requires your username and an API key for that installation. Get those (I found mine in the admin panel), and you can pass them in to each function call, or set as option variables in <code class="highlighter-rouge">.Rprofile</code> (use <code class="highlighter-rouge">discourse_api_key</code> and <code class="highlighter-rouge">discourse_username</code>) or environment variables in <code class="highlighter-rouge">.Renviron</code> (use <code class="highlighter-rouge">DISCOURSE_API_KEY</code> and <code class="highlighter-rouge">DISCOURSE_USERNAME</code>).</p>
+```r
+library("discgolf")
+```
 
-<h2 id="examples">Examples</h2>
+## Authentication
 
-<p>Get the latest topics (abbreviated content for blog post brevity)</p>
+The Discourse API is based on using a specific installation of Discourse (as far as I know), which requires your username and an API key for that installation. Get those (I found mine in the admin panel), and you can pass them in to each function call, or set as option variables in `.Rprofile` (use `discourse_api_key` and `discourse_username`) or environment variables in `.Renviron` (use `DISCOURSE_API_KEY` and `DISCOURSE_USERNAME`).
 
-<div class="language-r highlighter-rouge"><pre class="highlight"><code><span class="n">latest_topics</span><span class="p">()</span><span class="w">
-</span></code></pre>
-</div>
+## Examples
 
-<div class="highlighter-rouge"><pre class="highlight"><code>#&gt;    id                             title                       fancy_title
-#&gt; 1   8       Welcome to rOpenSci Discuss       Welcome to rOpenSci Discuss
-#&gt; 2  92    Feedback on geojsonio package?    Feedback on geojsonio package?
-#&gt; 3 102                Astronomy research                Astronomy research
-#&gt; 4  99           Rgbif argument question           Rgbif argument question
-#&gt; 5  93 Feedback on rnoaa ghcnd functions Feedback on rnoaa ghcnd functions
-#&gt;                                slug
-#&gt; 1       welcome-to-ropensci-discuss
-#&gt; 2     feedback-on-geojsonio-package
-#&gt; 3                astronomy-research
-#&gt; 4           rgbif-argument-question
-#&gt; 5 feedback-on-rnoaa-ghcnd-functions
-</code></pre>
-</div>
+Get the latest topics (abbreviated content for blog post brevity)
 
-<p>Get new topics</p>
 
-<div class="language-r highlighter-rouge"><pre class="highlight"><code><span class="n">new_topics</span><span class="p">()</span><span class="w">
-</span><span class="c1">#&gt; $topic_list
-#&gt; $topic_list$can_create_topic
-#&gt; [1] TRUE
-#&gt; 
-#&gt; $topic_list$draft
-#&gt; NULL
-#&gt; 
-#&gt; $topic_list$draft_key
-#&gt; [1] "new_topic"
-#&gt; 
-#&gt; $topic_list$draft_sequence
-#&gt; [1] 15
-#&gt; 
-#&gt; $topic_list$per_page
-#&gt; [1] 30
-#&gt; 
-#&gt; $topic_list$topics
-#&gt; list()
-</span></code></pre>
-</div>
+```r
+latest_topics()
+```
 
-<p>Get topics by a specific user</p>
 
-<div class="language-r highlighter-rouge"><pre class="highlight"><code><span class="n">topics_by</span><span class="p">(</span><span class="s2">"cboettig"</span><span class="p">)</span><span class="w">
-</span><span class="c1">#&gt; $users
-#&gt;   id username uploaded_avatar_id
-#&gt; 1  3 cboettig                  4
-#&gt; 2  1   sckott                  2
-#&gt; 3 35 noamross                 57
-#&gt; 4  2  karthik                  3
-#&gt;                                            avatar_template
-#&gt; 1  /user_avatar/discuss.ropensci.org/cboettig/{size}/4.png
-#&gt; 2    /user_avatar/discuss.ropensci.org/sckott/{size}/2.png
-#&gt; 3 /user_avatar/discuss.ropensci.org/noamross/{size}/57.png
-#&gt; 4   /user_avatar/discuss.ropensci.org/karthik/{size}/3.png
-#&gt; 
-#&gt; $topic_list
-#&gt; $topic_list$can_create_topic
-#&gt; [1] TRUE
-#&gt; 
-#&gt; $topic_list$draft
-#&gt; NULL
-#&gt; 
-#&gt; $topic_list$draft_key
-#&gt; [1] "new_topic"
-#&gt; 
-#&gt; $topic_list$draft_sequence
-#&gt; [1] 15
-#&gt; 
-#&gt; $topic_list$per_page
-#&gt; [1] 30
-#&gt; 
-#&gt; $topic_list$topics
-#&gt;   id                                      title
-#&gt; 1 15 Using Discourse for blog comments as well?
-#&gt; 2 16                            Reply by email?
-#&gt;                                  fancy_title
-#&gt; 1 Using Discourse for blog comments as well?
-#&gt; 2                            Reply by email?
-#&gt;                                        slug posts_count reply_count
-#&gt; 1 using-discourse-for-blog-comments-as-well           8           4
-#&gt; 2                            reply-by-email           6           2
-#&gt;   highest_post_number image_url               created_at
-#&gt; 1                   8        NA 2014-12-15T19:33:11.879Z
-#&gt; 2                   6        NA 2014-12-15T20:10:36.414Z
-#&gt;             last_posted_at bumped                bumped_at unseen
-#&gt; 1 2015-01-02T19:47:42.403Z   TRUE 2015-01-02T19:47:42.403Z  FALSE
-#&gt; 2 2014-12-17T00:18:31.427Z   TRUE 2014-12-17T00:18:31.427Z  FALSE
-#&gt;   last_read_post_number unread new_posts pinned unpinned visible closed
-#&gt; 1                     8      0         0  FALSE       NA    TRUE  FALSE
-#&gt; 2                     6      0         0  FALSE       NA    TRUE  FALSE
-#&gt;   archived notification_level bookmarked liked views like_count
-#&gt; 1    FALSE                  2       TRUE FALSE    71          0
-#&gt; 2    FALSE                  3       TRUE FALSE    54          0
-#&gt;   has_summary archetype last_poster_username category_id pinned_globally
-#&gt; 1       FALSE   regular             cboettig           3           FALSE
-#&gt; 2       FALSE   regular               sckott           1           FALSE
-#&gt;   bookmarked_post_numbers
-#&gt; 1                       1
-#&gt; 2                       1
-#&gt;                                                                                                                   posters
-#&gt; 1 latest, NA, NA, NA, Original Poster, Most Recent Poster, Frequent Poster, Frequent Poster, Frequent Poster, 3, 1, 35, 2
-#&gt; 2                                                                   NA, latest, Original Poster, Most Recent Poster, 3, 1
-</span></code></pre>
-</div>
+```
+#>    id                             title                       fancy_title
+#> 1   8       Welcome to rOpenSci Discuss       Welcome to rOpenSci Discuss
+#> 2  92    Feedback on geojsonio package?    Feedback on geojsonio package?
+#> 3 102                Astronomy research                Astronomy research
+#> 4  99           Rgbif argument question           Rgbif argument question
+#> 5  93 Feedback on rnoaa ghcnd functions Feedback on rnoaa ghcnd functions
+#>                                slug
+#> 1       welcome-to-ropensci-discuss
+#> 2     feedback-on-geojsonio-package
+#> 3                astronomy-research
+#> 4           rgbif-argument-question
+#> 5 feedback-on-rnoaa-ghcnd-functions
+```
 
-<p>Get a single topic by id number</p>
+Get new topics
 
-<div class="language-r highlighter-rouge"><pre class="highlight"><code><span class="n">topic</span><span class="p">(</span><span class="m">8</span><span class="p">)</span><span class="w">
-</span></code></pre>
-</div>
 
-<div class="highlighter-rouge"><pre class="highlight"><code>#&gt;   id              name username
-#&gt; 1 11            system   system
-#&gt; 2 14 Scott Chamberlain   sckott
-#&gt; 3 51 Scott Chamberlain   sckott
-#&gt;                                         avatar_template uploaded_avatar_id
-#&gt; 1 /user_avatar/discuss.ropensci.org/system/{size}/1.png                  1
-#&gt; 2 /user_avatar/discuss.ropensci.org/sckott/{size}/2.png                  2
-#&gt; 3 /user_avatar/discuss.ropensci.org/sckott/{size}/2.png                  2
-</code></pre>
-</div>
+```r
+new_topics()
+#> $topic_list
+#> $topic_list$can_create_topic
+#> [1] TRUE
+#> 
+#> $topic_list$draft
+#> NULL
+#> 
+#> $topic_list$draft_key
+#> [1] "new_topic"
+#> 
+#> $topic_list$draft_sequence
+#> [1] 15
+#> 
+#> $topic_list$per_page
+#> [1] 30
+#> 
+#> $topic_list$topics
+#> list()
+```
 
-<p>Create topic</p>
+Get topics by a specific user
 
-<div class="language-r highlighter-rouge"><pre class="highlight"><code><span class="n">text</span><span class="w"> </span><span class="o">&lt;-</span><span class="w"> </span><span class="s1">'
+
+```r
+topics_by("cboettig")
+#> $users
+#>   id username uploaded_avatar_id
+#> 1  3 cboettig                  4
+#> 2  1   sckott                  2
+#> 3 35 noamross                 57
+#> 4  2  karthik                  3
+#>                                            avatar_template
+#> 1  /user_avatar/discuss.ropensci.org/cboettig/{size}/4.png
+#> 2    /user_avatar/discuss.ropensci.org/sckott/{size}/2.png
+#> 3 /user_avatar/discuss.ropensci.org/noamross/{size}/57.png
+#> 4   /user_avatar/discuss.ropensci.org/karthik/{size}/3.png
+#> 
+#> $topic_list
+#> $topic_list$can_create_topic
+#> [1] TRUE
+#> 
+#> $topic_list$draft
+#> NULL
+#> 
+#> $topic_list$draft_key
+#> [1] "new_topic"
+#> 
+#> $topic_list$draft_sequence
+#> [1] 15
+#> 
+#> $topic_list$per_page
+#> [1] 30
+#> 
+#> $topic_list$topics
+#>   id                                      title
+#> 1 15 Using Discourse for blog comments as well?
+#> 2 16                            Reply by email?
+#>                                  fancy_title
+#> 1 Using Discourse for blog comments as well?
+#> 2                            Reply by email?
+#>                                        slug posts_count reply_count
+#> 1 using-discourse-for-blog-comments-as-well           8           4
+#> 2                            reply-by-email           6           2
+#>   highest_post_number image_url               created_at
+#> 1                   8        NA 2014-12-15T19:33:11.879Z
+#> 2                   6        NA 2014-12-15T20:10:36.414Z
+#>             last_posted_at bumped                bumped_at unseen
+#> 1 2015-01-02T19:47:42.403Z   TRUE 2015-01-02T19:47:42.403Z  FALSE
+#> 2 2014-12-17T00:18:31.427Z   TRUE 2014-12-17T00:18:31.427Z  FALSE
+#>   last_read_post_number unread new_posts pinned unpinned visible closed
+#> 1                     8      0         0  FALSE       NA    TRUE  FALSE
+#> 2                     6      0         0  FALSE       NA    TRUE  FALSE
+#>   archived notification_level bookmarked liked views like_count
+#> 1    FALSE                  2       TRUE FALSE    71          0
+#> 2    FALSE                  3       TRUE FALSE    54          0
+#>   has_summary archetype last_poster_username category_id pinned_globally
+#> 1       FALSE   regular             cboettig           3           FALSE
+#> 2       FALSE   regular               sckott           1           FALSE
+#>   bookmarked_post_numbers
+#> 1                       1
+#> 2                       1
+#>                                                                                                                   posters
+#> 1 latest, NA, NA, NA, Original Poster, Most Recent Poster, Frequent Poster, Frequent Poster, Frequent Poster, 3, 1, 35, 2
+#> 2                                                                   NA, latest, Original Poster, Most Recent Poster, 3, 1
+```
+
+Get a single topic by id number
+
+
+```r
+topic(8)
+```
+
+
+```
+#>   id              name username
+#> 1 11            system   system
+#> 2 14 Scott Chamberlain   sckott
+#> 3 51 Scott Chamberlain   sckott
+#>                                         avatar_template uploaded_avatar_id
+#> 1 /user_avatar/discuss.ropensci.org/system/{size}/1.png                  1
+#> 2 /user_avatar/discuss.ropensci.org/sckott/{size}/2.png                  2
+#> 3 /user_avatar/discuss.ropensci.org/sckott/{size}/2.png                  2
+```
+
+Create topic
+
+
+```r
+text <- '
 print("hello world")
-#&gt; [1] "hello world"
+#> [1] "hello world"
 
 head(mtcars)
-#&gt;                    mpg cyl disp  hp drat    wt  qsec vs am gear carb
-#&gt; Mazda RX4         21.0   6  160 110 3.90 2.620 16.46  0  1    4    4
-#&gt; Mazda RX4 Wag     21.0   6  160 110 3.90 2.875 17.02  0  1    4    4
-#&gt; Datsun 710        22.8   4  108  93 3.85 2.320 18.61  1  1    4    1
-#&gt; Hornet 4 Drive    21.4   6  258 110 3.08 3.215 19.44  1  0    3    1
-#&gt; Hornet Sportabout 18.7   8  360 175 3.15 3.440 17.02  0  0    3    2
-#&gt; Valiant           18.1   6  225 105 2.76 3.460 20.22  1  0    3    1
-'</span><span class="w">
-
-</span><span class="n">create_topic</span><span class="p">(</span><span class="n">title</span><span class="o">=</span><span class="s2">"testing from discgolf - 2"</span><span class="p">,</span><span class="w"> </span><span class="n">text</span><span class="o">=</span><span class="n">text</span><span class="p">)</span><span class="w">
-</span></code></pre>
-</div>
-
-<h2 id="wrapup">Wrapup</h2>
-
-<p>There are more functions I didn’t highlight, and there are many methods that haven’t been implemented yet… in good time it will be done.</p>
-
-
-  </div>
-  
-  <div class="post">
-    <h1>
-      <a href="/2015/01/geojson-topojson-io/">
-        R I/O for geojson and topojson
-      </a>
-    </h1>
-
-    <span class="post-date">06 Jan 2015</span>
-
-    <p>At rOpenSci we’ve been working on an R package (<code class="highlighter-rouge">geojsonio</code>) to make converting R data in various formats to <a href="http://geojson.org/geojson-spec.html">geoJSON</a> and <a href="https://github.com/topojson/topojson-specification/blob/master/README.md">topoJSON</a>, and vice versa. We hope to do this one job very well, and handle all reasonable use cases.</p>
-
-<p>Functions in this package are organized first around what you’re working with or want to get, <code class="highlighter-rouge">geojson</code> or <code class="highlighter-rouge">topojson</code>, then convert to or read from various formats:</p>
-
-<ul>
-  <li><code class="highlighter-rouge">geojson_list()</code>/<code class="highlighter-rouge">topojson_list()</code> - convert to geojson/topojson as R list format</li>
-  <li><code class="highlighter-rouge">geojson_json()</code>/<code class="highlighter-rouge">topojson_json()</code> - convert to geojson/topojson as json</li>
-  <li><code class="highlighter-rouge">geojson_read()</code><code class="highlighter-rouge">topojson_read()</code> - read a geojson/topojson file from file path or URL</li>
-  <li><code class="highlighter-rouge">geojson_write()</code>/<code class="highlighter-rouge">topojson_write()</code> - write a geojson/topojson file locally</li>
-</ul>
-
-<p>Each of the above functions have methods for various objects/classes, including <code class="highlighter-rouge">numeric</code>, <code class="highlighter-rouge">data.frame</code>, <code class="highlighter-rouge">list</code>, <code class="highlighter-rouge">SpatialPolygons</code>, <code class="highlighter-rouge">SpatialPolygonsDataFrame</code>, <code class="highlighter-rouge">SpatialLines</code>, <code class="highlighter-rouge">SpatialLinesDataFrame</code>, <code class="highlighter-rouge">SpatialPoints</code>, <code class="highlighter-rouge">SpatialPointsDataFrame</code>.</p>
-
-<h2 id="install">Install</h2>
-
-<p>Install rgdal - in case you can’t get it installed from binary , here’s what works on a Mac.</p>
-
-<div class="language-r highlighter-rouge"><pre class="highlight"><code><span class="n">install.packages</span><span class="p">(</span><span class="s2">"http://cran.r-project.org/src/contrib/rgdal_0.9-1.tar.gz"</span><span class="p">,</span><span class="w"> </span><span class="n">repos</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="kc">NULL</span><span class="p">,</span><span class="w"> </span><span class="n">type</span><span class="o">=</span><span class="s2">"source"</span><span class="p">,</span><span class="w"> </span><span class="n">configure.args</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"--with-gdal-config=/Library/Frameworks/GDAL.framework/Versions/1.10/unix/bin/gdal-config --with-proj-include=/Library/Frameworks/PROJ.framework/unix/include --with-proj-lib=/Library/Frameworks/PROJ.framework/unix/lib"</span><span class="p">)</span><span class="w">
-</span></code></pre>
-</div>
-
-<p>Install <code class="highlighter-rouge">geojsonio</code></p>
-
-<div class="language-r highlighter-rouge"><pre class="highlight"><code><span class="n">install.packages</span><span class="p">(</span><span class="s2">"devtools"</span><span class="p">)</span><span class="w">
-</span><span class="n">devtools</span><span class="o">::</span><span class="n">install_github</span><span class="p">(</span><span class="s2">"ropensci/geojsonio"</span><span class="p">)</span><span class="w">
-</span></code></pre>
-</div>
-
-<div class="language-r highlighter-rouge"><pre class="highlight"><code><span class="n">library</span><span class="p">(</span><span class="s2">"geojsonio"</span><span class="p">)</span><span class="w">
-</span></code></pre>
-</div>
-
-<h2 id="geojson">GeoJSON</h2>
-
-<h3 id="convert-various-formats-to-geojson">Convert various formats to geojson</h3>
-
-<p>From a <code class="highlighter-rouge">numeric</code> vector of length 2, as json or list</p>
-
-<div class="language-r highlighter-rouge"><pre class="highlight"><code><span class="n">geojson_json</span><span class="p">(</span><span class="nf">c</span><span class="p">(</span><span class="m">32.45</span><span class="p">,</span><span class="m">-99.74</span><span class="p">))</span><span class="w">
-</span><span class="c1">#&gt; {"type":"Point","geometry":{"type":"Point","coordinates":[32.45,-99.74]},"properties":{}}
-</span><span class="n">geojson_list</span><span class="p">(</span><span class="nf">c</span><span class="p">(</span><span class="m">32.45</span><span class="p">,</span><span class="m">-99.74</span><span class="p">))</span><span class="w">
-</span><span class="c1">#&gt; $type
-#&gt; [1] "Point"
-#&gt; 
-#&gt; $geometry
-#&gt; $geometry$type
-#&gt; [1] "Point"
-#&gt; 
-#&gt; $geometry$coordinates
-#&gt; [1]  32.45 -99.74
-#&gt; 
-#&gt; 
-#&gt; $properties
-#&gt; NULL
-#&gt; 
-#&gt; attr(,"class")
-#&gt; [1] "geo_list"
-#&gt; attr(,"from")
-#&gt; [1] "numeric"
-</span></code></pre>
-</div>
-
-<p>From a <code class="highlighter-rouge">data.frame</code></p>
-
-<div class="language-r highlighter-rouge"><pre class="highlight"><code><span class="n">library</span><span class="p">(</span><span class="s1">'maps'</span><span class="p">)</span><span class="w">
-</span><span class="n">data</span><span class="p">(</span><span class="n">us.cities</span><span class="p">)</span><span class="w">
-</span><span class="n">geojson_json</span><span class="p">(</span><span class="n">us.cities</span><span class="p">[</span><span class="m">1</span><span class="o">:</span><span class="m">2</span><span class="p">,],</span><span class="w"> </span><span class="n">lat</span><span class="o">=</span><span class="s1">'lat'</span><span class="p">,</span><span class="w"> </span><span class="n">lon</span><span class="o">=</span><span class="s1">'long'</span><span class="p">)</span><span class="w">
-</span><span class="c1">#&gt; {"type":"FeatureCollection","features":[{"type":"Feature","geometry":{"type":"Point","coordinates":[-99.74,32.45]},"properties":{"name":"Abilene TX","country.etc":"TX","pop":"113888","capital":"0"}},{"type":"Feature","geometry":{"type":"Point","coordinates":[-81.52,41.08]},"properties":{"name":"Akron OH","country.etc":"OH","pop":"206634","capital":"0"}}]}
-</span><span class="n">geojson_list</span><span class="p">(</span><span class="n">us.cities</span><span class="p">[</span><span class="m">1</span><span class="o">:</span><span class="m">2</span><span class="p">,],</span><span class="w"> </span><span class="n">lat</span><span class="o">=</span><span class="s1">'lat'</span><span class="p">,</span><span class="w"> </span><span class="n">lon</span><span class="o">=</span><span class="s1">'long'</span><span class="p">)</span><span class="w">
-</span><span class="c1">#&gt; $type
-#&gt; [1] "FeatureCollection"
-#&gt; 
-#&gt; $features
-#&gt; $features[[1]]
-#&gt; $features[[1]]$type
-#&gt; [1] "Feature"
-#&gt; 
-#&gt; $features[[1]]$geometry
-#&gt; $features[[1]]$geometry$type
-#&gt; [1] "Point"
-#&gt; 
-#&gt; $features[[1]]$geometry$coordinates
-#&gt; [1] -99.74  32.45
-#&gt; 
-#&gt; 
-#&gt; $features[[1]]$properties
-#&gt; $features[[1]]$properties$name
-#&gt; [1] "Abilene TX"
-#&gt; 
-#&gt; $features[[1]]$properties$country.etc
-#&gt; [1] "TX"
-#&gt; 
-#&gt; $features[[1]]$properties$pop
-#&gt; [1] "113888"
-#&gt; 
-#&gt; $features[[1]]$properties$capital
-#&gt; [1] "0"
-#&gt; 
-#&gt; 
-#&gt; 
-#&gt; $features[[2]]
-#&gt; $features[[2]]$type
-#&gt; [1] "Feature"
-#&gt; 
-#&gt; $features[[2]]$geometry
-#&gt; $features[[2]]$geometry$type
-#&gt; [1] "Point"
-#&gt; 
-#&gt; $features[[2]]$geometry$coordinates
-#&gt; [1] -81.52  41.08
-#&gt; 
-#&gt; 
-#&gt; $features[[2]]$properties
-#&gt; $features[[2]]$properties$name
-#&gt; [1] "Akron OH"
-#&gt; 
-#&gt; $features[[2]]$properties$country.etc
-#&gt; [1] "OH"
-#&gt; 
-#&gt; $features[[2]]$properties$pop
-#&gt; [1] "206634"
-#&gt; 
-#&gt; $features[[2]]$properties$capital
-#&gt; [1] "0"
-#&gt; 
-#&gt; 
-#&gt; 
-#&gt; 
-#&gt; attr(,"class")
-#&gt; [1] "geo_list"
-#&gt; attr(,"from")
-#&gt; [1] "data.frame"
-</span></code></pre>
-</div>
-
-<p>From <code class="highlighter-rouge">SpatialPolygons</code> class</p>
-
-<div class="language-r highlighter-rouge"><pre class="highlight"><code><span class="n">library</span><span class="p">(</span><span class="s1">'sp'</span><span class="p">)</span><span class="w">
-</span><span class="n">poly1</span><span class="w"> </span><span class="o">&lt;-</span><span class="w"> </span><span class="n">Polygons</span><span class="p">(</span><span class="nf">list</span><span class="p">(</span><span class="n">Polygon</span><span class="p">(</span><span class="n">cbind</span><span class="p">(</span><span class="nf">c</span><span class="p">(</span><span class="m">-100</span><span class="p">,</span><span class="m">-90</span><span class="p">,</span><span class="m">-85</span><span class="p">,</span><span class="m">-100</span><span class="p">),</span><span class="w">
-                                     </span><span class="nf">c</span><span class="p">(</span><span class="m">40</span><span class="p">,</span><span class="m">50</span><span class="p">,</span><span class="m">45</span><span class="p">,</span><span class="m">40</span><span class="p">)))),</span><span class="w"> </span><span class="s2">"1"</span><span class="p">)</span><span class="w">
-</span><span class="n">poly2</span><span class="w"> </span><span class="o">&lt;-</span><span class="w"> </span><span class="n">Polygons</span><span class="p">(</span><span class="nf">list</span><span class="p">(</span><span class="n">Polygon</span><span class="p">(</span><span class="n">cbind</span><span class="p">(</span><span class="nf">c</span><span class="p">(</span><span class="m">-90</span><span class="p">,</span><span class="m">-80</span><span class="p">,</span><span class="m">-75</span><span class="p">,</span><span class="m">-90</span><span class="p">),</span><span class="w">
-                                     </span><span class="nf">c</span><span class="p">(</span><span class="m">30</span><span class="p">,</span><span class="m">40</span><span class="p">,</span><span class="m">35</span><span class="p">,</span><span class="m">30</span><span class="p">)))),</span><span class="w"> </span><span class="s2">"2"</span><span class="p">)</span><span class="w">
-</span><span class="n">sp_poly</span><span class="w"> </span><span class="o">&lt;-</span><span class="w"> </span><span class="n">SpatialPolygons</span><span class="p">(</span><span class="nf">list</span><span class="p">(</span><span class="n">poly1</span><span class="p">,</span><span class="w"> </span><span class="n">poly2</span><span class="p">),</span><span class="w"> </span><span class="m">1</span><span class="o">:</span><span class="m">2</span><span class="p">)</span><span class="w">
-</span></code></pre>
-</div>
-
-<p>to json</p>
-
-<div class="language-r highlighter-rouge"><pre class="highlight"><code><span class="n">geojson_json</span><span class="p">(</span><span class="n">sp_poly</span><span class="p">)</span><span class="w">
-</span><span class="c1">#&gt; {"type":"Polygon","bbox":[-100,-75,30,50],"coordinates":[[[-100,40],[-90,50],[-85,45],[-100,40]],[[-90,30],[-80,40],[-75,35],[-90,30]]],"properties":{}}
-</span></code></pre>
-</div>
-
-<p>to list</p>
-
-<div class="language-r highlighter-rouge"><pre class="highlight"><code><span class="n">geojson_list</span><span class="p">(</span><span class="n">sp_poly</span><span class="p">)</span><span class="o">$</span><span class="n">coordinates</span><span class="p">[[</span><span class="m">1</span><span class="p">]]</span><span class="w">
-</span><span class="c1">#&gt; [[1]]
-#&gt; [[1]][[1]]
-#&gt; [1] -100
-#&gt; 
-#&gt; [[1]][[2]]
-#&gt; [1] 40
-#&gt; 
-#&gt; 
-#&gt; [[2]]
-#&gt; [[2]][[1]]
-#&gt; [1] -90
-#&gt; 
-#&gt; [[2]][[2]]
-#&gt; [1] 50
-#&gt; 
-#&gt; 
-#&gt; [[3]]
-#&gt; [[3]][[1]]
-#&gt; [1] -85
-#&gt; 
-#&gt; [[3]][[2]]
-#&gt; [1] 45
-#&gt; 
-#&gt; 
-#&gt; [[4]]
-#&gt; [[4]][[1]]
-#&gt; [1] -100
-#&gt; 
-#&gt; [[4]][[2]]
-#&gt; [1] 40
-</span></code></pre>
-</div>
-
-<h3 id="write-geojson">Write geojson</h3>
-
-<div class="language-r highlighter-rouge"><pre class="highlight"><code><span class="n">library</span><span class="p">(</span><span class="s1">'maps'</span><span class="p">)</span><span class="w">
-</span><span class="n">data</span><span class="p">(</span><span class="n">us.cities</span><span class="p">)</span><span class="w">
-</span><span class="n">geojson_write</span><span class="p">(</span><span class="n">us.cities</span><span class="p">[</span><span class="m">1</span><span class="o">:</span><span class="m">2</span><span class="p">,],</span><span class="w"> </span><span class="n">lat</span><span class="o">=</span><span class="s1">'lat'</span><span class="p">,</span><span class="w"> </span><span class="n">lon</span><span class="o">=</span><span class="s1">'long'</span><span class="p">)</span><span class="w">
-</span><span class="c1">#&gt; &lt;geojson&gt;
-#&gt;   Path:       myfile.geojson
-#&gt;   From class: data.frame
-</span></code></pre>
-</div>
-
-<h3 id="read-geojson">Read geojson</h3>
-
-<div class="language-r highlighter-rouge"><pre class="highlight"><code><span class="n">file</span><span class="w"> </span><span class="o">&lt;-</span><span class="w"> </span><span class="n">system.file</span><span class="p">(</span><span class="s2">"examples"</span><span class="p">,</span><span class="w"> </span><span class="s2">"california.geojson"</span><span class="p">,</span><span class="w"> </span><span class="n">package</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"geojsonio"</span><span class="p">)</span><span class="w">
-</span><span class="n">out</span><span class="w"> </span><span class="o">&lt;-</span><span class="w"> </span><span class="n">geojson_read</span><span class="p">(</span><span class="n">file</span><span class="p">)</span><span class="w">
-</span><span class="c1">#&gt; OGR data source with driver: GeoJSON 
-#&gt; Source: "/Users/sacmac/Library/R/3.1/library/geojsonio/examples/california.geojson", layer: "OGRGeoJSON"
-#&gt; with 1 features and 11 fields
-#&gt; Feature type: wkbMultiPolygon with 2 dimensions
-</span><span class="n">plot</span><span class="p">(</span><span class="n">out</span><span class="p">)</span><span class="w">
-</span></code></pre>
-</div>
-
-<p><img src="/public/img/2015-01-06-geojson-topojson-io/unnamed-chunk-11-1.png" alt="plot of chunk unnamed-chunk-11" /></p>
-
-<h2 id="topojson">TopoJSON</h2>
-
-<h3 id="convert-to-topojson-with-node-topojson-client">Convert to TopoJSON with Node topojson client</h3>
-
-<p>For topojson you will need Mike Bostock’s command line client. Install it by doing</p>
-
-<div class="highlighter-rouge"><pre class="highlight"><code>sudo npm install -g topojson
-</code></pre>
-</div>
-
-<p>Download a zipped shape fileset, <a href="http://esp.cr.usgs.gov/data/little/querwisl.zip">this one</a> for distribution of <em>Quercus wislizeni</em>. Unzip the zip file to a folder. Then do (changing the path to your path)</p>
-
-<div class="language-r highlighter-rouge"><pre class="highlight"><code><span class="n">topojson_write</span><span class="p">(</span><span class="n">shppath</span><span class="o">=</span><span class="s1">'~/Downloads/querwisl'</span><span class="p">,</span><span class="w"> </span><span class="n">path</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"~/Downloads"</span><span class="p">,</span><span class="w"> </span><span class="n">projection</span><span class="o">=</span><span class="s1">'albers'</span><span class="p">,</span><span class="w"> </span><span class="n">projargs</span><span class="o">=</span><span class="nf">list</span><span class="p">(</span><span class="n">rotate</span><span class="o">=</span><span class="s1">'[60, -35, 0]'</span><span class="p">))</span><span class="w">
-</span><span class="c1">#&gt; OGR data source with driver: ESRI Shapefile 
-#&gt; Source: "/Users/sacmac/Downloads/querwisl", layer: "querwisl"
-#&gt; with 35 features and 5 fields
-#&gt; Feature type: wkbPolygon with 2 dimensions
-</span></code></pre>
-</div>
-
-<p>Which prints progress on the conversion of the shape file. And prints the topojson CLI call, including the location of the output file, here <code class="highlighter-rouge">/Users/sacmac/querwisl.json</code></p>
-
-<div class="language-r highlighter-rouge"><pre class="highlight"><code><span class="n">OGR</span><span class="w"> </span><span class="n">data</span><span class="w"> </span><span class="n">source</span><span class="w"> </span><span class="n">with</span><span class="w"> </span><span class="n">driver</span><span class="o">:</span><span class="w"> </span><span class="n">ESRI</span><span class="w"> </span><span class="n">Shapefile</span><span class="w">
-</span><span class="n">Source</span><span class="o">:</span><span class="w"> </span><span class="s2">"/Users/sacmac/Downloads/querwisl"</span><span class="p">,</span><span class="w"> </span><span class="n">layer</span><span class="o">:</span><span class="w"> </span><span class="s2">"querwisl"</span><span class="w">
-</span><span class="n">with</span><span class="w"> </span><span class="m">35</span><span class="w"> </span><span class="n">features</span><span class="w"> </span><span class="n">and</span><span class="w"> </span><span class="m">5</span><span class="w"> </span><span class="n">fields</span><span class="w">
-</span><span class="n">Feature</span><span class="w"> </span><span class="n">type</span><span class="o">:</span><span class="w"> </span><span class="n">wkbPolygon</span><span class="w"> </span><span class="n">with</span><span class="w"> </span><span class="m">2</span><span class="w"> </span><span class="n">dimensions</span><span class="w">
-</span><span class="n">topojson</span><span class="w"> </span><span class="o">-</span><span class="n">o</span><span class="w"> </span><span class="o">/</span><span class="n">Users</span><span class="o">/</span><span class="n">sacmac</span><span class="o">/</span><span class="n">querwisl.json</span><span class="w"> </span><span class="o">-</span><span class="n">q</span><span class="w"> </span><span class="m">1e4</span><span class="w"> </span><span class="o">-</span><span class="n">s</span><span class="w"> </span><span class="m">0</span><span class="w"> </span><span class="o">--</span><span class="n">shapefile</span><span class="o">-</span><span class="n">encoding</span><span class="w"> </span><span class="n">utf8</span><span class="w"> </span><span class="o">--</span><span class="n">projection</span><span class="w"> </span><span class="s1">'d3.geo.albers().rotate([60, -35, 0])'</span><span class="w"> </span><span class="o">--</span><span class="w"> </span><span class="o">/</span><span class="n">var</span><span class="o">/</span><span class="n">folders</span><span class="o">/</span><span class="n">gs</span><span class="o">/</span><span class="m">4</span><span class="n">khph0xs0436gmd2gdnwsg080000gn</span><span class="o">/</span><span class="nb">T</span><span class="o">//</span><span class="n">Rtmp49APW7</span><span class="o">/</span><span class="n">querwisl.shp</span><span class="w">
-
-</span><span class="n">bounds</span><span class="o">:</span><span class="w"> </span><span class="m">-403.2554825867553</span><span class="w"> </span><span class="m">401.27189387582916</span><span class="w"> </span><span class="m">-295.798050380061</span><span class="w"> </span><span class="m">585.4214768677039</span><span class="w"> </span><span class="p">(</span><span class="n">cartesian</span><span class="p">)</span><span class="w">
-</span><span class="n">pre</span><span class="o">-</span><span class="n">quantization</span><span class="o">:</span><span class="w"> </span><span class="m">0.010746817902459677</span><span class="w"> </span><span class="m">0.018416799979185387</span><span class="w">
-</span><span class="n">topology</span><span class="o">:</span><span class="w"> </span><span class="m">35</span><span class="w"> </span><span class="n">arcs</span><span class="p">,</span><span class="w"> </span><span class="m">2492</span><span class="w"> </span><span class="n">points</span><span class="w">
-</span><span class="n">prune</span><span class="o">:</span><span class="w"> </span><span class="n">retained</span><span class="w"> </span><span class="m">35</span><span class="w"> </span><span class="o">/</span><span class="w"> </span><span class="m">35</span><span class="w"> </span><span class="n">arcs</span><span class="w"> </span><span class="p">(</span><span class="m">100</span><span class="o">%</span><span class="p">)</span><span class="w">
-</span></code></pre>
-</div>
-
-<p>You can then use this topojson file wherever. We’ll add a function soon to automagically throw this file up as a Github gist to get an interactive map.</p>
-
-<h3 id="read-topojson">Read topojson</h3>
-
-<p>TopoJSON</p>
-
-<div class="language-r highlighter-rouge"><pre class="highlight"><code><span class="n">url</span><span class="w"> </span><span class="o">&lt;-</span><span class="w"> </span><span class="s2">"https://raw.githubusercontent.com/shawnbot/d3-cartogram/master/data/us-states.topojson"</span><span class="w">
-</span><span class="n">out</span><span class="w"> </span><span class="o">&lt;-</span><span class="w"> </span><span class="n">topojson_read</span><span class="p">(</span><span class="n">url</span><span class="p">)</span><span class="w">
-</span><span class="c1">#&gt; OGR data source with driver: GeoJSON 
-#&gt; Source: "https://raw.githubusercontent.com/shawnbot/d3-cartogram/master/data/us-states.topojson", layer: "states"
-#&gt; with 51 features and 2 fields
-#&gt; Feature type: wkbPolygon with 2 dimensions
-</span><span class="n">plot</span><span class="p">(</span><span class="n">out</span><span class="p">)</span><span class="w">
-</span></code></pre>
-</div>
-
-<p><img src="/public/img/2015-01-06-geojson-topojson-io/unnamed-chunk-14-1.png" alt="plot of chunk unnamed-chunk-14" /></p>
-
-<h2 id="use-case-play-with-us-states">Use case: Play with US states</h2>
-
-<p>Using data from <a href="https://github.com/glynnbird/usstatesgeojson">https://github.com/glynnbird/usstatesgeojson</a></p>
-
-<p>Get some geojson</p>
-
-<div class="language-r highlighter-rouge"><pre class="highlight"><code><span class="n">library</span><span class="p">(</span><span class="s1">'httr'</span><span class="p">)</span><span class="w">
-</span><span class="n">res</span><span class="w"> </span><span class="o">&lt;-</span><span class="w"> </span><span class="n">GET</span><span class="p">(</span><span class="s1">'https://api.github.com/repos/glynnbird/usstatesgeojson/contents'</span><span class="p">)</span><span class="w">
-</span><span class="n">st_names</span><span class="w"> </span><span class="o">&lt;-</span><span class="w"> </span><span class="n">Filter</span><span class="p">(</span><span class="k">function</span><span class="p">(</span><span class="n">x</span><span class="p">)</span><span class="w"> </span><span class="n">grepl</span><span class="p">(</span><span class="s2">"\\.geojson"</span><span class="p">,</span><span class="w"> </span><span class="n">x</span><span class="p">),</span><span class="w"> </span><span class="n">sapply</span><span class="p">(</span><span class="n">content</span><span class="p">(</span><span class="n">res</span><span class="p">),</span><span class="w"> </span><span class="s2">"[["</span><span class="p">,</span><span class="w"> </span><span class="s2">"name"</span><span class="p">))</span><span class="w">
-</span><span class="n">base</span><span class="w"> </span><span class="o">&lt;-</span><span class="w"> </span><span class="s1">'https://raw.githubusercontent.com/glynnbird/usstatesgeojson/master/'</span><span class="w">
-</span><span class="n">st_files</span><span class="w"> </span><span class="o">&lt;-</span><span class="w"> </span><span class="n">paste0</span><span class="p">(</span><span class="n">base</span><span class="p">,</span><span class="w"> </span><span class="n">st_names</span><span class="p">)</span><span class="w">
-</span></code></pre>
-</div>
-
-<p>Make a faceted plot</p>
-
-<div class="language-r highlighter-rouge"><pre class="highlight"><code><span class="n">library</span><span class="p">(</span><span class="s1">'ggplot2'</span><span class="p">)</span><span class="w">
-</span><span class="n">library</span><span class="p">(</span><span class="s1">'plyr'</span><span class="p">)</span><span class="w">
-</span><span class="n">st_use</span><span class="w"> </span><span class="o">&lt;-</span><span class="w"> </span><span class="n">st_files</span><span class="p">[</span><span class="m">7</span><span class="o">:</span><span class="m">13</span><span class="p">]</span><span class="w">
-</span><span class="n">geo</span><span class="w"> </span><span class="o">&lt;-</span><span class="w"> </span><span class="n">lapply</span><span class="p">(</span><span class="n">st_use</span><span class="p">,</span><span class="w"> </span><span class="n">geojson_read</span><span class="p">,</span><span class="w"> </span><span class="n">verbose</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="kc">FALSE</span><span class="p">)</span><span class="w">
-</span><span class="n">df</span><span class="w"> </span><span class="o">&lt;-</span><span class="w"> </span><span class="n">ldply</span><span class="p">(</span><span class="n">setNames</span><span class="p">(</span><span class="n">lapply</span><span class="p">(</span><span class="n">geo</span><span class="p">,</span><span class="w"> </span><span class="n">fortify</span><span class="p">),</span><span class="w"> </span><span class="n">gsub</span><span class="p">(</span><span class="s2">"\\.geojson"</span><span class="p">,</span><span class="w"> </span><span class="s2">""</span><span class="p">,</span><span class="w"> </span><span class="n">st_names</span><span class="p">[</span><span class="m">7</span><span class="o">:</span><span class="m">13</span><span class="p">])))</span><span class="w">
-</span><span class="n">ggplot</span><span class="p">(</span><span class="n">df</span><span class="p">,</span><span class="w"> </span><span class="n">aes</span><span class="p">(</span><span class="n">long</span><span class="p">,</span><span class="w"> </span><span class="n">lat</span><span class="p">,</span><span class="w"> </span><span class="n">group</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">group</span><span class="p">))</span><span class="w"> </span><span class="o">+</span><span class="w">
-  </span><span class="n">geom_polygon</span><span class="p">()</span><span class="w"> </span><span class="o">+</span><span class="w">
-  </span><span class="n">facet_wrap</span><span class="p">(</span><span class="o">~</span><span class="w"> </span><span class="n">.id</span><span class="p">,</span><span class="w"> </span><span class="n">scales</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"free"</span><span class="p">)</span><span class="w">
-</span></code></pre>
-</div>
-
-<p><img src="/public/img/2015-01-06-geojson-topojson-io/unnamed-chunk-16-1.png" alt="plot of chunk unnamed-chunk-16" /></p>
-
-<h2 id="maps">Maps</h2>
-
-<p>We’re also working on <code class="highlighter-rouge">map_gist()</code> - to push up a geojson or topojson file as a GitHub gist (renders as an interactive map). It still needs some work…</p>
-
-<h2 id="validate-geojson">Validate geojson</h2>
-
-<p><a href="http://geojsonlint.com/">geojsonlint.com</a> has a nice web interface you can use to make sure you’re geoJSON is in the right format. In addition, it provides a RESTful endpoint at <code class="highlighter-rouge">geojsonlint.com/validate</code> to validate geoJSON. 
-This was just added today in this package, and can be used from many data types.</p>
-
-<p>Good geoJSON</p>
-
-<div class="language-r highlighter-rouge"><pre class="highlight"><code><span class="n">validate</span><span class="p">(</span><span class="s1">'{"type": "Point", "coordinates": [-100, 80]}'</span><span class="p">)</span><span class="w">
-</span><span class="c1">#&gt; $status
-#&gt; [1] "ok"
-</span></code></pre>
-</div>
-
-<p>Bad geoJSON</p>
-
-<div class="language-r highlighter-rouge"><pre class="highlight"><code><span class="n">validate</span><span class="p">(</span><span class="s1">'{"type": "Rhombus", "coordinates": [[1, 2], [3, 4], [5, 6]]}'</span><span class="p">)</span><span class="w">
-</span><span class="c1">#&gt; $message
-#&gt; [1] "\"Rhombus\" is not a valid GeoJSON type."
-#&gt; 
-#&gt; $status
-#&gt; [1] "error"
-</span></code></pre>
-</div>
-
-<p>A file</p>
-
-<div class="language-r highlighter-rouge"><pre class="highlight"><code><span class="n">file</span><span class="w"> </span><span class="o">&lt;-</span><span class="w"> </span><span class="n">system.file</span><span class="p">(</span><span class="s2">"examples"</span><span class="p">,</span><span class="w"> </span><span class="s2">"zillow_or.geojson"</span><span class="p">,</span><span class="w"> </span><span class="n">package</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"togeojson"</span><span class="p">)</span><span class="w">
-</span><span class="n">validate</span><span class="p">(</span><span class="n">x</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">as.location</span><span class="p">(</span><span class="n">file</span><span class="p">))</span><span class="w">
-</span><span class="c1">#&gt; $status
-#&gt; [1] "ok"
-</span></code></pre>
-</div>
-
-<p>A URL</p>
-
-<div class="language-r highlighter-rouge"><pre class="highlight"><code><span class="n">url</span><span class="w"> </span><span class="o">&lt;-</span><span class="w"> </span><span class="s2">"https://raw.githubusercontent.com/glynnbird/usstatesgeojson/master/california.geojson"</span><span class="w">
-</span><span class="n">validate</span><span class="p">(</span><span class="n">as.location</span><span class="p">(</span><span class="n">url</span><span class="p">))</span><span class="w">
-</span><span class="c1">#&gt; $status
-#&gt; [1] "ok"
-</span></code></pre>
-</div>
-
-<p>From the output of <code class="highlighter-rouge">geojson_list()</code></p>
-
-<div class="language-r highlighter-rouge"><pre class="highlight"><code><span class="n">library</span><span class="p">(</span><span class="s2">"maps"</span><span class="p">)</span><span class="w">
-</span><span class="n">data</span><span class="p">(</span><span class="n">us.cities</span><span class="p">)</span><span class="w">
-</span><span class="n">x</span><span class="w"> </span><span class="o">&lt;-</span><span class="w"> </span><span class="n">geojson_list</span><span class="p">(</span><span class="n">us.cities</span><span class="p">[</span><span class="m">1</span><span class="o">:</span><span class="m">2</span><span class="p">,],</span><span class="w"> </span><span class="n">lat</span><span class="o">=</span><span class="s1">'lat'</span><span class="p">,</span><span class="w"> </span><span class="n">lon</span><span class="o">=</span><span class="s1">'long'</span><span class="p">)</span><span class="w">
-</span><span class="n">validate</span><span class="p">(</span><span class="n">x</span><span class="p">)</span><span class="w">
-</span><span class="c1">#&gt; $status
-#&gt; [1] "ok"
-</span></code></pre>
-</div>
-
-<p>From SpatialPoints class</p>
-
-<div class="language-r highlighter-rouge"><pre class="highlight"><code><span class="n">library</span><span class="p">(</span><span class="s2">"sp"</span><span class="p">)</span><span class="w">
-</span><span class="n">a</span><span class="w"> </span><span class="o">&lt;-</span><span class="w"> </span><span class="nf">c</span><span class="p">(</span><span class="m">1</span><span class="p">,</span><span class="m">2</span><span class="p">,</span><span class="m">3</span><span class="p">,</span><span class="m">4</span><span class="p">,</span><span class="m">5</span><span class="p">)</span><span class="w">
-</span><span class="n">b</span><span class="w"> </span><span class="o">&lt;-</span><span class="w"> </span><span class="nf">c</span><span class="p">(</span><span class="m">3</span><span class="p">,</span><span class="m">2</span><span class="p">,</span><span class="m">5</span><span class="p">,</span><span class="m">1</span><span class="p">,</span><span class="m">4</span><span class="p">)</span><span class="w">
-</span><span class="n">x</span><span class="w"> </span><span class="o">&lt;-</span><span class="w"> </span><span class="n">SpatialPoints</span><span class="p">(</span><span class="n">cbind</span><span class="p">(</span><span class="n">a</span><span class="p">,</span><span class="n">b</span><span class="p">))</span><span class="w">
-</span><span class="n">validate</span><span class="p">(</span><span class="n">x</span><span class="p">)</span><span class="w">
-</span><span class="c1">#&gt; $status
-#&gt; [1] "ok"
-</span></code></pre>
-</div>
+#>                    mpg cyl disp  hp drat    wt  qsec vs am gear carb
+#> Mazda RX4         21.0   6  160 110 3.90 2.620 16.46  0  1    4    4
+#> Mazda RX4 Wag     21.0   6  160 110 3.90 2.875 17.02  0  1    4    4
+#> Datsun 710        22.8   4  108  93 3.85 2.320 18.61  1  1    4    1
+#> Hornet 4 Drive    21.4   6  258 110 3.08 3.215 19.44  1  0    3    1
+#> Hornet Sportabout 18.7   8  360 175 3.15 3.440 17.02  0  0    3    2
+#> Valiant           18.1   6  225 105 2.76 3.460 20.22  1  0    3    1
+'
+
+create_topic(title="testing from discgolf - 2", text=text)
+```
+
+## Wrapup
+
+There are more functions I didn't highlight, and there are many methods that haven't been implemented yet... in good time it will be done. 
+
+[disc]: http://www.discourse.org/
+[metadisc]: https://meta.discourse.org/
+[rodisc]: http://discuss.ropensci.org/
 
   </div>
   

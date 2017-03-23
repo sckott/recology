@@ -33,7 +33,7 @@
     <header class="masthead">
       <div class="masthead-inner">
         <h1>Recology</h1>
-        <!-- <h1> <a href="http://recology.info/">Recology</a></h1> -->
+        <!-- <h1> <a href="http://localhost:4000">Recology</a></h1> -->
         <p class="lead">R/etc.</p>
 
         <div class="colophon">
@@ -61,6 +61,457 @@
   
   <div class="post">
     <h1>
+      <a href="/2013/08/govdat-vignette/">
+        govdat - SunlightLabs and New York Times Congress data via R
+      </a>
+    </h1>
+
+    <span class="post-date">28 Aug 2013</span>
+
+    I started an R package a while back, and a few people have shown interest, so I thought it was time to revist the code. govdat is an interface to various APIs for government data: currently the Sunlight Labs APIs, and the New York Times congress API. Returned objects from functions are simple lists. In future versions of govdat, I may change how data is returned. The following are examples (which is also the package vignette) of using the Sunlight Labs API. I will add examples of using the New York Times Congress API once their site is up again; I'm doing this on 2013-08-28, just after the takedown of their site.
+
+I show just a bit of each data object returned for brevity. And yes, I realize this is not related at all to ecology. 
+
+You will need an API key to use both Sunlight Labs APIs and the New York Times APIs. Get your API key at Sunlight Labs [here](http://sunlightfoundation.com/api/) and NYT [here](http://developer.nytimes.com/docs/congress_api). You can pass in your key within each function or you can put the key in your .Rprofile file on your machine (which is read from the default R working directory) and the key will be read in automatically inside the function. I recommend the latter option. 
+
+Do let me know of bugs or feature requests over at the Github issues page [here](https://github.com/sckott/govdat/issues).
+
+********************
+
+#### Install govdat
+
+
+{% highlight r %}
+install.packages("devtools")
+library(devtools)
+install_github("govdat", "sckott")
+{% endhighlight %}
+
+
+********************
+
+#### Load govdat
+
+
+{% highlight r %}
+library(govdat)
+{% endhighlight %}
+
+
+********************
+
+#### Gets details (subcommittees + membership) for a committee by id.
+
+
+{% highlight r %}
+key <- getOption("SunlightLabsKey")
+out <- sll_cg_getcommittees(id = "JSPR")
+out$response$committee$members[[1]]$legislator[1:5]
+{% endhighlight %}
+
+
+
+{% highlight text %}
+$website
+[1] "http://www.alexander.senate.gov"
+
+$fax
+[1] "202-228-3398"
+
+$govtrack_id
+[1] "300002"
+
+$firstname
+[1] "Lamar"
+
+$chamber
+[1] "senate"
+{% endhighlight %}
+
+
+********************
+
+#### Gets a list of all committees that a member serves on, including subcommittes.
+
+
+{% highlight r %}
+out <- sll_cg_getcommitteesallleg(bioguide_id = "S000148")
+out$response$committees[[1]]
+{% endhighlight %}
+
+
+
+{% highlight text %}
+$committee
+$committee$chamber
+[1] "Senate"
+
+$committee$id
+[1] "SSRA"
+
+$committee$name
+[1] "Senate Committee on Rules and Administration"
+{% endhighlight %}
+
+
+********************
+
+#### Get districts for a latitude/longitude.
+
+
+{% highlight r %}
+out <- sll_cg_getdistrictlatlong(latitude = 35.778788, longitude = -78.787805)
+out$response$districts
+{% endhighlight %}
+
+
+
+{% highlight text %}
+[[1]]
+[[1]]$district
+[[1]]$district$state
+[1] "NC"
+
+[[1]]$district$number
+[1] "2"
+{% endhighlight %}
+
+
+********************
+
+#### Get districts that overlap for a certain zip code.
+
+
+{% highlight r %}
+out <- sll_cg_getdistrictzip(zip = 27511)
+out$response$districts
+{% endhighlight %}
+
+
+
+{% highlight text %}
+[[1]]
+[[1]]$district
+[[1]]$district$state
+[1] "NC"
+
+[[1]]$district$number
+[1] "2"
+
+
+
+[[2]]
+[[2]]$district
+[[2]]$district$state
+[1] "NC"
+
+[[2]]$district$number
+[1] "4"
+
+
+
+[[3]]
+[[3]]$district
+[[3]]$district$state
+[1] "NC"
+
+[[3]]$district$number
+[1] "13"
+{% endhighlight %}
+
+
+********************
+
+#### Search congress people and senate members.
+
+
+{% highlight r %}
+out <- sll_cg_getlegislatorsearch(name = "Reed")
+out$response$results[[1]]$result$legislator[1:5]
+{% endhighlight %}
+
+
+
+{% highlight text %}
+$website
+[1] "http://www.reed.senate.gov"
+
+$fax
+[1] "202-224-4680"
+
+$govtrack_id
+[1] "300081"
+
+$firstname
+[1] "John"
+
+$chamber
+[1] "senate"
+{% endhighlight %}
+
+
+********************
+
+#### Search congress people and senate members for a zip code.
+
+
+{% highlight r %}
+out <- sll_cg_legislatorsallforzip(zip = 77006)
+library(plyr)
+ldply(out$response$legislators, function(x) data.frame(x$legislator[c("firstname", 
+    "lastname")]))
+{% endhighlight %}
+
+
+
+{% highlight text %}
+  firstname    lastname
+1    Sheila Jackson Lee
+2       Ted        Cruz
+3      John      Cornyn
+4       Ted         Poe
+{% endhighlight %}
+
+
+********************
+
+#### Find the popularity of a phrase over a period of time.
+
+##### Get a list of how many times the phrase "united states" appears in the Congressional Record in each month between January and June, 2010:
+
+
+{% highlight r %}
+sll_cw_timeseries(phrase = "united states", start_date = "2009-01-01", end_date = "2009-04-30", 
+    granularity = "month")
+{% endhighlight %}
+
+
+
+{% highlight text %}
+4 records returned
+{% endhighlight %}
+
+
+
+{% highlight text %}
+  count      month
+1  3805 2009-01-01
+2  3512 2009-02-01
+3  6018 2009-03-01
+4  2967 2009-04-01
+{% endhighlight %}
+
+
+##### Plot data
+
+
+{% highlight r %}
+library(ggplot2)
+dat <- sll_cw_timeseries(phrase = "climate change")
+{% endhighlight %}
+
+
+
+{% highlight text %}
+1354 records returned
+{% endhighlight %}
+
+
+
+{% highlight r %}
+ggplot(dat, aes(day, count)) + geom_line() + theme_grey(base_size = 20)
+{% endhighlight %}
+
+![center](/public/img/2013-08-28-govdat-vignette/sll_cw_timeseries2.png) 
+
+
+##### Plot more data
+
+
+{% highlight r %}
+dat_d <- sll_cw_timeseries(phrase = "climate change", party = "D")
+{% endhighlight %}
+
+
+
+{% highlight text %}
+908 records returned
+{% endhighlight %}
+
+
+
+{% highlight r %}
+dat_d$party <- rep("D", nrow(dat_d))
+dat_r <- sll_cw_timeseries(phrase = "climate change", party = "R")
+{% endhighlight %}
+
+
+
+{% highlight text %}
+623 records returned
+{% endhighlight %}
+
+
+
+{% highlight r %}
+dat_r$party <- rep("R", nrow(dat_r))
+dat_both <- rbind(dat_d, dat_r)
+ggplot(dat_both, aes(day, count, colour = party)) + geom_line() + theme_grey(base_size = 20) + 
+    scale_colour_manual(values = c("blue", "red"))
+{% endhighlight %}
+
+![center](/public/img/2013-08-28-govdat-vignette/sll_cw_timeseries3.png) 
+
+
+********************
+
+#### Search OpenStates bills.
+
+
+{% highlight r %}
+out <- sll_os_billsearch(terms = "agriculture", state = "tx", chamber = "upper")
+lapply(out, "[[", "title")[100:110]
+{% endhighlight %}
+
+
+
+{% highlight text %}
+[[1]]
+[1] "Relating to the sale by the Brazos River Authority of certain property at Possum Kingdom Lake."
+
+[[2]]
+[1] "Proposing a constitutional amendment providing immediate additional revenue for the state budget by creating the Texas Gaming Commission, and authorizing and regulating the operation of casino games and slot machines by a limited number of licensed operators and certain Indian tribes."
+
+[[3]]
+[1] "Relating to production requirements for holders of winery permits."
+
+[[4]]
+[1] "Relating to the use of human remains in the training of search and rescue animals."
+
+[[5]]
+[1] "Relating to end-of-course assessment instruments administered to public high school students and other measures of secondary-level performance."
+
+[[6]]
+[1] "Relating to public high school graduation, including curriculum and assessment requirements for graduation and funding in support of certain curriculum authorized for graduation."
+
+[[7]]
+[1] "Relating to certain residential and other structures and mitigation of loss to those structures resulting from natural catastrophes; providing a criminal penalty."
+
+[[8]]
+[1] "Recognizing March 28, 2013, as Texas Water Conservation Day at the State Capitol."
+
+[[9]]
+[1] "Recognizing March 26, 2013, as Lubbock Day at the State Capitol."
+
+[[10]]
+[1] "In memory of Steve Jones."
+
+[[11]]
+[1] "Relating to the regulation of dangerous wild animals."
+{% endhighlight %}
+
+
+********************
+
+#### Search Legislators on OpenStates. 
+
+
+{% highlight r %}
+out <- sll_os_legislatorsearch(state = "tx", party = "democratic", active = TRUE)
+out[[1]][1:5]
+{% endhighlight %}
+
+
+
+{% highlight text %}
+$last_name
+[1] "Naishtat"
+
+$updated_at
+[1] "2013-08-29 03:03:22"
+
+$nimsp_candidate_id
+[1] "112047"
+
+$full_name
+[1] "Elliott Naishtat"
+
+$`+district_address`
+[1] " P.O. Box 2910\nAustin, TX 78768\n(512) 463-0668"
+{% endhighlight %}
+
+
+********************
+
+#### Search for entities - that is, politicians, individuals, or organizations with the given name
+
+
+{% highlight r %}
+out <- sll_ts_aggregatesearch("Nancy Pelosi")
+out <- lapply(out, function(x) {
+    x[sapply(x, is.null)] <- "none"
+    x
+})
+ldply(out, data.frame)
+{% endhighlight %}
+
+
+
+{% highlight text %}
+                       name count_given firm_income count_lobbied          seat
+1          Nancy Pelosi (D)           0           0             0 federal:house
+2 Nancy Pelosi for Congress           7           0             0          none
+  total_received state lobbying_firm count_received party total_given         type
+1       14173534    CA          none          10054     D           0   politician
+2              0  none          <NA>              0  none        7250 organization
+                                id non_firm_spending is_superpac
+1 85ab2e74589a414495d18cc7a9233981                 0        none
+2 afb432ec90454c8a83a3113061e7be27                 0        <NA>
+{% endhighlight %}
+
+
+********************
+
+#### Return the top contributoring organizations, ranked by total dollars given. An organization's giving is broken down into money given directly (by the organization's PAC) versus money given by individuals employed by or associated with the organization.
+
+
+{% highlight r %}
+out <- sll_ts_aggregatetopcontribs(id = "85ab2e74589a414495d18cc7a9233981")
+ldply(out, data.frame)
+{% endhighlight %}
+
+
+
+{% highlight text %}
+   employee_amount total_amount total_count                                     name
+1         64000.00    101300.00          79                         Akin, Gump et al
+2          3500.00     90000.00          29 American Fedn of St/Cnty/Munic Employees
+3                0     86600.00          48                National Assn of Realtors
+4                0     85000.00          32                      United Auto Workers
+5                0     82500.00          37                  National Education Assn
+6                0     77000.00          19                          Teamsters Union
+7                0     76000.00          36         National Assn of Letter Carriers
+8                0     72500.00          18   Intl Brotherhood of Electrical Workers
+9                0     72500.00          21                Sheet Metal Workers Union
+10         8000.00     72000.00          31                              Wells Fargo
+   direct_count employee_count                               id direct_amount
+1            16             63 105dcfc8c9384875a099af230dad9917      37300.00
+2            25              4 fb702029157e4c7c887172eba71c66c5      86500.00
+3            48              0 bb98402bd4d3471cad392a671ecd733a      86600.00
+4            32              0 4d3167b97c9f48deb433aad57bb0ee44      85000.00
+5            37              0 1b8fea7e453d4e75841eac48ff9df550      82500.00
+6            19              0 f89c8e3ab2b44f72971f91b764868231      77000.00
+7            36              0 390767dc6b4b491ca775b1bdf8a36eea      76000.00
+8            18              0 b53b4ad137d743a996f4d7467700fc88      72500.00
+9            21              0 425be85642b24cc2bc3d8a0bb3c7bc92      72500.00
+10           20             11 793070ae7f5e42c2a76a58663a588f3d      64000.00
+{% endhighlight %}
+
+
+  </div>
+  
+  <div class="post">
+    <h1>
       <a href="/2013/08/phenology/">
         Engaging the public on climate change through phenology data
       </a>
@@ -68,24 +519,29 @@
 
     <span class="post-date">18 Aug 2013</span>
 
-    <h2 id="scienceonline-climate">ScienceOnline Climate</h2>
+    ## ScienceOnline Climate
 
-<p>I recently attended ScienceOnline Climate, a conference in Washington, D.C. at AAAS offices. You may have heard of the ScienceOnline annual meeting in North Carolina - this was one of their topical meetings focused on Climate Change. Another one is coming up in October, ScienceOnline Oceans. Search Twitter for #scioClimate (or the entire list of hashtags <a href="https://gist.github.com/sckott/6213308">here</a>) for tweets from the conference.</p>
+I recently attended ScienceOnline Climate, a conference in Washington, D.C. at AAAS offices. You may have heard of the ScienceOnline annual meeting in North Carolina - this was one of their topical meetings focused on Climate Change. Another one is coming up in October, ScienceOnline Oceans. Search Twitter for \#scioClimate (or the entire list of hashtags [here][tags]) for tweets from the conference.
 
-<p>One of the sessions I attended was focused on how to democratize climate change knowledge, moderated by a fellow from the Union of Concerned Scientists. Search Twitter for #sciodemocracy to see the conversation from that session. There was a lot of very interesting discussion.</p>
+One of the sessions I attended was focused on how to democratize climate change knowledge, moderated by a fellow from the Union of Concerned Scientists. Search Twitter for \#sciodemocracy to see the conversation from that session. There was a lot of very interesting discussion.
 
-<h2 id="can-we-reach-the-public-with-phenology-data">Can we reach the public with phenology data?</h2>
+## Can we reach the public with phenology data?
 
-<p>During the #sciodemocracy session, I had a thought but couldn’t articulate it at the time. So here goes. People that are not inolved in climate change discussions may not think about climate change in the framework of changing sea level, melting ice, and altered severity of extreme events. However, many people observe birds, butterflies, and trees outside their apartment windows, cars/trains/buses, or on walks or hikes. When you live in a one place for many years changes in the timing of when birds, butterflies, and trees do certain things are easily noticed. Many of us, including myself, don’t necessarily record these changes, but some do! In fact, there are many web sites with databases of observations of birds, butterflies, and more that anyone, not just scientists, can submit observations to. Some examples are the <a href="https://www.usanpn.org/">USA National Phenology Network</a> and <a href="http://www.inaturalist.org/">iNaturalist</a>. And of course there are other databases that are focused on observations of organisms collected by scientists, like <a href="http://www.gbif.org/">GBIF</a> and <a href="http://vertnet.org/index.php">VertNet</a>.</p>
+During the \#sciodemocracy session, I had a thought but couldn't articulate it at the time. So here goes. People that are not inolved in climate change discussions may not think about climate change in the framework of changing sea level, melting ice, and altered severity of extreme events. However, many people observe birds, butterflies, and trees outside their apartment windows, cars/trains/buses, or on walks or hikes. When you live in a one place for many years changes in the timing of when birds, butterflies, and trees do certain things are easily noticed. Many of us, including myself, don't necessarily record these changes, but some do! In fact, there are many web sites with databases of observations of birds, butterflies, and more that anyone, not just scientists, can submit observations to. Some examples are the [USA National Phenology Network][usnpn] and [iNaturalist][inat]. And of course there are other databases that are focused on observations of organisms collected by scientists, like [GBIF][gbif] and [VertNet][vertnet]. 
 
-<p>So what? What about it?</p>
+So what? What about it?
 
-<p>When enough of these observations are collected on any one species in one location (e.g., let’s say we have 1000 observations of a species in Seattle over 20 years) we can simply ask how has the first date of record of the species in Seattle changed through time? If there is a change in timing of first appearance in the spring through the years, we can hypothesize that this may be due to climate change, and look at the data to see if there is a correlation, etc.</p>
+When enough of these observations are collected on any one species in one location (e.g., let's say we have 1000 observations of a species in Seattle over 20 years) we can simply ask how has the first date of record of the species in Seattle changed through time? If there is a change in timing of first appearance in the spring through the years, we can hypothesize that this may be due to climate change, and look at the data to see if there is a correlation, etc. 
 
-<p>Non-scientists along with scientists are collecting vast amounts of data on observations of species. This data can be used to make people think about climate change. That is, why don’t we not only facilitate the public’s ability to collect data, but also to analyze the data - to do their own science, ask their own questions. In this way, people can link a bird appearing for the first time in spring a bit later than the previous year, or a tree flowering a bit early, to variables associated with climate change, like temperature, precipitation, etc.</p>
+Non-scientists along with scientists are collecting vast amounts of data on observations of species. This data can be used to make people think about climate change. That is, why don't we not only facilitate the public's ability to collect data, but also to analyze the data - to do their own science, ask their own questions. In this way, people can link a bird appearing for the first time in spring a bit later than the previous year, or a tree flowering a bit early, to variables associated with climate change, like temperature, precipitation, etc. 
 
-<p>Empowering the general public to do their own science may bring the vague notion of climate change into stark relief - thereby movivating some to take action with their elected representatives, or to at least get curious to find out more.</p>
+Empowering the general public to do their own science may bring the vague notion of climate change into stark relief - thereby movivating some to take action with their elected representatives, or to at least get curious to find out more. 
 
+[tags]: https://gist.github.com/sckott/6213308
+[usnpn]: https://www.usanpn.org/
+[inat]: http://www.inaturalist.org/
+[gbif]: http://www.gbif.org/
+[vertnet]: http://vertnet.org/index.php
 
   </div>
   
@@ -98,171 +554,191 @@
 
     <span class="post-date">17 Aug 2013</span>
 
-    <p>I recently attended <a href="http://scioclimate.wikispaces.com">ScienceOnline Climate</a>, a conference in Washington, D.C. at AAAS. You may have heard of the <a href="https://twitter.com/#sciox">ScienceOnline annual meeting in North Carolina</a> - this was one of their topical meetings focused on Climate Change. I moderated a session on <a href="http://scioclimate.wikispaces.com/3W.+Working+With+Science+Data+From+Around+The+Web">working with data from the web in R</a>, focusing on climate data. Search Twitter for #scioClimate for tweets from the conference, and #sciordata for tweets from the session I ran. The following is an abbreviated demo of what I did in the workshop showing some of what you can do with climate data in R using our packages.</p>
+    I recently attended [ScienceOnline Climate][sciocweb], a conference in Washington, D.C. at AAAS. You may have heard of the [ScienceOnline annual meeting in North Carolina][sciox] - this was one of their topical meetings focused on Climate Change. I moderated a session on [working with data from the web in R][sciordata], focusing on climate data. Search Twitter for \#scioClimate for tweets from the conference, and \#sciordata for tweets from the session I ran. The following is an abbreviated demo of what I did in the workshop showing some of what you can do with climate data in R using our packages.
 
-<p>Before digging in, why would you want to get climate data programatically vs. via pushing buttons in a browser? Learning a programming language can take some time - we all already know how to use browsers. So why?!  First, getting data programatically, especially in R (or Python), allows you to then easily do other stuff, like manipulate data, visualize, and analyze data. Second, if you do your work programatically, <strong>you</strong> and <em>others</em> can reproduce, and extend, the work you did with little extra effort. Third, programatically getting data makes tasks that are repetitive and slow, fast and easy - you can’t easily automate button clicks in a browser. Fourth, you can combine code with writing to make your entire workflow reproducible, whether it’s notes, a blog post, or even a research article.</p>
+Before digging in, why would you want to get climate data programatically vs. via pushing buttons in a browser? Learning a programming language can take some time - we all already know how to use browsers. So why?!  First, getting data programatically, especially in R (or Python), allows you to then easily do other stuff, like manipulate data, visualize, and analyze data. Second, if you do your work programatically, **you** and *others* can reproduce, and extend, the work you did with little extra effort. Third, programatically getting data makes tasks that are repetitive and slow, fast and easy - you can't easily automate button clicks in a browser. Fourth, you can combine code with writing to make your entire workflow reproducible, whether it's notes, a blog post, or even a research article.
 
-<h2 id="interactive-visualizations-in-r">Interactive visualizations in R</h2>
+## Interactive visualizations in R
 
-<p>Let’s start off with something shiny. The majority of time I make static visualizations, which are great for me to look at during analyses, and for publications of research findings in PDFs. However, static visualizations don’t take advantage of the interactive nature of the web. Ramnath Vaidyanathan has developed an R package, <a href="https://github.com/ramnathv/rCharts">rCharts</a>, to generate dynamic Javascript visualizations directly from R that can be used interactively in a browser. Here is an example visualizing a dataset that comes with R.</p>
-
-<figure class="highlight"><pre><code class="language-r" data-lang="r"><span class="n">library</span><span class="p">(</span><span class="n">devtools</span><span class="p">)</span><span class="w">
-</span><span class="n">install_github</span><span class="p">(</span><span class="s2">"rCharts"</span><span class="p">,</span><span class="w"> </span><span class="s2">"ramnathv"</span><span class="p">)</span><span class="w">
-</span><span class="n">library</span><span class="p">(</span><span class="n">rCharts</span><span class="p">)</span><span class="w">
-
-</span><span class="c1"># Load a data set
-</span><span class="n">hair_eye_male</span><span class="w"> </span><span class="o">&lt;-</span><span class="w"> </span><span class="n">subset</span><span class="p">(</span><span class="n">as.data.frame</span><span class="p">(</span><span class="n">HairEyeColor</span><span class="p">),</span><span class="w"> </span><span class="n">Sex</span><span class="w"> </span><span class="o">==</span><span class="w"> </span><span class="s2">"Male"</span><span class="p">)</span><span class="w">
-
-</span><span class="c1"># Make a javascript plot object
-</span><span class="n">n</span><span class="m">1</span><span class="w"> </span><span class="o">&lt;-</span><span class="w"> </span><span class="n">nPlot</span><span class="p">(</span><span class="n">Freq</span><span class="w"> </span><span class="o">~</span><span class="w"> </span><span class="n">Hair</span><span class="p">,</span><span class="w"> </span><span class="n">group</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"Eye"</span><span class="p">,</span><span class="w"> </span><span class="n">data</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">hair_eye_male</span><span class="p">,</span><span class="w"> </span><span class="n">type</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"multiBarChart"</span><span class="p">)</span><span class="w">
-
-</span><span class="c1"># Visualize
-</span><span class="n">n</span><span class="m">1</span><span class="o">$</span><span class="n">show</span><span class="p">(</span><span class="n">cdn</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="kc">TRUE</span><span class="p">)</span></code></pre></figure>
-
-<p>Check out the output <a href="http://recology.info/vis/nvd3_eg.html">here</a>. If you like you can take the source code from the visualization (right click on select <em>View Page Source</em>) and put it in your html files, and you’re good to go (as long as you have dependencies, etc.) - quicker than learning <a href="http://d3js.org/">d3</a> and company from scratch, eh. This is a super simple example, but you can imagine the possibilities.</p>
-
-<h2 id="the-data-itself">The data itself</h2>
-
-<h3 id="first-install-some-packages---these-are-all-just-on-github-so-you-need-to-have-devtools-installed">First, install some packages - these are all just on Github, so you need to have devtools installed</h3>
-
-<figure class="highlight"><pre><code class="language-r" data-lang="r"><span class="n">library</span><span class="p">(</span><span class="n">devtools</span><span class="p">)</span><span class="w">
-</span><span class="n">install_github</span><span class="p">(</span><span class="s2">"govdat"</span><span class="p">,</span><span class="w"> </span><span class="s2">"sckott"</span><span class="p">)</span><span class="w">
-</span><span class="n">install_github</span><span class="p">(</span><span class="s2">"rnoaa"</span><span class="p">,</span><span class="w"> </span><span class="s2">"ropensci"</span><span class="p">)</span><span class="w">
-</span><span class="n">install_github</span><span class="p">(</span><span class="s2">"rWBclimate"</span><span class="p">,</span><span class="w"> </span><span class="s2">"ropensci"</span><span class="p">)</span><span class="w">
-</span><span class="n">install_github</span><span class="p">(</span><span class="s2">"rnpn"</span><span class="p">,</span><span class="w"> </span><span class="s2">"ropensci"</span><span class="p">)</span></code></pre></figure>
-
-<h3 id="politicians-talk---sunlight-foundation-listens">Politicians talk - Sunlight Foundation listens</h3>
-
-<h4 id="look-at-mentions-of-the-phrase-climate-change-in-congress-using-the-govdat-package">Look at mentions of the phrase “climate change” in congress, using the govdat package</h4>
-
-<figure class="highlight"><pre><code class="language-r" data-lang="r"><span class="n">library</span><span class="p">(</span><span class="n">govdat</span><span class="p">)</span><span class="w">
-</span><span class="n">library</span><span class="p">(</span><span class="n">ggplot2</span><span class="p">)</span><span class="w">
-
-</span><span class="c1"># Get mentions of climate change from Democrats
-</span><span class="n">dat_d</span><span class="w"> </span><span class="o">&lt;-</span><span class="w"> </span><span class="n">sll_cw_timeseries</span><span class="p">(</span><span class="n">phrase</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"climate change"</span><span class="p">,</span><span class="w"> </span><span class="n">party</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"D"</span><span class="p">)</span><span class="w">
-
-</span><span class="c1"># Add a column that says this is data from deomcrats
-</span><span class="n">dat_d</span><span class="o">$</span><span class="n">party</span><span class="w"> </span><span class="o">&lt;-</span><span class="w"> </span><span class="nf">rep</span><span class="p">(</span><span class="s2">"D"</span><span class="p">,</span><span class="w"> </span><span class="n">nrow</span><span class="p">(</span><span class="n">dat_d</span><span class="p">))</span><span class="w">
-
-</span><span class="c1"># Get mentions of climate change from Democrats
-</span><span class="n">dat_r</span><span class="w"> </span><span class="o">&lt;-</span><span class="w"> </span><span class="n">sll_cw_timeseries</span><span class="p">(</span><span class="n">phrase</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"climate change"</span><span class="p">,</span><span class="w"> </span><span class="n">party</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"R"</span><span class="p">)</span><span class="w">
-
-</span><span class="c1"># Add a column that says this is data from republicans
-</span><span class="n">dat_r</span><span class="o">$</span><span class="n">party</span><span class="w"> </span><span class="o">&lt;-</span><span class="w"> </span><span class="nf">rep</span><span class="p">(</span><span class="s2">"R"</span><span class="p">,</span><span class="w"> </span><span class="n">nrow</span><span class="p">(</span><span class="n">dat_r</span><span class="p">))</span><span class="w">
-
-</span><span class="c1"># Put two tables together
-</span><span class="n">dat_both</span><span class="w"> </span><span class="o">&lt;-</span><span class="w"> </span><span class="n">rbind</span><span class="p">(</span><span class="n">dat_d</span><span class="p">,</span><span class="w"> </span><span class="n">dat_r</span><span class="p">)</span><span class="w">
-
-</span><span class="c1"># Plot data
-</span><span class="n">ggplot</span><span class="p">(</span><span class="n">dat_both</span><span class="p">,</span><span class="w"> </span><span class="n">aes</span><span class="p">(</span><span class="n">day</span><span class="p">,</span><span class="w"> </span><span class="n">count</span><span class="p">,</span><span class="w"> </span><span class="n">colour</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">party</span><span class="p">))</span><span class="w"> </span><span class="o">+</span><span class="w"> </span><span class="n">theme_grey</span><span class="p">(</span><span class="n">base_size</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="m">20</span><span class="p">)</span><span class="w"> </span><span class="o">+</span><span class="w"> 
-    </span><span class="n">geom_line</span><span class="p">()</span><span class="w"> </span><span class="o">+</span><span class="w"> </span><span class="n">scale_colour_manual</span><span class="p">(</span><span class="n">values</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nf">c</span><span class="p">(</span><span class="s2">"blue"</span><span class="p">,</span><span class="w"> </span><span class="s2">"red"</span><span class="p">))</span></code></pre></figure>
-
-<p><img src="/public/img/2013-08-17-sciordata/govdat.png" alt="center" /></p>
-
-<h3 id="noaa-climate-data-using-the-rnoaa-package">NOAA climate data, using the rnoaa package</h3>
-
-<h4 id="map-sea-ice-for-12-years-for-april-only-for-the-north-pole">Map sea ice for 12 years, for April only, for the North pole</h4>
-
-<figure class="highlight"><pre><code class="language-r" data-lang="r"><span class="n">library</span><span class="p">(</span><span class="n">rnoaa</span><span class="p">)</span><span class="w">
-</span><span class="n">library</span><span class="p">(</span><span class="n">scales</span><span class="p">)</span><span class="w">
-</span><span class="n">library</span><span class="p">(</span><span class="n">ggplot2</span><span class="p">)</span><span class="w">
-</span><span class="n">library</span><span class="p">(</span><span class="n">doMC</span><span class="p">)</span><span class="w">
-</span><span class="n">library</span><span class="p">(</span><span class="n">plyr</span><span class="p">)</span><span class="w">
-
-</span><span class="c1"># Get URLs for data
-</span><span class="n">urls</span><span class="w"> </span><span class="o">&lt;-</span><span class="w"> </span><span class="n">seaiceeurls</span><span class="p">(</span><span class="n">mo</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"Apr"</span><span class="p">,</span><span class="w"> </span><span class="n">pole</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"N"</span><span class="p">)[</span><span class="m">1</span><span class="o">:</span><span class="m">12</span><span class="p">]</span><span class="w">
-
-</span><span class="c1"># Download sea ice data
-</span><span class="n">registerDoMC</span><span class="p">(</span><span class="n">cores</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="m">4</span><span class="p">)</span><span class="w">
-</span><span class="n">out</span><span class="w"> </span><span class="o">&lt;-</span><span class="w"> </span><span class="n">llply</span><span class="p">(</span><span class="n">urls</span><span class="p">,</span><span class="w"> </span><span class="n">noaa_seaice</span><span class="p">,</span><span class="w"> </span><span class="n">storepath</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"~/seaicedata"</span><span class="p">,</span><span class="w"> </span><span class="n">.parallel</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="kc">TRUE</span><span class="p">)</span><span class="w">
-
-</span><span class="c1"># Name elements of list
-</span><span class="nf">names</span><span class="p">(</span><span class="n">out</span><span class="p">)</span><span class="w"> </span><span class="o">&lt;-</span><span class="w"> </span><span class="n">seq</span><span class="p">(</span><span class="m">1979</span><span class="p">,</span><span class="w"> </span><span class="m">1990</span><span class="p">,</span><span class="w"> </span><span class="m">1</span><span class="p">)</span><span class="w">
-
-</span><span class="c1"># Make a data.frame
-</span><span class="n">df</span><span class="w"> </span><span class="o">&lt;-</span><span class="w"> </span><span class="n">ldply</span><span class="p">(</span><span class="n">out</span><span class="p">)</span><span class="w">
-
-</span><span class="c1"># Plot data
-</span><span class="n">ggplot</span><span class="p">(</span><span class="n">df</span><span class="p">,</span><span class="w"> </span><span class="n">aes</span><span class="p">(</span><span class="n">long</span><span class="p">,</span><span class="w"> </span><span class="n">lat</span><span class="p">,</span><span class="w"> </span><span class="n">group</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">group</span><span class="p">))</span><span class="w"> </span><span class="o">+</span><span class="w"> </span><span class="n">geom_polygon</span><span class="p">(</span><span class="n">fill</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"steelblue"</span><span class="p">)</span><span class="w"> </span><span class="o">+</span><span class="w"> 
-    </span><span class="n">theme_ice</span><span class="p">()</span><span class="w"> </span><span class="o">+</span><span class="w"> </span><span class="n">facet_wrap</span><span class="p">(</span><span class="o">~</span><span class="n">.id</span><span class="p">)</span></code></pre></figure>
-
-<p><img src="/public/img/2013-08-17-sciordata/seaice2.png" alt="center" /></p>
-
-<h3 id="world-bank-climate-data-using-the-rwbclimate-package">World Bank climate data, using the rWBclimate package</h3>
-
-<h4 id="plotting-annual-data-for-different-countries">Plotting annual data for different countries</h4>
-
-<p>Data can be extracted from countries or basins submitted as vectors. Here we will plot the expected temperature anomaly for each 20 year period over a baseline control period of 1961-2000. These countries chosen span the north to south pole. It’s clear from the plot that the northern most countries (US and Canada) have the biggest anomaly, and Belize, the most equatorial country, has the smallest anomaly.</p>
-
-<figure class="highlight"><pre><code class="language-r" data-lang="r"><span class="n">library</span><span class="p">(</span><span class="n">rWBclimate</span><span class="p">)</span><span class="w">
-
-</span><span class="c1"># Search for data
-</span><span class="n">country.list</span><span class="w"> </span><span class="o">&lt;-</span><span class="w"> </span><span class="nf">c</span><span class="p">(</span><span class="s2">"CAN"</span><span class="p">,</span><span class="w"> </span><span class="s2">"USA"</span><span class="p">,</span><span class="w"> </span><span class="s2">"MEX"</span><span class="p">,</span><span class="w"> </span><span class="s2">"BLZ"</span><span class="p">,</span><span class="w"> </span><span class="s2">"ARG"</span><span class="p">)</span><span class="w">
-</span><span class="n">country.dat</span><span class="w"> </span><span class="o">&lt;-</span><span class="w"> </span><span class="n">get_model_temp</span><span class="p">(</span><span class="n">country.list</span><span class="p">,</span><span class="w"> </span><span class="s2">"annualanom"</span><span class="p">,</span><span class="w"> </span><span class="m">2010</span><span class="p">,</span><span class="w"> </span><span class="m">2100</span><span class="p">)</span><span class="w">
-
-</span><span class="c1"># Subset data to one specific model
-</span><span class="n">country.dat.bcc</span><span class="w"> </span><span class="o">&lt;-</span><span class="w"> </span><span class="n">country.dat</span><span class="p">[</span><span class="n">country.dat</span><span class="o">$</span><span class="n">gcm</span><span class="w"> </span><span class="o">==</span><span class="w"> </span><span class="s2">"bccr_bcm2_0"</span><span class="p">,</span><span class="w"> </span><span class="p">]</span><span class="w">
-
-</span><span class="c1"># Exclude A2 scenario
-</span><span class="n">country.dat.bcc</span><span class="w"> </span><span class="o">&lt;-</span><span class="w"> </span><span class="n">subset</span><span class="p">(</span><span class="n">country.dat.bcc</span><span class="p">,</span><span class="w"> </span><span class="n">country.dat.bcc</span><span class="o">$</span><span class="n">scenario</span><span class="w"> </span><span class="o">!=</span><span class="w"> </span><span class="s2">"a2"</span><span class="p">)</span><span class="w">
-
-</span><span class="c1"># Plot data
-</span><span class="n">ggplot</span><span class="p">(</span><span class="n">country.dat.bcc</span><span class="p">,</span><span class="w"> </span><span class="n">aes</span><span class="p">(</span><span class="n">x</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">fromYear</span><span class="p">,</span><span class="w"> </span><span class="n">y</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">data</span><span class="p">,</span><span class="w"> </span><span class="n">group</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">locator</span><span class="p">,</span><span class="w"> </span><span class="n">colour</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">locator</span><span class="p">))</span><span class="w"> </span><span class="o">+</span><span class="w"> 
-    </span><span class="n">geom_point</span><span class="p">()</span><span class="w"> </span><span class="o">+</span><span class="w"> </span><span class="n">geom_path</span><span class="p">()</span><span class="w"> </span><span class="o">+</span><span class="w"> </span><span class="n">ylab</span><span class="p">(</span><span class="s2">"Temperature anomaly over baseline"</span><span class="p">)</span><span class="w"> </span><span class="o">+</span><span class="w"> 
-    </span><span class="n">theme_bw</span><span class="p">(</span><span class="n">base_size</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="m">20</span><span class="p">)</span></code></pre></figure>
-
-<p><img src="/public/img/2013-08-17-sciordata/unnamed-chunk-1.png" alt="center" /></p>
-
-<h3 id="phenology-data-from-the-usa-national-phenology-network-using-rnpn">Phenology data from the USA National Phenology Network, using rnpn</h3>
-
-<figure class="highlight"><pre><code class="language-r" data-lang="r"><span class="n">library</span><span class="p">(</span><span class="n">rnpn</span><span class="p">)</span><span class="w">
-
-</span><span class="c1"># Lookup names
-</span><span class="n">temp</span><span class="w"> </span><span class="o">&lt;-</span><span class="w"> </span><span class="n">lookup_names</span><span class="p">(</span><span class="n">name</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"bird"</span><span class="p">,</span><span class="w"> </span><span class="n">type</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"common"</span><span class="p">)</span><span class="w">
-</span><span class="n">comnames</span><span class="w"> </span><span class="o">&lt;-</span><span class="w"> </span><span class="n">temp</span><span class="p">[</span><span class="n">temp</span><span class="o">$</span><span class="n">species_id</span><span class="w"> </span><span class="o">%in%</span><span class="w"> </span><span class="nf">c</span><span class="p">(</span><span class="m">357</span><span class="p">,</span><span class="w"> </span><span class="m">359</span><span class="p">,</span><span class="w"> </span><span class="m">1108</span><span class="p">),</span><span class="w"> </span><span class="s2">"common_name"</span><span class="p">]</span><span class="w">
-
-</span><span class="c1"># Get some data
-</span><span class="n">out</span><span class="w"> </span><span class="o">&lt;-</span><span class="w"> </span><span class="n">getobsspbyday</span><span class="p">(</span><span class="n">speciesid</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nf">c</span><span class="p">(</span><span class="m">357</span><span class="p">,</span><span class="w"> </span><span class="m">359</span><span class="p">,</span><span class="w"> </span><span class="m">1108</span><span class="p">),</span><span class="w"> </span><span class="n">startdate</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"2010-04-01"</span><span class="p">,</span><span class="w"> 
-    </span><span class="n">enddate</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"2013-09-31"</span><span class="p">)</span><span class="w">
-</span><span class="nf">names</span><span class="p">(</span><span class="n">out</span><span class="p">)</span><span class="w"> </span><span class="o">&lt;-</span><span class="w"> </span><span class="n">comnames</span><span class="w">
-</span><span class="n">df</span><span class="w"> </span><span class="o">&lt;-</span><span class="w"> </span><span class="n">ldply</span><span class="p">(</span><span class="n">out</span><span class="p">)</span><span class="w">
-</span><span class="n">df</span><span class="o">$</span><span class="n">date</span><span class="w"> </span><span class="o">&lt;-</span><span class="w"> </span><span class="n">as.Date</span><span class="p">(</span><span class="n">df</span><span class="o">$</span><span class="n">date</span><span class="p">)</span><span class="w">
-
-</span><span class="c1"># Visualize data
-</span><span class="n">library</span><span class="p">(</span><span class="n">ggplot2</span><span class="p">)</span><span class="w">
-</span><span class="n">ggplot</span><span class="p">(</span><span class="n">df</span><span class="p">,</span><span class="w"> </span><span class="n">aes</span><span class="p">(</span><span class="n">date</span><span class="p">,</span><span class="w"> </span><span class="n">count</span><span class="p">))</span><span class="w"> </span><span class="o">+</span><span class="w"> </span><span class="n">geom_line</span><span class="p">()</span><span class="w"> </span><span class="o">+</span><span class="w"> </span><span class="n">theme_grey</span><span class="p">(</span><span class="n">base_size</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="m">20</span><span class="p">)</span><span class="w"> </span><span class="o">+</span><span class="w"> </span><span class="n">facet_grid</span><span class="p">(</span><span class="n">.id</span><span class="w"> </span><span class="o">~</span><span class="w"> 
-    </span><span class="n">.</span><span class="p">)</span></code></pre></figure>
-
-<p><img src="/public/img/2013-08-17-sciordata/rnpn.png" alt="center" /></p>
-
-<h3 id="feedback-and-new-climate-data-sources">Feedback and new climate data sources</h3>
-
-<p>Do use the above pacakges (<a href="https://github.com/sckott/govdat">govdat</a>, <a href="https://github.com/ropensci/rnoaa">rnoaa</a>, <a href="https://github.com/ropensci/rWBclimate">rWBclimate</a>, and <a href="https://github.com/ropensci/rnpn">rnpn</a>) to get climate data, and get in touch with bug reports, and feature requests.</p>
-
-<p>Surely there are other sources of climate data out there that you want to use in R, right? Let us know what else you want to use. Better yet, if you can sling some R code, start writing your own package to interact with a source of climate data on the web - we can lend a hand.</p>
+Let's start off with something shiny. The majority of time I make static visualizations, which are great for me to look at during analyses, and for publications of research findings in PDFs. However, static visualizations don't take advantage of the interactive nature of the web. Ramnath Vaidyanathan has developed an R package, [rCharts][rcharts], to generate dynamic Javascript visualizations directly from R that can be used interactively in a browser. Here is an example visualizing a dataset that comes with R. 
 
 
-  </div>
-  
-  <div class="post">
-    <h1>
-      <a href="/2013/07/r-ecology-workshop/">
-        R ecology workshop
-      </a>
-    </h1>
+{% highlight r %}
+library(devtools)
+install_github("rCharts", "ramnathv")
+library(rCharts)
 
-    <span class="post-date">31 Jul 2013</span>
+# Load a data set
+hair_eye_male <- subset(as.data.frame(HairEyeColor), Sex == "Male")
 
-    <p>After <a href="http://sckott.github.io/2013/07/r-resources/">my presentation yesterday</a> to a group of grad students on R resources, I did a presentation today on intro to R data manipulation, visualizations, and analyses/visualizations of biparite networks and community level analyses (diversity, rarefaction, ordination, etc.). As I said <a href="http://sckott.github.io/2013/07/r-resources/">yesterday</a> I’ve been playing with two ways to make reproducible presentations in R: <a href="http://www.rstudio.com/ide/docs/presentations/overview">RStudio’s presentations</a> built in to RStudio IDE, and <a href="http://slidify.org/">Slidify</a>. Yesterday I went with RStudio’s product - today I used Slidify. See the Markdown file for the presentation <a href="https://github.com/sckott/posterstalks/blob/gh-pages/sfu/resources/r_resources.Rpres">here</a>.</p>
+# Make a javascript plot object
+n1 <- nPlot(Freq ~ Hair, group = "Eye", data = hair_eye_male, type = "multiBarChart")
 
-<p>Check out the presentation slides <a href="https://bitly.com/sfuworkshop">here</a>, and if you want, fork <a href="http://bit.ly/1bKVX2O">the code on Github</a>, change it, submit changes back to me, etc. (click on the image to go to slides)</p>
+# Visualize
+n1$show(cdn = TRUE)
+{% endhighlight %}
 
-<p>How I actually ran the 2 hr workshop was to present a few slides, then live demo writing the code out with students following along, with a number of times where they do something on their own.</p>
 
-<p><br /></p>
+Check out the output [here][rchartsout]. If you like you can take the source code from the visualization (right click on select *View Page Source*) and put it in your html files, and you're good to go (as long as you have dependencies, etc.) - quicker than learning [d3][d3] and company from scratch, eh. This is a super simple example, but you can imagine the possibilities.  
 
-<p><a href="https://bitly.com/sfuworkshop"><img src="/public/img/pres.png" />&lt;/img&gt;</a></p>
 
+## The data itself
+
+
+### First, install some packages - these are all just on Github, so you need to have devtools installed
+
+
+{% highlight r %}
+library(devtools)
+install_github("govdat", "sckott")
+install_github("rnoaa", "ropensci")
+install_github("rWBclimate", "ropensci")
+install_github("rnpn", "ropensci")
+{% endhighlight %}
+
+
+
+### Politicians talk - Sunlight Foundation listens
+
+#### Look at mentions of the phrase "climate change" in congress, using the govdat package
+
+
+{% highlight r %}
+library(govdat)
+library(ggplot2)
+
+# Get mentions of climate change from Democrats
+dat_d <- sll_cw_timeseries(phrase = "climate change", party = "D")
+
+# Add a column that says this is data from deomcrats
+dat_d$party <- rep("D", nrow(dat_d))
+
+# Get mentions of climate change from Democrats
+dat_r <- sll_cw_timeseries(phrase = "climate change", party = "R")
+
+# Add a column that says this is data from republicans
+dat_r$party <- rep("R", nrow(dat_r))
+
+# Put two tables together
+dat_both <- rbind(dat_d, dat_r)
+
+# Plot data
+ggplot(dat_both, aes(day, count, colour = party)) + theme_grey(base_size = 20) + 
+    geom_line() + scale_colour_manual(values = c("blue", "red"))
+{% endhighlight %}
+
+![center](/public/img/2013-08-17-sciordata/govdat.png) 
+
+
+
+### NOAA climate data, using the rnoaa package
+
+#### Map sea ice for 12 years, for April only, for the North pole
+
+
+{% highlight r %}
+library(rnoaa)
+library(scales)
+library(ggplot2)
+library(doMC)
+library(plyr)
+
+# Get URLs for data
+urls <- seaiceeurls(mo = "Apr", pole = "N")[1:12]
+
+# Download sea ice data
+registerDoMC(cores = 4)
+out <- llply(urls, noaa_seaice, storepath = "~/seaicedata", .parallel = TRUE)
+
+# Name elements of list
+names(out) <- seq(1979, 1990, 1)
+
+# Make a data.frame
+df <- ldply(out)
+
+# Plot data
+ggplot(df, aes(long, lat, group = group)) + geom_polygon(fill = "steelblue") + 
+    theme_ice() + facet_wrap(~.id)
+{% endhighlight %}
+
+![center](/public/img/2013-08-17-sciordata/seaice2.png) 
+
+
+
+### World Bank climate data, using the rWBclimate package
+
+#### Plotting annual data for different countries
+
+Data can be extracted from countries or basins submitted as vectors. Here we will plot the expected temperature anomaly for each 20 year period over a baseline control period of 1961-2000. These countries chosen span the north to south pole. It's clear from the plot that the northern most countries (US and Canada) have the biggest anomaly, and Belize, the most equatorial country, has the smallest anomaly.
+
+
+{% highlight r %}
+library(rWBclimate)
+
+# Search for data
+country.list <- c("CAN", "USA", "MEX", "BLZ", "ARG")
+country.dat <- get_model_temp(country.list, "annualanom", 2010, 2100)
+
+# Subset data to one specific model
+country.dat.bcc <- country.dat[country.dat$gcm == "bccr_bcm2_0", ]
+
+# Exclude A2 scenario
+country.dat.bcc <- subset(country.dat.bcc, country.dat.bcc$scenario != "a2")
+
+# Plot data
+ggplot(country.dat.bcc, aes(x = fromYear, y = data, group = locator, colour = locator)) + 
+    geom_point() + geom_path() + ylab("Temperature anomaly over baseline") + 
+    theme_bw(base_size = 20)
+{% endhighlight %}
+
+![center](/public/img/2013-08-17-sciordata/unnamed-chunk-1.png) 
+
+
+
+
+### Phenology data from the USA National Phenology Network, using rnpn
+
+
+{% highlight r %}
+library(rnpn)
+
+# Lookup names
+temp <- lookup_names(name = "bird", type = "common")
+comnames <- temp[temp$species_id %in% c(357, 359, 1108), "common_name"]
+
+# Get some data
+out <- getobsspbyday(speciesid = c(357, 359, 1108), startdate = "2010-04-01", 
+    enddate = "2013-09-31")
+names(out) <- comnames
+df <- ldply(out)
+df$date <- as.Date(df$date)
+
+# Visualize data
+library(ggplot2)
+ggplot(df, aes(date, count)) + geom_line() + theme_grey(base_size = 20) + facet_grid(.id ~ 
+    .)
+{% endhighlight %}
+
+![center](/public/img/2013-08-17-sciordata/rnpn.png) 
+
+
+
+### Feedback and new climate data sources
+
+Do use the above pacakges ([govdat][govdat], [rnoaa][rnoaa], [rWBclimate][rWBclimate], and [rnpn][rnpn]) to get climate data, and get in touch with bug reports, and feature requests. 
+
+Surely there are other sources of climate data out there that you want to use in R, right? Let us know what else you want to use. Better yet, if you can sling some R code, start writing your own package to interact with a source of climate data on the web - we can lend a hand. 
+
+[sciocweb]: http://scioclimate.wikispaces.com
+[sciox]: https://twitter.com/#sciox
+[rchartsout]: http://recology.info/vis/nvd3_eg.html
+[rcharts]: https://github.com/ramnathv/rCharts
+[sciordata]: http://scioclimate.wikispaces.com/3W.+Working+With+Science+Data+From+Around+The+Web
+[d3]: http://d3js.org/
+[govdat]: https://github.com/sckott/govdat
+[rnoaa]: https://github.com/ropensci/rnoaa
+[rWBclimate]: https://github.com/ropensci/rWBclimate
+[rnpn]: https://github.com/ropensci/rnpn
 
   </div>
   

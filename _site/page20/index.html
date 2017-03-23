@@ -33,7 +33,7 @@
     <header class="masthead">
       <div class="masthead-inner">
         <h1>Recology</h1>
-        <!-- <h1> <a href="http://recology.info/">Recology</a></h1> -->
+        <!-- <h1> <a href="http://localhost:4000">Recology</a></h1> -->
         <p class="lead">R/etc.</p>
 
         <div class="colophon">
@@ -61,6 +61,392 @@
   
   <div class="post">
     <h1>
+      <a href="/2014/01/rgauges-hourly/">
+        rgauges - fun with hourly web site analytics
+      </a>
+    </h1>
+
+    <span class="post-date">17 Jan 2014</span>
+
+    [Gaug.es](http://get.gaug.es/) is a really nice looking analytics platform as an alternative to Google Analytics. It is a paid service, but not that expensive really. 
+
+We've made an R package to interact with the Gaug.es API called `rgauges`. Find it [on Github](https://github.com/ropensci/rgauges) and [on CRAN](http://cran.r-project.org/web/packages/rgauges/index.html).
+
+Although working with the Gaug.es API is nice and easy, they don't keep hourly visit stats and provide those via the API, so that you have to continually collect them yourself if you want them. That's what I have done for my own website. 
+
+It took a few steps to get this data:
+
+* I wrote a little Ruby script using [Twelve gem](http://rubygems.org/gems/twelve) to collect data from the Gaug.es API every day at the same time, which just gets the patst 24 hours of data. This script makes a call to the Gaug.es API and sends the data to a [CouchDB](http://couchdb.apache.org/) database hosted on [Cloudant](https://cloudant.com/). In reality, the script is is embeded in a rack app as I don't think you can throw up a standalone script to Heroku. Here's the script:
+
+```ruby
+class MyApp
+  require 'couchrest'
+  require 'twelve'
+  require 'date'
+  require 'time'
+  
+  def self.getgaugesdata_scott
+    bfg = Twelve.new('<gaugeskey>')
+    out = bfg.gauges('<gaugeskey>')['recent_hours']
+    yip = { "from_url"=> "http://sckott.github.io/", "coll_date"=> Date.today.to_s, "coll_time"=> Time.now.utc.localtime.to_s, "recent_hours"=> out }
+    @db = CouchRest.database!("https://app16517180.heroku:<key>@app16517180.heroku.cloudant.com/gaugesdb_scott")
+    @db.save_doc(yip)
+
+  def call env
+    [200, {"Content-Type" => "text/html"}, ["no output printed here"]] 
+  end
+end
+```
+
+* One little catch though: I run the Ruby script on Heroku, so I don't have to do it locally, but Heroku free instance goes down unless it's doing something. So I used a little service called [UptimeRobot](http://uptimerobot.com/) to ping the Heroku app every 5 minutes. UptimeRobot also is giving you uptime stats too on your app, which I don't really need, but is a cool feature. 
+
+* And that's it. Now the data is stored from each day's collection of visitor stats to a free Cloudant CouchDB database. 
+
+## Regular Gaug.es data
+
+First, let's look at what you can do with data that Gaug.es does give to you, using the `rgauges` R package.
+
+********************
+
+### Install rgauges
+
+
+{% highlight r %}
+install.packages("devtools")
+library(devtools)
+install_github("rgauges", "ropensci")
+{% endhighlight %}
+
+
+### Load rgauges and other dependency libraries
+
+
+{% highlight r %}
+library(rgauges)
+library(ggplot2)
+{% endhighlight %}
+
+
+### Your info
+
+
+{% highlight r %}
+gs_me()
+{% endhighlight %}
+
+
+
+{% highlight text %}
+## $user
+## $user$name
+## [1] "Scott Chamberlain"
+## 
+## $user$email
+## [1] "myrmecocystus@gmail.com"
+## 
+## $user$id
+## [1] "4eddbafb613f5d5139000001"
+## 
+## $user$last_name
+## [1] "Chamberlain"
+## 
+## $user$urls
+## $user$urls$self
+## [1] "https://secure.gaug.es/me"
+## 
+## $user$urls$clients
+## [1] "https://secure.gaug.es/clients"
+## 
+## $user$urls$gauges
+## [1] "https://secure.gaug.es/gauges"
+## 
+## 
+## $user$first_name
+## [1] "Scott"
+{% endhighlight %}
+
+
+#### Traffic
+
+
+{% highlight r %}
+gs_traffic(id = "4efd83a6f5a1f5158a000004")
+{% endhighlight %}
+
+
+
+{% highlight text %}
+## $metadata
+## $metadata$views
+## [1] 386
+## 
+## $metadata$urls
+## $metadata$urls$older
+## [1] "https://secure.gaug.es/gauges/4efd83a6f5a1f5158a000004/traffic?date=2013-12-01"
+## 
+## $metadata$urls$newer
+## NULL
+## 
+## 
+## $metadata$date
+## [1] "2014-01-17"
+## 
+## $metadata$people
+## [1] 208
+## 
+## 
+## $data
+##    views       date people
+## 1      7 2014-01-01      5
+## 2     17 2014-01-02      7
+## 3     39 2014-01-03     17
+## 4     15 2014-01-04      9
+## 5     14 2014-01-05      7
+## 6     33 2014-01-06     22
+## 7     19 2014-01-07     11
+## 8     15 2014-01-08     11
+## 9     53 2014-01-09     24
+## 10    53 2014-01-10     13
+## 11    14 2014-01-11      9
+## 12    11 2014-01-12     10
+## 13    14 2014-01-13     14
+## 14    11 2014-01-14      9
+## 15    23 2014-01-15     16
+## 16    16 2014-01-16     14
+## 17    32 2014-01-17     25
+{% endhighlight %}
+
+
+### Screen/browser information
+
+
+{% highlight r %}
+gs_reso(id = "4efd83a6f5a1f5158a000004")
+{% endhighlight %}
+
+
+
+{% highlight text %}
+## $browser_height
+##   views title
+## 1   190   600
+## 2    77   768
+## 3    53   900
+## 4    38   480
+## 5    28  1024
+## 
+## $browser_width
+##   views title
+## 1   153  1280
+## 2    91  1024
+## 3    58  1600
+## 4    36   800
+## 5    30  1440
+## 6     6  2000
+## 7     6   320
+## 8     6   480
+## 
+## $screen_width
+##   views title
+## 1   176  1280
+## 2    90  1600
+## 3    55  1440
+## 4    35  1024
+## 5    14  2000
+## 6     6   320
+## 7     6   480
+## 8     4   800
+{% endhighlight %}
+
+
+### Visualize traffic data
+
+You'll need to load ggplot2 
+
+
+{% highlight r %}
+library(ggplot2)
+out <- gs_gauge_detail(id = "4efd83a6f5a1f5158a000004")
+vis_gauge(out)
+{% endhighlight %}
+
+
+
+{% highlight text %}
+## Using hour, time as id variables
+## Using date as id variables
+## Using date as id variables
+{% endhighlight %}
+
+![center](/public/img/2014-01-17-rgauges-hourly/unnamed-chunk-4.png) 
+
+{% highlight text %}
+## NULL
+{% endhighlight %}
+
+
+********************
+********************
+
+## Historic hourly Gaug.es data
+
+Now let's play with the hourly data. To do that we aren't going to use `rgauges`, but rather call the Cloudant API. CouchDB provides a RESTful API out of the box, so we can do a call like `https://app16517180.heroku.cloudant.com/gaugesdb_scott/_all_docs?limit=20` to get metadata (or other calls to get the documents themselves). (note: that url won't work for you since you don't have my login info) 
+
+### Get some data
+
+
+{% highlight r %}
+library(devtools)
+install_github("sckott/sofa")  # or install_github('sofa', 'sckott')
+{% endhighlight %}
+
+
+
+
+{% highlight r %}
+library(sofa)
+cloudant_name <- "app16517180.heroku"
+cloudant_pwd <- getOption("sofa_cloudant_heroku")[[2]]
+cushion(sofa_cloudant = c(cloudant_name, cloudant_pwd))
+dat <- sofa_alldocs(cushion = "sofa_cloudant", dbname = "gaugesdb_scott", include_docs = "true")
+{% endhighlight %}
+
+
+### Manipulate and visualize
+
+
+{% highlight r %}
+library(plyr)
+dates <- ldply(dat$rows, function(x) x$doc$coll_date)
+min(dates$V1)
+{% endhighlight %}
+
+
+
+{% highlight text %}
+## [1] "2013-06-26"
+{% endhighlight %}
+
+
+
+{% highlight r %}
+max(dates$V1)
+{% endhighlight %}
+
+
+
+{% highlight text %}
+## [1] "2014-01-16"
+{% endhighlight %}
+
+
+
+{% highlight r %}
+length(dates$V1)
+{% endhighlight %}
+
+
+
+{% highlight text %}
+## [1] 198
+{% endhighlight %}
+
+
+So we've got 198 days of data, first collected near end of June, and most recent yesterday. Now get actual visits data
+
+
+{% highlight r %}
+df <- ldply(dat$rows, function(x) {
+    y <- do.call(rbind, lapply(x$doc$recent_hours, data.frame))
+    data.frame(date = x$doc$coll_date, y)
+})
+df$date <- as.Date(df$date)
+df$hour <- as.numeric(df$hour)
+
+library(reshape2)
+df_melt <- melt(df, id.vars = c("date", "hour"))
+head(df_melt)
+{% endhighlight %}
+
+
+
+{% highlight text %}
+##         date hour variable value
+## 1 2013-09-18    1    views     2
+## 2 2013-09-18    2    views     3
+## 3 2013-09-18    3    views     2
+## 4 2013-09-18    4    views     0
+## 5 2013-09-18    5    views     1
+## 6 2013-09-18    6    views    10
+{% endhighlight %}
+
+
+We need to combine the date and hour in to one date time string:
+
+
+{% highlight r %}
+df_melt <- transform(df_melt, datetime = as.POSIXct(paste(date, sprintf("%s:00:00", 
+    hour))))
+head(df_melt)
+{% endhighlight %}
+
+
+
+{% highlight text %}
+##         date hour variable value            datetime
+## 1 2013-09-18    1    views     2 2013-09-18 01:00:00
+## 2 2013-09-18    2    views     3 2013-09-18 02:00:00
+## 3 2013-09-18    3    views     2 2013-09-18 03:00:00
+## 4 2013-09-18    4    views     0 2013-09-18 04:00:00
+## 5 2013-09-18    5    views     1 2013-09-18 05:00:00
+## 6 2013-09-18    6    views    10 2013-09-18 06:00:00
+{% endhighlight %}
+
+
+Now plot all data
+
+
+{% highlight r %}
+library(ggplot2); library(scales)
+
+gauge_theme <- function(){
+  list(theme(panel.grid.major = element_blank(),
+             panel.grid.minor = element_blank(),
+             legend.position = c(0.85,0.85),
+             legend.key = element_blank()))
+}
+
+ggplot(df_melt, aes(datetime, value, group=variable, colour=variable)) +
+    theme_bw(base_size=18) + 
+    geom_line(size=2) +
+    scale_color_brewer(name="", palette=3) +
+    labs(x="", y="") +
+    gauge_theme()
+{% endhighlight %}
+
+![center](/public/img/2014-01-17-rgauges-hourly/unnamed-chunk-8.png) 
+
+
+And just one day
+
+
+{% highlight r %}
+oneday <- df_melt[ as.character(df_melt$date) %in% "2013-11-12", ]
+ggplot(oneday, aes(datetime, value, group=variable, colour=variable)) +
+    theme_bw(base_size=18) + 
+    geom_line(size=2) +
+    scale_color_brewer(name="", palette=3) +
+    labs(x="", y="") +
+    gauge_theme()
+{% endhighlight %}
+
+![center](/public/img/2014-01-17-rgauges-hourly/unnamed-chunk-9.png) 
+
+
+  </div>
+  
+  <div class="post">
+    <h1>
       <a href="/2013/11/jekyll-intro/">
         Jekyll - an intro
       </a>
@@ -68,121 +454,117 @@
 
     <span class="post-date">20 Nov 2013</span>
 
-    <p>I started using Jekyll when I didn’t really know HTML, CSS, or Ruby - so I’ve had to learn a lot - but using Jekyll has been a great learning experience for all those languages.</p>
+    I started using Jekyll when I didn't really know HTML, CSS, or Ruby - so I've had to learn a lot - but using Jekyll has been a great learning experience for all those languages. 
 
-<p>I’ve tried to boil down steps to building a Jekyll site or blog to the minimal steps:</p>
+I've tried to boil down steps to building a Jekyll site or blog to the minimal steps:
 
-<p><br /><br /></p>
+<br><br>
 
-<h3 id="install-jekyll">Install Jekyll</h3>
+### Install Jekyll
 
-<ul>
-  <li>Mac/Linux/Unix:
-    <ul>
-      <li>Install dependencies:
-        <ul>
-          <li><a href="http://www.ruby-lang.org/en/downloads/">Ruby</a></li>
-          <li><a href="http://rubygems.org/pages/download">RubyGems</a></li>
-        </ul>
-      </li>
-      <li>Install Jekyll using RubyGems <code class="highlighter-rouge">gem install jekyll</code> (you may need to do <code class="highlighter-rouge">sudo...</code>)</li>
-      <li>If you’re having trouble installing, see the <a href="http://jekyllrb.com/docs/troubleshooting/">troubleshooting page</a>.</li>
-    </ul>
-  </li>
-  <li>Windows: Jekyll doesn’t officially support installation on Windows - follow <a href="http://www.madhur.co.in/blog/2011/09/01/runningjekyllwindows.html">these steps</a> for a Windows install.</li>
-</ul>
++ Mac/Linux/Unix: 
+	+ Install dependencies: 
+		+ [Ruby](http://www.ruby-lang.org/en/downloads/)
+		+ [RubyGems](http://rubygems.org/pages/download)
+	+ Install Jekyll using RubyGems `gem install jekyll` (you may need to do `sudo...`)
+	+ If you're having trouble installing, see the [troubleshooting page](http://jekyllrb.com/docs/troubleshooting/).
++ Windows: Jekyll doesn't officially support installation on Windows - follow [these steps](http://www.madhur.co.in/blog/2011/09/01/runningjekyllwindows.html) for a Windows install. 
 
-<p><br /><br /></p>
+<br><br>
 
-<h3 id="make-a-site">Make a site</h3>
+### Make a site
 
-<p>The easiest way to get started is by using the command <code class="highlighter-rouge">jekyll new SITENAME</code> - let’s replace <code class="highlighter-rouge">SITENAME</code> with <code class="highlighter-rouge">foobar</code> for this example.</p>
+The easiest way to get started is by using the command `jekyll new SITENAME` - let's replace `SITENAME` with `foobar` for this example.
 
-<p>So we run <code class="highlighter-rouge">jekyll new foobar</code>, which gives us:</p>
+So we run `jekyll new foobar`, which gives us:
 
-<figure class="highlight"><pre><code class="language-bash" data-lang="bash">New jekyll site installed <span class="k">in</span> /Users/scottmac2/foobar.</code></pre></figure>
+{% highlight bash %}
+New jekyll site installed in /Users/scottmac2/foobar.
+{% endhighlight %}
 
-<p>Go into that directory, and run</p>
+Go into that directory, and run 
 
-<figure class="highlight"><pre><code class="language-bash" data-lang="bash"><span class="nb">cd </span>foobar
-jekyll serve</code></pre></figure>
+{% highlight bash %}
+cd foobar
+jekyll serve
+{% endhighlight %}
 
-<p>Which gives you the files and directories:</p>
+Which gives you the files and directories:
 
-<figure class="highlight"><pre><code class="language-bash" data-lang="bash">|
+{% highlight bash %}
+|
 --|- _config.yml
   |- _posts
   |- css
   |- _layouts
   |- _site
-  |- index.html</code></pre></figure>
+  |- index.html
+{% endhighlight %}
 
-<p>Then point your browser to <a href="http://localhost:4000/">http://localhost:4000/</a>. And you should see the following:</p>
+Then point your browser to [http://localhost:4000/](http://localhost:4000/). And you should see the following:
 
-<p><img src="http://f.cl.ly/items/2q322a2P3f2m2A3a3l0O/Screen%20Shot%202013-11-20%20at%209.54.21%20AM.png" alt="" /></p>
+![](http://f.cl.ly/items/2q322a2P3f2m2A3a3l0O/Screen%20Shot%202013-11-20%20at%209.54.21%20AM.png)
 
-<p><br /><br /></p>
+<br><br>
 
-<h3 id="write-a-new-blog-post">Write a new blog post</h3>
+### Write a new blog post
 
-<p>We’ll add a new file to the _posts folder.</p>
+We'll add a new file to the _posts folder. 
 
-<figure class="highlight"><pre><code class="language-bash" data-lang="bash">---
+{% highlight bash %}
+---
 layout: post
 title:  My second post
 date:   2013-11-20
 categories: jekyll programming R
 ---
 
-My second blog post!</code></pre></figure>
+My second blog post!
+{% endhighlight %}
 
-<p>Paste this in to a new file in the <code class="highlighter-rouge">_posts</code> folder, save as today’s date (2013-11-20) plus the post name, which gives us 2013-11-20-second-post.md.</p>
+Paste this in to a new file in the `_posts` folder, save as today's date ({{ page.date | date: "%Y-%m-%d" }}) plus the post name, which gives us {{ page.date | date: "%Y-%m-%d" }}-second-post.md.
 
-<p><br /><br /></p>
+<br><br>
 
-<h3 id="deploying">Deploying</h3>
+### Deploying
 
-<p>An obvious option given that Jekyll was built by Github, is to put it up on Github. Github has some instructions <a href="http://jekyllrb.com/docs/github-pages/">here</a>. Here is my attempt at instructions:</p>
+An obvious option given that Jekyll was built by Github, is to put it up on Github. Github has some instructions [here](http://jekyllrb.com/docs/github-pages/). Here is my attempt at instructions: 
 
-<ul>
-  <li>If you don’t have a Github account already, <a href="https://help.github.com/articles/signing-up-for-a-new-github-account">create one</a> - it’s free.</li>
-  <li>Set up Git. Github’s help for this: https://help.github.com/articles/set-up-git</li>
-  <li>Creat a new repo on Github, with the same name as your repo on your machine, in this case <code class="highlighter-rouge">foobar</code>.</li>
-  <li>Make your new blog directory <code class="highlighter-rouge">foobar</code> a git repo by doing <code class="highlighter-rouge">git init</code> within the repo.</li>
-  <li>Add you files to be tracked by git via <code class="highlighter-rouge">git add --all</code></li>
-  <li>Commit your changes by <code class="highlighter-rouge">git commit -am 'new blog files added'</code></li>
-  <li>Make a <code class="highlighter-rouge">gh-pages</code> branch by doing <code class="highlighter-rouge">git branch gh-pages</code>.</li>
-  <li>Add link for your repo on Github: <code class="highlighter-rouge">git remote add origin https://github.com/&lt;yourgithubusername&gt;/foobar.git</code></li>
-  <li>Push to Github using <code class="highlighter-rouge">git push -u origin master</code></li>
-</ul>
++ If you don't have a Github account already, [create one](https://help.github.com/articles/signing-up-for-a-new-github-account) - it's free.
++ Set up Git. Github's help for this: https://help.github.com/articles/set-up-git
++ Creat a new repo on Github, with the same name as your repo on your machine, in this case `foobar`. 
++ Make your new blog directory `foobar` a git repo by doing `git init` within the repo.
++ Add you files to be tracked by git via `git add --all`
++ Commit your changes by `git commit -am 'new blog files added'`
++ Make a `gh-pages` branch by doing `git branch gh-pages`.
++ Add link for your repo on Github: `git remote add origin https://github.com/<yourgithubusername>/foobar.git`
++ Push to Github using `git push -u origin master`
 
-<p>Github gives you one repo that you can name <code class="highlighter-rouge">&lt;yourgithubusername&gt;.github.io</code> that will be viewable at the URL <code class="highlighter-rouge">http://&lt;yourgithubusername&gt;.github.io</code>. You can have your blog/website on the master branch, and you don’t need to create a <code class="highlighter-rouge">gh-pages</code> branch. But if you have your site in any other named repo, you will need the <code class="highlighter-rouge">gh-pages</code> branch. If you don’t use a <code class="highlighter-rouge">&lt;yourgithubusername&gt;.github.io</code> repo, your site will be viewable at <code class="highlighter-rouge">&lt;yourgithubusername&gt;.github.io/&lt;reponame&gt;</code>, in this case <code class="highlighter-rouge">&lt;yourgithubusername&gt;.github.io/foobar</code>.</p>
+Github gives you one repo that you can name `<yourgithubusername>.github.io` that will be viewable at the URL `http://<yourgithubusername>.github.io`. You can have your blog/website on the master branch, and you don't need to create a `gh-pages` branch. But if you have your site in any other named repo, you will need the `gh-pages` branch. If you don't use a `<yourgithubusername>.github.io` repo, your site will be viewable at `<yourgithubusername>.github.io/<reponame>`, in this case `<yourgithubusername>.github.io/foobar`. 
 
-<p><em>Beginners take note:</em> Instead of the command line, you could use a Git GUI, from Github (<a href="http://mac.github.com/">OSX</a>, <a href="http://windows.github.com/">Windows</a>), or others, e.g., <a href="http://gitboxapp.com/">GitBox</a>.</p>
+*Beginners take note:* Instead of the command line, you could use a Git GUI, from Github ([OSX](http://mac.github.com/), [Windows](http://windows.github.com/)), or others, e.g., [GitBox](http://gitboxapp.com/).
 
-<p><br /><br /></p>
+<br><br>
 
-<h3 id="other-info">Other info</h3>
+### Other info 
 
-<p>That’s the basics of how to get started. Inevitably, you’ll run into problems with various dependencies. The <a href="http://jekyllrb.com/">Jekyll site</a> has a lot of documntation now, so go there for help - and see a roundup of links below.</p>
+That's the basics of how to get started. Inevitably, you'll run into problems with various dependencies. The [Jekyll site](http://jekyllrb.com/) has a lot of documntation now, so go there for help - and see a roundup of links below. 
 
-<p>For inspiration, here are many examples of sites that use Jekyll: http://jekyllrb.com/docs/sites/. If you want to build off someone else’s work, find one that provides their code.</p>
+For inspiration, here are many examples of sites that use Jekyll: http://jekyllrb.com/docs/sites/. If you want to build off someone else's work, find one that provides their code.
 
-<hr />
+----------------
 
-<p>A roundup of links for building static sites with jekyll</p>
+A roundup of links for building static sites with jekyll
 
-<ul>
-  <li><a href="http://net.tutsplus.com/tutorials/other/building-static-sites-with-jekyll/">http://net.tutsplus.com/tutorials/other/building-static-sites-with-jekyll/</a></li>
-  <li><a href="http://www.andrewmunsell.com/tutorials/jekyll-by-example/">http://www.andrewmunsell.com/tutorials/jekyll-by-example/</a></li>
-  <li><a href="http://jekyllbootstrap.com/">Jekyll Bootstrap</a></li>
-  <li>Jekyll thoughts by <a href="http://carlboettiger.info/index.html">Carl Boettiger</a>: <a href="http://carlboettiger.info/2012/12/30/learning-jekyll.html">http://carlboettiger.info/2012/12/30/learning-jekyll.html</a></li>
-  <li><a href="http://danielmcgraw.com/2011/04/14/The-Ultimate-Guide-To-Getting-Started-With-Jekyll-Part-1/">http://danielmcgraw.com/2011/04/14/The-Ultimate-Guide-To-Getting-Started-With-Jekyll-Part-1/</a></li>
-  <li><a href="http://mijingo.com/products/screencasts/static-websites-with-jekyll/">A book on building sites with Jekyll</a></li>
-  <li><a href="http://yeswejekyll.com/">http://yeswejekyll.com/</a></li>
-  <li><a href="http://hellarobots.com/2012/01/06/blogging-with-jekyll-quickstart.html">http://hellarobots.com/2012/01/06/blogging-with-jekyll-quickstart.html</a></li>
-  <li><a href="http://www.sitepoint.com/zero-to-jekyll-in-20-minutes/">http://www.sitepoint.com/zero-to-jekyll-in-20-minutes/</a></li>
-</ul>
+* [http://net.tutsplus.com/tutorials/other/building-static-sites-with-jekyll/](http://net.tutsplus.com/tutorials/other/building-static-sites-with-jekyll/)
+* [http://www.andrewmunsell.com/tutorials/jekyll-by-example/](http://www.andrewmunsell.com/tutorials/jekyll-by-example/)
+* [Jekyll Bootstrap](http://jekyllbootstrap.com/)
+* Jekyll thoughts by [Carl Boettiger](http://carlboettiger.info/index.html): [http://carlboettiger.info/2012/12/30/learning-jekyll.html](http://carlboettiger.info/2012/12/30/learning-jekyll.html)
+* [http://danielmcgraw.com/2011/04/14/The-Ultimate-Guide-To-Getting-Started-With-Jekyll-Part-1/](http://danielmcgraw.com/2011/04/14/The-Ultimate-Guide-To-Getting-Started-With-Jekyll-Part-1/)
+* [A book on building sites with Jekyll](http://mijingo.com/products/screencasts/static-websites-with-jekyll/)
+* [http://yeswejekyll.com/](http://yeswejekyll.com/)
+* [http://hellarobots.com/2012/01/06/blogging-with-jekyll-quickstart.html](http://hellarobots.com/2012/01/06/blogging-with-jekyll-quickstart.html)
+* [http://www.sitepoint.com/zero-to-jekyll-in-20-minutes/](http://www.sitepoint.com/zero-to-jekyll-in-20-minutes/)
 
   </div>
   
@@ -195,104 +577,11 @@ My second blog post!</code></pre></figure>
 
     <span class="post-date">25 Oct 2013</span>
 
-    <p>Code in journals, that is, code you would type to do some programmatic operation in say R or Python, is kind of a mess to say the least. Okay, so you can <strong>SEE</strong> code in papers, but code is not formatted in a way that facilites reuse. If an author in a paper writes out some code for software they create, or an analysis they do in the paper, wouldn’t it be nice for a reader to be able to copy and paste that code directly into whatever environment that code should execute in, and actually work. Of course there is dependencies, etc. for that software to worry about, but here I am just concerned with the code formatting in articles. Code is displayed as an image in some cases (gasp!). Additionally, there’s this thing called the internet, and we can use color, so let’s highlight code already. At least in one of our recent <a href="http://ropensci.org/">rOpenSci</a> papers in F1000 Research, <a href="http://f1000research.com/articles/2-191/v1">they do use syntax highlighting</a> - w00t!</p>
+    Code in journals, that is, code you would type to do some programmatic operation in say R or Python, is kind of a mess to say the least. Okay, so you can **SEE** code in papers, but code is not formatted in a way that facilites reuse. If an author in a paper writes out some code for software they create, or an analysis they do in the paper, wouldn't it be nice for a reader to be able to copy and paste that code directly into whatever environment that code should execute in, and actually work. Of course there is dependencies, etc. for that software to worry about, but here I am just concerned with the code formatting in articles. Code is displayed as an image in some cases (gasp!). Additionally, there's this thing called the internet, and we can use color, so let's highlight code already. At least in one of our recent [rOpenSci](http://ropensci.org/) papers in F1000 Research, [they do use syntax highlighting](http://f1000research.com/articles/2-191/v1) - w00t!
 
-<p>Carl Boettiger (@cboettig) and I disccused how frustrated we are with the state of code in papers, and started a Github gist, listing publishers/journals and how they display code. It lives here: <a href="https://gist.github.com/sckott/6787278">https://gist.github.com/sckott/6787278</a>.</p>
+Carl Boettiger (@cboettig) and I disccused how frustrated we are with the state of code in papers, and started a Github gist, listing publishers/journals and how they display code. It lives here: [https://gist.github.com/sckott/6787278](https://gist.github.com/sckott/6787278). 
 
-<p>We have a start, but would like your help in filling this list out more. What are the code presentation practices for various publishers and journals? With a list of what currently happens, perhaps we can start to convince publishers to display code more appropriately, partly by pointing out that “XYZ publisher does it really well, why can’t you?”. I tried to record info in a standardized way across publishers…</p>
-
-  </div>
-  
-  <div class="post">
-    <h1>
-      <a href="/2013/10/shutdown/">
-        Guide to using rOpenSci packages during the US Gov't shutdown
-      </a>
-    </h1>
-
-    <span class="post-date">08 Oct 2013</span>
-
-    <p><em>Note: This is cross-posted from the <a href="http://ropensci.org/blog">rOpenSci blog</a>, which will update with this post when our technical snafu is fixed.</em></p>
-
-<p>With the US government shut down, many of the federal government provided data APIs are down. We write R packages to interact with many of these APIs. We have been tweeting about what APIs that are down related to R pacakges we make, but we thought we would write up a proper blog post on the issue.</p>
-
-<p>NCBI services are still up! NCBI is within NIH, which is within the Department of Health and Human Services. Here is the message on the NCBI page:</p>
-
-<blockquote>
-  <p>The information on this web site remains accessible; but, due to the lapse in government funding, the information may not be up to date, and the agency may not be able to respond to inquiries until appropriations are enacted. For updates regarding government operating status see USA.gov.</p>
-</blockquote>
-
-<p>Most USGS services are down. Some of the message on the USGS page (ITIS is under USGS, which is under the Department of the Interior):</p>
-
-<blockquote>
-  <p>Due to the Federal government shutdown, usgs.gov and most associated web sites are unavailable. Only web sites necessary to protect lives and property will be maintained…</p>
-</blockquote>
-
-<p>However, the USGS BISON service is still up for some reason - perhaps a different pot of money than other USGS projects?</p>
-
-<p>Some of the shutdown message from NOAA, under the Department of Commerce:</p>
-
-<blockquote>
-  <p>Due to the Federal government shutdown, NOAA.gov and most associated web sites are unavailable. Specific NOAA web sites necessary to protect lives and property are operational and will be maintained.</p>
-</blockquote>
-
-<p>Here’s a table of APIs we interact with, the related R package, and any notes:
-<br /><br /></p>
-<table class="table table-bordered table-striped">
-	<thead>
-      <tr>
-        <th>API provider</th>
-        <th>API still up?</th>
-        <th>rOpenSci R package</th>
-      </tr>
-    </thead>
-    <tbody>
-      <tr>
-        <td>USGS BISON (Biodiversity Information Serving our Nation) <a href="http://bison.usgs.ornl.gov/services.html">link</a></td>
-        <td>Yep!</td>
-        <td><a href="https://github.com/ropensci/rbison">rbison</a></td>
-      </tr>
-      <tr>
-        <td>NOAA Climate data <a href="http://www.ncdc.noaa.gov/cdo-web/webservices">link</a></td>
-        <td>No :(</td>
-        <td><a href="https://github.com/ropensci/rnoaa">rnoaa</a></td>
-      </tr>
-   	  <tr>
-        <td>USGS ITIS (Integrated Taxonomic Information Service) <a href="http://www.itis.gov/ws_description.html">link</a></td>
-        <td>No :(</td>
-        <td><a href="https://github.com/ropensci/taxize_">taxize</a></td>
-      </tr>
-      <tr>
-        <td>NCBI Entrez <a href="http://www.ncbi.nlm.nih.gov/">link</a></td>
-        <td>No :(</td>
-        <td><a href="https://github.com/ropensci/taxize_">taxize</a>,<a href="https://github.com/ropensci/rentrez">rentrez</a></td>
-      </tr>
-      <tr>
-        <td>PubMed <a href="http://www.ncbi.nlm.nih.gov/pubmed">link</a></td>
-        <td>No :(</td>
-        <td><a href="https://github.com/ropensci/rpubmed">rpubmed</a></td>
-      </tr>
-  	</tbody>
-</table>
-
-<p><br /><br />
-For those wanting to get NOAA climate data, perhaps check out the <a href="http://cran.r-project.org/web/packages/RNCEP/index.html">RNCEP package</a>.</p>
-
-<p>For those using taxize, you can grab taxonomic IDs from NCBI using <code class="highlighter-rouge">get_uid()</code> rather than the ITIS version <code class="highlighter-rouge">get_tsn()</code>. With a UID from NCBI, you can do things like get a taxonomic classification using the function <code class="highlighter-rouge">classification()</code>. There are many non-government taxonomic sources in taxize, so you should be able to find what you need without ITIS. Other functions that use ITIS, and that you should avoid until the shutdown is over, are:</p>
-
-<ul>
-  <li>A long list carried over from the itis package that is now within taxize: <code class="highlighter-rouge">getacceptednamesfromtsn()</code>, <code class="highlighter-rouge">getanymatchcount()</code>, <code class="highlighter-rouge">getcommentdetailfromtsn()</code>, <code class="highlighter-rouge">getcommonnamesfromtsn()</code>, <code class="highlighter-rouge">getcoremetadatafromtsn()</code>, <code class="highlighter-rouge">getcoveragefromtsn()</code>, <code class="highlighter-rouge">getcredibilityratingfromtsn()</code>, <code class="highlighter-rouge">getcredibilityratings()</code>, <code class="highlighter-rouge">getcurrencyfromtsn()</code>, <code class="highlighter-rouge">getdatedatafromtsn()</code>, <code class="highlighter-rouge">getdescription()</code>, <code class="highlighter-rouge">getexpertsfromtsn()</code>, <code class="highlighter-rouge">getfullhierarchyfromtsn()</code>, <code class="highlighter-rouge">getfullrecordfromlsid()</code>, <code class="highlighter-rouge">getfullrecordfromtsn()</code>, <code class="highlighter-rouge">getgeographicdivisionsfromtsn()</code>, <code class="highlighter-rouge">getgeographicvalues()</code>, <code class="highlighter-rouge">getglobalspeciescompletenessfromtsn()</code>, <code class="highlighter-rouge">gethierarchydownfromtsn()</code>, <code class="highlighter-rouge">gethierarchyupfromtsn()</code>, <code class="highlighter-rouge">getitistermsfromcommonname()</code>, <code class="highlighter-rouge">getitistermsfromscientificname()</code>, <code class="highlighter-rouge">getjurisdictionaloriginfromtsn()</code>, <code class="highlighter-rouge">getjurisdictionoriginvalues()</code>, <code class="highlighter-rouge">getjurisdictionvalues()</code>, <code class="highlighter-rouge">getkingdomnamefromtsn()</code>, <code class="highlighter-rouge">getkingdomnames()</code>, <code class="highlighter-rouge">getlastchangedate()</code>, <code class="highlighter-rouge">getlsidfromtsn()</code>, <code class="highlighter-rouge">getothersourcesfromtsn()</code>, <code class="highlighter-rouge">getparenttsnfromtsn()</code>, <code class="highlighter-rouge">getpublicationsfromtsn()</code>, <code class="highlighter-rouge">getranknames()</code>, <code class="highlighter-rouge">getrecordfromlsid()</code>, <code class="highlighter-rouge">getreviewyearfromtsn()</code>, <code class="highlighter-rouge">getscientificnamefromtsn()</code>, <code class="highlighter-rouge">getsynonymnamesfromtsn()</code>, <code class="highlighter-rouge">gettaxonauthorshipfromtsn()</code>, <code class="highlighter-rouge">gettaxonomicranknamefromtsn()</code>, <code class="highlighter-rouge">gettaxonomicusagefromtsn()</code>, <code class="highlighter-rouge">gettsnbyvernacularlanguage()</code>, <code class="highlighter-rouge">gettsnfromlsid()</code>, <code class="highlighter-rouge">getunacceptabilityreasonfromtsn()</code>, <code class="highlighter-rouge">getvernacularlanguages()</code>, <code class="highlighter-rouge">searchbycommonname()</code>, <code class="highlighter-rouge">searchbycommonnamebeginswith()</code>, <code class="highlighter-rouge">searchbycommonnameendswith()</code>, <code class="highlighter-rouge">searchbyscientificname()</code>, <code class="highlighter-rouge">searchforanymatch()</code>, <code class="highlighter-rouge">searchforanymatchpaged()</code></li>
-  <li><code class="highlighter-rouge">itis_acceptname()</code></li>
-  <li><code class="highlighter-rouge">itis_downstream()</code></li>
-  <li><code class="highlighter-rouge">itis_name()</code></li>
-  <li><code class="highlighter-rouge">itis_taxrank()</code></li>
-  <li>In <code class="highlighter-rouge">tax_agg()</code>, only use db=”ncbi”</li>
-  <li>In <code class="highlighter-rouge">tax_name()</code>, only use db=”ncbi”</li>
-  <li>In <code class="highlighter-rouge">tax_rank()</code>, only use db=”ncbi”</li>
-</ul>
-
-<p>Let us know if you have any questions or comments.</p>
-
+We have a start, but would like your help in filling this list out more. What are the code presentation practices for various publishers and journals? With a list of what currently happens, perhaps we can start to convince publishers to display code more appropriately, partly by pointing out that "XYZ publisher does it really well, why can't you?". I tried to record info in a standardized way across publishers...
 
   </div>
   

@@ -33,7 +33,7 @@
     <header class="masthead">
       <div class="masthead-inner">
         <h1>Recology</h1>
-        <!-- <h1> <a href="http://recology.info/">Recology</a></h1> -->
+        <!-- <h1> <a href="http://localhost:4000">Recology</a></h1> -->
         <p class="lead">R/etc.</p>
 
         <div class="colophon">
@@ -61,6 +61,163 @@
   
   <div class="post">
     <h1>
+      <a href="/2015/06/idigbio-in-spocc/">
+        iDigBio - a new data source in spocc
+      </a>
+    </h1>
+
+    <span class="post-date">08 Jun 2015</span>
+
+    [iDigBio](https://www.idigbio.org/), or _Integrated Digitized Biocollections_, collects and provides access to species occurrence data, and associated metadata (e.g., images of specimens, when provided). They collect data from [a lot of different providers](https://www.idigbio.org/portal/publishers). They have a nice web interface for searching, check out [idigbio.org/portal/search](https://www.idigbio.org/portal/search). 
+
+`spocc` is a package we've been working on at [rOpenSci](http://ropensci.org/) for a while now - it is a one stop shop for retrieving species ocurrence data. As new sources of species occurrence data come to our attention, and are available via a RESTful API, we incorporate them into `spocc`. 
+
+I attended last week a [hackathon put on by iDigBio](https://github.com/idigbio-api-hackathon/HackathonCentral/). One of the projects I worked on was integrating iDigBio into `spocc`.  
+
+With the addition of iDigBio, we now have in `spocc`:
+
+* [GBIF](http://www.gbif.org/)
+* [iNaturalist](http://www.inaturalist.org/)
+* [USGS Bison](http://bison.usgs.ornl.gov/)
+* [eBird](http://ebird.org/content/ebird/)
+* [Ecoengine](https://ecoengine.berkeley.edu/)
+* [Vertnet](http://vertnet.org/)
+* [iDigBio](https://www.idigbio.org/)
+
+The following is a quick demo of getting iDigBio data in `spocc`
+
+## Install
+
+Get updated versions of `rgbif` and `ridigbio` first. And get `leaflet` to make an interactive map.
+
+
+```r
+devtools::install_github("ropensci/rgbif", "iDigBio/ridigbio", "rstudio/leaflet")
+devtools::install_github("ropensci/spocc")
+```
+
+
+```r
+library("spocc")
+```
+
+## Use ridigbio - the R client for iDigBio
+
+
+```r
+library("ridigbio")
+idig_search_records(rq = list(genus = "acer"), limit = 5)
+#>                                   uuid
+#> 1 00041678-5df1-4a23-ba78-8c12f60af369
+#> 2 00072caf-0f24-447f-b68e-a20299f6afc7
+#> 3 000a6b9b-0bbd-46f6-82cb-848c30c46313
+#> 4 001d05e0-9c86-466d-957d-e73e2ce64fbe
+#> 5 0022a2da-bc97-4bef-b2a5-b8a9944fc677
+#>                                    occurrenceid catalognumber      family
+#> 1 urn:uuid:b275f928-5c0d-4832-ae82-fde363d8fde1          <NA> sapindaceae
+#> 2          40428b90-27a5-11e3-8d47-005056be0003   lsu00049997   aceraceae
+#> 3          02ca5aae-d8ab-492f-af10-e005b96c2295        191243 sapindaceae
+#> 4                     urn:catalog:cas:ds:679715      ds679715 sapindaceae
+#> 5          b12bd651-2c6b-11e3-b3b8-180373cac83e         41898 sapindaceae
+#>   genus  scientificname       country stateprovince geopoint.lat
+#> 1  acer     acer rubrum united states      illinois         <NA>
+#> 2  acer    acer negundo united states     louisiana         <NA>
+#> 3  acer            <NA> united states      new york         <NA>
+#> 4  acer acer circinatum united states    california      41.8714
+#> 5  acer     acer rubrum united states      maryland   39.4197222
+#>   geopoint.lon             datecollected           collector
+#> 1         <NA> 1967-06-25T00:00:00+00:00     john e. ebinger
+#> 2         <NA> 1991-04-19T00:00:00+00:00     alan w. lievens
+#> 3         <NA>                      <NA> stephen f. hilfiker
+#> 4    -123.8503 1930-10-27T00:00:00+00:00        carl b. wolf
+#> 5  -77.1227778 1980-04-29T00:00:00+00:00         doweary, d.
+```
+
+## Use spocc
+
+### Scientific name search
+
+Same search as above with `ridigbio`
+
+
+```r
+occ(query = "Acer", from = "idigbio", limit = 5)
+#> Searched: idigbio
+#> Occurrences - Found: 379, Returned: 5
+#> Search type: Scientific
+#>   idigbio: Acer (5)
+```
+
+### Geographic search
+
+iDigBio uses Elasticsearch syntax to define a geographic search, but all you need to do is give a numeric vector of length 4 defining a bounding box, and you're good to go. 
+
+
+```r
+bounds <- c(-120, 40, -100, 45)
+occ(from = "idigbio", geometry = bounds, limit = 10)
+#> Searched: idigbio
+#> Occurrences - Found: 346,737, Returned: 10
+#> Search type: Geometry
+```
+
+### W/ or W/O Coordinates
+
+Don't pass `has_coords` (gives data w/ and w/o coordinates data)
+
+
+```r
+occ(query = "Acer", from = "idigbio", limit = 5)
+#> Searched: idigbio
+#> Occurrences - Found: 379, Returned: 5
+#> Search type: Scientific
+#>   idigbio: Acer (5)
+```
+
+Only records with coordinates data
+
+
+```r
+occ(query = "Acer", from = "idigbio", limit = 5, has_coords = TRUE)
+#> Searched: idigbio
+#> Occurrences - Found: 16, Returned: 5
+#> Search type: Scientific
+#>   idigbio: Acer (5)
+```
+
+Only records without coordinates data
+
+
+```r
+occ(query = "Acer", from = "idigbio", limit = 5, has_coords = FALSE)
+#> Searched: idigbio
+#> Occurrences - Found: 363, Returned: 5
+#> Search type: Scientific
+#>   idigbio: Acer (5)
+```
+
+### Make an interactive map
+
+
+```r
+library("leaflet")
+bounds <- c(-120, 40, -100, 45)
+leaflet(data = dat) %>% 
+  addTiles() %>%
+  addMarkers(~longitude, ~latitude, popup = ~name) %>% 
+  addRectangles(
+    lng1 = bounds[1], lat1 = bounds[4],
+    lng2 = bounds[3], lat2 = bounds[2],
+    fillColor = "transparent"
+  )
+```
+
+![image](/public/img/2015-06-08-idigbio-in-spocc/plot.png)
+
+  </div>
+  
+  <div class="post">
+    <h1>
       <a href="/2015/05/openadds/">
         openadds - open addresses client
       </a>
@@ -68,188 +225,196 @@
 
     <span class="post-date">18 May 2015</span>
 
-    <p><code class="highlighter-rouge">openadds</code> talks to <a href="http://openaddresses.io/">Openaddresses.io</a>. a run down of its things:</p>
+    `openadds` talks to [Openaddresses.io](http://openaddresses.io/). a run down of its things:
 
-<h2 id="install">Install</h2>
+## Install
 
-<div class="language-r highlighter-rouge"><pre class="highlight"><code><span class="n">devtools</span><span class="o">::</span><span class="n">install_github</span><span class="p">(</span><span class="s2">"sckott/openadds"</span><span class="p">)</span><span class="w">
-</span></code></pre>
-</div>
 
-<div class="language-r highlighter-rouge"><pre class="highlight"><code><span class="n">library</span><span class="p">(</span><span class="s2">"openadds"</span><span class="p">)</span><span class="w">
-</span></code></pre>
-</div>
+```r
+devtools::install_github("sckott/openadds")
+```
 
-<h2 id="list-datasets">List datasets</h2>
 
-<p>Scrapes links to datasets from the openaddresses site</p>
+```r
+library("openadds")
+```
 
-<div class="language-r highlighter-rouge"><pre class="highlight"><code><span class="n">dat</span><span class="w"> </span><span class="o">&lt;-</span><span class="w"> </span><span class="n">oa_list</span><span class="p">()</span><span class="w">
-</span><span class="n">dat</span><span class="p">[</span><span class="m">2</span><span class="o">:</span><span class="m">6</span><span class="p">]</span><span class="w">
-</span><span class="c1">#&gt; [1] "http://data.openaddresses.io.s3.amazonaws.com/20150511/au-tas-launceston.csv"   
-#&gt; [2] "http://s3.amazonaws.com/data.openaddresses.io/20141127/au-victoria.zip"         
-#&gt; [3] "http://data.openaddresses.io.s3.amazonaws.com/20150511/be-flanders.zip"         
-#&gt; [4] "http://data.openaddresses.io.s3.amazonaws.com/20150417/ca-ab-calgary.zip"       
-#&gt; [5] "http://data.openaddresses.io.s3.amazonaws.com/20150511/ca-ab-grande_prairie.zip"
-</span></code></pre>
-</div>
+## List datasets
 
-<h2 id="search-for-datasets">Search for datasets</h2>
+Scrapes links to datasets from the openaddresses site
 
-<p>Uses <code class="highlighter-rouge">oa_list()</code> internally, then searches through columns requested.</p>
 
-<div class="language-r highlighter-rouge"><pre class="highlight"><code><span class="n">oa_search</span><span class="p">(</span><span class="n">country</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"us"</span><span class="p">,</span><span class="w"> </span><span class="n">state</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"ca"</span><span class="p">)</span><span class="w">
-</span><span class="c1">#&gt; Source: local data frame [68 x 5]
-#&gt; 
-#&gt;    country state             city  ext
-#&gt; 1       us    ca san_mateo_county .zip
-#&gt; 2       us    ca   alameda_county .zip
-#&gt; 3       us    ca   alameda_county .zip
-#&gt; 4       us    ca           amador .zip
-#&gt; 5       us    ca           amador .zip
-#&gt; 6       us    ca      bakersfield .zip
-#&gt; 7       us    ca      bakersfield .zip
-#&gt; 8       us    ca         berkeley .zip
-#&gt; 9       us    ca         berkeley .zip
-#&gt; 10      us    ca     butte_county .zip
-#&gt; ..     ...   ...              ...  ...
-#&gt; Variables not shown: url (chr)
-</span></code></pre>
-</div>
+```r
+dat <- oa_list()
+dat[2:6]
+#> [1] "http://data.openaddresses.io.s3.amazonaws.com/20150511/au-tas-launceston.csv"   
+#> [2] "http://s3.amazonaws.com/data.openaddresses.io/20141127/au-victoria.zip"         
+#> [3] "http://data.openaddresses.io.s3.amazonaws.com/20150511/be-flanders.zip"         
+#> [4] "http://data.openaddresses.io.s3.amazonaws.com/20150417/ca-ab-calgary.zip"       
+#> [5] "http://data.openaddresses.io.s3.amazonaws.com/20150511/ca-ab-grande_prairie.zip"
+```
 
-<h2 id="get-data">Get data</h2>
+## Search for datasets
 
-<p>Passing in a URL</p>
+Uses `oa_list()` internally, then searches through columns requested.
 
-<div class="language-r highlighter-rouge"><pre class="highlight"><code><span class="p">(</span><span class="n">out1</span><span class="w"> </span><span class="o">&lt;-</span><span class="w"> </span><span class="n">oa_get</span><span class="p">(</span><span class="n">dat</span><span class="p">[</span><span class="m">5</span><span class="p">]))</span><span class="w">
-</span><span class="c1">#&gt; &lt;Openaddresses data&gt; ~/.openadds/ca-ab-calgary.zip
-#&gt; Dimensions [350962, 13]
-#&gt; 
-#&gt;    OBJECTID ADDRESS_TY                 ADDRESS    STREET_NAM STREET_TYP
-#&gt; 0    757023     Parcel  249 SAGE MEADOWS CI NW  SAGE MEADOWS         CI
-#&gt; 1    757022     Parcel           2506 17 ST SE            17         ST
-#&gt; 2    757021     Parcel     305 EVANSPARK GD NW     EVANSPARK         GD
-#&gt; 3    757020     Parcel     321 EVANSPARK GD NW     EVANSPARK         GD
-#&gt; 4    757019     Parcel   204 EVANSBROOKE LD NW   EVANSBROOKE         LD
-#&gt; 5    757018     Parcel   200 EVANSBROOKE LD NW   EVANSBROOKE         LD
-#&gt; 6    757017     Parcel 219 HIDDEN VALLEY LD NW HIDDEN VALLEY         LD
-#&gt; 7    757016     Parcel 211 HIDDEN VALLEY LD NW HIDDEN VALLEY         LD
-#&gt; 8    757015     Parcel 364 HIDDEN VALLEY LD NW HIDDEN VALLEY         LD
-#&gt; 9    757014     Parcel 348 HIDDEN VALLEY LD NW HIDDEN VALLEY         LD
-#&gt; ..      ...        ...                     ...           ...        ...
-#&gt; Variables not shown: STREET_QUA (fctr), HOUSE_NUMB (int), HOUSE_ALPH
-#&gt;      (fctr), SUITE_NUMB (int), SUITE_ALPH (fctr), LONGITUDE (dbl),
-#&gt;      LATITUDE (dbl), COMM_NAME (fctr)
-</span></code></pre>
-</div>
 
-<p>First getting URL for dataset through <code class="highlighter-rouge">as_openadd()</code>, then passing to <code class="highlighter-rouge">oa_get()</code></p>
+```r
+oa_search(country = "us", state = "ca")
+#> Source: local data frame [68 x 5]
+#> 
+#>    country state             city  ext
+#> 1       us    ca san_mateo_county .zip
+#> 2       us    ca   alameda_county .zip
+#> 3       us    ca   alameda_county .zip
+#> 4       us    ca           amador .zip
+#> 5       us    ca           amador .zip
+#> 6       us    ca      bakersfield .zip
+#> 7       us    ca      bakersfield .zip
+#> 8       us    ca         berkeley .zip
+#> 9       us    ca         berkeley .zip
+#> 10      us    ca     butte_county .zip
+#> ..     ...   ...              ...  ...
+#> Variables not shown: url (chr)
+```
 
-<div class="language-r highlighter-rouge"><pre class="highlight"><code><span class="p">(</span><span class="n">x</span><span class="w"> </span><span class="o">&lt;-</span><span class="w"> </span><span class="n">as_openadd</span><span class="p">(</span><span class="s2">"us"</span><span class="p">,</span><span class="w"> </span><span class="s2">"nm"</span><span class="p">,</span><span class="w"> </span><span class="s2">"hidalgo"</span><span class="p">))</span><span class="w">
-</span><span class="c1">#&gt; &lt;&lt;OpenAddreses&gt;&gt; 
-#&gt;   &lt;&lt;country&gt;&gt; us
-#&gt;   &lt;&lt;state&gt;&gt; nm
-#&gt;   &lt;&lt;city&gt;&gt; hidalgo
-#&gt;   &lt;&lt;extension&gt;&gt; .csv
-</span></code></pre>
-</div>
+## Get data
 
-<div class="language-r highlighter-rouge"><pre class="highlight"><code><span class="n">oa_get</span><span class="p">(</span><span class="n">x</span><span class="p">)</span><span class="w">
-</span><span class="c1">#&gt; &lt;Openaddresses data&gt; ~/.openadds/us-nm-hidalgo.csv
-#&gt; Dimensions [170659, 37]
-#&gt; 
-#&gt;    OBJECTID Shape ADD_NUM ADD_SUF PRE_MOD PRE_DIR PRE_TYPE         ST_NAME
-#&gt; 1         1    NA     422                       S                      2ND
-#&gt; 2         2    NA    1413                       S                      4TH
-#&gt; 3         3    NA     412                       E                 CHAMPION
-#&gt; 4         4    NA     110                       E                   SAMANO
-#&gt; 5         5    NA    2608                       W          FREDDY GONZALEZ
-#&gt; 6         6    NA    2604                       W          FREDDY GONZALEZ
-#&gt; 7         7    NA    1123                       W                      FAY
-#&gt; 8         8    NA     417                       S                      2ND
-#&gt; 9         9    NA    4551                       E                    TEXAS
-#&gt; 10       10    NA     810                                        DRIFTWOOD
-#&gt; ..      ...   ...     ...     ...     ...     ...      ...             ...
-#&gt; Variables not shown: ST_TYPE (chr), POS_DIR (chr), POS_MOD (chr), ESN
-#&gt;      (int), MSAG_COMM (chr), PARCEL_ID (chr), PLACE_TYPE (chr), LANDMARK
-#&gt;      (chr), BUILDING (chr), UNIT (chr), ROOM (chr), FLOOR (int), LOC_NOTES
-#&gt;      (chr), ST_ALIAS (chr), FULL_ADDR (chr), ZIP (chr), POSTAL_COM (chr),
-#&gt;      MUNICIPAL (chr), COUNTY (chr), STATE (chr), SOURCE (chr), REGION
-#&gt;      (chr), EXCH (chr), LAT (dbl), LONG (dbl), PICTURE (chr), OA:x (dbl),
-#&gt;      OA:y (dbl), OA:geom (chr)
-</span></code></pre>
-</div>
+Passing in a URL
 
-<h2 id="combine-multiple-datasets">Combine multiple datasets</h2>
 
-<p><code class="highlighter-rouge">combine</code> attemps to guess lat/long and address columns, but definitely more work to do to make 
+```r
+(out1 <- oa_get(dat[5]))
+#> <Openaddresses data> ~/.openadds/ca-ab-calgary.zip
+#> Dimensions [350962, 13]
+#> 
+#>    OBJECTID ADDRESS_TY                 ADDRESS    STREET_NAM STREET_TYP
+#> 0    757023     Parcel  249 SAGE MEADOWS CI NW  SAGE MEADOWS         CI
+#> 1    757022     Parcel           2506 17 ST SE            17         ST
+#> 2    757021     Parcel     305 EVANSPARK GD NW     EVANSPARK         GD
+#> 3    757020     Parcel     321 EVANSPARK GD NW     EVANSPARK         GD
+#> 4    757019     Parcel   204 EVANSBROOKE LD NW   EVANSBROOKE         LD
+#> 5    757018     Parcel   200 EVANSBROOKE LD NW   EVANSBROOKE         LD
+#> 6    757017     Parcel 219 HIDDEN VALLEY LD NW HIDDEN VALLEY         LD
+#> 7    757016     Parcel 211 HIDDEN VALLEY LD NW HIDDEN VALLEY         LD
+#> 8    757015     Parcel 364 HIDDEN VALLEY LD NW HIDDEN VALLEY         LD
+#> 9    757014     Parcel 348 HIDDEN VALLEY LD NW HIDDEN VALLEY         LD
+#> ..      ...        ...                     ...           ...        ...
+#> Variables not shown: STREET_QUA (fctr), HOUSE_NUMB (int), HOUSE_ALPH
+#>      (fctr), SUITE_NUMB (int), SUITE_ALPH (fctr), LONGITUDE (dbl),
+#>      LATITUDE (dbl), COMM_NAME (fctr)
+```
+
+First getting URL for dataset through `as_openadd()`, then passing to `oa_get()`
+
+
+```r
+(x <- as_openadd("us", "nm", "hidalgo"))
+#> <<OpenAddreses>> 
+#>   <<country>> us
+#>   <<state>> nm
+#>   <<city>> hidalgo
+#>   <<extension>> .csv
+```
+
+
+```r
+oa_get(x)
+#> <Openaddresses data> ~/.openadds/us-nm-hidalgo.csv
+#> Dimensions [170659, 37]
+#> 
+#>    OBJECTID Shape ADD_NUM ADD_SUF PRE_MOD PRE_DIR PRE_TYPE         ST_NAME
+#> 1         1    NA     422                       S                      2ND
+#> 2         2    NA    1413                       S                      4TH
+#> 3         3    NA     412                       E                 CHAMPION
+#> 4         4    NA     110                       E                   SAMANO
+#> 5         5    NA    2608                       W          FREDDY GONZALEZ
+#> 6         6    NA    2604                       W          FREDDY GONZALEZ
+#> 7         7    NA    1123                       W                      FAY
+#> 8         8    NA     417                       S                      2ND
+#> 9         9    NA    4551                       E                    TEXAS
+#> 10       10    NA     810                                        DRIFTWOOD
+#> ..      ...   ...     ...     ...     ...     ...      ...             ...
+#> Variables not shown: ST_TYPE (chr), POS_DIR (chr), POS_MOD (chr), ESN
+#>      (int), MSAG_COMM (chr), PARCEL_ID (chr), PLACE_TYPE (chr), LANDMARK
+#>      (chr), BUILDING (chr), UNIT (chr), ROOM (chr), FLOOR (int), LOC_NOTES
+#>      (chr), ST_ALIAS (chr), FULL_ADDR (chr), ZIP (chr), POSTAL_COM (chr),
+#>      MUNICIPAL (chr), COUNTY (chr), STATE (chr), SOURCE (chr), REGION
+#>      (chr), EXCH (chr), LAT (dbl), LONG (dbl), PICTURE (chr), OA:x (dbl),
+#>      OA:y (dbl), OA:geom (chr)
+```
+
+## Combine multiple datasets
+
+`combine` attemps to guess lat/long and address columns, but definitely more work to do to make 
 this work for most cases. Lat/long and address columns vary among every dataset - some datasets
-have no lat/long data, some have no address data.</p>
+have no lat/long data, some have no address data.
+ 
 
-<div class="language-r highlighter-rouge"><pre class="highlight"><code><span class="n">out2</span><span class="w"> </span><span class="o">&lt;-</span><span class="w"> </span><span class="n">oa_get</span><span class="p">(</span><span class="n">dat</span><span class="p">[</span><span class="m">32</span><span class="p">])</span><span class="w">
-</span><span class="p">(</span><span class="n">alldat</span><span class="w"> </span><span class="o">&lt;-</span><span class="w"> </span><span class="n">oa_combine</span><span class="p">(</span><span class="n">out1</span><span class="p">,</span><span class="w"> </span><span class="n">out2</span><span class="p">))</span><span class="w">
-</span><span class="c1">#&gt; Source: local data frame [418,623 x 4]
-#&gt; 
-#&gt;          lon      lat                 address           dataset
-#&gt; 1  -114.1303 51.17188  249 SAGE MEADOWS CI NW ca-ab-calgary.zip
-#&gt; 2  -114.0190 51.03168           2506 17 ST SE ca-ab-calgary.zip
-#&gt; 3  -114.1175 51.17497     305 EVANSPARK GD NW ca-ab-calgary.zip
-#&gt; 4  -114.1175 51.17461     321 EVANSPARK GD NW ca-ab-calgary.zip
-#&gt; 5  -114.1212 51.16268   204 EVANSBROOKE LD NW ca-ab-calgary.zip
-#&gt; 6  -114.1213 51.16264   200 EVANSBROOKE LD NW ca-ab-calgary.zip
-#&gt; 7  -114.1107 51.14784 219 HIDDEN VALLEY LD NW ca-ab-calgary.zip
-#&gt; 8  -114.1108 51.14768 211 HIDDEN VALLEY LD NW ca-ab-calgary.zip
-#&gt; 9  -114.1121 51.14780 364 HIDDEN VALLEY LD NW ca-ab-calgary.zip
-#&gt; 10 -114.1117 51.14800 348 HIDDEN VALLEY LD NW ca-ab-calgary.zip
-#&gt; ..       ...      ...                     ...               ...
-</span></code></pre>
-</div>
+```r
+out2 <- oa_get(dat[32])
+(alldat <- oa_combine(out1, out2))
+#> Source: local data frame [418,623 x 4]
+#> 
+#>          lon      lat                 address           dataset
+#> 1  -114.1303 51.17188  249 SAGE MEADOWS CI NW ca-ab-calgary.zip
+#> 2  -114.0190 51.03168           2506 17 ST SE ca-ab-calgary.zip
+#> 3  -114.1175 51.17497     305 EVANSPARK GD NW ca-ab-calgary.zip
+#> 4  -114.1175 51.17461     321 EVANSPARK GD NW ca-ab-calgary.zip
+#> 5  -114.1212 51.16268   204 EVANSBROOKE LD NW ca-ab-calgary.zip
+#> 6  -114.1213 51.16264   200 EVANSBROOKE LD NW ca-ab-calgary.zip
+#> 7  -114.1107 51.14784 219 HIDDEN VALLEY LD NW ca-ab-calgary.zip
+#> 8  -114.1108 51.14768 211 HIDDEN VALLEY LD NW ca-ab-calgary.zip
+#> 9  -114.1121 51.14780 364 HIDDEN VALLEY LD NW ca-ab-calgary.zip
+#> 10 -114.1117 51.14800 348 HIDDEN VALLEY LD NW ca-ab-calgary.zip
+#> ..       ...      ...                     ...               ...
+```
 
-<h2 id="map-data">Map data</h2>
+## Map data
 
-<p>Get some data</p>
+Get some data
 
-<div class="language-r highlighter-rouge"><pre class="highlight"><code><span class="p">(</span><span class="n">out</span><span class="w"> </span><span class="o">&lt;-</span><span class="w"> </span><span class="n">oa_get</span><span class="p">(</span><span class="n">dat</span><span class="p">[</span><span class="m">400</span><span class="p">]))</span><span class="w">
-</span><span class="c1">#&gt; &lt;Openaddresses data&gt; ~/.openadds/us-ca-sonoma_county.zip
-#&gt; Dimensions [217243, 5]
-#&gt; 
-#&gt;          LON      LAT  NUMBER          STREET POSTCODE
-#&gt; 1  -122.5327 38.29779 3771  A       Cory Lane       NA
-#&gt; 2  -122.5422 38.30354   18752 White Oak Drive       NA
-#&gt; 3  -122.5412 38.30327   18749 White Oak Drive       NA
-#&gt; 4  -122.3997 38.26122    3552       Napa Road       NA
-#&gt; 5  -122.5425 38.30404    3998 White Oak Court       NA
-#&gt; 6  -122.5429 38.30434    4026 White Oak Court       NA
-#&gt; 7  -122.5430 38.30505    4039 White Oak Court       NA
-#&gt; 8  -122.5417 38.30504    4017 White Oak Court       NA
-#&gt; 9  -122.5409 38.30436   18702 White Oak Drive       NA
-#&gt; 10 -122.5403 38.30392   18684 White Oak Drive       NA
-#&gt; ..       ...      ...     ...             ...      ...
-</span></code></pre>
-</div>
 
-<p>Make an interactive map (not all data)</p>
+```r
+(out <- oa_get(dat[400]))
+#> <Openaddresses data> ~/.openadds/us-ca-sonoma_county.zip
+#> Dimensions [217243, 5]
+#> 
+#>          LON      LAT  NUMBER          STREET POSTCODE
+#> 1  -122.5327 38.29779 3771  A       Cory Lane       NA
+#> 2  -122.5422 38.30354   18752 White Oak Drive       NA
+#> 3  -122.5412 38.30327   18749 White Oak Drive       NA
+#> 4  -122.3997 38.26122    3552       Napa Road       NA
+#> 5  -122.5425 38.30404    3998 White Oak Court       NA
+#> 6  -122.5429 38.30434    4026 White Oak Court       NA
+#> 7  -122.5430 38.30505    4039 White Oak Court       NA
+#> 8  -122.5417 38.30504    4017 White Oak Court       NA
+#> 9  -122.5409 38.30436   18702 White Oak Drive       NA
+#> 10 -122.5403 38.30392   18684 White Oak Drive       NA
+#> ..       ...      ...     ...             ...      ...
+```
 
-<div class="language-r highlighter-rouge"><pre class="highlight"><code><span class="n">library</span><span class="p">(</span><span class="s2">"leaflet"</span><span class="p">)</span><span class="w">
+Make an interactive map (not all data)
 
-</span><span class="n">x</span><span class="w"> </span><span class="o">&lt;-</span><span class="w"> </span><span class="n">oa_get</span><span class="p">(</span><span class="n">oa_search</span><span class="p">(</span><span class="n">country</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"us"</span><span class="p">,</span><span class="w"> </span><span class="n">city</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"boulder"</span><span class="p">)[</span><span class="m">1</span><span class="p">,]</span><span class="o">$</span><span class="n">url</span><span class="p">)</span><span class="w">
-</span><span class="n">y</span><span class="w"> </span><span class="o">&lt;-</span><span class="w"> </span><span class="n">oa_get</span><span class="p">(</span><span class="n">oa_search</span><span class="p">(</span><span class="n">country</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"us"</span><span class="p">,</span><span class="w"> </span><span class="n">city</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"gunnison"</span><span class="p">)[</span><span class="m">1</span><span class="p">,]</span><span class="o">$</span><span class="n">url</span><span class="p">)</span><span class="w">
-</span><span class="n">oa_combine</span><span class="p">(</span><span class="n">x</span><span class="p">,</span><span class="w"> </span><span class="n">y</span><span class="p">)</span><span class="w"> </span><span class="o">%&gt;%</span><span class="w"> 
-  </span><span class="n">leaflet</span><span class="p">()</span><span class="w"> </span><span class="o">%&gt;%</span><span class="w">
-  </span><span class="n">addTiles</span><span class="p">()</span><span class="w"> </span><span class="o">%&gt;%</span><span class="w">
-  </span><span class="n">addCircles</span><span class="p">(</span><span class="n">lat</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="o">~</span><span class="n">lat</span><span class="p">,</span><span class="w"> </span><span class="n">lng</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="o">~</span><span class="n">lon</span><span class="p">,</span><span class="w"> </span><span class="n">popup</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="o">~</span><span class="n">address</span><span class="p">)</span><span class="w">
-</span></code></pre>
-</div>
 
-<p><img src="/public/img/2015-05-18-openadds/map.png" alt="image" /></p>
+```r
+library("leaflet")
 
-<h2 id="to-do">To do</h2>
+x <- oa_get(oa_search(country = "us", city = "boulder")[1,]$url)
+y <- oa_get(oa_search(country = "us", city = "gunnison")[1,]$url)
+oa_combine(x, y) %>% 
+  leaflet() %>%
+  addTiles() %>%
+  addCircles(lat = ~lat, lng = ~lon, popup = ~address)
+```
 
-<ul>
-  <li>Surely there are many datasets that won’t work in <code class="highlighter-rouge">oa_combine()</code> - gotta go through many more.</li>
-  <li>An easy viz function wrapping <code class="highlighter-rouge">leaflet</code></li>
-  <li>Since you can get a lot of spatial data quickly, easy way to visualize big data, maybe marker clusters?</li>
-</ul>
+![image](/public/img/2015-05-18-openadds/map.png)
+
+## To do
+
+* Surely there are many datasets that won't work in `oa_combine()` - gotta go through many more.
+* An easy viz function wrapping `leaflet`
+* Since you can get a lot of spatial data quickly, easy way to visualize big data, maybe marker clusters?
 
   </div>
   
@@ -262,312 +427,334 @@ have no lat/long data, some have no address data.</p>
 
     <span class="post-date">18 May 2015</span>
 
-    <p><code class="highlighter-rouge">lawn</code> is an R wrapper for the Javascript library <a href="http://turfjs.org/">turf.js</a> for advanced geospatial analysis. In addition, we have a few functions to interface with the <a href="https://github.com/mapbox/geojson-random">geojson-random</a> Javascript library.</p>
+    `lawn` is an R wrapper for the Javascript library [turf.js](http://turfjs.org/) for advanced geospatial analysis. In addition, we have a few functions to interface with the [geojson-random](https://github.com/mapbox/geojson-random) Javascript library.
 
-<p><code class="highlighter-rouge">lawn</code> includes traditional spatial operations, helper functions for creating GeoJSON data, and data classification and statistics tools.</p>
+`lawn` includes traditional spatial operations, helper functions for creating GeoJSON data, and data classification and statistics tools.
 
-<p>There is an additional helper function (see <code class="highlighter-rouge">view()</code>) in this package to help visualize data with interactive maps via the <code class="highlighter-rouge">leaflet</code> package (<a href="https://github.com/rstudio/leaflet">https://github.com/rstudio/leaflet</a>). Note that <code class="highlighter-rouge">leaflet</code> is not required to install <code class="highlighter-rouge">lawn</code> - it’s in Suggests, not Imports or Depends.</p>
+There is an additional helper function (see `view()`) in this package to help visualize data with interactive maps via the `leaflet` package ([https://github.com/rstudio/leaflet](https://github.com/rstudio/leaflet)). Note that `leaflet` is not required to install `lawn` - it's in Suggests, not Imports or Depends.
 
-<p>Use cases for this package include (but not limited to, obs.) the following (all below assumes GeoJSON format):</p>
+Use cases for this package include (but not limited to, obs.) the following (all below assumes GeoJSON format):
 
-<ul>
-  <li>Create random spatial data.</li>
-  <li>Convert among spatial data types (e.g. <code class="highlighter-rouge">Polygon</code> to <code class="highlighter-rouge">FeatureCollection</code>)</li>
-  <li>Transform objects, including merging many, simplifying, calculating hulls, etc.</li>
-  <li>Measuring objects</li>
-  <li>Performing interpolation of objects</li>
-  <li>Aggregating data (aka properties) associated with objects</li>
-</ul>
+* Create random spatial data.
+* Convert among spatial data types (e.g. `Polygon` to `FeatureCollection`)
+* Transform objects, including merging many, simplifying, calculating hulls, etc.
+* Measuring objects
+* Performing interpolation of objects
+* Aggregating data (aka properties) associated with objects
 
-<h2 id="install">Install</h2>
+## Install
 
-<p>Stable <code class="highlighter-rouge">lawn</code> version from CRAN - this should fetch <code class="highlighter-rouge">leaflet</code>, which is not on CRAN, but in a <code class="highlighter-rouge">drat</code> repo (let me know if it doesn’t)</p>
+Stable `lawn` version from CRAN - this should fetch `leaflet`, which is not on CRAN, but in a `drat` repo (let me know if it doesn't)
 
-<div class="language-r highlighter-rouge"><pre class="highlight"><code><span class="n">install.packages</span><span class="p">(</span><span class="s2">"lawn"</span><span class="p">)</span><span class="w">
-</span></code></pre>
-</div>
 
-<p>Or, the development version from Github</p>
+```r
+install.packages("lawn")
+```
 
-<div class="language-r highlighter-rouge"><pre class="highlight"><code><span class="n">devtools</span><span class="o">::</span><span class="n">install_github</span><span class="p">(</span><span class="s2">"ropensci/lawn"</span><span class="p">)</span><span class="w">
-</span></code></pre>
-</div>
+Or, the development version from Github
 
-<div class="language-r highlighter-rouge"><pre class="highlight"><code><span class="n">library</span><span class="p">(</span><span class="s2">"lawn"</span><span class="p">)</span><span class="w">
-</span></code></pre>
-</div>
 
-<h2 id="view">view</h2>
+```r
+devtools::install_github("ropensci/lawn")
+```
 
-<p><code class="highlighter-rouge">lawn</code> includes a tiny helper function for visualizing geojson. For examples below, we’ll make liberal use of the <code class="highlighter-rouge">lawn::view()</code> function to visualize what it is the heck we’re doing. mkay, lets roll…</p>
 
-<p>We’ve tried to make <code class="highlighter-rouge">view()</code> work with as many inputs as possible, from class <code class="highlighter-rouge">character</code> containing
-json to the class <code class="highlighter-rouge">json</code> from the <code class="highlighter-rouge">jsonlite</code> package, to the class <code class="highlighter-rouge">list</code> to all of the GeoJSON outputs
-from functions in <code class="highlighter-rouge">lawn</code>.</p>
+```r
+library("lawn")
+```
 
-<div class="language-r highlighter-rouge"><pre class="highlight"><code><span class="n">view</span><span class="p">(</span><span class="n">lawn_data</span><span class="o">$</span><span class="n">points_average</span><span class="p">)</span><span class="w">
-</span></code></pre>
-</div>
+## view
 
-<p><img src="/public/img/2015-05-18-mow-the-lawn/map1.png" alt="map1" /></p>
+`lawn` includes a tiny helper function for visualizing geojson. For examples below, we'll make liberal use of the `lawn::view()` function to visualize what it is the heck we're doing. mkay, lets roll...
 
-<p>Here, we sample at random two points from the same dataset just viewed.</p>
+We've tried to make `view()` work with as many inputs as possible, from class `character` containing
+json to the class `json` from the `jsonlite` package, to the class `list` to all of the GeoJSON outputs
+from functions in `lawn`.
 
-<div class="language-r highlighter-rouge"><pre class="highlight"><code><span class="n">lawn_sample</span><span class="p">(</span><span class="n">lawn_data</span><span class="o">$</span><span class="n">points_average</span><span class="p">,</span><span class="w"> </span><span class="m">2</span><span class="p">)</span><span class="w"> </span><span class="o">%&gt;%</span><span class="w"> </span><span class="n">view</span><span class="p">()</span><span class="w">
-</span></code></pre>
-</div>
 
-<p><img src="/public/img/2015-05-18-mow-the-lawn/map2.png" alt="map2" /></p>
+```r
+view(lawn_data$points_average)
+```
 
-<h2 id="make-some-geojson-data">Make some geojson data</h2>
+![map1](/public/img/2015-05-18-mow-the-lawn/map1.png)
 
-<p>Point</p>
+Here, we sample at random two points from the same dataset just viewed.
 
-<div class="language-r highlighter-rouge"><pre class="highlight"><code><span class="n">lawn_point</span><span class="p">(</span><span class="nf">c</span><span class="p">(</span><span class="m">-74.5</span><span class="p">,</span><span class="w"> </span><span class="m">40</span><span class="p">))</span><span class="w">
-</span><span class="c1">#&gt; $type
-#&gt; [1] "Feature"
-#&gt; 
-#&gt; $geometry
-#&gt; $geometry$type
-#&gt; [1] "Point"
-#&gt; 
-#&gt; $geometry$coordinates
-#&gt; [1] -74.5  40.0
-#&gt; 
-#&gt; 
-#&gt; $properties
-#&gt; named list()
-#&gt; 
-#&gt; attr(,"class")
-#&gt; [1] "point"
-</span></code></pre>
-</div>
 
-<div class="language-r highlighter-rouge"><pre class="highlight"><code><span class="n">lawn_point</span><span class="p">(</span><span class="nf">c</span><span class="p">(</span><span class="m">-74.5</span><span class="p">,</span><span class="w"> </span><span class="m">40</span><span class="p">))</span><span class="w"> </span><span class="o">%&gt;%</span><span class="w"> </span><span class="n">view</span><span class="w">
-</span></code></pre>
-</div>
+```r
+lawn_sample(lawn_data$points_average, 2) %>% view()
+```
 
-<p><img src="/public/img/2015-05-18-mow-the-lawn/point.png" alt="point" /></p>
+![map2](/public/img/2015-05-18-mow-the-lawn/map2.png)
 
-<p>Polygon</p>
+## Make some geojson data
 
-<div class="language-r highlighter-rouge"><pre class="highlight"><code><span class="n">rings</span><span class="w"> </span><span class="o">&lt;-</span><span class="w"> </span><span class="nf">list</span><span class="p">(</span><span class="nf">list</span><span class="p">(</span><span class="w">
-  </span><span class="nf">c</span><span class="p">(</span><span class="m">-2.275543</span><span class="p">,</span><span class="w"> </span><span class="m">53.464547</span><span class="p">),</span><span class="w">
-  </span><span class="nf">c</span><span class="p">(</span><span class="m">-2.275543</span><span class="p">,</span><span class="w"> </span><span class="m">53.489271</span><span class="p">),</span><span class="w">
-  </span><span class="nf">c</span><span class="p">(</span><span class="m">-2.215118</span><span class="p">,</span><span class="w"> </span><span class="m">53.489271</span><span class="p">),</span><span class="w">
-  </span><span class="nf">c</span><span class="p">(</span><span class="m">-2.215118</span><span class="p">,</span><span class="w"> </span><span class="m">53.464547</span><span class="p">),</span><span class="w">
-  </span><span class="nf">c</span><span class="p">(</span><span class="m">-2.275543</span><span class="p">,</span><span class="w"> </span><span class="m">53.464547</span><span class="p">)</span><span class="w">
-</span><span class="p">))</span><span class="w">
-</span><span class="n">lawn_polygon</span><span class="p">(</span><span class="n">rings</span><span class="p">)</span><span class="w">
-</span><span class="c1">#&gt; $type
-#&gt; [1] "Feature"
-#&gt; 
-#&gt; $geometry
-#&gt; $geometry$type
-#&gt; [1] "Polygon"
-#&gt; 
-#&gt; $geometry$coordinates
-#&gt; , , 1
-#&gt; 
-#&gt;           [,1]      [,2]      [,3]      [,4]      [,5]
-#&gt; [1,] -2.275543 -2.275543 -2.215118 -2.215118 -2.275543
-#&gt; 
-#&gt; , , 2
-#&gt; 
-#&gt;          [,1]     [,2]     [,3]     [,4]     [,5]
-#&gt; [1,] 53.46455 53.48927 53.48927 53.46455 53.46455
-#&gt; 
-#&gt; 
-#&gt; 
-#&gt; $properties
-#&gt; named list()
-#&gt; 
-#&gt; attr(,"class")
-#&gt; [1] "polygon"
-</span></code></pre>
-</div>
+Point
 
-<div class="language-r highlighter-rouge"><pre class="highlight"><code><span class="n">lawn_polygon</span><span class="p">(</span><span class="n">rings</span><span class="p">)</span><span class="w"> </span><span class="o">%&gt;%</span><span class="w"> </span><span class="n">view</span><span class="w">
-</span></code></pre>
-</div>
 
-<p><img src="/public/img/2015-05-18-mow-the-lawn/polygon.png" alt="polygon" /></p>
+```r
+lawn_point(c(-74.5, 40))
+#> $type
+#> [1] "Feature"
+#> 
+#> $geometry
+#> $geometry$type
+#> [1] "Point"
+#> 
+#> $geometry$coordinates
+#> [1] -74.5  40.0
+#> 
+#> 
+#> $properties
+#> named list()
+#> 
+#> attr(,"class")
+#> [1] "point"
+```
 
-<p>Random set of points</p>
 
-<div class="language-r highlighter-rouge"><pre class="highlight"><code><span class="n">lawn_random</span><span class="p">(</span><span class="n">n</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="m">2</span><span class="p">)</span><span class="w">
-</span><span class="c1">#&gt; $type
-#&gt; [1] "FeatureCollection"
-#&gt; 
-#&gt; $features
-#&gt;      type geometry.type  geometry.coordinates
-#&gt; 1 Feature         Point -137.46327, -63.46154
-#&gt; 2 Feature         Point  -110.68426, 83.10533
-#&gt; 
-#&gt; attr(,"class")
-#&gt; [1] "featurecollection"
-</span></code></pre>
-</div>
+```r
+lawn_point(c(-74.5, 40)) %>% view
+```
 
-<div class="language-r highlighter-rouge"><pre class="highlight"><code><span class="n">lawn_random</span><span class="p">(</span><span class="n">n</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="m">5</span><span class="p">)</span><span class="w"> </span><span class="o">%&gt;%</span><span class="w"> </span><span class="n">view</span><span class="w">
-</span></code></pre>
-</div>
+![point](/public/img/2015-05-18-mow-the-lawn/point.png)
 
-<p><img src="/public/img/2015-05-18-mow-the-lawn/lawn_random.png" alt="rand1" /></p>
+Polygon
 
-<p>Or, use a different Javascript library (<a href="https://github.com/mapbox/geojson-random">geojson-random</a>) to create random features.</p>
 
-<p>Positions</p>
+```r
+rings <- list(list(
+  c(-2.275543, 53.464547),
+  c(-2.275543, 53.489271),
+  c(-2.215118, 53.489271),
+  c(-2.215118, 53.464547),
+  c(-2.275543, 53.464547)
+))
+lawn_polygon(rings)
+#> $type
+#> [1] "Feature"
+#> 
+#> $geometry
+#> $geometry$type
+#> [1] "Polygon"
+#> 
+#> $geometry$coordinates
+#> , , 1
+#> 
+#>           [,1]      [,2]      [,3]      [,4]      [,5]
+#> [1,] -2.275543 -2.275543 -2.215118 -2.215118 -2.275543
+#> 
+#> , , 2
+#> 
+#>          [,1]     [,2]     [,3]     [,4]     [,5]
+#> [1,] 53.46455 53.48927 53.48927 53.46455 53.46455
+#> 
+#> 
+#> 
+#> $properties
+#> named list()
+#> 
+#> attr(,"class")
+#> [1] "polygon"
+```
 
-<div class="language-r highlighter-rouge"><pre class="highlight"><code><span class="n">gr_position</span><span class="p">()</span><span class="w">
-</span><span class="c1">#&gt; [1] -179.77996   45.99018
-</span></code></pre>
-</div>
 
-<p>Points</p>
+```r
+lawn_polygon(rings) %>% view
+```
 
-<div class="language-r highlighter-rouge"><pre class="highlight"><code><span class="n">gr_point</span><span class="p">(</span><span class="m">2</span><span class="p">)</span><span class="w">
-</span><span class="c1">#&gt; $type
-#&gt; [1] "FeatureCollection"
-#&gt; 
-#&gt; $features
-#&gt;      type geometry.type geometry.coordinates
-#&gt; 1 Feature         Point   5.83895, -27.77218
-#&gt; 2 Feature         Point   78.50177, 14.95840
-#&gt; 
-#&gt; attr(,"class")
-#&gt; [1] "featurecollection"
-</span></code></pre>
-</div>
+![polygon](/public/img/2015-05-18-mow-the-lawn/polygon.png)
 
-<div class="language-r highlighter-rouge"><pre class="highlight"><code><span class="n">gr_point</span><span class="p">(</span><span class="m">2</span><span class="p">)</span><span class="w"> </span><span class="o">%&gt;%</span><span class="w"> </span><span class="n">view</span><span class="w">
-</span></code></pre>
-</div>
+Random set of points
 
-<p><img src="/public/img/2015-05-18-mow-the-lawn/geojsonrandom_points.png" alt="rand2" /></p>
 
-<p>Polygons</p>
+```r
+lawn_random(n = 2)
+#> $type
+#> [1] "FeatureCollection"
+#> 
+#> $features
+#>      type geometry.type  geometry.coordinates
+#> 1 Feature         Point -137.46327, -63.46154
+#> 2 Feature         Point  -110.68426, 83.10533
+#> 
+#> attr(,"class")
+#> [1] "featurecollection"
+```
 
-<div class="language-r highlighter-rouge"><pre class="highlight"><code><span class="n">gr_polygon</span><span class="p">(</span><span class="n">n</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="m">1</span><span class="p">,</span><span class="w"> </span><span class="n">vertices</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="m">5</span><span class="p">,</span><span class="w"> </span><span class="n">max_radial_length</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="m">5</span><span class="p">)</span><span class="w">
-</span><span class="c1">#&gt; $type
-#&gt; [1] "FeatureCollection"
-#&gt; 
-#&gt; $features
-#&gt;      type geometry.type
-#&gt; 1 Feature       Polygon
-#&gt;                                                                                                           geometry.coordinates
-#&gt; 1 67.58827, 67.68551, 67.00091, 66.70156, 65.72578, 67.58827, -42.11340, -42.69850, -43.54866, -42.42758, -41.76731, -42.11340
-#&gt; 
-#&gt; attr(,"class")
-#&gt; [1] "featurecollection"
-</span></code></pre>
-</div>
 
-<div class="language-r highlighter-rouge"><pre class="highlight"><code><span class="n">gr_polygon</span><span class="p">(</span><span class="n">n</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="m">1</span><span class="p">,</span><span class="w"> </span><span class="n">vertices</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="m">5</span><span class="p">,</span><span class="w"> </span><span class="n">max_radial_length</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="m">5</span><span class="p">)</span><span class="w"> </span><span class="o">%&gt;%</span><span class="w"> </span><span class="n">view</span><span class="w">
-</span></code></pre>
-</div>
+```r
+lawn_random(n = 5) %>% view
+```
 
-<p><img src="/public/img/2015-05-18-mow-the-lawn/geojsonrandom_polygons.png" alt="rand3" /></p>
+![rand1](/public/img/2015-05-18-mow-the-lawn/lawn_random.png)
 
-<h2 id="count">count</h2>
+Or, use a different Javascript library ([geojson-random](https://github.com/mapbox/geojson-random)) to create random features.
 
-<p>Count number of points within polygons, appends a new field to properties (see the <code class="highlighter-rouge">count</code> field)</p>
+Positions
 
-<div class="language-r highlighter-rouge"><pre class="highlight"><code><span class="n">lawn_count</span><span class="p">(</span><span class="n">polygons</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">lawn_data</span><span class="o">$</span><span class="n">polygons_count</span><span class="p">,</span><span class="w"> </span><span class="n">points</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">lawn_data</span><span class="o">$</span><span class="n">points_count</span><span class="p">)</span><span class="w">
-</span><span class="c1">#&gt; $type
-#&gt; [1] "FeatureCollection"
-#&gt; 
-#&gt; $features
-#&gt;      type pt_count geometry.type
-#&gt; 1 Feature        2       Polygon
-#&gt; 2 Feature        0       Polygon
-#&gt;                                                                                           geometry.coordinates
-#&gt; 1 -112.07239, -112.07239, -112.02810, -112.02810, -112.07239, 46.58659, 46.61761, 46.61761, 46.58659, 46.58659
-#&gt; 2 -112.02398, -112.02398, -111.96613, -111.96613, -112.02398, 46.57043, 46.61502, 46.61502, 46.57043, 46.57043
-#&gt; 
-#&gt; attr(,"class")
-#&gt; [1] "featurecollection"
-</span></code></pre>
-</div>
 
-<h2 id="distance">distance</h2>
+```r
+gr_position()
+#> [1] -179.77996   45.99018
+```
 
-<p>Define two points</p>
+Points
 
-<div class="language-r highlighter-rouge"><pre class="highlight"><code><span class="n">from</span><span class="w"> </span><span class="o">&lt;-</span><span class="w"> </span><span class="s1">'{
+
+```r
+gr_point(2)
+#> $type
+#> [1] "FeatureCollection"
+#> 
+#> $features
+#>      type geometry.type geometry.coordinates
+#> 1 Feature         Point   5.83895, -27.77218
+#> 2 Feature         Point   78.50177, 14.95840
+#> 
+#> attr(,"class")
+#> [1] "featurecollection"
+```
+
+
+```r
+gr_point(2) %>% view
+```
+
+![rand2](/public/img/2015-05-18-mow-the-lawn/geojsonrandom_points.png)
+
+Polygons
+
+
+```r
+gr_polygon(n = 1, vertices = 5, max_radial_length = 5)
+#> $type
+#> [1] "FeatureCollection"
+#> 
+#> $features
+#>      type geometry.type
+#> 1 Feature       Polygon
+#>                                                                                                           geometry.coordinates
+#> 1 67.58827, 67.68551, 67.00091, 66.70156, 65.72578, 67.58827, -42.11340, -42.69850, -43.54866, -42.42758, -41.76731, -42.11340
+#> 
+#> attr(,"class")
+#> [1] "featurecollection"
+```
+
+
+```r
+gr_polygon(n = 1, vertices = 5, max_radial_length = 5) %>% view
+```
+
+![rand3](/public/img/2015-05-18-mow-the-lawn/geojsonrandom_polygons.png)
+
+## count
+
+Count number of points within polygons, appends a new field to properties (see the `count` field)
+
+
+```r
+lawn_count(polygons = lawn_data$polygons_count, points = lawn_data$points_count)
+#> $type
+#> [1] "FeatureCollection"
+#> 
+#> $features
+#>      type pt_count geometry.type
+#> 1 Feature        2       Polygon
+#> 2 Feature        0       Polygon
+#>                                                                                           geometry.coordinates
+#> 1 -112.07239, -112.07239, -112.02810, -112.02810, -112.07239, 46.58659, 46.61761, 46.61761, 46.58659, 46.58659
+#> 2 -112.02398, -112.02398, -111.96613, -111.96613, -112.02398, 46.57043, 46.61502, 46.61502, 46.57043, 46.57043
+#> 
+#> attr(,"class")
+#> [1] "featurecollection"
+```
+
+## distance
+
+Define two points
+
+
+```r
+from <- '{
  "type": "Feature",
  "properties": {},
  "geometry": {
    "type": "Point",
    "coordinates": [-75.343, 39.984]
  }
-}'</span><span class="w">
-</span><span class="n">to</span><span class="w"> </span><span class="o">&lt;-</span><span class="w"> </span><span class="s1">'{
+}'
+to <- '{
   "type": "Feature",
   "properties": {},
   "geometry": {
     "type": "Point",
     "coordinates": [-75.534, 39.123]
   }
-}'</span><span class="w">
-</span></code></pre>
-</div>
+}'
+```
 
-<p>Calculate distance, default units is kilometers (default output: <code class="highlighter-rouge">km</code>)</p>
+Calculate distance, default units is kilometers (default output: `km`)
 
-<div class="language-r highlighter-rouge"><pre class="highlight"><code><span class="n">lawn_distance</span><span class="p">(</span><span class="n">from</span><span class="p">,</span><span class="w"> </span><span class="n">to</span><span class="p">)</span><span class="w">
-</span><span class="c1">#&gt; [1] 97.15958
-</span></code></pre>
-</div>
 
-<h2 id="sample-from-a-featurecollection">sample from a FeatureCollection</h2>
+```r
+lawn_distance(from, to)
+#> [1] 97.15958
+```
 
-<div class="language-r highlighter-rouge"><pre class="highlight"><code><span class="n">dat</span><span class="w"> </span><span class="o">&lt;-</span><span class="w"> </span><span class="n">lawn_data</span><span class="o">$</span><span class="n">points_average</span><span class="w">
-</span><span class="n">cat</span><span class="p">(</span><span class="n">dat</span><span class="p">)</span><span class="w">
-</span><span class="c1">#&gt; {
-#&gt;   "type": "FeatureCollection",
-#&gt;   "features": [
-#&gt;     {
-#&gt;       "type": "Feature",
-#&gt;       "properties": {
-#&gt;         "population": 200
-#&gt;       },
-#&gt;       "geometry": {
-#&gt;         "type": "Point",
-</span><span class="n">...</span><span class="w">
-</span></code></pre>
-</div>
+## sample from a FeatureCollection
 
-<p>Sample 2 points at random</p>
 
-<div class="language-r highlighter-rouge"><pre class="highlight"><code><span class="n">lawn_sample</span><span class="p">(</span><span class="n">dat</span><span class="p">,</span><span class="w"> </span><span class="m">2</span><span class="p">)</span><span class="w">
-</span><span class="c1">#&gt; $type
-#&gt; [1] "FeatureCollection"
-#&gt; 
-#&gt; $features
-#&gt;      type population geometry.type geometry.coordinates
-#&gt; 1 Feature        200         Point   10.80643, 59.90891
-#&gt; 2 Feature        600         Point   10.71579, 59.90478
-#&gt; 
-#&gt; attr(,"class")
-#&gt; [1] "featurecollection"
-</span></code></pre>
-</div>
+```r
+dat <- lawn_data$points_average
+cat(dat)
+#> {
+#>   "type": "FeatureCollection",
+#>   "features": [
+#>     {
+#>       "type": "Feature",
+#>       "properties": {
+#>         "population": 200
+#>       },
+#>       "geometry": {
+#>         "type": "Point",
+...
+```
 
-<h2 id="extent">extent</h2>
+Sample 2 points at random
 
-<p>Calculates the extent of all input features in a FeatureCollection, and returns a bounding box.</p>
 
-<div class="language-r highlighter-rouge"><pre class="highlight"><code><span class="n">lawn_extent</span><span class="p">(</span><span class="n">lawn_data</span><span class="o">$</span><span class="n">points_average</span><span class="p">)</span><span class="w">
-</span><span class="c1">#&gt; [1] 10.71579 59.90478 10.80643 59.93162
-</span></code></pre>
-</div>
+```r
+lawn_sample(dat, 2)
+#> $type
+#> [1] "FeatureCollection"
+#> 
+#> $features
+#>      type population geometry.type geometry.coordinates
+#> 1 Feature        200         Point   10.80643, 59.90891
+#> 2 Feature        600         Point   10.71579, 59.90478
+#> 
+#> attr(,"class")
+#> [1] "featurecollection"
+```
 
-<h2 id="buffer">buffer</h2>
+## extent
 
-<p>Calculates a buffer for input features for a given radius.</p>
+Calculates the extent of all input features in a FeatureCollection, and returns a bounding box.
 
-<div class="language-r highlighter-rouge"><pre class="highlight"><code><span class="n">dat</span><span class="w"> </span><span class="o">&lt;-</span><span class="w"> </span><span class="s1">'{
+
+```r
+lawn_extent(lawn_data$points_average)
+#> [1] 10.71579 59.90478 10.80643 59.93162
+```
+
+## buffer
+
+Calculates a buffer for input features for a given radius.
+
+
+```r
+dat <- '{
  "type": "Feature",
  "properties": {},
  "geometry": {
@@ -580,22 +767,24 @@ from functions in <code class="highlighter-rouge">lawn</code>.</p>
        [-112.072391,46.586591]
      ]]
    }
-}'</span><span class="w">
-</span><span class="n">view</span><span class="p">(</span><span class="n">dat</span><span class="p">)</span><span class="w">
-</span></code></pre>
-</div>
+}'
+view(dat)
+```
 
-<p><img src="/public/img/2015-05-18-mow-the-lawn/buffer1.png" alt="buffer1" /></p>
+![buffer1](/public/img/2015-05-18-mow-the-lawn/buffer1.png)
 
-<div class="language-r highlighter-rouge"><pre class="highlight"><code><span class="n">lawn_buffer</span><span class="p">(</span><span class="n">dat</span><span class="p">,</span><span class="w"> </span><span class="m">1</span><span class="p">,</span><span class="w"> </span><span class="s2">"miles"</span><span class="p">)</span><span class="w"> </span><span class="o">%&gt;%</span><span class="w"> </span><span class="n">view</span><span class="w">
-</span></code></pre>
-</div>
 
-<p><img src="/public/img/2015-05-18-mow-the-lawn/buffer2.png" alt="buffer2" /></p>
+```r
+lawn_buffer(dat, 1, "miles") %>% view
+```
 
-<h2 id="union-polygons-together">Union polygons together</h2>
+![buffer2](/public/img/2015-05-18-mow-the-lawn/buffer2.png)
 
-<div class="language-r highlighter-rouge"><pre class="highlight"><code><span class="n">poly1</span><span class="w"> </span><span class="o">&lt;-</span><span class="w"> </span><span class="s1">'{
+## Union polygons together
+
+
+```r
+poly1 <- '{
  "type": "Feature",
  "properties": {
    "fill": "#0f0"
@@ -610,9 +799,9 @@ from functions in <code class="highlighter-rouge">lawn</code>.</p>
      [-122.801742, 45.48565]
     ]]
  }
-}'</span><span class="w">
+}'
 
-</span><span class="n">poly2</span><span class="w"> </span><span class="o">&lt;-</span><span class="w"> </span><span class="s1">'{
+poly2 <- '{
  "type": "Feature",
  "properties": {
    "fill": "#00f"
@@ -630,37 +819,40 @@ from functions in <code class="highlighter-rouge">lawn</code>.</p>
      [-122.520217, 45.535693]
      ]]
  }
-}'</span><span class="w">
-</span><span class="n">view</span><span class="p">(</span><span class="n">poly1</span><span class="p">)</span><span class="w">
-</span></code></pre>
-</div>
+}'
+view(poly1)
+```
 
-<p><img src="/public/img/2015-05-18-mow-the-lawn/union1.png" alt="union1" /></p>
+![union1](/public/img/2015-05-18-mow-the-lawn/union1.png)
 
-<div class="language-r highlighter-rouge"><pre class="highlight"><code><span class="n">view</span><span class="p">(</span><span class="n">poly2</span><span class="p">)</span><span class="w">
-</span></code></pre>
-</div>
 
-<p><img src="/public/img/2015-05-18-mow-the-lawn/union2.png" alt="union2" /></p>
+```r
+view(poly2)
+```
 
-<p>Visualize union-ed polygons</p>
+![union2](/public/img/2015-05-18-mow-the-lawn/union2.png)
 
-<div class="language-r highlighter-rouge"><pre class="highlight"><code><span class="n">lawn_union</span><span class="p">(</span><span class="n">poly1</span><span class="p">,</span><span class="w"> </span><span class="n">poly2</span><span class="p">)</span><span class="w"> </span><span class="o">%&gt;%</span><span class="w"> </span><span class="n">view</span><span class="w">
-</span></code></pre>
-</div>
+Visualize union-ed polygons
 
-<p><img src="/public/img/2015-05-18-mow-the-lawn/union3.png" alt="union3" /></p>
 
-<p>See also <code class="highlighter-rouge">lawn_merge()</code> and <code class="highlighter-rouge">lawn_intersect()</code>.</p>
+```r
+lawn_union(poly1, poly2) %>% view
+```
 
-<h2 id="lint-input-geojson">lint input geojson</h2>
+![union3](/public/img/2015-05-18-mow-the-lawn/union3.png)
 
-<p>For most functions, you can lint your input geojson data to make sure it is proper geojson. We use 
-the javascript library <a href="https://github.com/mapbox/geojsonhint">geojsonhint</a>. See the <code class="highlighter-rouge">lint</code> parameter.</p>
+See also `lawn_merge()` and `lawn_intersect()`.
 
-<p>Good GeoJSON</p>
+## lint input geojson
 
-<div class="language-r highlighter-rouge"><pre class="highlight"><code><span class="n">dat</span><span class="w"> </span><span class="o">&lt;-</span><span class="w"> </span><span class="s1">'{
+For most functions, you can lint your input geojson data to make sure it is proper geojson. We use 
+the javascript library [geojsonhint](https://github.com/mapbox/geojsonhint). See the `lint` parameter.
+
+Good GeoJSON
+
+
+```r
+dat <- '{
   "type": "FeatureCollection",
   "features": [
     {
@@ -674,15 +866,16 @@ the javascript library <a href="https://github.com/mapbox/geojsonhint">geojsonhi
       }
     }
   ]
-}'</span><span class="w">
-</span><span class="n">lawn_extent</span><span class="p">(</span><span class="n">dat</span><span class="p">)</span><span class="w">
-</span><span class="c1">#&gt; [1] 10.72403 59.92681 10.72403 59.92681
-</span></code></pre>
-</div>
+}'
+lawn_extent(dat)
+#> [1] 10.72403 59.92681 10.72403 59.92681
+```
 
-<p>Bad GeoJSON</p>
+Bad GeoJSON
 
-<div class="language-r highlighter-rouge"><pre class="highlight"><code><span class="n">dat</span><span class="w"> </span><span class="o">&lt;-</span><span class="w"> </span><span class="s1">'{
+
+```r
+dat <- '{
   "type": "FeatureCollection",
   "features": [
     {
@@ -695,348 +888,16 @@ the javascript library <a href="https://github.com/mapbox/geojsonhint">geojsonhi
       }
     }
   ]
-}'</span><span class="w">
-</span><span class="n">lawn_extent</span><span class="p">(</span><span class="n">dat</span><span class="p">,</span><span class="w"> </span><span class="n">lint</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="kc">TRUE</span><span class="p">)</span><span class="w">
+}'
+lawn_extent(dat, lint = TRUE)
 
-</span><span class="c1">#&gt; Error: Line 1 - "coordinates" property required
-</span></code></pre>
-</div>
+#> Error: Line 1 - "coordinates" property required
+```
 
-<h2 id="to-do">To do</h2>
+## To do
 
-<ul>
-  <li>As Turf.js changes, we’ll update <code class="highlighter-rouge">lawn</code></li>
-  <li>Performance improvements. We realize that this package is slower than the C based <code class="highlighter-rouge">rgdal</code>/<code class="highlighter-rouge">rgeos</code> - we are looking into ways to increaes performance to get closer to the performance of those packages.</li>
-</ul>
-
-  </div>
-  
-  <div class="post">
-    <h1>
-      <a href="/2015/04/geojson-io/">
-        geojsonio - a new package to do geojson things
-      </a>
-    </h1>
-
-    <span class="post-date">30 Apr 2015</span>
-
-    <p><code class="highlighter-rouge">geojsonio</code> converts geographic data to GeoJSON and TopoJSON formats - though the focus is mostly on GeoJSON</p>
-
-<p>For those not familiar GeoJSON it is a format for encoding a variety of geographic data structures. GeoJSON supports the following geometry types: Point, LineString, Polygon, MultiPoint, MultiLineString, MultiPolygon, and GeometryCollection. These geometry types are also found in <a href="http://en.wikipedia.org/wiki/Well-known_text">well known text (WKT)</a>, and have equivalents in R’s spatial classes. Read the <a href="http://geojson.org/geojson-spec.html">spec</a> for more detailed information.</p>
-
-<p>Other great geojson resources:</p>
-
-<ul>
-  <li>GeoJSON lint - lint your geojson - <a href="http://geojsonlint.com/">http://geojsonlint.com/</a></li>
-  <li>GeoJSON.io - make maps with geojson input or draw maps and get geojson - <a href="http://geojson.io/">http://geojson.io/</a></li>
-</ul>
-
-<p>Functions in this package are organized first around what you’re working with or want to get, geojson or topojson, then convert to or read from various formats:</p>
-
-<ul>
-  <li><code class="highlighter-rouge">geojson_list()</code> - convert to GeoJSON as R list format</li>
-  <li><code class="highlighter-rouge">geojson_json()</code> - convert to GeoJSON as json</li>
-  <li><code class="highlighter-rouge">geojson_read()</code>/<code class="highlighter-rouge">topojson_read()</code> - read a GeoJSON/TopoJSON file from file path or URL</li>
-  <li><code class="highlighter-rouge">geojson_write()</code> - write a GeoJSON file locally (no write TopoJSON yet)</li>
-</ul>
-
-<p>Each of the above functions have methods for various objects/classes, including <code class="highlighter-rouge">numeric</code>, <code class="highlighter-rouge">data.frame</code>, <code class="highlighter-rouge">list</code>, <code class="highlighter-rouge">SpatialPolygons</code>, <code class="highlighter-rouge">SpatialLines</code>, <code class="highlighter-rouge">SpatialPoints</code>, etc. (including the classes in <code class="highlighter-rouge">rgeos</code>)</p>
-
-<p>Use cases for this package include (but not limited to, obs.) the following:</p>
-
-<ul>
-  <li>Get data in GeoJSON json format, and you want to get it into a list in R.</li>
-  <li>Get data into GeoJSON format to use downstream to make a interactive map
-    <ul>
-      <li>in R (e.g., with <a href="https://github.com/rstudio/leaflet">leaflet</a>)</li>
-      <li>or in another context (e.g., using javascript with mapbox/leaflet)</li>
-    </ul>
-  </li>
-  <li>Data is in a data.frame/matrix/list and you want to make GeoJSON format data.</li>
-  <li>Data is in one of the many spatial classes (e.g., <code class="highlighter-rouge">SpatialPoints</code>) and you want GeoJSON</li>
-  <li>You need to add styling to your data - can do with this package for certain data types.</li>
-  <li>You want to check that your GeoJSON data is valid - two ways to do it in geojsonio.</li>
-  <li>Combine objects together (e.g., a point and a line), either from two <code class="highlighter-rouge">geo_list</code> objects, or two <code class="highlighter-rouge">json</code> objects. See <code class="highlighter-rouge">?geojson-add</code></li>
-</ul>
-
-<h2 id="install">Install</h2>
-
-<p>See the github repo for notes about dependencies <a href="https://github.com/ropensci/geojsonio#install">https://github.com/ropensci/geojsonio#install</a>.</p>
-
-<p>CRAN version or the dev version from GitHub</p>
-
-<div class="language-r highlighter-rouge"><pre class="highlight"><code><span class="n">install.packages</span><span class="p">(</span><span class="s2">"geojsonio"</span><span class="p">)</span><span class="w">
-</span><span class="n">devtools</span><span class="o">::</span><span class="n">install_github</span><span class="p">(</span><span class="s2">"sckott/geojsonio"</span><span class="p">)</span><span class="w">
-</span></code></pre>
-</div>
-
-<div class="language-r highlighter-rouge"><pre class="highlight"><code><span class="n">library</span><span class="p">(</span><span class="s2">"geojsonio"</span><span class="p">)</span><span class="w">
-</span></code></pre>
-</div>
-
-<h2 id="geojson">GeoJSON</h2>
-
-<h3 id="convert-various-formats-to-geojson">Convert various formats to geojson</h3>
-
-<p>From a <code class="highlighter-rouge">numeric</code> vector of length 2</p>
-
-<p>as <em>json</em></p>
-
-<div class="language-r highlighter-rouge"><pre class="highlight"><code><span class="n">geojson_json</span><span class="p">(</span><span class="nf">c</span><span class="p">(</span><span class="m">32.45</span><span class="p">,</span><span class="w"> </span><span class="m">-99.74</span><span class="p">))</span><span class="w">
-</span><span class="c1">#&gt; {"type":"FeatureCollection","features":[{"type":"Feature","geometry":{"type":"Point","coordinates":[32.45,-99.74]},"properties":{}}]}
-</span></code></pre>
-</div>
-
-<p>as a <strong>list</strong></p>
-
-<div class="language-r highlighter-rouge"><pre class="highlight"><code><span class="n">geojson_list</span><span class="p">(</span><span class="nf">c</span><span class="p">(</span><span class="m">32.45</span><span class="p">,</span><span class="w"> </span><span class="m">-99.74</span><span class="p">))</span><span class="w">
-</span><span class="c1">#&gt; $type
-#&gt; [1] "FeatureCollection"
-#&gt; 
-#&gt; $features
-#&gt; $features[[1]]
-#&gt; $features[[1]]$type
-#&gt; [1] "Feature"
-#&gt; 
-#&gt; $features[[1]]$geometry
-#&gt; $features[[1]]$geometry$type
-</span><span class="n">...</span><span class="w">
-</span></code></pre>
-</div>
-
-<p>From a <code class="highlighter-rouge">data.frame</code></p>
-
-<p>as <strong>json</strong></p>
-
-<div class="language-r highlighter-rouge"><pre class="highlight"><code><span class="n">geojson_json</span><span class="p">(</span><span class="n">us_cities</span><span class="p">[</span><span class="m">1</span><span class="o">:</span><span class="m">2</span><span class="p">,</span><span class="w"> </span><span class="p">],</span><span class="w"> </span><span class="n">lat</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s1">'lat'</span><span class="p">,</span><span class="w"> </span><span class="n">lon</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s1">'long'</span><span class="p">)</span><span class="w">
-</span><span class="c1">#&gt; {"type":"FeatureCollection","features":[{"type":"Feature","geometry":{"type":"Point","coordinates":[-99.74,32.45]},"properties":{"name":"Abilene TX","country.etc":"TX","pop":"113888","capital":"0"}},{"type":"Feature","geometry":{"type":"Point","coordinates":[-81.52,41.08]},"properties":{"name":"Akron OH","country.etc":"OH","pop":"206634","capital":"0"}}]}
-</span></code></pre>
-</div>
-
-<p>as a <strong>list</strong></p>
-
-<div class="language-r highlighter-rouge"><pre class="highlight"><code><span class="n">geojson_list</span><span class="p">(</span><span class="n">us_cities</span><span class="p">[</span><span class="m">1</span><span class="o">:</span><span class="m">2</span><span class="p">,</span><span class="w"> </span><span class="p">],</span><span class="w"> </span><span class="n">lat</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s1">'lat'</span><span class="p">,</span><span class="w"> </span><span class="n">lon</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s1">'long'</span><span class="p">)</span><span class="w">
-</span><span class="c1">#&gt; $type
-#&gt; [1] "FeatureCollection"
-#&gt; 
-#&gt; $features
-#&gt; $features[[1]]
-#&gt; $features[[1]]$type
-#&gt; [1] "Feature"
-#&gt; 
-#&gt; $features[[1]]$geometry
-#&gt; $features[[1]]$geometry$type
-</span><span class="n">...</span><span class="w">
-</span></code></pre>
-</div>
-
-<p>From <code class="highlighter-rouge">SpatialPolygons</code> class</p>
-
-<div class="language-r highlighter-rouge"><pre class="highlight"><code><span class="n">library</span><span class="p">(</span><span class="s1">'sp'</span><span class="p">)</span><span class="w">
-</span><span class="n">poly1</span><span class="w"> </span><span class="o">&lt;-</span><span class="w"> </span><span class="n">Polygons</span><span class="p">(</span><span class="nf">list</span><span class="p">(</span><span class="n">Polygon</span><span class="p">(</span><span class="n">cbind</span><span class="p">(</span><span class="nf">c</span><span class="p">(</span><span class="m">-100</span><span class="p">,</span><span class="w"> </span><span class="m">-90</span><span class="p">,</span><span class="w"> </span><span class="m">-85</span><span class="p">,</span><span class="w"> </span><span class="m">-100</span><span class="p">),</span><span class="w">
-  </span><span class="nf">c</span><span class="p">(</span><span class="m">40</span><span class="p">,</span><span class="w"> </span><span class="m">50</span><span class="p">,</span><span class="w"> </span><span class="m">45</span><span class="p">,</span><span class="w"> </span><span class="m">40</span><span class="p">)))),</span><span class="w"> </span><span class="s2">"1"</span><span class="p">)</span><span class="w">
-</span><span class="n">poly2</span><span class="w"> </span><span class="o">&lt;-</span><span class="w"> </span><span class="n">Polygons</span><span class="p">(</span><span class="nf">list</span><span class="p">(</span><span class="n">Polygon</span><span class="p">(</span><span class="n">cbind</span><span class="p">(</span><span class="nf">c</span><span class="p">(</span><span class="m">-90</span><span class="p">,</span><span class="w"> </span><span class="m">-80</span><span class="p">,</span><span class="w"> </span><span class="m">-75</span><span class="p">,</span><span class="w"> </span><span class="m">-90</span><span class="p">),</span><span class="w">
-  </span><span class="nf">c</span><span class="p">(</span><span class="m">30</span><span class="p">,</span><span class="w"> </span><span class="m">40</span><span class="p">,</span><span class="w"> </span><span class="m">35</span><span class="p">,</span><span class="w"> </span><span class="m">30</span><span class="p">)))),</span><span class="w"> </span><span class="s2">"2"</span><span class="p">)</span><span class="w">
-</span><span class="p">(</span><span class="n">sp_poly</span><span class="w"> </span><span class="o">&lt;-</span><span class="w"> </span><span class="n">SpatialPolygons</span><span class="p">(</span><span class="nf">list</span><span class="p">(</span><span class="n">poly1</span><span class="p">,</span><span class="w"> </span><span class="n">poly2</span><span class="p">),</span><span class="w"> </span><span class="m">1</span><span class="o">:</span><span class="m">2</span><span class="p">))</span><span class="w">
-</span><span class="c1">#&gt; An object of class "SpatialPolygons"
-#&gt; Slot "polygons":
-#&gt; [[1]]
-#&gt; An object of class "Polygons"
-#&gt; Slot "Polygons":
-#&gt; [[1]]
-#&gt; An object of class "Polygon"
-#&gt; Slot "labpt":
-#&gt; [1] -91.66667  45.00000
-#&gt; 
-</span><span class="n">...</span><span class="w">
-</span></code></pre>
-</div>
-
-<p>to <strong>json</strong></p>
-
-<div class="language-r highlighter-rouge"><pre class="highlight"><code><span class="n">geojson_json</span><span class="p">(</span><span class="n">sp_poly</span><span class="p">)</span><span class="w">
-</span><span class="c1">#&gt; {"type":"FeatureCollection","features":[{"type":"Feature","id":1,"properties":{"dummy":0},"geometry":{"type":"Polygon","coordinates":[[[-100,40],[-90,50],[-85,45],[-100,40]]]}},{"type":"Feature","id":2,"properties":{"dummy":0},"geometry":{"type":"Polygon","coordinates":[[[-90,30],[-80,40],[-75,35],[-90,30]]]}}]}
-</span></code></pre>
-</div>
-
-<p>to a <strong>list</strong></p>
-
-<div class="language-r highlighter-rouge"><pre class="highlight"><code><span class="n">geojson_list</span><span class="p">(</span><span class="n">sp_poly</span><span class="p">)</span><span class="w">
-</span><span class="c1">#&gt; $type
-#&gt; [1] "FeatureCollection"
-#&gt; 
-#&gt; $features
-#&gt; $features[[1]]
-#&gt; $features[[1]]$type
-#&gt; [1] "Feature"
-#&gt; 
-#&gt; $features[[1]]$id
-#&gt; [1] 1
-</span><span class="n">...</span><span class="w">
-</span></code></pre>
-</div>
-
-<p>From <code class="highlighter-rouge">SpatialPoints</code> class</p>
-
-<div class="language-r highlighter-rouge"><pre class="highlight"><code><span class="n">x</span><span class="w"> </span><span class="o">&lt;-</span><span class="w"> </span><span class="nf">c</span><span class="p">(</span><span class="m">1</span><span class="p">,</span><span class="w"> </span><span class="m">2</span><span class="p">,</span><span class="w"> </span><span class="m">3</span><span class="p">,</span><span class="w"> </span><span class="m">4</span><span class="p">,</span><span class="w"> </span><span class="m">5</span><span class="p">)</span><span class="w">
-</span><span class="n">y</span><span class="w"> </span><span class="o">&lt;-</span><span class="w"> </span><span class="nf">c</span><span class="p">(</span><span class="m">3</span><span class="p">,</span><span class="w"> </span><span class="m">2</span><span class="p">,</span><span class="w"> </span><span class="m">5</span><span class="p">,</span><span class="w"> </span><span class="m">1</span><span class="p">,</span><span class="w"> </span><span class="m">4</span><span class="p">)</span><span class="w">
-</span><span class="p">(</span><span class="n">s</span><span class="w"> </span><span class="o">&lt;-</span><span class="w"> </span><span class="n">SpatialPoints</span><span class="p">(</span><span class="n">cbind</span><span class="p">(</span><span class="n">x</span><span class="p">,</span><span class="w"> </span><span class="n">y</span><span class="p">)))</span><span class="w">
-</span><span class="c1">#&gt; SpatialPoints:
-#&gt;      x y
-#&gt; [1,] 1 3
-#&gt; [2,] 2 2
-#&gt; [3,] 3 5
-#&gt; [4,] 4 1
-#&gt; [5,] 5 4
-#&gt; Coordinate Reference System (CRS) arguments: NA
-</span></code></pre>
-</div>
-
-<p>to <strong>json</strong></p>
-
-<div class="language-r highlighter-rouge"><pre class="highlight"><code><span class="n">geojson_json</span><span class="p">(</span><span class="n">s</span><span class="p">)</span><span class="w">
-</span><span class="c1">#&gt; {"type":"FeatureCollection","features":[{"type":"Feature","id":1,"properties":{"dat":1},"geometry":{"type":"Point","coordinates":[1,3]}},{"type":"Feature","id":2,"properties":{"dat":2},"geometry":{"type":"Point","coordinates":[2,2]}},{"type":"Feature","id":3,"properties":{"dat":3},"geometry":{"type":"Point","coordinates":[3,5]}},{"type":"Feature","id":4,"properties":{"dat":4},"geometry":{"type":"Point","coordinates":[4,1]}},{"type":"Feature","id":5,"properties":{"dat":5},"geometry":{"type":"Point","coordinates":[5,4]}}]}
-</span></code></pre>
-</div>
-
-<p>to a <strong>list</strong></p>
-
-<div class="language-r highlighter-rouge"><pre class="highlight"><code><span class="n">geojson_list</span><span class="p">(</span><span class="n">s</span><span class="p">)</span><span class="w">
-</span><span class="c1">#&gt; $type
-#&gt; [1] "FeatureCollection"
-#&gt; 
-#&gt; $features
-#&gt; $features[[1]]
-#&gt; $features[[1]]$type
-#&gt; [1] "Feature"
-#&gt; 
-#&gt; $features[[1]]$id
-#&gt; [1] 1
-</span><span class="n">...</span><span class="w">
-</span></code></pre>
-</div>
-
-<h3 id="combine-objects">Combine objects</h3>
-
-<p><code class="highlighter-rouge">geo_list</code> + <code class="highlighter-rouge">geo_list</code></p>
-
-<blockquote>
-  <p>Note: <code class="highlighter-rouge">geo_list</code> is the output type from <code class="highlighter-rouge">geojson_list()</code>, it’s just a list with a class attached so we know it’s geojson :)</p>
-</blockquote>
-
-<div class="language-r highlighter-rouge"><pre class="highlight"><code><span class="n">vec</span><span class="w"> </span><span class="o">&lt;-</span><span class="w"> </span><span class="nf">c</span><span class="p">(</span><span class="m">-99.74</span><span class="p">,</span><span class="w"> </span><span class="m">32.45</span><span class="p">)</span><span class="w">
-</span><span class="n">a</span><span class="w"> </span><span class="o">&lt;-</span><span class="w"> </span><span class="n">geojson_list</span><span class="p">(</span><span class="n">vec</span><span class="p">)</span><span class="w">
-</span><span class="n">vecs</span><span class="w"> </span><span class="o">&lt;-</span><span class="w"> </span><span class="nf">list</span><span class="p">(</span><span class="nf">c</span><span class="p">(</span><span class="m">100.0</span><span class="p">,</span><span class="w"> </span><span class="m">0.0</span><span class="p">),</span><span class="w"> </span><span class="nf">c</span><span class="p">(</span><span class="m">101.0</span><span class="p">,</span><span class="w"> </span><span class="m">0.0</span><span class="p">),</span><span class="w"> </span><span class="nf">c</span><span class="p">(</span><span class="m">100.0</span><span class="p">,</span><span class="w"> </span><span class="m">0.0</span><span class="p">))</span><span class="w">
-</span><span class="n">b</span><span class="w"> </span><span class="o">&lt;-</span><span class="w"> </span><span class="n">geojson_list</span><span class="p">(</span><span class="n">vecs</span><span class="p">,</span><span class="w"> </span><span class="n">geometry</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"polygon"</span><span class="p">)</span><span class="w">
-</span><span class="n">a</span><span class="w"> </span><span class="o">+</span><span class="w"> </span><span class="n">b</span><span class="w">
-</span><span class="c1">#&gt; $type
-#&gt; [1] "FeatureCollection"
-#&gt; 
-#&gt; $features
-#&gt; $features[[1]]
-#&gt; $features[[1]]$type
-#&gt; [1] "Feature"
-#&gt; 
-#&gt; $features[[1]]$geometry
-#&gt; $features[[1]]$geometry$type
-</span><span class="n">...</span><span class="w">
-</span></code></pre>
-</div>
-
-<p><code class="highlighter-rouge">json</code> + <code class="highlighter-rouge">json</code></p>
-
-<div class="language-r highlighter-rouge"><pre class="highlight"><code><span class="n">c</span><span class="w"> </span><span class="o">&lt;-</span><span class="w"> </span><span class="n">geojson_json</span><span class="p">(</span><span class="nf">c</span><span class="p">(</span><span class="m">-99.74</span><span class="p">,</span><span class="w"> </span><span class="m">32.45</span><span class="p">))</span><span class="w">
-</span><span class="n">vecs</span><span class="w"> </span><span class="o">&lt;-</span><span class="w"> </span><span class="nf">list</span><span class="p">(</span><span class="nf">c</span><span class="p">(</span><span class="m">100.0</span><span class="p">,</span><span class="w"> </span><span class="m">0.0</span><span class="p">),</span><span class="w"> </span><span class="nf">c</span><span class="p">(</span><span class="m">101.0</span><span class="p">,</span><span class="w"> </span><span class="m">0.0</span><span class="p">),</span><span class="w"> </span><span class="nf">c</span><span class="p">(</span><span class="m">101.0</span><span class="p">,</span><span class="w"> </span><span class="m">1.0</span><span class="p">),</span><span class="w"> </span><span class="nf">c</span><span class="p">(</span><span class="m">100.0</span><span class="p">,</span><span class="w"> </span><span class="m">1.0</span><span class="p">),</span><span class="w"> </span><span class="nf">c</span><span class="p">(</span><span class="m">100.0</span><span class="p">,</span><span class="w"> </span><span class="m">0.0</span><span class="p">))</span><span class="w">
-</span><span class="n">d</span><span class="w"> </span><span class="o">&lt;-</span><span class="w"> </span><span class="n">geojson_json</span><span class="p">(</span><span class="n">vecs</span><span class="p">,</span><span class="w"> </span><span class="n">geometry</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"polygon"</span><span class="p">)</span><span class="w">
-</span><span class="n">c</span><span class="w"> </span><span class="o">+</span><span class="w"> </span><span class="n">d</span><span class="w">
-</span><span class="c1">#&gt; {"type":"FeatureCollection","features":[{"type":"Feature","geometry":{"type":"Point","coordinates":[-99.74,32.45]},"properties":{}},{"type":"Feature","geometry":{"type":"Polygon","coordinates":[[[100,0],[101,0],[101,1],[100,1],[100,0]]]},"properties":[]}]}
-</span></code></pre>
-</div>
-
-<h3 id="write-geojson">Write geojson</h3>
-
-<div class="language-r highlighter-rouge"><pre class="highlight"><code><span class="n">geojson_write</span><span class="p">(</span><span class="n">us_cities</span><span class="p">[</span><span class="m">1</span><span class="o">:</span><span class="m">2</span><span class="p">,</span><span class="w"> </span><span class="p">],</span><span class="w"> </span><span class="n">lat</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s1">'lat'</span><span class="p">,</span><span class="w"> </span><span class="n">lon</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s1">'long'</span><span class="p">)</span><span class="w">
-</span><span class="c1">#&gt; &lt;geojson&gt;
-#&gt;   Path:       myfile.geojson
-#&gt;   From class: data.frame
-</span></code></pre>
-</div>
-
-<h2 id="topojson">Topojson</h2>
-
-<p>In the current version of this package you can read topojson. Writing topojson was in this package, but is gone for now - will come back later as in interface to <a href="https://github.com/mbostock/topojson">topojson</a> via <a href="https://github.com/jeroenooms/V8">V8</a>.</p>
-
-<p>Read from a file</p>
-
-<div class="language-r highlighter-rouge"><pre class="highlight"><code><span class="n">file</span><span class="w"> </span><span class="o">&lt;-</span><span class="w"> </span><span class="n">system.file</span><span class="p">(</span><span class="s2">"examples"</span><span class="p">,</span><span class="w"> </span><span class="s2">"us_states.topojson"</span><span class="p">,</span><span class="w"> </span><span class="n">package</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"geojsonio"</span><span class="p">)</span><span class="w">
-</span><span class="n">out</span><span class="w"> </span><span class="o">&lt;-</span><span class="w"> </span><span class="n">topojson_read</span><span class="p">(</span><span class="n">file</span><span class="p">)</span><span class="w">
-</span></code></pre>
-</div>
-
-<p>Read from a URL</p>
-
-<div class="language-r highlighter-rouge"><pre class="highlight"><code><span class="n">url</span><span class="w"> </span><span class="o">&lt;-</span><span class="w"> </span><span class="s2">"https://raw.githubusercontent.com/shawnbot/d3-cartogram/master/data/us-states.topojson"</span><span class="w">
-</span><span class="n">out</span><span class="w"> </span><span class="o">&lt;-</span><span class="w"> </span><span class="n">topojson_read</span><span class="p">(</span><span class="n">url</span><span class="p">)</span><span class="w">
-</span></code></pre>
-</div>
-
-<h2 id="lint-geojson">Lint geojson</h2>
-
-<p>There are two ways to do this in this package.</p>
-
-<h3 id="lint-locally">lint, locally</h3>
-
-<p>Uses the javascript library <a href="https://github.com/mapbox/geojsonhint">geojsonhint</a> from Mapbox. We’re running this locally via the <a href="http://cran.rstudio.com/web/packages/V8/">V8</a> package.</p>
-
-<p>Good</p>
-
-<div class="language-r highlighter-rouge"><pre class="highlight"><code><span class="n">lint</span><span class="p">(</span><span class="s1">'{"type": "Point", "coordinates": [-100, 80]}'</span><span class="p">)</span><span class="w">
-</span><span class="c1">#&gt; [1] "valid"
-</span></code></pre>
-</div>
-
-<p>Bad</p>
-
-<div class="language-r highlighter-rouge"><pre class="highlight"><code><span class="n">lint</span><span class="p">(</span><span class="s1">'{"type": "Rhombus", "coordinates": [[1, 2], [3, 4], [5, 6]]}'</span><span class="p">)</span><span class="w">
-</span><span class="c1">#&gt; $message
-#&gt; [1] "The type Rhombus is unknown"
-#&gt; 
-#&gt; $line
-#&gt; [1] 1
-</span></code></pre>
-</div>
-
-<h3 id="validate-with-a-web-service">validate, with a web service</h3>
-
-<p>Uses the web service at <a href="http://geojsonlint.com/">http://geojsonlint.com/</a></p>
-
-<p>Good</p>
-
-<div class="language-r highlighter-rouge"><pre class="highlight"><code><span class="n">validate</span><span class="p">(</span><span class="s1">'{"type": "Point", "coordinates": [-100, 80]}'</span><span class="p">)</span><span class="w">
-</span><span class="c1">#&gt; $status
-#&gt; [1] "ok"
-</span></code></pre>
-</div>
-
-<p>Bad</p>
-
-<div class="language-r highlighter-rouge"><pre class="highlight"><code><span class="n">validate</span><span class="p">(</span><span class="s1">'{"type": "Rhombus", "coordinates": [[1, 2], [3, 4], [5, 6]]}'</span><span class="p">)</span><span class="w">
-</span><span class="c1">#&gt; $message
-#&gt; [1] "\"Rhombus\" is not a valid GeoJSON type."
-#&gt; 
-#&gt; $status
-#&gt; [1] "error"
-</span></code></pre>
-</div>
-
-<h2 id="to-do">To do</h2>
-
-<ul>
-  <li>I’d like to replace <code class="highlighter-rouge">rgdal</code> with javascript libraries to read from various file types (kml, shp, etc.) and convert to geojson. This is <a href="https://github.com/ropensci/geojsonio/tree/js">in development</a>, and will come in the next version of this package most likely. This should make installation a bit easier as we won’t have to depend on <code class="highlighter-rouge">rgdal</code> and <code class="highlighter-rouge">GDAL</code></li>
-  <li>Performance improvements. Some operations already use the gdal or geos C libraries, so are quite fast, though the round trip to disk and back does take significant time. I’d like to speed this up.</li>
-  <li>More input types. We already have operations (json, list, etc.) for lots of input types (data.frame, list, sp classes), but likely there will be more added.</li>
-  <li>Most likely add functions <code class="highlighter-rouge">topojson_list()</code>, <code class="highlighter-rouge">topojson_json()</code></li>
-</ul>
+* As Turf.js changes, we'll update `lawn`
+* Performance improvements. We realize that this package is slower than the C based `rgdal`/`rgeos` - we are looking into ways to increaes performance to get closer to the performance of those packages. 
 
   </div>
   

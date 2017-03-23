@@ -33,7 +33,7 @@
     <header class="masthead">
       <div class="masthead-inner">
         <h1>Recology</h1>
-        <!-- <h1> <a href="http://recology.info/">Recology</a></h1> -->
+        <!-- <h1> <a href="http://localhost:4000">Recology</a></h1> -->
         <p class="lead">R/etc.</p>
 
         <div class="colophon">
@@ -61,6 +61,343 @@
   
   <div class="post">
     <h1>
+      <a href="/2015/04/geojson-io/">
+        geojsonio - a new package to do geojson things
+      </a>
+    </h1>
+
+    <span class="post-date">30 Apr 2015</span>
+
+    `geojsonio` converts geographic data to GeoJSON and TopoJSON formats - though the focus is mostly on GeoJSON 
+
+For those not familiar GeoJSON it is a format for encoding a variety of geographic data structures. GeoJSON supports the following geometry types: Point, LineString, Polygon, MultiPoint, MultiLineString, MultiPolygon, and GeometryCollection. These geometry types are also found in [well known text (WKT)](http://en.wikipedia.org/wiki/Well-known_text), and have equivalents in R's spatial classes. Read the [spec](http://geojson.org/geojson-spec.html) for more detailed information. 
+
+Other great geojson resources:
+
+* GeoJSON lint - lint your geojson - [http://geojsonlint.com/](http://geojsonlint.com/)
+* GeoJSON.io - make maps with geojson input or draw maps and get geojson - [http://geojson.io/](http://geojson.io/)
+
+Functions in this package are organized first around what you're working with or want to get, geojson or topojson, then convert to or read from various formats:
+
+* `geojson_list()` - convert to GeoJSON as R list format
+* `geojson_json()` - convert to GeoJSON as json
+* `geojson_read()`/`topojson_read()` - read a GeoJSON/TopoJSON file from file path or URL
+* `geojson_write()` - write a GeoJSON file locally (no write TopoJSON yet)
+
+Each of the above functions have methods for various objects/classes, including `numeric`, `data.frame`, `list`, `SpatialPolygons`, `SpatialLines`, `SpatialPoints`, etc. (including the classes in `rgeos`)
+
+Use cases for this package include (but not limited to, obs.) the following:
+
+* Get data in GeoJSON json format, and you want to get it into a list in R.
+* Get data into GeoJSON format to use downstream to make a interactive map
+  * in R (e.g., with [leaflet](https://github.com/rstudio/leaflet))
+  * or in another context (e.g., using javascript with mapbox/leaflet)
+* Data is in a data.frame/matrix/list and you want to make GeoJSON format data.
+* Data is in one of the many spatial classes (e.g., `SpatialPoints`) and you want GeoJSON
+* You need to add styling to your data - can do with this package for certain data types.
+* You want to check that your GeoJSON data is valid - two ways to do it in geojsonio.
+* Combine objects together (e.g., a point and a line), either from two `geo_list` objects, or two `json` objects. See `?geojson-add`
+
+## Install
+
+See the github repo for notes about dependencies [https://github.com/ropensci/geojsonio#install](https://github.com/ropensci/geojsonio#install). 
+
+CRAN version or the dev version from GitHub
+
+
+```r
+install.packages("geojsonio")
+devtools::install_github("sckott/geojsonio")
+```
+
+
+```r
+library("geojsonio")
+```
+
+## GeoJSON
+
+### Convert various formats to geojson
+
+From a `numeric` vector of length 2
+
+as _json_
+
+
+```r
+geojson_json(c(32.45, -99.74))
+#> {"type":"FeatureCollection","features":[{"type":"Feature","geometry":{"type":"Point","coordinates":[32.45,-99.74]},"properties":{}}]}
+```
+
+as a __list__
+
+
+```r
+geojson_list(c(32.45, -99.74))
+#> $type
+#> [1] "FeatureCollection"
+#> 
+#> $features
+#> $features[[1]]
+#> $features[[1]]$type
+#> [1] "Feature"
+#> 
+#> $features[[1]]$geometry
+#> $features[[1]]$geometry$type
+...
+```
+
+From a `data.frame`
+
+as __json__
+
+
+```r
+geojson_json(us_cities[1:2, ], lat = 'lat', lon = 'long')
+#> {"type":"FeatureCollection","features":[{"type":"Feature","geometry":{"type":"Point","coordinates":[-99.74,32.45]},"properties":{"name":"Abilene TX","country.etc":"TX","pop":"113888","capital":"0"}},{"type":"Feature","geometry":{"type":"Point","coordinates":[-81.52,41.08]},"properties":{"name":"Akron OH","country.etc":"OH","pop":"206634","capital":"0"}}]}
+```
+
+as a __list__
+
+
+```r
+geojson_list(us_cities[1:2, ], lat = 'lat', lon = 'long')
+#> $type
+#> [1] "FeatureCollection"
+#> 
+#> $features
+#> $features[[1]]
+#> $features[[1]]$type
+#> [1] "Feature"
+#> 
+#> $features[[1]]$geometry
+#> $features[[1]]$geometry$type
+...
+```
+
+From `SpatialPolygons` class
+
+
+```r
+library('sp')
+poly1 <- Polygons(list(Polygon(cbind(c(-100, -90, -85, -100),
+  c(40, 50, 45, 40)))), "1")
+poly2 <- Polygons(list(Polygon(cbind(c(-90, -80, -75, -90),
+  c(30, 40, 35, 30)))), "2")
+(sp_poly <- SpatialPolygons(list(poly1, poly2), 1:2))
+#> An object of class "SpatialPolygons"
+#> Slot "polygons":
+#> [[1]]
+#> An object of class "Polygons"
+#> Slot "Polygons":
+#> [[1]]
+#> An object of class "Polygon"
+#> Slot "labpt":
+#> [1] -91.66667  45.00000
+#> 
+...
+```
+
+to __json__
+
+
+```r
+geojson_json(sp_poly)
+#> {"type":"FeatureCollection","features":[{"type":"Feature","id":1,"properties":{"dummy":0},"geometry":{"type":"Polygon","coordinates":[[[-100,40],[-90,50],[-85,45],[-100,40]]]}},{"type":"Feature","id":2,"properties":{"dummy":0},"geometry":{"type":"Polygon","coordinates":[[[-90,30],[-80,40],[-75,35],[-90,30]]]}}]}
+```
+
+to a __list__
+
+
+```r
+geojson_list(sp_poly)
+#> $type
+#> [1] "FeatureCollection"
+#> 
+#> $features
+#> $features[[1]]
+#> $features[[1]]$type
+#> [1] "Feature"
+#> 
+#> $features[[1]]$id
+#> [1] 1
+...
+```
+
+From `SpatialPoints` class
+
+
+```r
+x <- c(1, 2, 3, 4, 5)
+y <- c(3, 2, 5, 1, 4)
+(s <- SpatialPoints(cbind(x, y)))
+#> SpatialPoints:
+#>      x y
+#> [1,] 1 3
+#> [2,] 2 2
+#> [3,] 3 5
+#> [4,] 4 1
+#> [5,] 5 4
+#> Coordinate Reference System (CRS) arguments: NA
+```
+
+to __json__
+
+
+```r
+geojson_json(s)
+#> {"type":"FeatureCollection","features":[{"type":"Feature","id":1,"properties":{"dat":1},"geometry":{"type":"Point","coordinates":[1,3]}},{"type":"Feature","id":2,"properties":{"dat":2},"geometry":{"type":"Point","coordinates":[2,2]}},{"type":"Feature","id":3,"properties":{"dat":3},"geometry":{"type":"Point","coordinates":[3,5]}},{"type":"Feature","id":4,"properties":{"dat":4},"geometry":{"type":"Point","coordinates":[4,1]}},{"type":"Feature","id":5,"properties":{"dat":5},"geometry":{"type":"Point","coordinates":[5,4]}}]}
+```
+
+to a __list__
+
+
+```r
+geojson_list(s)
+#> $type
+#> [1] "FeatureCollection"
+#> 
+#> $features
+#> $features[[1]]
+#> $features[[1]]$type
+#> [1] "Feature"
+#> 
+#> $features[[1]]$id
+#> [1] 1
+...
+```
+
+### Combine objects
+
+`geo_list` + `geo_list`
+
+> Note: `geo_list` is the output type from `geojson_list()`, it's just a list with a class attached so we know it's geojson :)
+
+
+```r
+vec <- c(-99.74, 32.45)
+a <- geojson_list(vec)
+vecs <- list(c(100.0, 0.0), c(101.0, 0.0), c(100.0, 0.0))
+b <- geojson_list(vecs, geometry = "polygon")
+a + b
+#> $type
+#> [1] "FeatureCollection"
+#> 
+#> $features
+#> $features[[1]]
+#> $features[[1]]$type
+#> [1] "Feature"
+#> 
+#> $features[[1]]$geometry
+#> $features[[1]]$geometry$type
+...
+```
+
+`json` + `json`
+
+
+```r
+c <- geojson_json(c(-99.74, 32.45))
+vecs <- list(c(100.0, 0.0), c(101.0, 0.0), c(101.0, 1.0), c(100.0, 1.0), c(100.0, 0.0))
+d <- geojson_json(vecs, geometry = "polygon")
+c + d
+#> {"type":"FeatureCollection","features":[{"type":"Feature","geometry":{"type":"Point","coordinates":[-99.74,32.45]},"properties":{}},{"type":"Feature","geometry":{"type":"Polygon","coordinates":[[[100,0],[101,0],[101,1],[100,1],[100,0]]]},"properties":[]}]}
+```
+
+### Write geojson
+
+
+```r
+geojson_write(us_cities[1:2, ], lat = 'lat', lon = 'long')
+#> <geojson>
+#>   Path:       myfile.geojson
+#>   From class: data.frame
+```
+
+## Topojson
+
+In the current version of this package you can read topojson. Writing topojson was in this package, but is gone for now - will come back later as in interface to [topojson](https://github.com/mbostock/topojson) via [V8](https://github.com/jeroenooms/V8).
+
+Read from a file
+
+
+```r
+file <- system.file("examples", "us_states.topojson", package = "geojsonio")
+out <- topojson_read(file)
+```
+
+Read from a URL
+
+
+```r
+url <- "https://raw.githubusercontent.com/shawnbot/d3-cartogram/master/data/us-states.topojson"
+out <- topojson_read(url)
+```
+
+## Lint geojson
+
+There are two ways to do this in this package. 
+
+### lint, locally
+
+Uses the javascript library [geojsonhint](https://github.com/mapbox/geojsonhint) from Mapbox. We're running this locally via the [V8](http://cran.rstudio.com/web/packages/V8/) package.
+
+Good
+
+
+```r
+lint('{"type": "Point", "coordinates": [-100, 80]}')
+#> [1] "valid"
+```
+
+Bad
+
+
+```r
+lint('{"type": "Rhombus", "coordinates": [[1, 2], [3, 4], [5, 6]]}')
+#> $message
+#> [1] "The type Rhombus is unknown"
+#> 
+#> $line
+#> [1] 1
+```
+
+### validate, with a web service
+
+Uses the web service at [http://geojsonlint.com/](http://geojsonlint.com/)
+
+Good
+
+
+```r
+validate('{"type": "Point", "coordinates": [-100, 80]}')
+#> $status
+#> [1] "ok"
+```
+
+Bad
+
+
+```r
+validate('{"type": "Rhombus", "coordinates": [[1, 2], [3, 4], [5, 6]]}')
+#> $message
+#> [1] "\"Rhombus\" is not a valid GeoJSON type."
+#> 
+#> $status
+#> [1] "error"
+```
+
+## To do
+
+* I'd like to replace `rgdal` with javascript libraries to read from various file types (kml, shp, etc.) and convert to geojson. This is [in development](https://github.com/ropensci/geojsonio/tree/js), and will come in the next version of this package most likely. This should make installation a bit easier as we won't have to depend on `rgdal` and `GDAL`
+* Performance improvements. Some operations already use the gdal or geos C libraries, so are quite fast, though the round trip to disk and back does take significant time. I'd like to speed this up. 
+* More input types. We already have operations (json, list, etc.) for lots of input types (data.frame, list, sp classes), but likely there will be more added. 
+* Most likely add functions `topojson_list()`, `topojson_json()`
+
+  </div>
+  
+  <div class="post">
+    <h1>
       <a href="/2015/04/the-new-way/">
         the new way - httsnap
       </a>
@@ -68,229 +405,233 @@
 
     <span class="post-date">29 Apr 2015</span>
 
-    <p>Inspired by <code class="highlighter-rouge">httpie</code>, a Python command line client as a sort of drop in replacement for <code class="highlighter-rouge">curl</code>, I am playing around with something similar-ish in R, at least in spirit. I started a little R pkg called <code class="highlighter-rouge">httsnap</code> with the following ideas:</p>
+    Inspired by `httpie`, a Python command line client as a sort of drop in replacement for `curl`, I am playing around with something similar-ish in R, at least in spirit. I started a little R pkg called `httsnap` with the following ideas:
 
-<ul>
-  <li>The web is increasingly a JSON world, so set <code class="highlighter-rouge">content-type</code> and <code class="highlighter-rouge">accept</code> headers to <code class="highlighter-rouge">applications/json</code> by default</li>
-  <li>The workflow follows logically, or at least should, from, <em>hey, I got this url</em>, to <em>i need to add some options</em>, to <em>execute request</em></li>
-  <li>Whenever possible, transform output to data.frame’s - facilitating downstream manipulation via <code class="highlighter-rouge">dplyr</code>, etc.</li>
-  <li>Do <code class="highlighter-rouge">GET</code> requests by default. Specify a different type if you don’t want <code class="highlighter-rouge">GET</code>. Some functionality does GET by default, though in some cases you need to specify GET</li>
-  <li>You can use non-standard evaluation to easily pass in query parameters without worrying about <code class="highlighter-rouge">&amp;</code>’s, URL escaping, etc. (see <code class="highlighter-rouge">Query()</code>)</li>
-  <li>Same for body params (see <code class="highlighter-rouge">Body()</code>)</li>
-</ul>
+* The web is increasingly a JSON world, so set `content-type` and `accept` headers to `applications/json` by default 
+* The workflow follows logically, or at least should, from, _hey, I got this url_, to _i need to add some options_, to _execute request_
+* Whenever possible, transform output to data.frame's - facilitating downstream manipulation via `dplyr`, etc.
+* Do `GET` requests by default. Specify a different type if you don't want `GET`. Some functionality does GET by default, though in some cases you need to specify GET
+* You can use non-standard evaluation to easily pass in query parameters without worrying about `&`'s, URL escaping, etc. (see `Query()`)
+* Same for body params (see `Body()`)
 
-<h2 id="install">Install</h2>
+## Install
 
-<p>Install and load <code class="highlighter-rouge">httsnap</code></p>
+Install and load `httsnap`
 
-<div class="language-r highlighter-rouge"><pre class="highlight"><code><span class="n">devtools</span><span class="o">::</span><span class="n">install_github</span><span class="p">(</span><span class="s2">"sckott/httsnap"</span><span class="p">)</span><span class="w">
-</span></code></pre>
-</div>
 
-<div class="language-r highlighter-rouge"><pre class="highlight"><code><span class="n">library</span><span class="p">(</span><span class="s2">"httsnap"</span><span class="p">)</span><span class="w">
-</span><span class="n">library</span><span class="p">(</span><span class="s2">"dplyr"</span><span class="p">)</span><span class="w">
-</span></code></pre>
-</div>
+```r
+devtools::install_github("sckott/httsnap")
+```
 
-<h2 id="functions-so-far">Functions so far</h2>
 
-<ul>
-  <li><code class="highlighter-rouge">Get</code> - GET request</li>
-  <li><code class="highlighter-rouge">Query</code> - add query parameters</li>
-  <li><code class="highlighter-rouge">Authenticate</code> - add authentication details</li>
-  <li><code class="highlighter-rouge">Progress</code> - add progress bar</li>
-  <li><code class="highlighter-rouge">Timeout</code> - add a timeout</li>
-  <li><code class="highlighter-rouge">User_agent</code> - add a user agent</li>
-  <li><code class="highlighter-rouge">Verbose</code> - give verbose output</li>
-  <li><code class="highlighter-rouge">Body</code> - add a body</li>
-  <li><code class="highlighter-rouge">h</code> - add headers by key-value pair</li>
-</ul>
+```r
+library("httsnap")
+library("dplyr")
+```
 
-<p>These are named to avoid conflict with <code class="highlighter-rouge">httr</code></p>
+## Functions so far
 
-<h2 id="intro">Intro</h2>
+* `Get` - GET request
+* `Query` - add query parameters
+* `Authenticate` - add authentication details
+* `Progress` - add progress bar
+* `Timeout` - add a timeout
+* `User_agent` - add a user agent
+* `Verbose` - give verbose output
+* `Body` - add a body
+* `h` - add headers by key-value pair
 
-<p>A simple <code class="highlighter-rouge">GET</code> request</p>
+These are named to avoid conflict with `httr`
 
-<div class="language-r highlighter-rouge"><pre class="highlight"><code><span class="s2">"http://httpbin.org/get"</span><span class="w"> </span><span class="o">%&gt;%</span><span class="w">
-  </span><span class="n">Get</span><span class="p">()</span><span class="w">
-</span><span class="c1">#&gt; $args
-#&gt; named list()
-#&gt; 
-#&gt; $headers
-#&gt; $headers$Accept
-#&gt; [1] "application/json, text/xml, application/xml, */*"
-#&gt; 
-#&gt; $headers$`Accept-Encoding`
-#&gt; [1] "gzip"
-#&gt; 
-#&gt; $headers$Host
-#&gt; [1] "httpbin.org"
-#&gt; 
-#&gt; $headers$`User-Agent`
-#&gt; [1] "curl/7.37.1 Rcurl/1.95.4.1 httr/0.6.1 httsnap/0.0.2.99"
-#&gt; 
-#&gt; 
-#&gt; $origin
-#&gt; [1] "24.21.209.71"
-#&gt; 
-#&gt; $url
-#&gt; [1] "http://httpbin.org/get"
-</span></code></pre>
-</div>
+## Intro
 
-<p>You’ll notice that <code class="highlighter-rouge">Get()</code> doesn’t just get the response, but also checks for whether it was a good response (the HTTP status code), and extracts the data.</p>
+A simple `GET` request
 
-<p>Or you can just pass the URL into the function itself</p>
 
-<div class="language-r highlighter-rouge"><pre class="highlight"><code><span class="n">Get</span><span class="p">(</span><span class="s2">"http://httpbin.org/get"</span><span class="p">)</span><span class="w">
-</span><span class="c1">#&gt; $args
-#&gt; named list()
-#&gt; 
-#&gt; $headers
-#&gt; $headers$Accept
-#&gt; [1] "application/json, text/xml, application/xml, */*"
-#&gt; 
-#&gt; $headers$`Accept-Encoding`
-#&gt; [1] "gzip"
-#&gt; 
-#&gt; $headers$Host
-#&gt; [1] "httpbin.org"
-#&gt; 
-#&gt; $headers$`User-Agent`
-#&gt; [1] "curl/7.37.1 Rcurl/1.95.4.1 httr/0.6.1 httsnap/0.0.2.99"
-#&gt; 
-#&gt; 
-#&gt; $origin
-#&gt; [1] "24.21.209.71"
-#&gt; 
-#&gt; $url
-#&gt; [1] "http://httpbin.org/get"
-</span></code></pre>
-</div>
+```r
+"http://httpbin.org/get" %>%
+  Get()
+#> $args
+#> named list()
+#> 
+#> $headers
+#> $headers$Accept
+#> [1] "application/json, text/xml, application/xml, */*"
+#> 
+#> $headers$`Accept-Encoding`
+#> [1] "gzip"
+#> 
+#> $headers$Host
+#> [1] "httpbin.org"
+#> 
+#> $headers$`User-Agent`
+#> [1] "curl/7.37.1 Rcurl/1.95.4.1 httr/0.6.1 httsnap/0.0.2.99"
+#> 
+#> 
+#> $origin
+#> [1] "24.21.209.71"
+#> 
+#> $url
+#> [1] "http://httpbin.org/get"
+```
 
-<p>You can buid up options by calling functions via pipes, and see what the options look like</p>
+You'll notice that `Get()` doesn't just get the response, but also checks for whether it was a good response (the HTTP status code), and extracts the data. 
 
-<div class="language-r highlighter-rouge"><pre class="highlight"><code><span class="s2">"http://httpbin.org/get"</span><span class="w"> </span><span class="o">%&gt;%</span><span class="w">
-  </span><span class="n">Progress</span><span class="p">()</span><span class="w"> </span><span class="o">%&gt;%</span><span class="w">
-  </span><span class="n">Verbose</span><span class="p">()</span><span class="w">
-</span><span class="c1">#&gt; &lt;http request&gt; 
-#&gt;   url: http://httpbin.org/get
-#&gt;   config: 
-#&gt; Config: 
-#&gt; List of 4
-#&gt;  $ noprogress      :FALSE
-#&gt;  $ progressfunction:function (...)  
-#&gt;  $ debugfunction   :function (...)  
-#&gt;  $ verbose         :TRUE
-</span></code></pre>
-</div>
+Or you can just pass the URL into the function itself
 
-<p>Then execute the GET request when you’re ready</p>
 
-<div class="language-r highlighter-rouge"><pre class="highlight"><code><span class="s2">"http://httpbin.org/get"</span><span class="w"> </span><span class="o">%&gt;%</span><span class="w">
-  </span><span class="n">Progress</span><span class="p">()</span><span class="w"> </span><span class="o">%&gt;%</span><span class="w">
-  </span><span class="n">Verbose</span><span class="p">()</span><span class="w"> </span><span class="o">%&gt;%</span><span class="w">
-  </span><span class="n">Get</span><span class="p">()</span><span class="w">
-</span><span class="c1">#&gt; $args
-#&gt; named list()
-#&gt; 
-#&gt; $headers
-#&gt; $headers$Accept
-#&gt; [1] "application/json, text/xml, application/xml, */*"
-#&gt; 
-#&gt; $headers$`Accept-Encoding`
-#&gt; [1] "gzip"
-#&gt; 
-#&gt; $headers$Host
-#&gt; [1] "httpbin.org"
-#&gt; 
-#&gt; $headers$`User-Agent`
-#&gt; [1] "curl/7.37.1 Rcurl/1.95.4.1 httr/0.6.1 httsnap/0.0.2.99"
-#&gt; 
-#&gt; 
-#&gt; $origin
-#&gt; [1] "24.21.209.71"
-#&gt; 
-#&gt; $url
-#&gt; [1] "http://httpbin.org/get"
-</span></code></pre>
-</div>
+```r
+Get("http://httpbin.org/get")
+#> $args
+#> named list()
+#> 
+#> $headers
+#> $headers$Accept
+#> [1] "application/json, text/xml, application/xml, */*"
+#> 
+#> $headers$`Accept-Encoding`
+#> [1] "gzip"
+#> 
+#> $headers$Host
+#> [1] "httpbin.org"
+#> 
+#> $headers$`User-Agent`
+#> [1] "curl/7.37.1 Rcurl/1.95.4.1 httr/0.6.1 httsnap/0.0.2.99"
+#> 
+#> 
+#> $origin
+#> [1] "24.21.209.71"
+#> 
+#> $url
+#> [1] "http://httpbin.org/get"
+```
 
-<h2 id="example-1">Example 1</h2>
+You can buid up options by calling functions via pipes, and see what the options look like
 
-<p>Get scholarly article metadata from the Crossref API</p>
 
-<div class="language-r highlighter-rouge"><pre class="highlight"><code><span class="s2">"http://api.crossref.org/works"</span><span class="w"> </span><span class="o">%&gt;%</span><span class="w">
-  </span><span class="n">Query</span><span class="p">(</span><span class="n">query</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"ecology"</span><span class="p">)</span><span class="w"> </span><span class="o">%&gt;%</span><span class="w"> 
-  </span><span class="n">.</span><span class="o">$</span><span class="n">message</span><span class="w"> </span><span class="o">%&gt;%</span><span class="w"> 
-  </span><span class="n">.</span><span class="o">$</span><span class="n">items</span><span class="w"> </span><span class="o">%&gt;%</span><span class="w"> 
-  </span><span class="n">select</span><span class="p">(</span><span class="n">DOI</span><span class="p">,</span><span class="w"> </span><span class="n">title</span><span class="p">,</span><span class="w"> </span><span class="n">publisher</span><span class="p">)</span><span class="w">
-</span><span class="c1">#&gt;                            DOI                title
-#&gt; 1          10.4996/fireecology         Fire Ecology
-#&gt; 2              10.5402/ecology         ISRN Ecology
-#&gt; 3                 10.1155/8641         ISRN Ecology
-#&gt; 4      10.1111/(issn)1526-100x  Restoration Ecology
-#&gt; 5        10.1007/248.1432-184x    Microbial Ecology
-#&gt; 6      10.1007/10144.1438-390x   Population Ecology
-#&gt; 7      10.1007/10452.1573-5125      Aquatic Ecology
-#&gt; 8      10.1007/10682.1573-8477 Evolutionary Ecology
-#&gt; 9      10.1007/10745.1572-9915        Human Ecology
-#&gt; 10     10.1007/10980.1572-9761    Landscape Ecology
-#&gt; 11     10.1007/11258.1573-5052        Plant Ecology
-#&gt; 12     10.1007/12080.1874-1746  Theoretical Ecology
-#&gt; 13     10.1111/(issn)1442-9993      Austral Ecology
-#&gt; 14     10.1111/(issn)1439-0485       Marine Ecology
-#&gt; 15     10.1111/(issn)1365-2435   Functional Ecology
-#&gt; 16     10.1111/(issn)1365-294x    Molecular Ecology
-#&gt; 17     10.1111/(issn)1461-0248      Ecology Letters
-#&gt; 18   10.1002/9780470979365.ch7  Behavioural Ecology
-#&gt; 19 10.1111/fec.2007.21.issue-5                     
-#&gt; 20     10.1111/rec.0.0.issue-0                     
-#&gt;                            publisher
-#&gt; 1       Association for Fire Ecology
-#&gt; 2     Hindawi Publishing Corporation
-#&gt; 3     Hindawi Publishing Corporation
-#&gt; 4                    Wiley-Blackwell
-#&gt; 5  Springer Science + Business Media
-#&gt; 6  Springer Science + Business Media
-#&gt; 7  Springer Science + Business Media
-#&gt; 8  Springer Science + Business Media
-#&gt; 9  Springer Science + Business Media
-#&gt; 10 Springer Science + Business Media
-#&gt; 11 Springer Science + Business Media
-#&gt; 12 Springer Science + Business Media
-#&gt; 13                   Wiley-Blackwell
-#&gt; 14                   Wiley-Blackwell
-#&gt; 15                   Wiley-Blackwell
-#&gt; 16                   Wiley-Blackwell
-#&gt; 17                   Wiley-Blackwell
-#&gt; 18                   Wiley-Blackwell
-#&gt; 19                   Wiley-Blackwell
-#&gt; 20                   Wiley-Blackwell
-</span></code></pre>
-</div>
+```r
+"http://httpbin.org/get" %>%
+  Progress() %>%
+  Verbose()
+#> <http request> 
+#>   url: http://httpbin.org/get
+#>   config: 
+#> Config: 
+#> List of 4
+#>  $ noprogress      :FALSE
+#>  $ progressfunction:function (...)  
+#>  $ debugfunction   :function (...)  
+#>  $ verbose         :TRUE
+```
 
-<h2 id="example-2">Example 2</h2>
+Then execute the GET request when you're ready
 
-<p>Get Public Library of Science article metadata via their API, make a histogram of number of tweets for each article</p>
 
-<div class="language-r highlighter-rouge"><pre class="highlight"><code><span class="s2">"http://api.plos.org/search"</span><span class="w"> </span><span class="o">%&gt;%</span><span class="w">
-  </span><span class="n">Query</span><span class="p">(</span><span class="n">q</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"*:*"</span><span class="p">,</span><span class="w"> </span><span class="n">wt</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"json"</span><span class="p">,</span><span class="w"> </span><span class="n">rows</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="m">100</span><span class="p">,</span><span class="w"> 
-        </span><span class="n">fl</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"id,journal,alm_twitterCount"</span><span class="p">,</span><span class="w">  
-        </span><span class="n">fq</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s1">'alm_twitterCount:[100 TO 10000]'</span><span class="p">)</span><span class="w"> </span><span class="o">%&gt;%</span><span class="w"> 
-  </span><span class="n">.</span><span class="o">$</span><span class="n">response</span><span class="w"> </span><span class="o">%&gt;%</span><span class="w"> 
-  </span><span class="n">.</span><span class="o">$</span><span class="n">docs</span><span class="w"> </span><span class="o">%&gt;%</span><span class="w"> 
-  </span><span class="n">.</span><span class="o">$</span><span class="n">alm_twitterCount</span><span class="w"> </span><span class="o">%&gt;%</span><span class="w"> 
-  </span><span class="n">hist</span><span class="p">()</span><span class="w">
-</span></code></pre>
-</div>
+```r
+"http://httpbin.org/get" %>%
+  Progress() %>%
+  Verbose() %>%
+  Get()
+#> $args
+#> named list()
+#> 
+#> $headers
+#> $headers$Accept
+#> [1] "application/json, text/xml, application/xml, */*"
+#> 
+#> $headers$`Accept-Encoding`
+#> [1] "gzip"
+#> 
+#> $headers$Host
+#> [1] "httpbin.org"
+#> 
+#> $headers$`User-Agent`
+#> [1] "curl/7.37.1 Rcurl/1.95.4.1 httr/0.6.1 httsnap/0.0.2.99"
+#> 
+#> 
+#> $origin
+#> [1] "24.21.209.71"
+#> 
+#> $url
+#> [1] "http://httpbin.org/get"
+```
 
-<p><img src="/public/img/2015-04-29-the-new-way/unnamed-chunk-9-1.png" alt="image" /></p>
+## Example 1
 
-<h2 id="notes">Notes</h2>
+Get scholarly article metadata from the Crossref API
 
-<p>Okay, so this isn’t drastically different from what <code class="highlighter-rouge">httr</code> already does, but its early days.</p>
+
+```r
+"http://api.crossref.org/works" %>%
+  Query(query = "ecology") %>% 
+  .$message %>% 
+  .$items %>% 
+  select(DOI, title, publisher)
+#>                            DOI                title
+#> 1          10.4996/fireecology         Fire Ecology
+#> 2              10.5402/ecology         ISRN Ecology
+#> 3                 10.1155/8641         ISRN Ecology
+#> 4      10.1111/(issn)1526-100x  Restoration Ecology
+#> 5        10.1007/248.1432-184x    Microbial Ecology
+#> 6      10.1007/10144.1438-390x   Population Ecology
+#> 7      10.1007/10452.1573-5125      Aquatic Ecology
+#> 8      10.1007/10682.1573-8477 Evolutionary Ecology
+#> 9      10.1007/10745.1572-9915        Human Ecology
+#> 10     10.1007/10980.1572-9761    Landscape Ecology
+#> 11     10.1007/11258.1573-5052        Plant Ecology
+#> 12     10.1007/12080.1874-1746  Theoretical Ecology
+#> 13     10.1111/(issn)1442-9993      Austral Ecology
+#> 14     10.1111/(issn)1439-0485       Marine Ecology
+#> 15     10.1111/(issn)1365-2435   Functional Ecology
+#> 16     10.1111/(issn)1365-294x    Molecular Ecology
+#> 17     10.1111/(issn)1461-0248      Ecology Letters
+#> 18   10.1002/9780470979365.ch7  Behavioural Ecology
+#> 19 10.1111/fec.2007.21.issue-5                     
+#> 20     10.1111/rec.0.0.issue-0                     
+#>                            publisher
+#> 1       Association for Fire Ecology
+#> 2     Hindawi Publishing Corporation
+#> 3     Hindawi Publishing Corporation
+#> 4                    Wiley-Blackwell
+#> 5  Springer Science + Business Media
+#> 6  Springer Science + Business Media
+#> 7  Springer Science + Business Media
+#> 8  Springer Science + Business Media
+#> 9  Springer Science + Business Media
+#> 10 Springer Science + Business Media
+#> 11 Springer Science + Business Media
+#> 12 Springer Science + Business Media
+#> 13                   Wiley-Blackwell
+#> 14                   Wiley-Blackwell
+#> 15                   Wiley-Blackwell
+#> 16                   Wiley-Blackwell
+#> 17                   Wiley-Blackwell
+#> 18                   Wiley-Blackwell
+#> 19                   Wiley-Blackwell
+#> 20                   Wiley-Blackwell
+```
+
+## Example 2
+
+Get Public Library of Science article metadata via their API, make a histogram of number of tweets for each article
+
+
+```r
+"http://api.plos.org/search" %>%
+  Query(q = "*:*", wt = "json", rows = 100, 
+        fl = "id,journal,alm_twitterCount",  
+        fq = 'alm_twitterCount:[100 TO 10000]') %>% 
+  .$response %>% 
+  .$docs %>% 
+  .$alm_twitterCount %>% 
+  hist()
+```
+ 
+![image](/public/img/2015-04-29-the-new-way/unnamed-chunk-9-1.png)
+
+## Notes
+
+Okay, so this isn't drastically different from what `httr` already does, but its early days. 
 
   </div>
   
@@ -303,363 +644,140 @@
 
     <span class="post-date">20 Mar 2015</span>
 
-    <p>With the <a href="https://github.com/ropensci/solr/issues/47">help of user input</a>, I’ve tweaked <code class="highlighter-rouge">solr</code> just a bit to make things faster using default setings. I imagine the main interface for people using the <code class="highlighter-rouge">solr</code> R client is via <code class="highlighter-rouge">solr_search()</code>, which used to have <code class="highlighter-rouge">wt=json</code> by default. Changing this to <code class="highlighter-rouge">wt=csv</code> gives better performance. And it sorta makes sense to use csv, as the point of using an R client is probably do get data eventually into a data.frame, so it makes sense to go csv format (Already in tabular format) if it’s faster too.</p>
+    With the [help of user input](https://github.com/ropensci/solr/issues/47), I've tweaked `solr` just a bit to make things faster using default setings. I imagine the main interface for people using the `solr` R client is via `solr_search()`, which used to have `wt=json` by default. Changing this to `wt=csv` gives better performance. And it sorta makes sense to use csv, as the point of using an R client is probably do get data eventually into a data.frame, so it makes sense to go csv format (Already in tabular format) if it's faster too.
 
-<h2 id="install">Install</h2>
+## Install
 
-<p>Install and load <code class="highlighter-rouge">solr</code></p>
+Install and load `solr`
 
-<div class="language-r highlighter-rouge"><pre class="highlight"><code><span class="n">devtools</span><span class="o">::</span><span class="n">install_github</span><span class="p">(</span><span class="s2">"ropensci/solr"</span><span class="p">)</span><span class="w">
-</span></code></pre>
-</div>
 
-<div class="language-r highlighter-rouge"><pre class="highlight"><code><span class="n">library</span><span class="p">(</span><span class="s2">"solr"</span><span class="p">)</span><span class="w">
-</span><span class="n">library</span><span class="p">(</span><span class="s2">"microbenchmark"</span><span class="p">)</span><span class="w">
-</span></code></pre>
-</div>
+```r
+devtools::install_github("ropensci/solr")
+```
 
-<h2 id="setup">Setup</h2>
 
-<p>Define base url and fields to return</p>
+```r
+library("solr")
+library("microbenchmark")
+```
 
-<div class="language-r highlighter-rouge"><pre class="highlight"><code><span class="n">url</span><span class="w"> </span><span class="o">&lt;-</span><span class="w"> </span><span class="s1">'http://api.plos.org/search'</span><span class="w">
-</span><span class="n">fields</span><span class="w"> </span><span class="o">&lt;-</span><span class="w"> </span><span class="nf">c</span><span class="p">(</span><span class="s1">'id'</span><span class="p">,</span><span class="s1">'cross_published_journal_name'</span><span class="p">,</span><span class="s1">'cross_published_journal_key'</span><span class="p">,</span><span class="w">
-            </span><span class="s1">'cross_published_journal_eissn'</span><span class="p">,</span><span class="s1">'pmid'</span><span class="p">,</span><span class="s1">'pmcid'</span><span class="p">,</span><span class="s1">'publisher'</span><span class="p">,</span><span class="s1">'journal'</span><span class="p">,</span><span class="w">
-            </span><span class="s1">'publication_date'</span><span class="p">,</span><span class="s1">'article_type'</span><span class="p">,</span><span class="s1">'article_type_facet'</span><span class="p">,</span><span class="s1">'author'</span><span class="p">,</span><span class="w">
-            </span><span class="s1">'author_facet'</span><span class="p">,</span><span class="s1">'volume'</span><span class="p">,</span><span class="s1">'issue'</span><span class="p">,</span><span class="s1">'elocation_id'</span><span class="p">,</span><span class="s1">'author_display'</span><span class="p">,</span><span class="w">
-            </span><span class="s1">'competing_interest'</span><span class="p">,</span><span class="s1">'copyright'</span><span class="p">)</span><span class="w">
-</span></code></pre>
-</div>
+## Setup
 
-<h2 id="json">json</h2>
+Define base url and fields to return
 
-<p>The previous default for <code class="highlighter-rouge">solr_search()</code> used <code class="highlighter-rouge">json</code></p>
 
-<div class="language-r highlighter-rouge"><pre class="highlight"><code><span class="n">solr_search</span><span class="p">(</span><span class="n">q</span><span class="o">=</span><span class="s1">'*:*'</span><span class="p">,</span><span class="w"> </span><span class="n">rows</span><span class="o">=</span><span class="m">10</span><span class="p">,</span><span class="w"> </span><span class="n">fl</span><span class="o">=</span><span class="n">fields</span><span class="p">,</span><span class="w"> </span><span class="n">base</span><span class="o">=</span><span class="n">url</span><span class="p">,</span><span class="w"> </span><span class="n">wt</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"json"</span><span class="p">)</span><span class="w">
-</span><span class="c1">#&gt; Source: local data frame [10 x 19]
-#&gt; 
-#&gt;                                                                    id
-#&gt; 1             10.1371/annotation/856f0890-9d85-4719-8e54-c27530ac94f4
-#&gt; 2       10.1371/annotation/856f0890-9d85-4719-8e54-c27530ac94f4/title
-#&gt; 3    10.1371/annotation/856f0890-9d85-4719-8e54-c27530ac94f4/abstract
-#&gt; 4  10.1371/annotation/856f0890-9d85-4719-8e54-c27530ac94f4/references
-#&gt; 5        10.1371/annotation/856f0890-9d85-4719-8e54-c27530ac94f4/body
-#&gt; 6             10.1371/annotation/8551e3d5-fdd5-413b-a253-170ba13b7525
-#&gt; 7       10.1371/annotation/8551e3d5-fdd5-413b-a253-170ba13b7525/title
-#&gt; 8    10.1371/annotation/8551e3d5-fdd5-413b-a253-170ba13b7525/abstract
-#&gt; 9  10.1371/annotation/8551e3d5-fdd5-413b-a253-170ba13b7525/references
-#&gt; 10       10.1371/annotation/8551e3d5-fdd5-413b-a253-170ba13b7525/body
-#&gt; Variables not shown: cross_published_journal_name (chr),
-#&gt;   cross_published_journal_key (chr), cross_published_journal_eissn (chr),
-#&gt;   pmid (chr), pmcid (chr), publisher (chr), journal (chr),
-#&gt;   publication_date (chr), article_type (chr), article_type_facet (chr),
-#&gt;   author (chr), author_facet (chr), volume (int), issue (int),
-#&gt;   elocation_id (chr), author_display (chr), competing_interest (chr),
-#&gt;   copyright (chr)
-</span></code></pre>
-</div>
+```r
+url <- 'http://api.plos.org/search'
+fields <- c('id','cross_published_journal_name','cross_published_journal_key',
+            'cross_published_journal_eissn','pmid','pmcid','publisher','journal',
+            'publication_date','article_type','article_type_facet','author',
+            'author_facet','volume','issue','elocation_id','author_display',
+            'competing_interest','copyright')
+```
 
-<h2 id="csv">csv</h2>
+## json
 
-<p>The default <code class="highlighter-rouge">wt</code> setting is now <code class="highlighter-rouge">csv</code></p>
+The previous default for `solr_search()` used `json`
 
-<div class="language-r highlighter-rouge"><pre class="highlight"><code><span class="n">solr_search</span><span class="p">(</span><span class="n">q</span><span class="o">=</span><span class="s1">'*:*'</span><span class="p">,</span><span class="w"> </span><span class="n">rows</span><span class="o">=</span><span class="m">10</span><span class="p">,</span><span class="w"> </span><span class="n">fl</span><span class="o">=</span><span class="n">fields</span><span class="p">,</span><span class="w"> </span><span class="n">base</span><span class="o">=</span><span class="n">url</span><span class="p">,</span><span class="w"> </span><span class="n">wt</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"json"</span><span class="p">)</span><span class="w">
-</span><span class="c1">#&gt; Source: local data frame [10 x 19]
-#&gt; 
-#&gt;                                                                    id
-#&gt; 1             10.1371/annotation/856f0890-9d85-4719-8e54-c27530ac94f4
-#&gt; 2       10.1371/annotation/856f0890-9d85-4719-8e54-c27530ac94f4/title
-#&gt; 3    10.1371/annotation/856f0890-9d85-4719-8e54-c27530ac94f4/abstract
-#&gt; 4  10.1371/annotation/856f0890-9d85-4719-8e54-c27530ac94f4/references
-#&gt; 5        10.1371/annotation/856f0890-9d85-4719-8e54-c27530ac94f4/body
-#&gt; 6             10.1371/annotation/8551e3d5-fdd5-413b-a253-170ba13b7525
-#&gt; 7       10.1371/annotation/8551e3d5-fdd5-413b-a253-170ba13b7525/title
-#&gt; 8    10.1371/annotation/8551e3d5-fdd5-413b-a253-170ba13b7525/abstract
-#&gt; 9  10.1371/annotation/8551e3d5-fdd5-413b-a253-170ba13b7525/references
-#&gt; 10       10.1371/annotation/8551e3d5-fdd5-413b-a253-170ba13b7525/body
-#&gt; Variables not shown: cross_published_journal_name (chr),
-#&gt;   cross_published_journal_key (chr), cross_published_journal_eissn (chr),
-#&gt;   pmid (chr), pmcid (chr), publisher (chr), journal (chr),
-#&gt;   publication_date (chr), article_type (chr), article_type_facet (chr),
-#&gt;   author (chr), author_facet (chr), volume (int), issue (int),
-#&gt;   elocation_id (chr), author_display (chr), competing_interest (chr),
-#&gt;   copyright (chr)
-</span></code></pre>
-</div>
 
-<h2 id="compare-times">Compare times</h2>
+```r
+solr_search(q='*:*', rows=10, fl=fields, base=url, wt = "json")
+#> Source: local data frame [10 x 19]
+#> 
+#>                                                                    id
+#> 1             10.1371/annotation/856f0890-9d85-4719-8e54-c27530ac94f4
+#> 2       10.1371/annotation/856f0890-9d85-4719-8e54-c27530ac94f4/title
+#> 3    10.1371/annotation/856f0890-9d85-4719-8e54-c27530ac94f4/abstract
+#> 4  10.1371/annotation/856f0890-9d85-4719-8e54-c27530ac94f4/references
+#> 5        10.1371/annotation/856f0890-9d85-4719-8e54-c27530ac94f4/body
+#> 6             10.1371/annotation/8551e3d5-fdd5-413b-a253-170ba13b7525
+#> 7       10.1371/annotation/8551e3d5-fdd5-413b-a253-170ba13b7525/title
+#> 8    10.1371/annotation/8551e3d5-fdd5-413b-a253-170ba13b7525/abstract
+#> 9  10.1371/annotation/8551e3d5-fdd5-413b-a253-170ba13b7525/references
+#> 10       10.1371/annotation/8551e3d5-fdd5-413b-a253-170ba13b7525/body
+#> Variables not shown: cross_published_journal_name (chr),
+#>   cross_published_journal_key (chr), cross_published_journal_eissn (chr),
+#>   pmid (chr), pmcid (chr), publisher (chr), journal (chr),
+#>   publication_date (chr), article_type (chr), article_type_facet (chr),
+#>   author (chr), author_facet (chr), volume (int), issue (int),
+#>   elocation_id (chr), author_display (chr), competing_interest (chr),
+#>   copyright (chr)
+```
 
-<p>When parsing to a data.frame (which <code class="highlighter-rouge">solr_search()</code> does by default), csv is quite a bit faster.</p>
+## csv
 
-<div class="language-r highlighter-rouge"><pre class="highlight"><code><span class="n">microbenchmark</span><span class="p">(</span><span class="w">
-  </span><span class="n">json</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">solr_search</span><span class="p">(</span><span class="n">q</span><span class="o">=</span><span class="s1">'*:*'</span><span class="p">,</span><span class="w"> </span><span class="n">rows</span><span class="o">=</span><span class="m">500</span><span class="p">,</span><span class="w"> </span><span class="n">fl</span><span class="o">=</span><span class="n">fields</span><span class="p">,</span><span class="w"> </span><span class="n">base</span><span class="o">=</span><span class="n">url</span><span class="p">,</span><span class="w"> </span><span class="n">wt</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"json"</span><span class="p">,</span><span class="w"> </span><span class="n">verbose</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="kc">FALSE</span><span class="p">),</span><span class="w">
-  </span><span class="n">csv</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">solr_search</span><span class="p">(</span><span class="n">q</span><span class="o">=</span><span class="s1">'*:*'</span><span class="p">,</span><span class="w"> </span><span class="n">rows</span><span class="o">=</span><span class="m">500</span><span class="p">,</span><span class="w"> </span><span class="n">fl</span><span class="o">=</span><span class="n">fields</span><span class="p">,</span><span class="w"> </span><span class="n">base</span><span class="o">=</span><span class="n">url</span><span class="p">,</span><span class="w"> </span><span class="n">wt</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"csv"</span><span class="p">,</span><span class="w"> </span><span class="n">verbose</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="kc">FALSE</span><span class="p">),</span><span class="w"> 
-  </span><span class="n">times</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="m">20</span><span class="w">
-</span><span class="p">)</span><span class="w">
-</span><span class="c1">#&gt; Unit: milliseconds
-#&gt;  expr      min       lq      mean    median        uq       max neval cld
-#&gt;  json 965.7043 1013.014 1124.1229 1086.3225 1227.9054 1441.8332    20   b
-#&gt;   csv 509.6573  520.089  541.5784  532.4546  548.0303  723.7575    20  a
-</span></code></pre>
-</div>
+The default `wt` setting is now `csv`
 
-<h2 id="json-vs-xml-vs-csv">json vs xml vs csv</h2>
 
-<p>When getting raw data, csv is best, json next, then xml pulling up the rear.</p>
+```r
+solr_search(q='*:*', rows=10, fl=fields, base=url, wt = "json")
+#> Source: local data frame [10 x 19]
+#> 
+#>                                                                    id
+#> 1             10.1371/annotation/856f0890-9d85-4719-8e54-c27530ac94f4
+#> 2       10.1371/annotation/856f0890-9d85-4719-8e54-c27530ac94f4/title
+#> 3    10.1371/annotation/856f0890-9d85-4719-8e54-c27530ac94f4/abstract
+#> 4  10.1371/annotation/856f0890-9d85-4719-8e54-c27530ac94f4/references
+#> 5        10.1371/annotation/856f0890-9d85-4719-8e54-c27530ac94f4/body
+#> 6             10.1371/annotation/8551e3d5-fdd5-413b-a253-170ba13b7525
+#> 7       10.1371/annotation/8551e3d5-fdd5-413b-a253-170ba13b7525/title
+#> 8    10.1371/annotation/8551e3d5-fdd5-413b-a253-170ba13b7525/abstract
+#> 9  10.1371/annotation/8551e3d5-fdd5-413b-a253-170ba13b7525/references
+#> 10       10.1371/annotation/8551e3d5-fdd5-413b-a253-170ba13b7525/body
+#> Variables not shown: cross_published_journal_name (chr),
+#>   cross_published_journal_key (chr), cross_published_journal_eissn (chr),
+#>   pmid (chr), pmcid (chr), publisher (chr), journal (chr),
+#>   publication_date (chr), article_type (chr), article_type_facet (chr),
+#>   author (chr), author_facet (chr), volume (int), issue (int),
+#>   elocation_id (chr), author_display (chr), competing_interest (chr),
+#>   copyright (chr)
+```
 
-<div class="language-r highlighter-rouge"><pre class="highlight"><code><span class="n">microbenchmark</span><span class="p">(</span><span class="w">
-  </span><span class="n">json</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">solr_search</span><span class="p">(</span><span class="n">q</span><span class="o">=</span><span class="s1">'*:*'</span><span class="p">,</span><span class="w"> </span><span class="n">rows</span><span class="o">=</span><span class="m">1000</span><span class="p">,</span><span class="w"> </span><span class="n">fl</span><span class="o">=</span><span class="n">fields</span><span class="p">,</span><span class="w"> </span><span class="n">base</span><span class="o">=</span><span class="n">url</span><span class="p">,</span><span class="w"> </span><span class="n">wt</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"json"</span><span class="p">,</span><span class="w"> </span><span class="n">verbose</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="kc">FALSE</span><span class="p">,</span><span class="w"> </span><span class="n">raw</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="kc">TRUE</span><span class="p">),</span><span class="w">
-  </span><span class="n">csv</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">solr_search</span><span class="p">(</span><span class="n">q</span><span class="o">=</span><span class="s1">'*:*'</span><span class="p">,</span><span class="w"> </span><span class="n">rows</span><span class="o">=</span><span class="m">1000</span><span class="p">,</span><span class="w"> </span><span class="n">fl</span><span class="o">=</span><span class="n">fields</span><span class="p">,</span><span class="w"> </span><span class="n">base</span><span class="o">=</span><span class="n">url</span><span class="p">,</span><span class="w"> </span><span class="n">wt</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"csv"</span><span class="p">,</span><span class="w"> </span><span class="n">verbose</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="kc">FALSE</span><span class="p">,</span><span class="w"> </span><span class="n">raw</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="kc">TRUE</span><span class="p">),</span><span class="w">
-  </span><span class="n">xml</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">solr_search</span><span class="p">(</span><span class="n">q</span><span class="o">=</span><span class="s1">'*:*'</span><span class="p">,</span><span class="w"> </span><span class="n">rows</span><span class="o">=</span><span class="m">1000</span><span class="p">,</span><span class="w"> </span><span class="n">fl</span><span class="o">=</span><span class="n">fields</span><span class="p">,</span><span class="w"> </span><span class="n">base</span><span class="o">=</span><span class="n">url</span><span class="p">,</span><span class="w"> </span><span class="n">wt</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"xml"</span><span class="p">,</span><span class="w"> </span><span class="n">verbose</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="kc">FALSE</span><span class="p">,</span><span class="w"> </span><span class="n">raw</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="kc">TRUE</span><span class="p">),</span><span class="w">
-  </span><span class="n">times</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="m">10</span><span class="w">
-</span><span class="p">)</span><span class="w">
-</span><span class="c1">#&gt; Unit: milliseconds
-#&gt;  expr       min       lq      mean    median        uq       max neval cld
-#&gt;  json 1110.9515 1142.478 1198.9981 1169.0808 1195.5709 1518.7412    10  b 
-#&gt;   csv  801.6871  802.516  826.0655  819.1532  835.0512  873.4266    10 a  
-#&gt;   xml 1507.1111 1554.002 1618.5963 1617.5208 1671.0026 1740.4448    10   c
-</span></code></pre>
-</div>
+## Compare times
 
-<h2 id="notes">Notes</h2>
+When parsing to a data.frame (which `solr_search()` does by default), csv is quite a bit faster.
 
-<p>Note that <code class="highlighter-rouge">wt=csv</code> is only available in <code class="highlighter-rouge">solr_search()</code> and <code class="highlighter-rouge">solr_all()</code> because csv writer 
+
+```r
+microbenchmark(
+  json = solr_search(q='*:*', rows=500, fl=fields, base=url, wt = "json", verbose = FALSE),
+  csv = solr_search(q='*:*', rows=500, fl=fields, base=url, wt = "csv", verbose = FALSE), 
+  times = 20
+)
+#> Unit: milliseconds
+#>  expr      min       lq      mean    median        uq       max neval cld
+#>  json 965.7043 1013.014 1124.1229 1086.3225 1227.9054 1441.8332    20   b
+#>   csv 509.6573  520.089  541.5784  532.4546  548.0303  723.7575    20  a
+```
+
+## json vs xml vs csv
+
+When getting raw data, csv is best, json next, then xml pulling up the rear.
+
+
+```r
+microbenchmark(
+  json = solr_search(q='*:*', rows=1000, fl=fields, base=url, wt = "json", verbose = FALSE, raw = TRUE),
+  csv = solr_search(q='*:*', rows=1000, fl=fields, base=url, wt = "csv", verbose = FALSE, raw = TRUE),
+  xml = solr_search(q='*:*', rows=1000, fl=fields, base=url, wt = "xml", verbose = FALSE, raw = TRUE),
+  times = 10
+)
+#> Unit: milliseconds
+#>  expr       min       lq      mean    median        uq       max neval cld
+#>  json 1110.9515 1142.478 1198.9981 1169.0808 1195.5709 1518.7412    10  b 
+#>   csv  801.6871  802.516  826.0655  819.1532  835.0512  873.4266    10 a  
+#>   xml 1507.1111 1554.002 1618.5963 1617.5208 1671.0026 1740.4448    10   c
+```
+
+## Notes
+
+Note that `wt=csv` is only available in `solr_search()` and `solr_all()` because csv writer 
 only returns the docs element in csv, dropping other elements, including facets, mlt, groups, 
-stats, etc.</p>
+stats, etc. 
 
-<p>Also, note the http client used in <code class="highlighter-rouge">solr</code> is <code class="highlighter-rouge">httr</code>, which passes in a gzip compression header by default, so as long as the server serving up the Solr data has compression turned on, that’s all set.</p>
+Also, note the http client used in `solr` is `httr`, which passes in a gzip compression header by default, so as long as the server serving up the Solr data has compression turned on, that's all set.
 
-<p>Another way I’ve sped things up is if you use <code class="highlighter-rouge">wt=json</code> then parse to a data.frame, it uses <code class="highlighter-rouge">dplyr</code> which sped things up considerably.</p>
-
-  </div>
-  
-  <div class="post">
-    <h1>
-      <a href="/2015/03/couch-dataframes/">
-        PUT dataframes on your couch
-      </a>
-    </h1>
-
-    <span class="post-date">12 Mar 2015</span>
-
-    <p>It would be nice to easily push each row or column of a data.frame into CouchDB instead of having to prepare them yourself into JSON, then push in to couch. I recently added ability to push data.frame’s into couch using the normal <code class="highlighter-rouge">PUT /{db}</code> method, and added support for the couch bulk API.</p>
-
-<h2 id="install">Install</h2>
-
-<div class="language-r highlighter-rouge"><pre class="highlight"><code><span class="n">install.packages</span><span class="p">(</span><span class="s2">"devtools"</span><span class="p">)</span><span class="w">
-</span><span class="n">devtools</span><span class="o">::</span><span class="n">install_github</span><span class="p">(</span><span class="s2">"sckott/sofa"</span><span class="p">)</span><span class="w">
-</span></code></pre>
-</div>
-
-<div class="language-r highlighter-rouge"><pre class="highlight"><code><span class="n">library</span><span class="p">(</span><span class="s2">"sofa"</span><span class="p">)</span><span class="w">
-</span></code></pre>
-</div>
-
-<h2 id="put-db">PUT /db</h2>
-
-<p>You can write directly from a data.frame, either by rows or columns. First, rows:</p>
-
-<div class="highlighter-rouge"><pre class="highlight"><code>#&gt; $ok
-#&gt; [1] TRUE
-</code></pre>
-</div>
-
-<p>Create a database</p>
-
-<div class="language-r highlighter-rouge"><pre class="highlight"><code><span class="n">db_create</span><span class="p">(</span><span class="n">dbname</span><span class="o">=</span><span class="s2">"mtcarsdb"</span><span class="p">)</span><span class="w">
-</span><span class="c1">#&gt; $ok
-#&gt; [1] TRUE
-</span></code></pre>
-</div>
-
-<div class="language-r highlighter-rouge"><pre class="highlight"><code><span class="n">out</span><span class="w"> </span><span class="o">&lt;-</span><span class="w"> </span><span class="n">doc_create</span><span class="p">(</span><span class="n">mtcars</span><span class="p">,</span><span class="w"> </span><span class="n">dbname</span><span class="o">=</span><span class="s2">"mtcarsdb"</span><span class="p">,</span><span class="w"> </span><span class="n">how</span><span class="o">=</span><span class="s2">"rows"</span><span class="p">)</span><span class="w">
-</span><span class="n">out</span><span class="p">[</span><span class="m">1</span><span class="o">:</span><span class="m">2</span><span class="p">]</span><span class="w">
-</span><span class="c1">#&gt; $`Mazda RX4`
-#&gt; $`Mazda RX4`$ok
-#&gt; [1] TRUE
-#&gt; 
-#&gt; $`Mazda RX4`$id
-#&gt; [1] "0063109bfb1c15765854cbc9525c3a7a"
-#&gt; 
-#&gt; $`Mazda RX4`$rev
-#&gt; [1] "1-3946941c894a874697554e3e6d9bc176"
-#&gt; 
-#&gt; 
-#&gt; $`Mazda RX4 Wag`
-#&gt; $`Mazda RX4 Wag`$ok
-#&gt; [1] TRUE
-#&gt; 
-#&gt; $`Mazda RX4 Wag`$id
-#&gt; [1] "0063109bfb1c15765854cbc9525c461d"
-#&gt; 
-#&gt; $`Mazda RX4 Wag`$rev
-#&gt; [1] "1-273ff17a938cb956cba21051ab428b95"
-</span></code></pre>
-</div>
-
-<p>Then by columns</p>
-
-<div class="language-r highlighter-rouge"><pre class="highlight"><code><span class="n">out</span><span class="w"> </span><span class="o">&lt;-</span><span class="w"> </span><span class="n">doc_create</span><span class="p">(</span><span class="n">mtcars</span><span class="p">,</span><span class="w"> </span><span class="n">dbname</span><span class="o">=</span><span class="s2">"mtcarsdb"</span><span class="p">,</span><span class="w"> </span><span class="n">how</span><span class="o">=</span><span class="s2">"columns"</span><span class="p">)</span><span class="w">
-</span><span class="n">out</span><span class="p">[</span><span class="m">1</span><span class="o">:</span><span class="m">2</span><span class="p">]</span><span class="w">
-</span><span class="c1">#&gt; $mpg
-#&gt; $mpg$ok
-#&gt; [1] TRUE
-#&gt; 
-#&gt; $mpg$id
-#&gt; [1] "0063109bfb1c15765854cbc9525d4f1f"
-#&gt; 
-#&gt; $mpg$rev
-#&gt; [1] "1-4b83d0ef53a28849a872d47ad03fef9a"
-#&gt; 
-#&gt; 
-#&gt; $cyl
-#&gt; $cyl$ok
-#&gt; [1] TRUE
-#&gt; 
-#&gt; $cyl$id
-#&gt; [1] "0063109bfb1c15765854cbc9525d57d3"
-#&gt; 
-#&gt; $cyl$rev
-#&gt; [1] "1-c21bfa5425c67743f0826fd4b44b0dbf"
-</span></code></pre>
-</div>
-
-<h2 id="bulk-api">Bulk API</h2>
-
-<p>The bulk API will/should be faster for larger data.frames</p>
-
-<div class="highlighter-rouge"><pre class="highlight"><code>#&gt; $ok
-#&gt; [1] TRUE
-</code></pre>
-</div>
-
-<p>We’ll use part of the diamonds dataset</p>
-
-<div class="language-r highlighter-rouge"><pre class="highlight"><code><span class="n">library</span><span class="p">(</span><span class="s2">"ggplot2"</span><span class="p">)</span><span class="w">
-</span><span class="n">dat</span><span class="w"> </span><span class="o">&lt;-</span><span class="w"> </span><span class="n">diamonds</span><span class="p">[</span><span class="m">1</span><span class="o">:</span><span class="m">20000</span><span class="p">,]</span><span class="w">
-</span></code></pre>
-</div>
-
-<p>Create a database</p>
-
-<div class="language-r highlighter-rouge"><pre class="highlight"><code><span class="n">db_create</span><span class="p">(</span><span class="n">dbname</span><span class="o">=</span><span class="s2">"bulktest"</span><span class="p">)</span><span class="w">
-</span><span class="c1">#&gt; $ok
-#&gt; [1] TRUE
-</span></code></pre>
-</div>
-
-<p>Load by row (could instead do each column, see <code class="highlighter-rouge">how</code> parameter), printing the time it takes</p>
-
-<div class="language-r highlighter-rouge"><pre class="highlight"><code><span class="n">system.time</span><span class="p">(</span><span class="n">out</span><span class="w"> </span><span class="o">&lt;-</span><span class="w"> </span><span class="n">bulk_create</span><span class="p">(</span><span class="n">dat</span><span class="p">,</span><span class="w"> </span><span class="n">dbname</span><span class="o">=</span><span class="s2">"bulktest"</span><span class="p">))</span><span class="w">
-</span><span class="c1">#&gt;    user  system elapsed 
-#&gt;  16.832   6.039  24.432
-</span></code></pre>
-</div>
-
-<p>The returned data is the same as with <code class="highlighter-rouge">doc_create()</code></p>
-
-<div class="language-r highlighter-rouge"><pre class="highlight"><code><span class="n">out</span><span class="p">[</span><span class="m">1</span><span class="o">:</span><span class="m">2</span><span class="p">]</span><span class="w">
-</span><span class="c1">#&gt; [[1]]
-#&gt; [[1]]$ok
-#&gt; [1] TRUE
-#&gt; 
-#&gt; [[1]]$id
-#&gt; [1] "0063109bfb1c15765854cbc9525d8b8d"
-#&gt; 
-#&gt; [[1]]$rev
-#&gt; [1] "1-f407fe4935af7fd17c101f13d3c81679"
-#&gt; 
-#&gt; 
-#&gt; [[2]]
-#&gt; [[2]]$ok
-#&gt; [1] TRUE
-#&gt; 
-#&gt; [[2]]$id
-#&gt; [1] "0063109bfb1c15765854cbc9525d998b"
-#&gt; 
-#&gt; [[2]]$rev
-#&gt; [1] "1-cf8b9a9dcdc026052a663d6fef8a36fe"
-</span></code></pre>
-</div>
-
-<p>So that’s 20,000 rows in not that much time, not bad.</p>
-
-<h3 id="not-dataframes">not dataframes</h3>
-
-<p>You can also pass in lists or vectors of json as character strings, e.g.,</p>
-
-<p><em>lists</em></p>
-
-<div class="highlighter-rouge"><pre class="highlight"><code>#&gt; $ok
-#&gt; [1] TRUE
-</code></pre>
-</div>
-
-<div class="language-r highlighter-rouge"><pre class="highlight"><code><span class="n">row.names</span><span class="p">(</span><span class="n">mtcars</span><span class="p">)</span><span class="w"> </span><span class="o">&lt;-</span><span class="w"> </span><span class="kc">NULL</span><span class="w"> </span><span class="c1"># get rid of row.names
-</span><span class="n">lst</span><span class="w"> </span><span class="o">&lt;-</span><span class="w"> </span><span class="n">parse_df</span><span class="p">(</span><span class="n">mtcars</span><span class="p">,</span><span class="w"> </span><span class="n">tojson</span><span class="o">=</span><span class="kc">FALSE</span><span class="p">)</span><span class="w">
-</span><span class="n">db_create</span><span class="p">(</span><span class="n">dbname</span><span class="o">=</span><span class="s2">"bulkfromlist"</span><span class="p">)</span><span class="w">
-</span><span class="c1">#&gt; $ok
-#&gt; [1] TRUE
-</span><span class="n">out</span><span class="w"> </span><span class="o">&lt;-</span><span class="w"> </span><span class="n">bulk_create</span><span class="p">(</span><span class="n">lst</span><span class="p">,</span><span class="w"> </span><span class="n">dbname</span><span class="o">=</span><span class="s2">"bulkfromlist"</span><span class="p">)</span><span class="w">
-</span><span class="n">out</span><span class="p">[</span><span class="m">1</span><span class="o">:</span><span class="m">2</span><span class="p">]</span><span class="w">
-</span><span class="c1">#&gt; [[1]]
-#&gt; [[1]]$ok
-#&gt; [1] TRUE
-#&gt; 
-#&gt; [[1]]$id
-#&gt; [1] "ba70c46d73707662b1e204a90fcd9bb8"
-#&gt; 
-#&gt; [[1]]$rev
-#&gt; [1] "1-3946941c894a874697554e3e6d9bc176"
-#&gt; 
-#&gt; 
-#&gt; [[2]]
-#&gt; [[2]]$ok
-#&gt; [1] TRUE
-#&gt; 
-#&gt; [[2]]$id
-#&gt; [1] "ba70c46d73707662b1e204a90fcda9f6"
-#&gt; 
-#&gt; [[2]]$rev
-#&gt; [1] "1-273ff17a938cb956cba21051ab428b95"
-</span></code></pre>
-</div>
-
-<p><em>json</em></p>
-
-<div class="highlighter-rouge"><pre class="highlight"><code>#&gt; $ok
-#&gt; [1] TRUE
-</code></pre>
-</div>
-
-<div class="language-r highlighter-rouge"><pre class="highlight"><code><span class="n">strs</span><span class="w"> </span><span class="o">&lt;-</span><span class="w"> </span><span class="nf">as.character</span><span class="p">(</span><span class="n">parse_df</span><span class="p">(</span><span class="n">mtcars</span><span class="p">,</span><span class="w"> </span><span class="s2">"columns"</span><span class="p">))</span><span class="w">
-</span><span class="n">db_create</span><span class="p">(</span><span class="n">dbname</span><span class="o">=</span><span class="s2">"bulkfromchr"</span><span class="p">)</span><span class="w">
-</span><span class="c1">#&gt; $ok
-#&gt; [1] TRUE
-</span><span class="n">out</span><span class="w"> </span><span class="o">&lt;-</span><span class="w"> </span><span class="n">bulk_create</span><span class="p">(</span><span class="n">strs</span><span class="p">,</span><span class="w"> </span><span class="n">dbname</span><span class="o">=</span><span class="s2">"bulkfromchr"</span><span class="p">)</span><span class="w">
-</span><span class="n">out</span><span class="p">[</span><span class="m">1</span><span class="o">:</span><span class="m">2</span><span class="p">]</span><span class="w">
-</span><span class="c1">#&gt; [[1]]
-#&gt; [[1]]$ok
-#&gt; [1] TRUE
-#&gt; 
-#&gt; [[1]]$id
-#&gt; [1] "ba70c46d73707662b1e204a90fce8c20"
-#&gt; 
-#&gt; [[1]]$rev
-#&gt; [1] "1-4b83d0ef53a28849a872d47ad03fef9a"
-#&gt; 
-#&gt; 
-#&gt; [[2]]
-#&gt; [[2]]$ok
-#&gt; [1] TRUE
-#&gt; 
-#&gt; [[2]]$id
-#&gt; [1] "ba70c46d73707662b1e204a90fce9bc1"
-#&gt; 
-#&gt; [[2]]$rev
-#&gt; [1] "1-c21bfa5425c67743f0826fd4b44b0dbf"
-</span></code></pre>
-</div>
+Another way I've sped things up is if you use `wt=json` then parse to a data.frame, it uses `dplyr` which sped things up considerably.
 
   </div>
   
