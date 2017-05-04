@@ -1,11 +1,11 @@
---- 
+---
 name: i-work-for-internet-
 layout: post
 title: I Work For The Internet !
 author: Scott Chamberlain
 date: 2011-12-13 09:35:00 -06:00
 sourceslug: _posts/2011-12-13-i-work-for-internet.md
-tags: 
+tags:
 - lubridate
 - ggplot2
 - twitteR
@@ -21,7 +21,7 @@ I used the #rstats package twitteR, created by Jeff Gentry, to search for tweets
 
 Tweets containing the phrase 'I work for the internet' by time:
 
-<a href="http://1.bp.blogspot.com/-KALUtp3xQ_Q/Tu8ya0ZX0GI/AAAAAAAAFNM/JGVLj1qSRYs/s1600/Rplot01.png" imageanchor="1" style="clear: left; float: left; margin-bottom: 1em; margin-right: 1em;"><img border="0" height="326" src="http://1.bp.blogspot.com/-KALUtp3xQ_Q/Tu8ya0ZX0GI/AAAAAAAAFNM/JGVLj1qSRYs/s400/Rplot01.png" width="400" /></a>
+<img src="http://1.bp.blogspot.com/-KALUtp3xQ_Q/Tu8ya0ZX0GI/AAAAAAAAFNM/JGVLj1qSRYs/s1600/Rplot01.png">
 
 Here's the code as a GitHub gist. Sometimes the searchTwitter fxn doesn't returns an error, which I don't understand, but you can play with it:
 

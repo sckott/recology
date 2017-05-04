@@ -3,7 +3,6 @@ name: video-editing
 layout: post
 title: video editing notes
 date: 2016-08-12
-author: Scott Chamberlain
 sourceslug: _posts/2016-08-12-video-editing.md
 tags:
 - talks

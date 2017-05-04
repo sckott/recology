@@ -3,7 +3,6 @@ name: gbids-is-back
 layout: post
 title: gbids - GenBank IDs API is back up!
 date: 2016-09-01
-author: Scott Chamberlain
 sourceslug: _posts/2016-09-01-gbids-is-back.md
 tags:
 - API
@@ -27,8 +26,8 @@ But that means I need people to use it!  So please to give it a try. Let me know
 Plans for the future of the GBIDS API:
 
 * Auto-update the Genbank data. This is quite complicated since the dump is so large. I can either keep an EC2 attached disc large enough to do the dump download/expansion/load/etc, or spin up a new instance each Sunday when they do their data release, do the SQL load, make a dump, then shuttle the SQL dump to the instance running, then load in the new data from the dump. I haven't got this bit running yet, so data is from Aug 7. 2016.
-* Add taxonomic IDs. Genbank also dumps their taxonomic IDs. I think it should be possible to get taxonomic IDs into the API, so that users can do accession number to taxon IDs and vice versa. 
-* Performance: as anyone would want, I want to continually improve performance. I'll watch out for things I can do, but also let me know what seems too slow. 
+* Add taxonomic IDs. Genbank also dumps their taxonomic IDs. I think it should be possible to get taxonomic IDs into the API, so that users can do accession number to taxon IDs and vice versa.
+* Performance: as anyone would want, I want to continually improve performance. I'll watch out for things I can do, but also let me know what seems too slow.
 
 ## Links
 

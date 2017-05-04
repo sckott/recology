@@ -3,7 +3,6 @@ name: usda-plants-database-r
 layout: post
 title: USDA plants database API in R
 date: 2016-10-19
-author: Scott Chamberlain
 sourceslug: _posts/2016-10-19-usda-plants-database-r.md
 tags:
 - API
@@ -36,7 +35,7 @@ when piping, you have to assign the output of the request to an object before yo
 can do any further manipulation. But that's probably good for avoiding too long
 pipe chains.
 
-> note, that I've set `tibble.max_extra_cols = 15` to not print the many 
+> note, that I've set `tibble.max_extra_cols = 15` to not print the many
 columns that are returned, for blog post brevity. When you run below
 you'll get more columns.
 
@@ -101,30 +100,30 @@ Let's first not pass any params
 root %>% api_path(search)
 #> $count
 #> [1] 92171
-#> 
+#>
 #> $returned
 #> [1] 10
-#> 
+#>
 #> $citation
 #> [1] "USDA, NRCS. 2016. The PLANTS Database (http://plants.usda.gov, 12 July 2016). National Plant Data Team, Greensboro, NC 27401-4901 USA."
-#> 
+#>
 #> $terms
 #> [1] "Our plant information, including the distribution maps, lists, and text, is not copyrighted and is free for any use."
-#> 
+#>
 #> $data
 #> # A tibble: 10 × 134
 #>       id Symbol Accepted_Symbol_x Synonym_Symbol_x
 #> *  <int>  <chr>             <chr>            <chr>
-#> 1      1   ABAB              ABAB                 
+#> 1      1   ABAB              ABAB
 #> 2      2  ABAB2             ABPR3            ABAB2
 #> 3      3  ABAB3              ABTH            ABAB3
-#> 4      4 ABAB70            ABAB70                 
+#> 4      4 ABAB70            ABAB70
 #> 5      5   ABAC             ABUMB             ABAC
-#> 6      6   ABAL              ABAL                 
+#> 6      6   ABAL              ABAL
 #> 7      7  ABAL2             ABUMU            ABAL2
-#> 8      8  ABAL3             ABAL3                 
-#> 9      9   ABAM              ABAM                 
-#> 10    10  ABAM2             ABAM2                 
+#> 8      8  ABAL3             ABAL3
+#> 9      9   ABAM              ABAM
+#> 10    10  ABAM2             ABAM2
 #> # ... with 130 more variables: Scientific_Name_x <chr>,
 #> #   Hybrid_Genus_Indicator <chr>, Hybrid_Species_Indicator <chr>,
 #> #   Species <chr>, Subspecies_Prefix <chr>,
@@ -132,7 +131,7 @@ root %>% api_path(search)
 #> #   Variety_Prefix <chr>, Hybrid_Variety_Indicator <chr>, Variety <chr>,
 #> #   Subvariety_Prefix <chr>, Subvariety <chr>, Forma_Prefix <chr>,
 #> #   Forma <chr>, Genera_Binomial_Author <chr>, ...
-#> 
+#>
 #> $error
 #> NULL
 ```
@@ -160,24 +159,24 @@ root %>%
   api_query(limit = 5)
 #> $count
 #> [1] 92171
-#> 
+#>
 #> $returned
 #> [1] 5
-#> 
+#>
 #> $citation
 #> [1] "USDA, NRCS. 2016. The PLANTS Database (http://plants.usda.gov, 12 July 2016). National Plant Data Team, Greensboro, NC 27401-4901 USA."
-#> 
+#>
 #> $terms
 #> [1] "Our plant information, including the distribution maps, lists, and text, is not copyrighted and is free for any use."
-#> 
+#>
 #> $data
 #> # A tibble: 5 × 134
 #>      id Symbol Accepted_Symbol_x Synonym_Symbol_x
 #> * <int>  <chr>             <chr>            <chr>
-#> 1     1   ABAB              ABAB                 
+#> 1     1   ABAB              ABAB
 #> 2     2  ABAB2             ABPR3            ABAB2
 #> 3     3  ABAB3              ABTH            ABAB3
-#> 4     4 ABAB70            ABAB70                 
+#> 4     4 ABAB70            ABAB70
 #> 5     5   ABAC             ABUMB             ABAC
 #> # ... with 130 more variables: Scientific_Name_x <chr>,
 #> #   Hybrid_Genus_Indicator <chr>, Hybrid_Species_Indicator <chr>,
@@ -186,7 +185,7 @@ root %>%
 #> #   Variety_Prefix <chr>, Hybrid_Variety_Indicator <chr>, Variety <chr>,
 #> #   Subvariety_Prefix <chr>, Subvariety <chr>, Forma_Prefix <chr>,
 #> #   Forma <chr>, Genera_Binomial_Author <chr>, ...
-#> 
+#>
 #> $error
 #> NULL
 ```
@@ -200,24 +199,24 @@ root %>%
   api_query(limit = 5, offset = 10)
 #> $count
 #> [1] 92161
-#> 
+#>
 #> $returned
 #> [1] 5
-#> 
+#>
 #> $citation
 #> [1] "USDA, NRCS. 2016. The PLANTS Database (http://plants.usda.gov, 12 July 2016). National Plant Data Team, Greensboro, NC 27401-4901 USA."
-#> 
+#>
 #> $terms
 #> [1] "Our plant information, including the distribution maps, lists, and text, is not copyrighted and is free for any use."
-#> 
+#>
 #> $data
 #> # A tibble: 5 × 134
 #>      id Symbol Accepted_Symbol_x Synonym_Symbol_x
 #> * <int>  <chr>             <chr>            <chr>
-#> 1    11  ABAM3             ABAM3                 
+#> 1    11  ABAM3             ABAM3
 #> 2    12  ABAM4              NAAM            ABAM4
 #> 3    13  ABAM5              ABAB            ABAM5
-#> 4    14   ABAN              ABAN                 
+#> 4    14   ABAN              ABAN
 #> 5    15  ABANA              ABAN            ABANA
 #> # ... with 130 more variables: Scientific_Name_x <chr>,
 #> #   Hybrid_Genus_Indicator <chr>, Hybrid_Species_Indicator <chr>,
@@ -226,7 +225,7 @@ root %>%
 #> #   Variety_Prefix <chr>, Hybrid_Variety_Indicator <chr>, Variety <chr>,
 #> #   Subvariety_Prefix <chr>, Subvariety <chr>, Forma_Prefix <chr>,
 #> #   Forma <chr>, Genera_Binomial_Author <chr>, ...
-#> 
+#>
 #> $error
 #> NULL
 ```
@@ -243,16 +242,16 @@ root %>%
   api_query(fields = 'Genus,Species,Symbol')
 #> $count
 #> [1] 92171
-#> 
+#>
 #> $returned
 #> [1] 10
-#> 
+#>
 #> $citation
 #> [1] "USDA, NRCS. 2016. The PLANTS Database (http://plants.usda.gov, 12 July 2016). National Plant Data Team, Greensboro, NC 27401-4901 USA."
-#> 
+#>
 #> $terms
 #> [1] "Our plant information, including the distribution maps, lists, and text, is not copyrighted and is free for any use."
-#> 
+#>
 #> $data
 #> # A tibble: 10 × 3
 #>    Symbol     Species       Genus
@@ -267,7 +266,7 @@ root %>%
 #> 8   ABAL3        alba       Abies
 #> 9    ABAM    amabilis       Abies
 #> 10  ABAM2     ameliae     Abronia
-#> 
+#>
 #> $error
 #> NULL
 ```
@@ -284,16 +283,16 @@ root %>%
   api_query(Genus = Pinus, fields = "Genus,Species")
 #> $count
 #> [1] 185
-#> 
+#>
 #> $returned
 #> [1] 10
-#> 
+#>
 #> $citation
 #> [1] "USDA, NRCS. 2016. The PLANTS Database (http://plants.usda.gov, 12 July 2016). National Plant Data Team, Greensboro, NC 27401-4901 USA."
-#> 
+#>
 #> $terms
 #> [1] "Our plant information, including the distribution maps, lists, and text, is not copyrighted and is free for any use."
-#> 
+#>
 #> $data
 #> # A tibble: 10 × 2
 #>       Species Genus
@@ -308,7 +307,7 @@ root %>%
 #> 8   arizonica Pinus
 #> 9   arizonica Pinus
 #> 10  attenuata Pinus
-#> 
+#>
 #> $error
 #> NULL
 ```
@@ -322,16 +321,16 @@ root %>%
   api_query(Species = annua, fields = "Genus,Species")
 #> $count
 #> [1] 30
-#> 
+#>
 #> $returned
 #> [1] 10
-#> 
+#>
 #> $citation
 #> [1] "USDA, NRCS. 2016. The PLANTS Database (http://plants.usda.gov, 12 July 2016). National Plant Data Team, Greensboro, NC 27401-4901 USA."
-#> 
+#>
 #> $terms
 #> [1] "Our plant information, including the distribution maps, lists, and text, is not copyrighted and is free for any use."
-#> 
+#>
 #> $data
 #> # A tibble: 10 × 2
 #>    Species         Genus
@@ -346,7 +345,7 @@ root %>%
 #> 8    annua    Eleocharis
 #> 9    annua  Fimbristylis
 #> 10   annua    Heliomeris
-#> 
+#>
 #> $error
 #> NULL
 ```
@@ -360,16 +359,16 @@ root %>%
   api_query(Duration = Perennial, fields = "Genus,Species,Symbol,Duration")
 #> $count
 #> [1] 25296
-#> 
+#>
 #> $returned
 #> [1] 10
-#> 
+#>
 #> $citation
 #> [1] "USDA, NRCS. 2016. The PLANTS Database (http://plants.usda.gov, 12 July 2016). National Plant Data Team, Greensboro, NC 27401-4901 USA."
-#> 
+#>
 #> $terms
 #> [1] "Our plant information, including the distribution maps, lists, and text, is not copyrighted and is free for any use."
-#> 
+#>
 #> $data
 #> # A tibble: 10 × 4
 #>    Symbol     Species  Duration    Genus
@@ -384,7 +383,7 @@ root %>%
 #> 8    ABAU     auritum Perennial Abutilon
 #> 9    ABBA    balsamea Perennial    Abies
 #> 10  ABBAB    balsamea Perennial    Abies
-#> 
+#>
 #> $error
 #> NULL
 ```

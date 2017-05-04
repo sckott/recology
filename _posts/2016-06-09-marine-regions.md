@@ -3,7 +3,6 @@ name: marine-regions
 layout: post
 title: Marine Regions data in R
 date: 2016-06-09
-author: Scott Chamberlain
 sourceslug: _drafts/2016-06-09-marine-regions.Rmd
 tags:
 - R
@@ -19,7 +18,7 @@ tags:
 
 I was at a hackathon focused on Ocean Biogeographic Information System (OBIS) data back in November last year in Belgium. One project idea was to make it easier to get at data based on one or more marine regions. I was told that Marineregions.org is often used for shape files to get different regions to then do other work with.
 
-During the event I started a package [mregions][mr]. Here I'll show how to get different marine regions, then use those outputs 
+During the event I started a package [mregions][mr]. Here I'll show how to get different marine regions, then use those outputs
 to get species occurrence data.
 
 We'll use WKT (Well-Known Text) to define spatial dimensions in this post. If
@@ -51,7 +50,7 @@ library("mregions")
 ```r
 res <- mr_place_types()
 head(res$type)
-#> [1] "Town"                      "Arrondissement"           
+#> [1] "Town"                      "Arrondissement"
 #> [3] "Department"                "Province (administrative)"
 #> [5] "Country"                   "Continent"
 ```
@@ -133,7 +132,7 @@ res <- mr_geojson(name = "Turkmen Exclusive Economic Zone")
 class(res)
 #> [1] "mr_geojson"
 names(res)
-#> [1] "type"          "totalFeatures" "features"      "crs"          
+#> [1] "type"          "totalFeatures" "features"      "crs"
 #> [5] "bbox"
 ```
 
@@ -215,7 +214,7 @@ You currently can't search for OBIS occurrences by EEZ ID, but hopefully soon...
 
 ## Dealing with bigger WKT
 
-What if you're WKT string is super long?  It's often a problem because some online species 
+What if you're WKT string is super long?  It's often a problem because some online species
 occurrence databases that accept WKT to search by geometry bork due to
 limitations on length of URLs if your WKT string is too long (about 8000 characters,
 including remainder of URL). One way to deal with it is to reduce detail - simplify.
@@ -271,13 +270,13 @@ if (!requireNamespace("rgbif")) {
 }
 library("rgbif")
 occ_search(geometry = mr_as_wkt(shp), limit = 400)
-#> Records found [2395936] 
-#> Records returned [400] 
-#> No. unique hierarchies [17] 
-#> No. media records [3] 
+#> Records found [2395936]
+#> Records returned [400]
+#> No. unique hierarchies [17]
+#> No. media records [3]
 #> Args [geometry=POLYGON ((7.2083632399999997 53.2428091399999985,
 #>      6.6974995100000001 53.4619365499999972, 5.89083650, limit=400,
-#>      offset=0, fields=all] 
+#>      offset=0, fields=all]
 #> # A tibble: 400 x 102
 #>                     name        key decimalLatitude decimalLongitude
 #>                    <chr>      <int>           <dbl>            <dbl>

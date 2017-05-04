@@ -5,20 +5,18 @@ title: Making matrices with zeros and ones
 date: 2012-08-30 08:02:00.00 -08:00
 author: Scott Chamberlain
 sourceslug: _drafts/2012-08-30-making-matrices.Rmd
-tags: 
+tags:
 - R
 - matrix
 - simulation
 ---
 
+So I was trying to figure out a fast way to make matrices with randomly allocated 0 or 1 in each cell of the matrix. I reached out on Twitter, and got many responses (thanks tweeps!).
 
-*********
 
-## So I was trying to figure out a fast way to make matrices with randomly allocated 0 or 1 in each cell of the matrix. I reached out on Twitter, and got many responses (thanks tweeps!). 
+### Here is the solution I came up with.
 
-*********
-
-### Here is the solution I came up with. See if you can tell why it would be slow.
+See if you can tell why it would be slow.
 
 {% highlight r linenos %}
 mm <- matrix(0, 10, 5)
@@ -42,7 +40,6 @@ apply(mm, c(1, 2), function(x) sample(c(0, 1), 1))
 {% endhighlight %}
 
 
-*********
 
 ### Ted Hart (@distribecology) replied first with:
 
@@ -67,10 +64,9 @@ matrix(rbinom(10 * 5, 1, 0.5), ncol = 5, nrow = 10)
 {% endhighlight %}
 
 
-*********
 
 
-### Next, David Smith (@revodavid) and Rafael Maia (@hylospar) came up with about the same solution. 
+### Next, David Smith (@revodavid) and Rafael Maia (@hylospar) came up with about the same solution.
 
 {% highlight r linenos %}
 m <- 10
@@ -95,7 +91,6 @@ matrix(sample(0:1, m * n, replace = TRUE), m, n)
 {% endhighlight %}
 
 
-*********
 
 
 ### Then there was the solution by Luis Apiolaza (@zentree).
@@ -123,9 +118,8 @@ round(matrix(runif(m * n), m, n))
 {% endhighlight %}
 
 
-*********
 
-### Last, a solution was proposed using `RcppArmadillo`, but I couldn't get it to work on my machine, but here is the function anyway if someone can. 
+### Last, a solution was proposed using `RcppArmadillo`, but I couldn't get it to work on my machine, but here is the function anyway if someone can.
 
 {% highlight r linenos %}
 library(inline)
@@ -134,9 +128,8 @@ f <- cxxfunction(body = "return wrap(arma::randu(5,10));", plugin = "RcppArmadil
 {% endhighlight %}
 
 
-*********
 
-### And here is the comparison of system.time for each solution. 
+### And here is the comparison of system.time for each solution.
 
 {% highlight r linenos %}
 mm <- matrix(0, 10, 5)
@@ -149,8 +142,8 @@ system.time(replicate(1000, apply(mm, c(1, 2), function(x) sample(c(0, 1), 1))))
 
 
 {% highlight text %}
-   user  system elapsed 
-  0.470   0.002   0.471 
+   user  system elapsed
+  0.470   0.002   0.471
 {% endhighlight %}
 
 
@@ -162,8 +155,8 @@ system.time(replicate(1000, matrix(rbinom(10 * 5, 1, 0.5), ncol = 5, nrow = 10))
 
 
 {% highlight text %}
-   user  system elapsed 
-  0.014   0.000   0.015 
+   user  system elapsed
+  0.014   0.000   0.015
 {% endhighlight %}
 
 
@@ -175,8 +168,8 @@ system.time(replicate(1000, matrix(sample(0:1, m * n, replace = TRUE), m, n)))  
 
 
 {% highlight text %}
-   user  system elapsed 
-  0.015   0.000   0.014 
+   user  system elapsed
+  0.015   0.000   0.014
 {% endhighlight %}
 
 
@@ -188,17 +181,15 @@ system.time(replicate(1000, round(matrix(runif(m * n), m, n)), ))  # @zentree
 
 
 {% highlight text %}
-   user  system elapsed 
-  0.014   0.000   0.014 
+   user  system elapsed
+  0.014   0.000   0.014
 {% endhighlight %}
 
 
-### If you want to take the time to learn C++ or already know it, the RcppArmadillo option would likely be the fastest, but I think (IMO) for many scientists, especially ecologists, we probably don't already know C++, so will stick to the next fastest options. 
+### If you want to take the time to learn C++ or already know it, the RcppArmadillo option would likely be the fastest, but I think (IMO) for many scientists, especially ecologists, we probably don't already know C++, so will stick to the next fastest options.
 
-*********
 
 ### Get the .Rmd file used to create this post [at my github account](https://github.com/sckott/sckott.github.com/tree/master/_drafts/2012-08-30-making-matrices.Rmd).
 
-*********
 
 ### Written in [Markdown](http://daringfireball.net/projects/markdown/), with help from [knitr](http://yihui.name/knitr/), and nice knitr highlighting/etc. in in [RStudio](http://rstudio.org/).

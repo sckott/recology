@@ -1,9 +1,8 @@
 ---
 name: cascadiarconf
-layout: post_nodisqus
+layout: post
 title: CascadiaRConf
 date: 2017-03-23
-author: Scott Chamberlain
 sourceslug: _posts/2017-03-23-cascadiarconf.md
 tags:
 - conference

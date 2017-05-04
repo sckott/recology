@@ -3,7 +3,6 @@ name: genbank-ids
 layout: post
 title: GenBank IDs API - get, match, swap id types
 date: 2016-03-29
-author: Scott Chamberlain
 sourceslug: _drafts/2016-03-29-genbank-ids.md
 tags:
 - API
