@@ -1,7 +1,7 @@
 ---
 name: package-dev
 layout: post
-title: Package dev
+title: Tooling for R package development
 date: 2017-06-18
 sourceslug: _posts/2017-06-18-package-dev.md
 ---
