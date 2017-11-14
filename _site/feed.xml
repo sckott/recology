@@ -5,17 +5,200 @@
     <description>code and such</description>
     <link>http://localhost:4000/</link>
     <atom:link href="http://localhost:4000/feed.xml" rel="self" type="application/rss+xml"/>
-    <pubDate>Mon, 23 Oct 2017 14:12:45 -0700</pubDate>
-    <lastBuildDate>Mon, 23 Oct 2017 14:12:45 -0700</lastBuildDate>
+    <pubDate>Tue, 14 Nov 2017 11:22:32 -0800</pubDate>
+    <lastBuildDate>Tue, 14 Nov 2017 11:22:32 -0800</lastBuildDate>
     <generator>Jekyll v3.4.4</generator>
+    
+      <item>
+        <title>Web APIs with Sinatra, Mongo, Docker, and Caddy</title>
+        <description>&lt;p&gt;I really like Ruby. It’s a language that is fun to use, the community is great, and there’s tons of packages.  Ruby is great for making web stuff, including web APIs. When doing web stuff, for me that means web APIs. For web APIs in Ruby, Rails is too heavy for all the stuff I do - that’s where &lt;a href=&quot;http://www.sinatrarb.com/&quot;&gt;Sinatra&lt;/a&gt; comes in.&lt;/p&gt;
+
+&lt;p&gt;Sinatra is a lightweight framework for making web apps/APIs. I make all my web APIs with Sinatra, and have had few complaints. Some may say “you should use X or Y because faster”, or whatever, but Sinatra is plenty fast for my use cases. Not every use case is “we’re Facebook”, or “we’re Google”.&lt;/p&gt;
+
+&lt;p&gt;Until recently I’ve been very much manually managing my Sinatra web APIs on servers - that is, installing/updating everything on the server itself, without using containers or any configuration management. This blog post is the blog post I would have wanted to read when I was figuring out how to dockerize my web APIs.&lt;/p&gt;
+
+&lt;h2 id=&quot;the-problem&quot;&gt;The problem&lt;/h2&gt;
+
+&lt;p&gt;To come back to the real world problem: The R community has a package distribution thing called &lt;a href=&quot;https://cran.rstudio.com/web/packages/&quot;&gt;CRAN&lt;/a&gt; just like Ruby has &lt;a href=&quot;https://rubygems.org/&quot;&gt;Rubygems&lt;/a&gt;, and Python has &lt;a href=&quot;https://pypi.python.org/pypi&quot;&gt;Pypi&lt;/a&gt;, etc. On all packages on CRAN, the CRAN maintainers run checks on each package on multiple versions of R and on many operating systems. They report those results on a page associated with the package, like &lt;a href=&quot;https://cran.rstudio.com/web/checks/check_results_crul.html&quot;&gt;this one&lt;/a&gt;.&lt;/p&gt;
+
+&lt;p&gt;You might be thinking: okay, but we have Travis-CI and friends, so who cares about that?  Well, it’s these checks that CRAN runs that will determine if your package on CRAN leads to emails to you asking for changes, and possibly the package being taken down if e.g., they email and you don’t respond for a period of time.&lt;/p&gt;
+
+&lt;p&gt;So CRAN provides these package checks. Now what?  Ideally, these would be available through an API so that the data is machine readable, which then makes many other things possible. For example, I envision providing a notification service so package maintainers can opt-in to notficiations when their checks are failing so they can be on top of fixes quickly. That notification system isn’t made yet.&lt;/p&gt;
+
+&lt;p&gt;So how to build the API?&lt;/p&gt;
+
+&lt;h2 id=&quot;building-the-cran-checks-api&quot;&gt;Building the CRAN checks API&lt;/h2&gt;
+
+&lt;p&gt;On GitHub: &lt;a href=&quot;https://github.com/ropensci/cchecksapi&quot;&gt;https://github.com/ropensci/cchecksapi&lt;/a&gt;&lt;/p&gt;
+
+&lt;p&gt;My main goal learning goals with this API tech wise were two fold:&lt;/p&gt;
+
+&lt;ul&gt;
+  &lt;li&gt;learn how to dockerize the application&lt;/li&gt;
+  &lt;li&gt;learn how to use MongoDB&lt;/li&gt;
+&lt;/ul&gt;
+
+&lt;p&gt;I hadn’t Dockerized a web API myself before, so that was an important goal - and I had actually never used MongoDB, but wanted to give it a shot to get familiar with it.&lt;/p&gt;
+
+&lt;p&gt;The whole stack is:&lt;/p&gt;
+
+&lt;ul&gt;
+  &lt;li&gt;language: Ruby&lt;/li&gt;
+  &lt;li&gt;web API framework: Sinatra&lt;/li&gt;
+  &lt;li&gt;http Ruby gem: faraday&lt;/li&gt;
+  &lt;li&gt;database: mongodb&lt;/li&gt;
+  &lt;li&gt;server: caddy&lt;/li&gt;
+  &lt;li&gt;container: all wrapped up in docker (docker-compose)&lt;/li&gt;
+  &lt;li&gt;hosting: Amazon EC2&lt;/li&gt;
+  &lt;li&gt;scheduling: crontab&lt;/li&gt;
+&lt;/ul&gt;
+
+&lt;p&gt;At a high level, the system is as so:&lt;/p&gt;
+
+&lt;ul&gt;
+  &lt;li&gt;Once a day a few Ruby scripts (&lt;a href=&quot;https://github.com/ropensci/cchecksapi/blob/master/scrape.rb&quot;&gt;for packages&lt;/a&gt;, &lt;a href=&quot;https://github.com/ropensci/cchecksapi/blob/master/scrape_maintainer.rb&quot;&gt;for maintainers&lt;/a&gt;):
+    &lt;ul&gt;
+      &lt;li&gt;collects the names of packages on CRAN from Gábor Csárdi’s &lt;a href=&quot;https://crandb.r-pkg.org&quot;&gt;https://crandb.r-pkg.org&lt;/a&gt; API and maintainer emails from CRAN itself, then&lt;/li&gt;
+      &lt;li&gt;goes out to the CRAN website and collects check results for each package, then&lt;/li&gt;
+      &lt;li&gt;insert data into a MongoDB database&lt;/li&gt;
+    &lt;/ul&gt;
+  &lt;/li&gt;
+  &lt;li&gt;The API provides routes for getting data on specific packages by name, or all packages, and data on all packages for any given maintainers email adddress, or all maintainers
+    &lt;ul&gt;
+      &lt;li&gt;API calls make a query into the MongoDB database matching on the package name or maintainer email address&lt;/li&gt;
+      &lt;li&gt;data is given back as JSON&lt;/li&gt;
+    &lt;/ul&gt;
+  &lt;/li&gt;
+&lt;/ul&gt;
+
+&lt;p&gt;The API doesn’t currently use caching, but may add if it seems needed.&lt;/p&gt;
+
+&lt;h2 id=&quot;the-api&quot;&gt;The API&lt;/h2&gt;
+
+&lt;p&gt;The API using Sinatra defines a number of rules about what HTTP verbs are allowed to be used, what headers to send in each response, etc.&lt;/p&gt;
+
+&lt;p&gt;This is what one of the route definitions looks like:&lt;/p&gt;
+
+&lt;div class=&quot;language-ruby highlighter-rouge&quot;&gt;&lt;pre class=&quot;highlight&quot;&gt;&lt;code&gt;&lt;span class=&quot;n&quot;&gt;get&lt;/span&gt; &lt;span class=&quot;s1&quot;&gt;'/pkgs/?'&lt;/span&gt; &lt;span class=&quot;k&quot;&gt;do&lt;/span&gt;
+  &lt;span class=&quot;n&quot;&gt;headers_get&lt;/span&gt;
+  &lt;span class=&quot;k&quot;&gt;begin&lt;/span&gt;
+    &lt;span class=&quot;n&quot;&gt;lim&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;=&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;params&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;[&lt;/span&gt;&lt;span class=&quot;ss&quot;&gt;:limit&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;]&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;||&lt;/span&gt; &lt;span class=&quot;mi&quot;&gt;10&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;).&lt;/span&gt;&lt;span class=&quot;nf&quot;&gt;to_i&lt;/span&gt;
+    &lt;span class=&quot;n&quot;&gt;off&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;=&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;params&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;[&lt;/span&gt;&lt;span class=&quot;ss&quot;&gt;:offset&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;]&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;||&lt;/span&gt; &lt;span class=&quot;mi&quot;&gt;0&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;).&lt;/span&gt;&lt;span class=&quot;nf&quot;&gt;to_i&lt;/span&gt;
+    &lt;span class=&quot;k&quot;&gt;raise&lt;/span&gt; &lt;span class=&quot;no&quot;&gt;Exception&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;.&lt;/span&gt;&lt;span class=&quot;nf&quot;&gt;new&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;s1&quot;&gt;'limit too large (max 1000)'&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt; &lt;span class=&quot;k&quot;&gt;unless&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;lim&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;&amp;lt;=&lt;/span&gt; &lt;span class=&quot;mi&quot;&gt;1000&lt;/span&gt;
+    &lt;span class=&quot;n&quot;&gt;d&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;=&lt;/span&gt; &lt;span class=&quot;vg&quot;&gt;$cks&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;.&lt;/span&gt;&lt;span class=&quot;nf&quot;&gt;find&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;({},&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;{&lt;/span&gt;&lt;span class=&quot;s2&quot;&gt;&quot;limit&quot;&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;=&amp;gt;&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;lim&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt; &lt;span class=&quot;s2&quot;&gt;&quot;skip&quot;&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;=&amp;gt;&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;off&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;})&lt;/span&gt;
+    &lt;span class=&quot;n&quot;&gt;dat&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;=&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;d&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;.&lt;/span&gt;&lt;span class=&quot;nf&quot;&gt;to_a&lt;/span&gt;
+    &lt;span class=&quot;k&quot;&gt;raise&lt;/span&gt; &lt;span class=&quot;no&quot;&gt;Exception&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;.&lt;/span&gt;&lt;span class=&quot;nf&quot;&gt;new&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;s1&quot;&gt;'no results found'&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt; &lt;span class=&quot;k&quot;&gt;if&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;d&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;.&lt;/span&gt;&lt;span class=&quot;nf&quot;&gt;nil?&lt;/span&gt;
+    &lt;span class=&quot;p&quot;&gt;{&lt;/span&gt; &lt;span class=&quot;ss&quot;&gt;found: &lt;/span&gt;&lt;span class=&quot;n&quot;&gt;d&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;.&lt;/span&gt;&lt;span class=&quot;nf&quot;&gt;count&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt; &lt;span class=&quot;ss&quot;&gt;count: &lt;/span&gt;&lt;span class=&quot;n&quot;&gt;dat&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;.&lt;/span&gt;&lt;span class=&quot;nf&quot;&gt;length&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt; &lt;span class=&quot;ss&quot;&gt;offset: &lt;/span&gt;&lt;span class=&quot;kp&quot;&gt;nil&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt; &lt;span class=&quot;ss&quot;&gt;error: &lt;/span&gt;&lt;span class=&quot;kp&quot;&gt;nil&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt;
+      &lt;span class=&quot;ss&quot;&gt;data: &lt;/span&gt;&lt;span class=&quot;n&quot;&gt;dat&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;}.&lt;/span&gt;&lt;span class=&quot;nf&quot;&gt;to_json&lt;/span&gt;
+  &lt;span class=&quot;k&quot;&gt;rescue&lt;/span&gt; &lt;span class=&quot;no&quot;&gt;Exception&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;=&amp;gt;&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;e&lt;/span&gt;
+    &lt;span class=&quot;n&quot;&gt;halt&lt;/span&gt; &lt;span class=&quot;mi&quot;&gt;400&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;{&lt;/span&gt; &lt;span class=&quot;ss&quot;&gt;count: &lt;/span&gt;&lt;span class=&quot;mi&quot;&gt;0&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt; &lt;span class=&quot;ss&quot;&gt;error: &lt;/span&gt;&lt;span class=&quot;p&quot;&gt;{&lt;/span&gt; &lt;span class=&quot;ss&quot;&gt;message: &lt;/span&gt;&lt;span class=&quot;n&quot;&gt;e&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;.&lt;/span&gt;&lt;span class=&quot;nf&quot;&gt;message&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;},&lt;/span&gt; &lt;span class=&quot;ss&quot;&gt;data: &lt;/span&gt;&lt;span class=&quot;kp&quot;&gt;nil&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;}.&lt;/span&gt;&lt;span class=&quot;nf&quot;&gt;to_json&lt;/span&gt;
+  &lt;span class=&quot;k&quot;&gt;end&lt;/span&gt;
+&lt;span class=&quot;k&quot;&gt;end&lt;/span&gt;
+&lt;/code&gt;&lt;/pre&gt;
+&lt;/div&gt;
+
+&lt;p&gt;This code chunk is for the &lt;code class=&quot;highlighter-rouge&quot;&gt;/pkgs&lt;/code&gt; route on the API. The &lt;code class=&quot;highlighter-rouge&quot;&gt;headers_get&lt;/code&gt; bit sends a pre-defined set of headers in the response. The &lt;code class=&quot;highlighter-rouge&quot;&gt;begin ... rescue ... end&lt;/code&gt; bit is a “try catch” thing - leading to a JSON failure response in case there is a failure - and a JSON response on success.&lt;/p&gt;
+
+&lt;h2 id=&quot;collecting-data-and-mongodb&quot;&gt;Collecting data and MongoDB&lt;/h2&gt;
+
+&lt;p&gt;xxx&lt;/p&gt;
+
+&lt;div class=&quot;language-ruby highlighter-rouge&quot;&gt;&lt;pre class=&quot;highlight&quot;&gt;&lt;code&gt;&lt;span class=&quot;n&quot;&gt;xxxx&lt;/span&gt;
+&lt;/code&gt;&lt;/pre&gt;
+&lt;/div&gt;
+
+&lt;h2 id=&quot;docker&quot;&gt;Docker&lt;/h2&gt;
+
+&lt;p&gt;Here is my &lt;code class=&quot;highlighter-rouge&quot;&gt;docker-compose.yml&lt;/code&gt; file:&lt;/p&gt;
+
+&lt;pre&gt;&lt;code class=&quot;language-Dockerfile&quot;&gt;mongo:
+  image: mongo
+  volumes:
+    - $HOME/data/mongodb:/data/db
+  restart: always
+  ports:
+    - &quot;27017:27017&quot;
+
+api:
+  build: .
+  ports:
+    - &quot;8834:8834&quot;
+  links:
+    - mongo
+&lt;/code&gt;&lt;/pre&gt;
+
+&lt;p&gt;This specifies the container for MongoDB and for the API, and speicifies in the API container to link to the mongo container.&lt;/p&gt;
+
+&lt;p&gt;To build and run do &lt;code class=&quot;highlighter-rouge&quot;&gt;docker-compose build &amp;amp;&amp;amp; docker-compose up -d&lt;/code&gt; (the &lt;code class=&quot;highlighter-rouge&quot;&gt;-d&lt;/code&gt; flag is for daemonize, i.e., run in the background). To kill them run &lt;code class=&quot;highlighter-rouge&quot;&gt;docker-compose stop &amp;amp;&amp;amp; docker-compose rm&lt;/code&gt;.&lt;/p&gt;
+
+&lt;h2 id=&quot;caddy-server&quot;&gt;Caddy server&lt;/h2&gt;
+
+&lt;p&gt;Caddy is pretty easy to setup. To install, check out the installation page &lt;a href=&quot;https://caddyserver.com/download&quot;&gt;https://caddyserver.com/download&lt;/a&gt;, and it’s easy as something like &lt;code class=&quot;highlighter-rouge&quot;&gt;curl https://getcaddy.com | bash -s personal&lt;/code&gt; (depends on configuration options on that page and license choice).&lt;/p&gt;
+
+&lt;p&gt;I know there’s an option to run a separate container with Caddy, but I run the application inside Docker containers, but Caddy is outside the container.&lt;/p&gt;
+
+&lt;p&gt;My &lt;code class=&quot;highlighter-rouge&quot;&gt;Caddyfile&lt;/code&gt; has something similar to the following:&lt;/p&gt;
+
+&lt;div class=&quot;highlighter-rouge&quot;&gt;&lt;pre class=&quot;highlight&quot;&gt;&lt;code&gt;cranchecks.info {
+  gzip
+
+  log / logfile.log &quot;{remote} - [{when}] {method} {uri} {query} {proto} {status} {size} {&amp;gt;User-Agent}&quot; {
+     rotate_size 3
+  }
+
+  tls email@foobar.com
+
+  proxy / localhost:8834 {
+    transparent
+  }
+}
+&lt;/code&gt;&lt;/pre&gt;
+&lt;/div&gt;
+
+&lt;ul&gt;
+  &lt;li&gt;&lt;code class=&quot;highlighter-rouge&quot;&gt;gzip&lt;/code&gt; tells Caddy to serve gzipp’ed content (see &lt;a href=&quot;https://caddyserver.com/docs/gzip&quot;&gt;https://caddyserver.com/docs/gzip&lt;/a&gt;)&lt;/li&gt;
+  &lt;li&gt;&lt;code class=&quot;highlighter-rouge&quot;&gt;log&lt;/code&gt; line specifies how to log requests (and &lt;code class=&quot;highlighter-rouge&quot;&gt;rotate_size&lt;/code&gt; says start a new file when the current one reaches 3 MB) (see &lt;a href=&quot;https://caddyserver.com/docs/log&quot;&gt;https://caddyserver.com/docs/log&lt;/a&gt;)&lt;/li&gt;
+  &lt;li&gt;&lt;code class=&quot;highlighter-rouge&quot;&gt;tls&lt;/code&gt; says use the given email for registering with &lt;a href=&quot;https://letsencrypt.org/&quot;&gt;Letsencrypt&lt;/a&gt; (see &lt;a href=&quot;https://caddyserver.com/docs/tls&quot;&gt;https://caddyserver.com/docs/tls&lt;/a&gt;)&lt;/li&gt;
+  &lt;li&gt;&lt;code class=&quot;highlighter-rouge&quot;&gt;proxy&lt;/code&gt; is for specifying reverse proxy (see &lt;a href=&quot;https://caddyserver.com/docs/proxy&quot;&gt;https://caddyserver.com/docs/proxy&lt;/a&gt;)&lt;/li&gt;
+&lt;/ul&gt;
+
+&lt;hr /&gt;
+
+&lt;h2 id=&quot;further-reading&quot;&gt;Further reading&lt;/h2&gt;
+
+&lt;p&gt;In a &lt;a href=&quot;http://blog.cloud66.com/deploying-rest-apis-to-docker-using-ruby-and-sinatra/&quot;&gt;similar post&lt;/a&gt; Cloud66 folks talked about deploying an API with the same stack essentially: Sinatra, MongoDB, and Docker.&lt;/p&gt;
+
+&lt;h2 id=&quot;ps&quot;&gt;p.s.&lt;/h2&gt;
+
+&lt;p&gt;since I mostly write about R software, so some readers may use R: if you want to make a web API but only know R, try learning Ruby!  It can’t hurt to learn Ruby, and you’ll be happy you did&lt;/p&gt;
+
+</description>
+        <pubDate>Tue, 14 Nov 2017 00:00:00 -0800</pubDate>
+        <link>http://localhost:4000/2017/11/sinatra-mongo-docker-caddy/</link>
+        <guid isPermaLink="true">http://localhost:4000/2017/11/sinatra-mongo-docker-caddy/</guid>
+        
+        <category>API</category>
+        
+        <category>ruby</category>
+        
+        <category>docker</category>
+        
+        <category>caddy</category>
+        
+        <category>mongo</category>
+        
+        <category>sinatra</category>
+        
+        
+      </item>
     
       <item>
         <title>habanero update: Crossref data from Python</title>
         <description>&lt;p&gt;I wrote about Crossref clients back nearly two years ago on this blog: &lt;a href=&quot;https://recology.info/2015/11/crossref-clients/&quot;&gt;Crossref programmatic clients&lt;/a&gt;.&lt;/p&gt;
 
-&lt;p&gt;Since it’s been a while, it seems worth talking again about the the many ways to work programmatically with Crossref data.&lt;/p&gt;
+&lt;p&gt;Since it’s been a while, it seems worth talking again about the the many ways to work programmatically with Crossref data - and focus in on the Python client &lt;code class=&quot;highlighter-rouge&quot;&gt;habanero&lt;/code&gt; since it has some recent updates.&lt;/p&gt;
 
-&lt;p&gt;The clients I’ll talk about below work with the main &lt;a href=&quot;http://api.crossref.org&quot;&gt;Crossref API&lt;/a&gt;, which lets you do things like search for works by title, author, etc. (e.g., books, articles), search for publishing members, for funders, for journals, for DOI prefixes, and for licenses. It’s a powerful API with basically no rate limits, so you can work through lots of data quickly.&lt;/p&gt;
+&lt;p&gt;The 3 clients work with the main &lt;a href=&quot;http://api.crossref.org&quot;&gt;Crossref API&lt;/a&gt;, which lets you do things like search for works by title, author, etc. (e.g., books, articles), search for publishing members, for funders, for journals, for DOI prefixes, and for licenses. It’s a powerful API with basically no rate limits, so you can work through lots of data quickly.&lt;/p&gt;
 
 &lt;p&gt;Some deets:&lt;/p&gt;
 
@@ -32,9 +215,13 @@
 
 &lt;p&gt;Back when the earlier blog post was written about these Crossref clients, we were at the first versions of both &lt;a href=&quot;https://github.com/sckott/serrano/tree/v0.1.1&quot;&gt;serrano&lt;/a&gt; and &lt;a href=&quot;https://github.com/sckott/habanero/tree/v0.1.0&quot;&gt;habanero&lt;/a&gt;. As you can see in the changelogs of the three clients (&lt;a href=&quot;https://github.com/sckott/serrano/blob/master/CHANGELOG.md&quot;&gt;serrano&lt;/a&gt;, &lt;a href=&quot;https://github.com/sckott/habanero/blob/master/Changelog.rst&quot;&gt;habanero&lt;/a&gt;, &lt;a href=&quot;https://github.com/ropensci/rcrossref/blob/master/NEWS.md&quot;&gt;rcrossref&lt;/a&gt;) alot has changed in the last two years as we’ve made improvements and kept up with Crossref API changes.&lt;/p&gt;
 
-&lt;h3 id=&quot;python&quot;&gt;Python&lt;/h3&gt;
+&lt;h3 id=&quot;ruby-and-r&quot;&gt;Ruby and R&lt;/h3&gt;
 
-&lt;p&gt;I’ve just released a new version of &lt;code class=&quot;highlighter-rouge&quot;&gt;habanero&lt;/code&gt; - &lt;code class=&quot;highlighter-rouge&quot;&gt;v0.6&lt;/code&gt;. Noteable changes include adding ability to add a &lt;code class=&quot;highlighter-rouge&quot;&gt;mailto&lt;/code&gt; to each request to get into the so called “polite pool”; &lt;code class=&quot;highlighter-rouge&quot;&gt;select&lt;/code&gt; parameter added to select certain fields to get back; and the docs got a major overhaul (check em out at &lt;a href=&quot;http://habanero.readthedocs.io/en/latest/&quot;&gt;http://habanero.readthedocs.io/en/latest/&lt;/a&gt;; hope you like it; get in touch if you think docs can be improved).&lt;/p&gt;
+&lt;p&gt;Nothing new to report for the Ruby (&lt;a href=&quot;https://github.com/sckott/serrano&quot;&gt;serrano&lt;/a&gt;) and R (&lt;a href=&quot;https://github.com/ropensci/rcrossref&quot;&gt;rcrossref&lt;/a&gt;) clients, though both will soon be getting the previous features just mentioned (&lt;code class=&quot;highlighter-rouge&quot;&gt;mailto&lt;/code&gt; and &lt;code class=&quot;highlighter-rouge&quot;&gt;select&lt;/code&gt;).&lt;/p&gt;
+
+&lt;h3 id=&quot;python-habanero&quot;&gt;Python: habanero&lt;/h3&gt;
+
+&lt;p&gt;I’ve just released a new version of &lt;code class=&quot;highlighter-rouge&quot;&gt;habanero&lt;/code&gt; - &lt;a href=&quot;https://pypi.python.org/pypi/habanero&quot;&gt;v0.6&lt;/a&gt;. Noteable changes include adding ability to add a &lt;code class=&quot;highlighter-rouge&quot;&gt;mailto&lt;/code&gt; to each request to get into the so called &lt;a href=&quot;https://github.com/CrossRef/rest-api-doc#good-manners--more-reliable-service&quot;&gt;“polite pool”&lt;/a&gt;; &lt;a href=&quot;https://github.com/CrossRef/rest-api-doc#selecting-which-elements-to-return&quot;&gt;&lt;code class=&quot;highlighter-rouge&quot;&gt;select&lt;/code&gt; parameter&lt;/a&gt; added to select certain fields to get back; and the docs got a major overhaul (check em out at &lt;a href=&quot;http://habanero.readthedocs.io/en/latest/&quot;&gt;http://habanero.readthedocs.io/en/latest/&lt;/a&gt;; hope you like it; get in touch if you think docs can be improved).&lt;/p&gt;
 
 &lt;p&gt;To install:&lt;/p&gt;
 
@@ -63,7 +250,7 @@ pip install habanero
 &lt;/code&gt;&lt;/pre&gt;
 &lt;/div&gt;
 
-&lt;h4 id=&quot;use-cases&quot;&gt;Use cases&lt;/h4&gt;
+&lt;h3 id=&quot;habanero-use-cases&quot;&gt;habanero use cases&lt;/h3&gt;
 
 &lt;p&gt;I’ve seen some cool use cases using &lt;code class=&quot;highlighter-rouge&quot;&gt;habanero&lt;/code&gt; lately.&lt;/p&gt;
 
@@ -73,9 +260,6 @@ pip install habanero
   &lt;li&gt;A Django app called &lt;a href=&quot;https://tailordev-biblio.herokuapp.com/&quot;&gt;TailorDev Biblio&lt;/a&gt; from &lt;a href=&quot;https://github.com/jmaupetit&quot;&gt;Julien Maupetit&lt;/a&gt; that manages references.&lt;/li&gt;
 &lt;/ul&gt;
 
-&lt;h3 id=&quot;ruby-and-r&quot;&gt;Ruby and R&lt;/h3&gt;
-
-&lt;p&gt;Nothing new to report for &lt;code class=&quot;highlighter-rouge&quot;&gt;serrano&lt;/code&gt; and &lt;code class=&quot;highlighter-rouge&quot;&gt;rcrossref&lt;/code&gt;, though both will soon be getting the previous features just mentioned (&lt;code class=&quot;highlighter-rouge&quot;&gt;mailto&lt;/code&gt; and &lt;code class=&quot;highlighter-rouge&quot;&gt;select&lt;/code&gt;).&lt;/p&gt;
 </description>
         <pubDate>Mon, 23 Oct 2017 00:00:00 -0700</pubDate>
         <link>http://localhost:4000/2017/10/habanero-update/</link>
@@ -1377,319 +1561,6 @@ subset of fields&lt;/p&gt;
         <category>sinatra</category>
         
         <category>science</category>
-        
-        
-      </item>
-    
-      <item>
-        <title>nonoyes - text analysis of Reply All podcast transcripts</title>
-        <description>&lt;ul&gt;
-  &lt;li&gt;&lt;a href=&quot;#setup&quot;&gt;Setup&lt;/a&gt;&lt;/li&gt;
-  &lt;li&gt;&lt;a href=&quot;#urls&quot;&gt;URLs&lt;/a&gt;&lt;/li&gt;
-  &lt;li&gt;&lt;a href=&quot;#episode-names&quot;&gt;Episode names&lt;/a&gt;&lt;/li&gt;
-  &lt;li&gt;&lt;a href=&quot;#transcripts&quot;&gt;Transcripts&lt;/a&gt;&lt;/li&gt;
-  &lt;li&gt;&lt;a href=&quot;#summary-word-usage&quot;&gt;Summary word usage&lt;/a&gt;&lt;/li&gt;
-  &lt;li&gt;&lt;a href=&quot;#sentiment&quot;&gt;Sentiment&lt;/a&gt;
-    &lt;ul&gt;
-      &lt;li&gt;&lt;a href=&quot;#most-common-positive-and-negative-words&quot;&gt;Most common positive and negative
-words&lt;/a&gt;&lt;/li&gt;
-    &lt;/ul&gt;
-  &lt;/li&gt;
-&lt;/ul&gt;
-
-&lt;p&gt;&lt;a href=&quot;https://gimletmedia.com/show/reply-all/&quot;&gt;Reply All&lt;/a&gt; is a great podcast.
-I’ve been wanting to learn some text analysis tools, and transcripts
-from the podcast are on their site.&lt;/p&gt;
-
-&lt;p&gt;Took some approaches outlined in the
-&lt;a href=&quot;https://cran.rstudio.com/web/packages/tidytext/&quot;&gt;tidytext&lt;/a&gt; package in
-&lt;a href=&quot;https://cran.rstudio.com/web/packages/tidytext/vignettes/tidytext.html&quot;&gt;this
-vignette&lt;/a&gt;,
-and used the
-&lt;a href=&quot;https://cran.rstudio.com/web/packages/tokenizers&quot;&gt;tokenizers&lt;/a&gt; package,
-and some of the tidyverse.&lt;/p&gt;
-
-&lt;p&gt;Code on github at &lt;a href=&quot;https://github.com/sckott/nonoyes&quot;&gt;sckott/nonoyes&lt;/a&gt;&lt;/p&gt;
-
-&lt;p&gt;Also check out the &lt;a href=&quot;http://htmlpreview.github.io/?https://github.com/sckott/nonoyes/blob/master/script.html&quot;&gt;html version&lt;/a&gt;&lt;/p&gt;
-
-&lt;h2 id=&quot;setup&quot;&gt;Setup&lt;/h2&gt;
-
-&lt;p&gt;Load deps&lt;/p&gt;
-
-&lt;div class=&quot;highlighter-rouge&quot;&gt;&lt;pre class=&quot;highlight&quot;&gt;&lt;code&gt;library(&quot;httr&quot;)
-library(&quot;xml2&quot;)
-library(&quot;stringi&quot;)
-library(&quot;dplyr&quot;)
-library(&quot;ggplot2&quot;)
-library(&quot;tokenizers&quot;)
-library(&quot;tidytext&quot;)
-library(&quot;tidyr&quot;)
-&lt;/code&gt;&lt;/pre&gt;
-&lt;/div&gt;
-
-&lt;p&gt;source helper functions&lt;/p&gt;
-
-&lt;div class=&quot;highlighter-rouge&quot;&gt;&lt;pre class=&quot;highlight&quot;&gt;&lt;code&gt;source(&quot;funs.R&quot;)
-&lt;/code&gt;&lt;/pre&gt;
-&lt;/div&gt;
-
-&lt;p&gt;set base url&lt;/p&gt;
-
-&lt;div class=&quot;highlighter-rouge&quot;&gt;&lt;pre class=&quot;highlight&quot;&gt;&lt;code&gt;ra_base &amp;lt;- &quot;https://gimletmedia.com/show/reply-all/episodes&quot;
-&lt;/code&gt;&lt;/pre&gt;
-&lt;/div&gt;
-
-&lt;h2 id=&quot;urls&quot;&gt;URLs&lt;/h2&gt;
-
-&lt;p&gt;Make all urls for each page of episodes&lt;/p&gt;
-
-&lt;div class=&quot;highlighter-rouge&quot;&gt;&lt;pre class=&quot;highlight&quot;&gt;&lt;code&gt;urls &amp;lt;- c(ra_base, file.path(ra_base, &quot;page&quot;, 2:8))
-&lt;/code&gt;&lt;/pre&gt;
-&lt;/div&gt;
-
-&lt;p&gt;Get urls for each episode&lt;/p&gt;
-
-&lt;div class=&quot;highlighter-rouge&quot;&gt;&lt;pre class=&quot;highlight&quot;&gt;&lt;code&gt;res &amp;lt;- lapply(urls, get_urls)
-&lt;/code&gt;&lt;/pre&gt;
-&lt;/div&gt;
-
-&lt;p&gt;Remove those that are rebroadcasts, updates, or revisited&lt;/p&gt;
-
-&lt;div class=&quot;highlighter-rouge&quot;&gt;&lt;pre class=&quot;highlight&quot;&gt;&lt;code&gt;res &amp;lt;- grep(&quot;rebroadcast|update|revisited&quot;, unlist(res), value = TRUE, invert = TRUE)
-&lt;/code&gt;&lt;/pre&gt;
-&lt;/div&gt;
-
-&lt;h2 id=&quot;episode-names&quot;&gt;Episode names&lt;/h2&gt;
-
-&lt;p&gt;Give some episodes numbers that don’t have them&lt;/p&gt;
-
-&lt;div class=&quot;highlighter-rouge&quot;&gt;&lt;pre class=&quot;highlight&quot;&gt;&lt;code&gt;epnames &amp;lt;- sub(&quot;/$&quot;, &quot;&quot;, sub(&quot;https://gimletmedia.com/episode/&quot;, &quot;&quot;, res))
-epnames &amp;lt;- sub(&quot;the-anxiety-box&quot;, &quot;8-the-anxiety-box&quot;, epnames)
-epnames &amp;lt;- sub(&quot;french-connection&quot;, &quot;10-french-connection&quot;, epnames)
-epnames &amp;lt;- sub(&quot;ive-killed-people-and-i-have-hostages&quot;, &quot;15-ive-killed-people-and-i-have-hostages&quot;, epnames)
-epnames &amp;lt;- sub(&quot;6-this-proves-everything&quot;, &quot;75-this-proves-everything&quot;, epnames)
-epnames &amp;lt;- sub(&quot;zardulu&quot;, &quot;56-zardulu&quot;, epnames)
-&lt;/code&gt;&lt;/pre&gt;
-&lt;/div&gt;
-
-&lt;h2 id=&quot;transcripts&quot;&gt;Transcripts&lt;/h2&gt;
-
-&lt;p&gt;Get transcripts&lt;/p&gt;
-
-&lt;div class=&quot;highlighter-rouge&quot;&gt;&lt;pre class=&quot;highlight&quot;&gt;&lt;code&gt;txts &amp;lt;- lapply(res, transcript_fetch, sleep = 1)
-&lt;/code&gt;&lt;/pre&gt;
-&lt;/div&gt;
-
-&lt;p&gt;Parse transcripts&lt;/p&gt;
-
-&lt;div class=&quot;highlighter-rouge&quot;&gt;&lt;pre class=&quot;highlight&quot;&gt;&lt;code&gt;txtsp &amp;lt;- lapply(txts, transcript_parse)
-&lt;/code&gt;&lt;/pre&gt;
-&lt;/div&gt;
-
-&lt;h2 id=&quot;summary-word-usage&quot;&gt;Summary word usage&lt;/h2&gt;
-
-&lt;p&gt;Summarise data for each transcript&lt;/p&gt;
-
-&lt;div class=&quot;highlighter-rouge&quot;&gt;&lt;pre class=&quot;highlight&quot;&gt;&lt;code&gt;dat &amp;lt;- stats::setNames(lapply(txtsp, function(m) {
-  bind_rows(lapply(m, function(v) {
-    tmp &amp;lt;- unname(vapply(v, nchar, 1))
-    data_frame(
-      n = length(tmp),
-      mean = mean(tmp),
-      n_laugh = count_word(v, &quot;laugh&quot;),
-      n_groan = count_word(v, &quot;groan&quot;)
-    )
-  }), .id = &quot;name&quot;)
-}), epnames)
-&lt;/code&gt;&lt;/pre&gt;
-&lt;/div&gt;
-
-&lt;p&gt;Bind data together to single dataframe, and filter, summarise&lt;/p&gt;
-
-&lt;div class=&quot;highlighter-rouge&quot;&gt;&lt;pre class=&quot;highlight&quot;&gt;&lt;code&gt;data &amp;lt;- bind_rows(dat, .id = &quot;episode&quot;) %&amp;gt;%
-  filter(!is.na(episode)) %&amp;gt;%
-  filter(grepl(&quot;^PJ$|^ALEX GOLDMAN$&quot;, name)) %&amp;gt;%
-  mutate(ep_no = as.numeric(strextract(episode, &quot;^[0-9]+&quot;))) %&amp;gt;%
-  group_by(ep_no) %&amp;gt;%
-  mutate(nrow = NROW(ep_no)) %&amp;gt;%
-  ungroup() %&amp;gt;%
-  filter(nrow == 2)
-data
-#&amp;gt; # A tibble: 114 × 8
-#&amp;gt;                 episode         name     n      mean n_laugh n_groan ep_no
-#&amp;gt;                   &amp;lt;chr&amp;gt;        &amp;lt;chr&amp;gt; &amp;lt;int&amp;gt;     &amp;lt;dbl&amp;gt;   &amp;lt;int&amp;gt;   &amp;lt;int&amp;gt; &amp;lt;dbl&amp;gt;
-#&amp;gt; 1            73-sandbox           PJ    89 130.65169       9       0    73
-#&amp;gt; 2            73-sandbox ALEX GOLDMAN    25  44.00000       1       1    73
-#&amp;gt; 3       72-dead-is-paul           PJ   137  67.77372      17       0    72
-#&amp;gt; 4       72-dead-is-paul ALEX GOLDMAN    90  61.82222       8       0    72
-#&amp;gt; 5  71-the-picture-taker           PJ    74  77.70270       3       0    71
-#&amp;gt; 6  71-the-picture-taker ALEX GOLDMAN    93 105.94624       6       0    71
-#&amp;gt; 7        69-disappeared           PJ    72  76.50000       2       0    69
-#&amp;gt; 8        69-disappeared ALEX GOLDMAN    50 135.90000       5       0    69
-#&amp;gt; 9      68-vampire-rules           PJ   142  88.00704       6       0    68
-#&amp;gt; 10     68-vampire-rules ALEX GOLDMAN   117  73.16239      13       0    68
-#&amp;gt; # ... with 104 more rows, and 1 more variables: nrow &amp;lt;int&amp;gt;
-&lt;/code&gt;&lt;/pre&gt;
-&lt;/div&gt;
-
-&lt;p&gt;Number of words - seems PJ talks more, but didn’t do quantiative
-comparison&lt;/p&gt;
-
-&lt;div class=&quot;highlighter-rouge&quot;&gt;&lt;pre class=&quot;highlight&quot;&gt;&lt;code&gt;ggplot(data, aes(ep_no, n, colour = name)) +
-  geom_point(size = 3, alpha = 0.5) +
-  geom_line(aes(group = ep_no), colour = &quot;black&quot;) +
-  scale_color_discrete(labels = c('Alex', 'PJ'))
-&lt;/code&gt;&lt;/pre&gt;
-&lt;/div&gt;
-
-&lt;p&gt;&lt;img src=&quot;/public/img/2016-08-25-no-no-yes/unnamed-chunk-12-1.png&quot; alt=&quot;&quot; /&gt;&lt;/p&gt;
-
-&lt;p&gt;Laughs per episode - take home: PJ laughs a lot&lt;/p&gt;
-
-&lt;div class=&quot;highlighter-rouge&quot;&gt;&lt;pre class=&quot;highlight&quot;&gt;&lt;code&gt;ggplot(data, aes(ep_no, n_laugh, colour = name)) +
-  geom_point(size = 3, alpha = 0.5) +
-  geom_line(aes(group = ep_no), colour = &quot;black&quot;) +
-  scale_color_discrete(labels = c('Alex', 'PJ'))
-&lt;/code&gt;&lt;/pre&gt;
-&lt;/div&gt;
-
-&lt;p&gt;&lt;img src=&quot;/public/img/2016-08-25-no-no-yes/unnamed-chunk-13-1.png&quot; alt=&quot;&quot; /&gt;&lt;/p&gt;
-
-&lt;h2 id=&quot;sentiment&quot;&gt;Sentiment&lt;/h2&gt;
-
-&lt;div class=&quot;highlighter-rouge&quot;&gt;&lt;pre class=&quot;highlight&quot;&gt;&lt;code&gt;zero &amp;lt;- which(vapply(txtsp, length, 1) == 0)
-txtsp_ &amp;lt;- Filter(function(x) length(x) != 0, txtsp)
-&lt;/code&gt;&lt;/pre&gt;
-&lt;/div&gt;
-
-&lt;p&gt;Tokenize words, and create data_frame&lt;/p&gt;
-
-&lt;div class=&quot;highlighter-rouge&quot;&gt;&lt;pre class=&quot;highlight&quot;&gt;&lt;code&gt;wordz &amp;lt;- stats::setNames(
-  lapply(txtsp_, function(z) {
-    bind_rows(
-      if (is.null(try_tokenize(z$`ALEX GOLDMAN`))) {
-        data_frame()
-      } else {
-        data_frame(
-          name = &quot;Alex&quot;,
-          word = try_tokenize(z$`ALEX GOLDMAN`)
-        )
-      },
-      if (is.null(try_tokenize(z$PJ))) {
-        data_frame()
-      } else {
-        data_frame(
-          name = &quot;PJ&quot;,
-          word = try_tokenize(z$PJ)
-        )
-      }
-    )
-  }), epnames[-zero])
-&lt;/code&gt;&lt;/pre&gt;
-&lt;/div&gt;
-
-&lt;p&gt;Combine to single data_frame&lt;/p&gt;
-
-&lt;div class=&quot;highlighter-rouge&quot;&gt;&lt;pre class=&quot;highlight&quot;&gt;&lt;code&gt;(wordz_df &amp;lt;- bind_rows(wordz, .id = &quot;episode&quot;))
-#&amp;gt; # A tibble: 104,713 × 3
-#&amp;gt;       episode  name      word
-#&amp;gt;         &amp;lt;chr&amp;gt; &amp;lt;chr&amp;gt;     &amp;lt;chr&amp;gt;
-#&amp;gt; 1  73-sandbox  Alex      alex
-#&amp;gt; 2  73-sandbox  Alex   goldman
-#&amp;gt; 3  73-sandbox  Alex         i
-#&amp;gt; 4  73-sandbox  Alex generally
-#&amp;gt; 5  73-sandbox  Alex     don’t
-#&amp;gt; 6  73-sandbox  Alex      alex
-#&amp;gt; 7  73-sandbox  Alex    really
-#&amp;gt; 8  73-sandbox  Alex      alex
-#&amp;gt; 9  73-sandbox  Alex    groans
-#&amp;gt; 10 73-sandbox  Alex        so
-#&amp;gt; # ... with 104,703 more rows
-&lt;/code&gt;&lt;/pre&gt;
-&lt;/div&gt;
-
-&lt;p&gt;Calculate sentiment using &lt;code class=&quot;highlighter-rouge&quot;&gt;tidytext&lt;/code&gt;&lt;/p&gt;
-
-&lt;div class=&quot;highlighter-rouge&quot;&gt;&lt;pre class=&quot;highlight&quot;&gt;&lt;code&gt;bing &amp;lt;- sentiments %&amp;gt;%
-  filter(lexicon == &quot;bing&quot;) %&amp;gt;%
-  select(-score)
-sent &amp;lt;- wordz_df %&amp;gt;%
-  inner_join(bing) %&amp;gt;%
-  count(name, episode, sentiment) %&amp;gt;%
-  spread(sentiment, n, fill = 0) %&amp;gt;%
-  mutate(sentiment = positive - negative) %&amp;gt;%
-  ungroup() %&amp;gt;%
-  filter(!is.na(episode)) %&amp;gt;%
-  complete(episode, name) %&amp;gt;%
-  mutate(ep_no = as.numeric(strextract(episode, &quot;^[0-9]+&quot;)))
-sent
-#&amp;gt; # A tibble: 148 × 6
-#&amp;gt;                                        episode  name negative positive
-#&amp;gt;                                          &amp;lt;chr&amp;gt; &amp;lt;chr&amp;gt;    &amp;lt;dbl&amp;gt;    &amp;lt;dbl&amp;gt;
-#&amp;gt; 1  1-an-app-sends-a-stranger-to-say-i-love-you  Alex       19       30
-#&amp;gt; 2  1-an-app-sends-a-stranger-to-say-i-love-you    PJ       14       14
-#&amp;gt; 3                         10-french-connection  Alex       15       32
-#&amp;gt; 4                         10-french-connection    PJ       16       36
-#&amp;gt; 5     11-did-errol-morris-brother-invent-email  Alex       NA       NA
-#&amp;gt; 6     11-did-errol-morris-brother-invent-email    PJ       25       30
-#&amp;gt; 7                           12-backend-trouble  Alex       20       15
-#&amp;gt; 8                           12-backend-trouble    PJ       40       59
-#&amp;gt; 9                              13-love-is-lies  Alex       NA       NA
-#&amp;gt; 10                             13-love-is-lies    PJ       45       64
-#&amp;gt; # ... with 138 more rows, and 2 more variables: sentiment &amp;lt;dbl&amp;gt;,
-#&amp;gt; #   ep_no &amp;lt;dbl&amp;gt;
-&lt;/code&gt;&lt;/pre&gt;
-&lt;/div&gt;
-
-&lt;p&gt;Names separate&lt;/p&gt;
-
-&lt;div class=&quot;highlighter-rouge&quot;&gt;&lt;pre class=&quot;highlight&quot;&gt;&lt;code&gt;ggplot(sent, aes(ep_no, sentiment, fill = name)) +
-  geom_bar(stat = &quot;identity&quot;) +
-  facet_wrap(~name, ncol = 2, scales = &quot;free_x&quot;)
-&lt;/code&gt;&lt;/pre&gt;
-&lt;/div&gt;
-
-&lt;p&gt;&lt;img src=&quot;/public/img/2016-08-25-no-no-yes/unnamed-chunk-18-1.png&quot; alt=&quot;&quot; /&gt;&lt;/p&gt;
-
-&lt;p&gt;Compare for each episode&lt;/p&gt;
-
-&lt;div class=&quot;highlighter-rouge&quot;&gt;&lt;pre class=&quot;highlight&quot;&gt;&lt;code&gt;ggplot(sent, aes(ep_no, sentiment, fill = name)) +
-  geom_bar(stat = &quot;identity&quot;, position = position_dodge(width = 0.5), width = 0.6)
-&lt;/code&gt;&lt;/pre&gt;
-&lt;/div&gt;
-
-&lt;p&gt;&lt;img src=&quot;/public/img/2016-08-25-no-no-yes/unnamed-chunk-19-1.png&quot; alt=&quot;&quot; /&gt;&lt;/p&gt;
-
-&lt;h3 id=&quot;most-common-positive-and-negative-words&quot;&gt;Most common positive and negative words&lt;/h3&gt;
-
-&lt;p&gt;Clearly, the word &lt;code class=&quot;highlighter-rouge&quot;&gt;like&lt;/code&gt; is surely rarely used as a positive word
-meaning e.g., that they &lt;em&gt;like something&lt;/em&gt;, but rather as the colloquial
-&lt;code class=&quot;highlighter-rouge&quot;&gt;like, totally&lt;/code&gt; usage. So it’s removed.&lt;/p&gt;
-
-&lt;p&gt;Alex&lt;/p&gt;
-
-&lt;div class=&quot;highlighter-rouge&quot;&gt;&lt;pre class=&quot;highlight&quot;&gt;&lt;code&gt;sent_cont_plot(wordz_df, &quot;Alex&quot;)
-&lt;/code&gt;&lt;/pre&gt;
-&lt;/div&gt;
-
-&lt;p&gt;&lt;img src=&quot;/public/img/2016-08-25-no-no-yes/unnamed-chunk-20-1.png&quot; alt=&quot;&quot; /&gt;&lt;/p&gt;
-
-&lt;p&gt;PJ&lt;/p&gt;
-
-&lt;div class=&quot;highlighter-rouge&quot;&gt;&lt;pre class=&quot;highlight&quot;&gt;&lt;code&gt;sent_cont_plot(wordz_df, &quot;PJ&quot;)
-&lt;/code&gt;&lt;/pre&gt;
-&lt;/div&gt;
-
-&lt;p&gt;&lt;img src=&quot;/public/img/2016-08-25-no-no-yes/unnamed-chunk-21-1.png&quot; alt=&quot;&quot; /&gt;&lt;/p&gt;
-</description>
-        <pubDate>Thu, 25 Aug 2016 00:00:00 -0700</pubDate>
-        <link>http://localhost:4000/2016/08/no-no-yes/</link>
-        <guid isPermaLink="true">http://localhost:4000/2016/08/no-no-yes/</guid>
-        
-        <category>text-mining</category>
-        
-        <category>R</category>
         
         
       </item>

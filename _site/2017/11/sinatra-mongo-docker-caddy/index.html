@@ -1,0 +1,440 @@
+<!DOCTYPE html>
+<html>
+
+  <head>
+  <meta charset="utf-8">
+  <meta http-equiv="X-UA-Compatible" content="IE=edge">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+
+  <title>Web APIs with Sinatra, Mongo, Docker, and Caddy</title>
+  <meta name="description" content="The problem">
+  <link href='https://fonts.googleapis.com/css?family=PT+Sans:400,700,400italic,700italic|Source+Sans+Pro:400,700,200,300|Josefin+Sans:400,600,700,300' rel='stylesheet' type='text/css'>
+  <link href="https://maxcdn.bootstrapcdn.com/font-awesome/4.5.0/css/font-awesome.min.css" rel="stylesheet">
+
+  <link rel="stylesheet" href="/css/style.css">
+  <link rel="canonical" href="http://localhost:4000/2017/11/sinatra-mongo-docker-caddy/">
+  <link rel="alternate" type="application/rss+xml" title="recology" href="http://localhost:4000/feed.xml">
+</head>
+
+
+  <body>
+
+    
+<div class="wrapper">
+  <center> <a href="/index.html"><div class="site-title">   recology </div></a></center>
+</div>
+<div class="wrapper site-description">
+<center>  code and such </center>
+</div>
+<div class="wrapper">
+  <div class="trigger site-navigation">
+    <a class="page-link" href="/">HOME</a>
+
+    
+    
+    
+    
+
+    <span class="exclamationMark">/</span><a class="page-link" href="/archives/">Archives</a>
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+  </div>
+</div>
+
+
+    <div class="page-content">
+      <div class="wrapper">
+        <article class="post" itemscope itemtype="http://schema.org/BlogPosting">
+
+  <header class="post-header">
+    <h1 class="post-title" itemprop="name headline"><a class="post-title-link"  href="/2017/11/sinatra-mongo-docker-caddy/">Web APIs with Sinatra, Mongo, Docker, and Caddy</a></h1>
+  <center>  <p class="post-meta"><time datetime="2017-11-14T00:00:00-08:00" itemprop="datePublished">Nov 14, 2017</time></p>
+    <!-- 
+     <div class="">
+       <center><p ><strong><span class="authorKeyword">Author</span><span class="small-site-title"> <h2 style="letter-spacing: 3px !important;
+       text-transform: uppercase !important;">Scott Chamberlain</h2></span></strong></p></center>
+
+     </div>
+      -->
+   </center>
+  </header>
+
+  <div class="post-content" itemprop="articleBody">
+    <h2 id="the-problem">The problem</h2>
+
+<p>The R community has a package distribution thing called <a href="https://cran.rstudio.com/web/packages/">CRAN</a> just like Ruby has <a href="https://rubygems.org/">Rubygems</a>, and Python has <a href="https://pypi.python.org/pypi">Pypi</a>, etc. On all packages on CRAN, the CRAN maintainers run checks on each package on multiple versions of R and on many operating systems. They report those results on a page associated with the package, like <a href="https://cran.rstudio.com/web/checks/check_results_crul.html">this one</a>.</p>
+
+<p>You might be thinking: okay, but we have Travis-CI and friends, so who cares about that?  Well, it’s these checks that CRAN runs that will determine if your package on CRAN leads to emails to you asking for changes, and possibly the package being taken down if e.g., they email and you don’t respond for a period of time.</p>
+
+<p>So CRAN provides these package checks. Now what?  Ideally, these would be available through an API so that the data is machine readable, which then makes many other things possible (see <a href="#whats-next">What’s Next</a> below).</p>
+
+<p>So how to build the API?</p>
+
+<h2 id="building-the-cran-checks-api">Building the CRAN checks API</h2>
+
+<p>On GitHub: <a href="https://github.com/ropensci/cchecksapi">https://github.com/ropensci/cchecksapi</a></p>
+
+<p>My main goal learning goals with this API tech wise were two fold:</p>
+
+<ul>
+  <li>learn how to dockerize the application</li>
+  <li>learn how to use MongoDB</li>
+</ul>
+
+<p>I hadn’t Dockerized a web API myself before, so that was an important goal - and I had actually never used MongoDB, but wanted to give it a shot to get familiar with it.</p>
+
+<p>The whole stack is:</p>
+
+<ul>
+  <li>language: Ruby</li>
+  <li>web API framework: Sinatra</li>
+  <li>http Ruby gem: faraday</li>
+  <li>database: mongodb</li>
+  <li>server: caddy</li>
+  <li>container: all wrapped up in docker (docker-compose)</li>
+  <li>hosting: Amazon EC2</li>
+  <li>scheduling: crontab</li>
+</ul>
+
+<p>At a high level, the system is as so:</p>
+
+<ul>
+  <li>Once a day a few Ruby scripts (<a href="https://github.com/ropensci/cchecksapi/blob/master/scrape.rb">for packages</a>, <a href="https://github.com/ropensci/cchecksapi/blob/master/scrape_maintainer.rb">for maintainers</a>):
+    <ul>
+      <li>collects the names of packages on CRAN from Gábor Csárdi’s <a href="https://crandb.r-pkg.org">https://crandb.r-pkg.org</a> API and maintainer emails from CRAN itself, then</li>
+      <li>goes out to the CRAN website and collects check results for each package, then</li>
+      <li>insert data into a MongoDB database</li>
+    </ul>
+  </li>
+  <li>The API provides routes for getting data on specific packages by name, or all packages, and data on all packages for any given maintainers email adddress, or all maintainers
+    <ul>
+      <li>API calls make a query into the MongoDB database matching on the package name or maintainer email address</li>
+      <li>data is given back as JSON</li>
+    </ul>
+  </li>
+</ul>
+
+<p>The API doesn’t currently use caching, but may add if it seems needed.</p>
+
+<h2 id="ruby-and-sinatra">Ruby and Sinatra</h2>
+
+<p>I really like Ruby. It’s a language that is fun to use, the community is great, and there’s tons of packages.  Ruby is great for making web stuff, including web APIs. When doing web stuff, for me that means web APIs. For web APIs in Ruby, Rails is too heavy for all the stuff I do - that’s where <a href="http://www.sinatrarb.com/">Sinatra</a> comes in.</p>
+
+<p>Sinatra is a lightweight framework for making web apps/APIs. I make all my web APIs with Sinatra, and have had few complaints. Some may say “you should use X or Y because faster”, or whatever, but Sinatra is plenty fast for my use cases. Not every use case is “we’re Facebook”, or “we’re Google”.</p>
+
+<p>Until recently I’ve been very much manually managing my Sinatra web APIs on servers - that is, installing/updating everything on the server itself, without using containers or any configuration management. This blog post is the blog post I would have wanted to read when I was figuring out how to dockerize my web APIs.</p>
+
+<h2 id="the-api">The API</h2>
+
+<p>The main meat of the API is definitions of routes. In addition, I’ve included a number of rules about what HTTP verbs are allowed to be used, what headers to send in each response, how to respond to client and server failures, etc.</p>
+
+<p>This is what one of the route definitions looks like:</p>
+
+<div class="language-ruby highlighter-rouge"><pre class="highlight"><code><span class="n">get</span> <span class="s1">'/pkgs/?'</span> <span class="k">do</span>
+  <span class="n">headers_get</span>
+  <span class="k">begin</span>
+    <span class="n">lim</span> <span class="o">=</span> <span class="p">(</span><span class="n">params</span><span class="p">[</span><span class="ss">:limit</span><span class="p">]</span> <span class="o">||</span> <span class="mi">10</span><span class="p">).</span><span class="nf">to_i</span>
+    <span class="n">off</span> <span class="o">=</span> <span class="p">(</span><span class="n">params</span><span class="p">[</span><span class="ss">:offset</span><span class="p">]</span> <span class="o">||</span> <span class="mi">0</span><span class="p">).</span><span class="nf">to_i</span>
+    <span class="k">raise</span> <span class="no">Exception</span><span class="p">.</span><span class="nf">new</span><span class="p">(</span><span class="s1">'limit too large (max 1000)'</span><span class="p">)</span> <span class="k">unless</span> <span class="n">lim</span> <span class="o">&lt;=</span> <span class="mi">1000</span>
+    <span class="n">d</span> <span class="o">=</span> <span class="vg">$cks</span><span class="p">.</span><span class="nf">find</span><span class="p">({},</span> <span class="p">{</span><span class="s2">"limit"</span> <span class="o">=&gt;</span> <span class="n">lim</span><span class="p">,</span> <span class="s2">"skip"</span> <span class="o">=&gt;</span> <span class="n">off</span><span class="p">})</span>
+    <span class="n">dat</span> <span class="o">=</span> <span class="n">d</span><span class="p">.</span><span class="nf">to_a</span>
+    <span class="k">raise</span> <span class="no">Exception</span><span class="p">.</span><span class="nf">new</span><span class="p">(</span><span class="s1">'no results found'</span><span class="p">)</span> <span class="k">if</span> <span class="n">d</span><span class="p">.</span><span class="nf">nil?</span>
+    <span class="p">{</span> <span class="ss">found: </span><span class="n">d</span><span class="p">.</span><span class="nf">count</span><span class="p">,</span> <span class="ss">count: </span><span class="n">dat</span><span class="p">.</span><span class="nf">length</span><span class="p">,</span> <span class="ss">offset: </span><span class="kp">nil</span><span class="p">,</span> <span class="ss">error: </span><span class="kp">nil</span><span class="p">,</span>
+      <span class="ss">data: </span><span class="n">dat</span> <span class="p">}.</span><span class="nf">to_json</span>
+  <span class="k">rescue</span> <span class="no">Exception</span> <span class="o">=&gt;</span> <span class="n">e</span>
+    <span class="n">halt</span> <span class="mi">400</span><span class="p">,</span> <span class="p">{</span> <span class="ss">count: </span><span class="mi">0</span><span class="p">,</span> <span class="ss">error: </span><span class="p">{</span> <span class="ss">message: </span><span class="n">e</span><span class="p">.</span><span class="nf">message</span> <span class="p">},</span> <span class="ss">data: </span><span class="kp">nil</span> <span class="p">}.</span><span class="nf">to_json</span>
+  <span class="k">end</span>
+<span class="k">end</span>
+</code></pre>
+</div>
+
+<p>This code chunk is for the <code class="highlighter-rouge">/pkgs</code> route on the API (check it out at <a href="https://cranchecks.info/pkgs">https://cranchecks.info/pkgs</a>). The <code class="highlighter-rouge">headers_get</code> bit sends a pre-defined set of headers in the response. The <code class="highlighter-rouge">begin ... rescue ... end</code> bit is a “try catch” thing - leading to a JSON failure response in case there is a failure - and a JSON response on success.</p>
+
+<h2 id="collecting-data-and-mongodb">Collecting data and MongoDB</h2>
+
+<p>As stated above, data is updated once a day. The code for scraping data on the package level and maintainer level is pretty similar. For both, the steps are the following: a) collect all names (for <code class="highlighter-rouge">/pkgs</code> that’s package names from <a href="https://crandb.r-pkg.org">https://crandb.r-pkg.org</a>; for <code class="highlighter-rouge">/maintainers</code> that’s maintainer email addresses from <a href="https://cran.rstudio.com/web/checks/check_summary_by_maintainer.html">https://cran.rstudio.com/web/checks/check_summary_by_maintainer.html</a>), b) for each package name or maintainer email scrape CRAN check results, c) with all data collected drop data in MongoDB and then load all new data (maybe this could be an update step?). You can see the gory details on GitHub for <a href="https://github.com/ropensci/cchecksapi/blob/master/scrape.rb">packages</a> and <a href="https://github.com/ropensci/cchecksapi/blob/master/scrape_maintainer.rb">maintainers</a>.</p>
+
+<p>Those steps above in code for packages is like the following:</p>
+
+<div class="language-ruby highlighter-rouge"><pre class="highlight"><code><span class="k">def</span> <span class="nf">scrape_all</span>
+  <span class="n">pkgs</span> <span class="o">=</span> <span class="n">cran_packages</span><span class="p">;</span> <span class="c1"># get all pkg names</span>
+  <span class="n">out</span> <span class="o">=</span> <span class="p">[]</span> <span class="c1"># make an array</span>
+  <span class="n">pkgs</span><span class="p">.</span><span class="nf">each</span> <span class="k">do</span> <span class="o">|</span><span class="n">x</span><span class="o">|</span> <span class="c1"># for each pkg, scrape check results</span>
+    <span class="n">out</span> <span class="o">&lt;&lt;</span> <span class="n">scrape_pkg</span><span class="p">(</span><span class="n">x</span><span class="p">)</span>
+  <span class="k">end</span>
+  <span class="k">if</span> <span class="vg">$cks</span><span class="p">.</span><span class="nf">count</span> <span class="o">&gt;</span> <span class="mi">0</span>
+    <span class="vg">$cks</span><span class="p">.</span><span class="nf">drop</span> <span class="c1"># drop data in Mongo</span>
+    <span class="vg">$cks</span> <span class="o">=</span> <span class="vg">$mongo</span><span class="p">[</span><span class="ss">:checks</span><span class="p">]</span> <span class="c1"># recreate database in Mongo</span>
+  <span class="k">end</span>
+  <span class="vg">$cks</span><span class="p">.</span><span class="nf">insert_many</span><span class="p">(</span><span class="n">out</span><span class="p">.</span><span class="nf">map</span> <span class="p">{</span> <span class="o">|</span><span class="n">e</span><span class="o">|</span> <span class="n">prep_mongo</span><span class="p">(</span><span class="n">e</span><span class="p">)</span> <span class="p">})</span> <span class="c1"># load new data into Mongo</span>
+<span class="k">end</span>
+</code></pre>
+</div>
+
+<p><code class="highlighter-rouge">$cks</code> is the MongoDB database connection.</p>
+
+<h2 id="docker">Docker</h2>
+
+<p>For containerizing the API, I used Docker. A colleague had used <a href="https://docs.docker.com/compose/">Docker Compose</a>, and it was a really easy experience spinning up and taking down the application we were working on. So I wanted to learn how to do that myself. After trial and error, finally got to a solution for this API. Here is my <code class="highlighter-rouge">docker-compose.yml</code> file:</p>
+
+<pre><code class="language-Dockerfile">mongo:
+  image: mongo
+  volumes:
+    - $HOME/data/mongodb:/data/db # persists data to disk outside container
+  restart: always
+  ports:
+    - "27017:27017"
+
+api:
+  build: .
+  ports:
+    - "8834:8834"
+  links:
+    - mongo
+</code></pre>
+
+<p>This specifies the container for MongoDB and for the API, and specifies in the API container to link to the mongo container.</p>
+
+<p>To build and run do</p>
+
+<div class="highlighter-rouge"><pre class="highlight"><code>docker-compose build &amp;&amp; docker-compose up -d
+</code></pre>
+</div>
+
+<p>The <code class="highlighter-rouge">-d</code> flag is for daemonize, i.e., run in the background. To kill them run</p>
+
+<div class="highlighter-rouge"><pre class="highlight"><code>docker-compose stop &amp;&amp; docker-compose rm
+</code></pre>
+</div>
+
+<h2 id="caddy-server">Caddy server</h2>
+
+<p>Caddy is great server. I never really used Nginx, so I can’t compare the two really - I just know that Caddy is super easy. To install, check out the installation page <a href="https://caddyserver.com/download">https://caddyserver.com/download</a>, and it’s easy as something like <code class="highlighter-rouge">curl https://getcaddy.com | bash -s personal</code> (depends on configuration options on that page and license choice).</p>
+
+<p>I know there’s an option to run a separate container with Caddy, but I run Caddy outside containers.</p>
+
+<p>My <code class="highlighter-rouge">Caddyfile</code> has something similar to the following:</p>
+
+<div class="highlighter-rouge"><pre class="highlight"><code>cranchecks.info {
+  gzip
+  tls email@foobar.com
+
+  log / logfile.log "{remote} - [{when}] {method} {uri} {query} {proto} {status} {size} {&gt;User-Agent}" {
+     rotate_size 3
+  }
+
+  proxy / localhost:8834 {
+    transparent
+  }
+}
+</code></pre>
+</div>
+
+<ul>
+  <li><code class="highlighter-rouge">gzip</code> tells Caddy to serve gzipp’ed content (see <a href="https://caddyserver.com/docs/gzip">https://caddyserver.com/docs/gzip</a>)</li>
+  <li><code class="highlighter-rouge">tls</code> says use the given email for registering with <a href="https://letsencrypt.org/">Letsencrypt</a> (see <a href="https://caddyserver.com/docs/tls">https://caddyserver.com/docs/tls</a>)</li>
+  <li><code class="highlighter-rouge">log</code> line specifies how to log requests (and <code class="highlighter-rouge">rotate_size</code> says start a new file when the current one reaches 3 MB) (see <a href="https://caddyserver.com/docs/log">https://caddyserver.com/docs/log</a>)</li>
+  <li><code class="highlighter-rouge">proxy</code> is for specifying reverse proxy (see <a href="https://caddyserver.com/docs/proxy">https://caddyserver.com/docs/proxy</a>)</li>
+</ul>
+
+<h2 id="whats-next">What’s Next</h2>
+
+<p>There’s still more work to do.</p>
+
+<ul>
+  <li>Better <code class="highlighter-rouge">/maintainers</code> results
+    <ul>
+      <li>right now, we have two arrays of results, one from the html table on the CRAN results page and the other from the text below it. This duplication isn’t ideal.</li>
+      <li>it would be helpful to have a summary across all packages for any given maintainer</li>
+    </ul>
+  </li>
+  <li>Better <code class="highlighter-rouge">/pkgs</code> results
+    <ul>
+      <li>it would be helpful to have a summary across all R versions and platforms for any given package</li>
+    </ul>
+  </li>
+  <li>Include actual CRAN check results - CRAN check results can include output of the failures (whether they’re in examples or the test suite, or an installation error). The API doesn’t currently include that output, but thinking about how it could.</li>
+  <li>Possibly update data more often. Right now we update once per day. Seems like results do roll in at different times though, perhaps as builds are done for each pkg?</li>
+  <li>Notification service:  package maintainers can opt-in to notifications when their checks are failing so they can be on top of fixes quickly.  This could be managed through the API itself, with no GUI, but to make it palatable to all types may want to make a super simple web page to sign up.</li>
+</ul>
+
+<p>Check out the <a href="https://github.com/ropensci/cchecksapi/issues">issue tracker</a> to follow progress or file a feature request or bug.</p>
+
+<p><br /></p>
+
+<hr />
+
+<h2 id="thanks">Thanks</h2>
+
+<p>Thanks to <a href="https://github.com/gaborcsardi">Gábor Csárdi</a> for the idea to make a <code class="highlighter-rouge">/maintainers</code> route.</p>
+
+<h2 id="further-reading">Further reading</h2>
+
+<p>In a <a href="http://blog.cloud66.com/deploying-rest-apis-to-docker-using-ruby-and-sinatra/">similar post</a> Cloud66 folks talked about deploying an API with the same stack essentially: Sinatra, MongoDB, and Docker.</p>
+
+<h2 id="ps">p.s.</h2>
+
+<p>I mostly write about R software, so some readers may use R: if you want to make a web API but only know R, try learning Ruby!  It can’t hurt to learn Ruby, and you’ll be happy you did.</p>
+
+
+  </div>
+
+  <footer class="postNavigation">
+  
+    <a class="postPrev" href="/2017/10/habanero-update/">
+        &laquo; habanero update: Crossref data from Python
+    </a>
+  
+  
+  </footer>
+
+
+</article>
+
+      </div>
+    </div>
+
+    <footer class="site-footer">
+
+  <div class="wrapper">
+
+    <h2 class="footer-heading small-site-title">Scott Chamberlain</h2>
+
+    <div class="footer-col-wrapper">
+      <div class="footer-col footer-col-1">
+        <ul class="contact-list footer-content">
+          <li>Theme: <a href="http://github.com/hemangsk/Gravity">Gravity</a></li>
+          <li>Made with <i class="fa fa-heart"></i> on <a href="http://jekyllrb.com"><span style="color:black">{ { Jekyll } }</a></span></li>
+
+
+        </ul>
+      </div>
+
+      <div class="footer-col footer-col-2 footer-content">
+        <ul class="social-media-list">
+          
+          <li>
+            <a href="https://github.com/sckott"><span class="icon icon--github"><svg viewBox="0 0 16 16"><path fill="#828282" d="M7.999,0.431c-4.285,0-7.76,3.474-7.76,7.761 c0,3.428,2.223,6.337,5.307,7.363c0.388,0.071,0.53-0.168,0.53-0.374c0-0.184-0.007-0.672-0.01-1.32 c-2.159,0.469-2.614-1.04-2.614-1.04c-0.353-0.896-0.862-1.135-0.862-1.135c-0.705-0.481,0.053-0.472,0.053-0.472 c0.779,0.055,1.189,0.8,1.189,0.8c0.692,1.186,1.816,0.843,2.258,0.645c0.071-0.502,0.271-0.843,0.493-1.037 C4.86,11.425,3.049,10.76,3.049,7.786c0-0.847,0.302-1.54,0.799-2.082C3.768,5.507,3.501,4.718,3.924,3.65 c0,0,0.652-0.209,2.134,0.796C6.677,4.273,7.34,4.187,8,4.184c0.659,0.003,1.323,0.089,1.943,0.261 c1.482-1.004,2.132-0.796,2.132-0.796c0.423,1.068,0.157,1.857,0.077,2.054c0.497,0.542,0.798,1.235,0.798,2.082 c0,2.981-1.814,3.637-3.543,3.829c0.279,0.24,0.527,0.713,0.527,1.437c0,1.037-0.01,1.874-0.01,2.129 c0,0.208,0.14,0.449,0.534,0.373c3.081-1.028,5.302-3.935,5.302-7.362C15.76,3.906,12.285,0.431,7.999,0.431z"/></svg>
+</span><span class="username">sckott</span></a>
+
+          </li>
+          
+
+          
+          <li>
+            <a href="https://twitter.com/sckottie"><span class="icon icon--twitter"><svg viewBox="0 0 16 16"><path fill="#828282" d="M15.969,3.058c-0.586,0.26-1.217,0.436-1.878,0.515c0.675-0.405,1.194-1.045,1.438-1.809c-0.632,0.375-1.332,0.647-2.076,0.793c-0.596-0.636-1.446-1.033-2.387-1.033c-1.806,0-3.27,1.464-3.27,3.27 c0,0.256,0.029,0.506,0.085,0.745C5.163,5.404,2.753,4.102,1.14,2.124C0.859,2.607,0.698,3.168,0.698,3.767 c0,1.134,0.577,2.135,1.455,2.722C1.616,6.472,1.112,6.325,0.671,6.08c0,0.014,0,0.027,0,0.041c0,1.584,1.127,2.906,2.623,3.206 C3.02,9.402,2.731,9.442,2.433,9.442c-0.211,0-0.416-0.021-0.615-0.059c0.416,1.299,1.624,2.245,3.055,2.271 c-1.119,0.877-2.529,1.4-4.061,1.4c-0.264,0-0.524-0.015-0.78-0.046c1.447,0.928,3.166,1.469,5.013,1.469 c6.015,0,9.304-4.983,9.304-9.304c0-0.142-0.003-0.283-0.009-0.423C14.976,4.29,15.531,3.714,15.969,3.058z"/></svg>
+</span><span class="username">sckottie</span></a>
+
+          </li>
+          
+        </ul>
+      </div>
+
+      <div class="footer-col footer-col-3 site-description">
+        <p style="display:inline">code and such</p>
+        <a href="/feed.xml"><i class="fa fa-rss fa-lg"></i></a>&nbsp;
+      </div>
+    </div>
+
+  </div>
+
+</footer>
+
+
+    <!--[if !(lt IE 8)]><!-->
+    <script type="text/javascript">
+      (function(){
+        var e = document.createElement('script'); e.type='text/javascript'; e.async = true;
+        e.src = 'https://www.eff.org/doa/widget.min.js';
+        var s = document.getElementsByTagName('script')[0]; s.parentNode.insertBefore(e, s);
+      })();
+    </script>
+    <!--<![endif]-->
+
+  </body>
+
+</html>
