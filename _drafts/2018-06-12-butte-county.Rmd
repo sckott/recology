@@ -2,9 +2,9 @@
 name: butte-county
 layout: post
 title: "Exploring specimen collections data in Butte County, California"
-date: 2018-06-11
+date: 2018-06-12
 author: Scott Chamberlain
-sourceslug: _drafts/2018-06-11-butte-county.Rmd
+sourceslug: _drafts/2018-06-12-butte-county.Rmd
 tags:
 - R
 - species
