@@ -24,7 +24,7 @@ There's sure to be different opinions on this, but this is why I defend this hil
 * Why introduce more complexity if it can be avoided?
 * It's one more thing out of your control. sure, in a perfect world package API's never break, at least after a certain version (v1 or so), but we can't depend on that. 
 * Rolling your own solution for a problem (aka function/class/etc.) means its completely under your control
-* There's a lot of great packages out there. However, in my opinion, many packages, including many of my own, are targeted at interactive users, not neccesarily optimizing for other packages to use. So even though a package may do X really well, you can also do X on your own if it's simple enough.
+* There's a lot of great packages out there. However, in my opinion, many packages, including many of my own, are targeted at interactive users, not necessarily optimizing for other packages to use. So even though a package may do X really well, you can also do X on your own if it's simple enough.
 
 ### base R solutions
 
