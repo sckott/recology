@@ -5,13 +5,121 @@
     <description>code and such</description>
     <link>https://recology.info/</link>
     <atom:link href="https://recology.info/feed.R.xml" rel="self" type="application/rss+xml"/>
-    <pubDate>Fri, 27 Jul 2018 10:24:26 -0700</pubDate>
-    <lastBuildDate>Fri, 27 Jul 2018 10:24:26 -0700</lastBuildDate>
+    <pubDate>Tue, 02 Oct 2018 13:44:41 -0700</pubDate>
+    <lastBuildDate>Tue, 02 Oct 2018 13:44:41 -0700</lastBuildDate>
     <generator>Jekyll v3.7.3</generator>
     
       <item>
+        <title>limiting dependencies in R package development</title>
+        <description>&lt;p&gt;The longer you do anything, the more preferences you may develop for that thing. One of these things is making R packages.&lt;/p&gt;
+
+&lt;p&gt;One preference I’ve developed is in limiting package dependencies - or at least limiting to the least painful dependencies - in the packages I maintain. Ideally, if a base R solution can be done then do it that way. Everybody has base R packages if they are using R, so you can’t fail there, at least on package installation.&lt;/p&gt;
+
+&lt;p&gt;This is largely not about trusting individual packages (&lt;a href=&quot;https://simplystatistics.org/2015/11/06/how-i-decide-when-to-trust-an-r-package/&quot;&gt;cf. Jeff Leek’s post&lt;/a&gt;), but trust does play a role in deciding which packages to use (see &lt;em&gt;choosing among packages that do the same thing&lt;/em&gt; below).&lt;/p&gt;
+
+&lt;h3 id=&quot;why&quot;&gt;why?&lt;/h3&gt;
+
+&lt;p&gt;There’s sure to be different opinions on this, but this is why I defend this hill:&lt;/p&gt;
+
+&lt;ul&gt;
+  &lt;li&gt;Why introduce more complexity if it can be avoided?&lt;/li&gt;
+  &lt;li&gt;It’s one more thing out of your control. sure, in a perfect world package API’s never break, at least after a certain version (v1 or so), but we can’t depend on that.&lt;/li&gt;
+  &lt;li&gt;Rolling your own solution for a problem (aka function/class/etc.) means its completely under your control&lt;/li&gt;
+  &lt;li&gt;There’s a lot of great packages out there. However, in my opinion, many packages, including many of my own, are targeted at interactive users, not neccesarily optimizing for other packages to use. So even though a package may do X really well, you can also do X on your own if it’s simple enough.&lt;/li&gt;
+&lt;/ul&gt;
+
+&lt;h3 id=&quot;base-r-solutions&quot;&gt;base R solutions&lt;/h3&gt;
+
+&lt;p&gt;Some examples of base R solutions I like to use rather than using an off the shelf package:&lt;/p&gt;
+
+&lt;ul&gt;
+  &lt;li&gt;Remove &lt;code class=&quot;highlighter-rouge&quot;&gt;NULL&lt;/code&gt; elements from a list. The function &lt;code class=&quot;highlighter-rouge&quot;&gt;function(l) Filter(Negate(is.null), l)&lt;/code&gt; is stolen from &lt;code class=&quot;highlighter-rouge&quot;&gt;plyr::compact&lt;/code&gt; originally. I include it as a utility function in many of my packages. It’s simple base R stuff. Easy peasy.&lt;/li&gt;
+  &lt;li&gt;Extract string form another string based on a pattern. The function &lt;code class=&quot;highlighter-rouge&quot;&gt;function(x, y) regmatches(x, regexpr(y, x))&lt;/code&gt; is what &lt;code class=&quot;highlighter-rouge&quot;&gt;stringr::str_extract&lt;/code&gt; used to do before it moved to wrapping &lt;code class=&quot;highlighter-rouge&quot;&gt;stringi&lt;/code&gt; functions. I like the pattern of the input first, and your pattern second, but don’t want to import a huge dependency (&lt;code class=&quot;highlighter-rouge&quot;&gt;stringi&lt;/code&gt;) if I know i just need a simple string extraction.&lt;/li&gt;
+  &lt;li&gt;Infix function &lt;code class=&quot;highlighter-rouge&quot;&gt;%||%&lt;/code&gt;. originally saw this in &lt;code class=&quot;highlighter-rouge&quot;&gt;dplyr&lt;/code&gt;, but now has left that package. the function: &lt;code class=&quot;highlighter-rouge&quot;&gt;function(x, y) if (is.null(x) || length(x) == 0) y else x&lt;/code&gt;. It provides an elegant solution of a in place defined default value for when you can’t be certain of the result. It’s a very brief function, so no need to import a package just for this function.&lt;/li&gt;
+  &lt;li&gt;Check that a parameter input is of the right type. R doesn’t have type checking like some other languages. we can do it internally within the package though. There are packages to do this (check out &lt;a href=&quot;https://github.com/ropensci/assertr&quot;&gt;assertr&lt;/a&gt;), but instead of importing a package, I do something like the below:&lt;/li&gt;
+&lt;/ul&gt;
+
+&lt;div class=&quot;language-r highlighter-rouge&quot;&gt;&lt;div class=&quot;highlight&quot;&gt;&lt;pre class=&quot;highlight&quot;&gt;&lt;code&gt;&lt;span class=&quot;n&quot;&gt;assert&lt;/span&gt;&lt;span class=&quot;w&quot;&gt; &lt;/span&gt;&lt;span class=&quot;o&quot;&gt;&amp;lt;-&lt;/span&gt;&lt;span class=&quot;w&quot;&gt; &lt;/span&gt;&lt;span class=&quot;k&quot;&gt;function&lt;/span&gt;&lt;span class=&quot;w&quot;&gt; &lt;/span&gt;&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;x&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt;&lt;span class=&quot;w&quot;&gt; &lt;/span&gt;&lt;span class=&quot;n&quot;&gt;y&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt;&lt;span class=&quot;w&quot;&gt; &lt;/span&gt;&lt;span class=&quot;p&quot;&gt;{&lt;/span&gt;&lt;span class=&quot;w&quot;&gt;
+  &lt;/span&gt;&lt;span class=&quot;k&quot;&gt;if&lt;/span&gt;&lt;span class=&quot;w&quot;&gt; &lt;/span&gt;&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;o&quot;&gt;!&lt;/span&gt;&lt;span class=&quot;nf&quot;&gt;is.null&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;x&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;))&lt;/span&gt;&lt;span class=&quot;w&quot;&gt; &lt;/span&gt;&lt;span class=&quot;p&quot;&gt;{&lt;/span&gt;&lt;span class=&quot;w&quot;&gt;
+    &lt;/span&gt;&lt;span class=&quot;k&quot;&gt;if&lt;/span&gt;&lt;span class=&quot;w&quot;&gt; &lt;/span&gt;&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;o&quot;&gt;!&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;inherits&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;x&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt;&lt;span class=&quot;w&quot;&gt; &lt;/span&gt;&lt;span class=&quot;n&quot;&gt;y&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;))&lt;/span&gt;&lt;span class=&quot;w&quot;&gt; &lt;/span&gt;&lt;span class=&quot;p&quot;&gt;{&lt;/span&gt;&lt;span class=&quot;w&quot;&gt;
+      &lt;/span&gt;&lt;span class=&quot;n&quot;&gt;stop&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;deparse&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;nf&quot;&gt;substitute&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;x&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;)),&lt;/span&gt;&lt;span class=&quot;w&quot;&gt; &lt;/span&gt;&lt;span class=&quot;s2&quot;&gt;&quot; must be of class &quot;&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt;&lt;span class=&quot;w&quot;&gt;
+          &lt;/span&gt;&lt;span class=&quot;n&quot;&gt;paste0&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;y&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt;&lt;span class=&quot;w&quot;&gt; &lt;/span&gt;&lt;span class=&quot;n&quot;&gt;collapse&lt;/span&gt;&lt;span class=&quot;w&quot;&gt; &lt;/span&gt;&lt;span class=&quot;o&quot;&gt;=&lt;/span&gt;&lt;span class=&quot;w&quot;&gt; &lt;/span&gt;&lt;span class=&quot;s2&quot;&gt;&quot;, &quot;&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;),&lt;/span&gt;&lt;span class=&quot;w&quot;&gt; &lt;/span&gt;&lt;span class=&quot;n&quot;&gt;call.&lt;/span&gt;&lt;span class=&quot;w&quot;&gt; &lt;/span&gt;&lt;span class=&quot;o&quot;&gt;=&lt;/span&gt;&lt;span class=&quot;w&quot;&gt; &lt;/span&gt;&lt;span class=&quot;kc&quot;&gt;FALSE&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt;&lt;span class=&quot;w&quot;&gt;
+    &lt;/span&gt;&lt;span class=&quot;p&quot;&gt;}&lt;/span&gt;&lt;span class=&quot;w&quot;&gt;
+  &lt;/span&gt;&lt;span class=&quot;p&quot;&gt;}&lt;/span&gt;&lt;span class=&quot;w&quot;&gt;
+&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;}&lt;/span&gt;&lt;span class=&quot;w&quot;&gt;
+&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;&lt;/div&gt;
+
+&lt;p&gt;It seems simple enough that I don’t think importing a package is warranted.&lt;/p&gt;
+
+&lt;h3 id=&quot;choosing-among-packages-that-do-the-same-thing&quot;&gt;choosing among packages that do the same thing&lt;/h3&gt;
+
+&lt;ul&gt;
+  &lt;li&gt;I often need to combine many rows/lists into a data.frame in my packages. &lt;code class=&quot;highlighter-rouge&quot;&gt;dplyr::bind_rows&lt;/code&gt; and &lt;code class=&quot;highlighter-rouge&quot;&gt;data.table::rbindlist&lt;/code&gt; do this (there’s probably others too). I’ve found that &lt;code class=&quot;highlighter-rouge&quot;&gt;data.table&lt;/code&gt; is a slightly/somewhat easier dependency WRT installation, so I commonly use the below function for binding named lists into rows of a &lt;code class=&quot;highlighter-rouge&quot;&gt;data.frame&lt;/code&gt;, with the optional conversion to a &lt;code class=&quot;highlighter-rouge&quot;&gt;tbl_df&lt;/code&gt;.&lt;/li&gt;
+&lt;/ul&gt;
+
+&lt;div class=&quot;highlighter-rouge&quot;&gt;&lt;div class=&quot;highlight&quot;&gt;&lt;pre class=&quot;highlight&quot;&gt;&lt;code&gt;function(x) {
+  tibble::as_tibble((x &amp;lt;- data.table::setDF(
+    data.table::rbindlist(x, use.names = TRUE, fill = TRUE, idcol = &quot;id&quot;))
+  ))
+}
+&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;&lt;/div&gt;
+
+&lt;h3 id=&quot;other-bits&quot;&gt;other bits&lt;/h3&gt;
+
+&lt;ul&gt;
+  &lt;li&gt;&lt;a href=&quot;https://github.com/jimhester&quot;&gt;Jim Hester&lt;/a&gt; did a presentation on the &lt;a href=&quot;https://github.com/tidyverse/glue&quot;&gt;glue&lt;/a&gt; package: &lt;a href=&quot;https://rawgit.com/jimhester/presentations/master/2018_07_13-Glue_strings_to_data_with_glue/2018_03_28-Glue_string_to_data_with_glue.html#/glue-is-for-packages&quot;&gt;Glue Strings to Data with Glue&lt;/a&gt; - and emphasized on one slide that &lt;code class=&quot;highlighter-rouge&quot;&gt;glue&lt;/code&gt; is for packages because it has zero dependencies, is customizable, and fast - all things you want in a dependency in your own package.&lt;/li&gt;
+  &lt;li&gt;As I was wrapping up this post I found a few papers:
+    &lt;ul&gt;
+      &lt;li&gt;Claes et al. &lt;sup id=&quot;fnref:1&quot;&gt;&lt;a href=&quot;#fn:1&quot; class=&quot;footnote&quot;&gt;1&lt;/a&gt;&lt;/sup&gt; found that “occurrence of errors in CRAN packages over a period of three months … resulted mostly from updates in the packages’ dependencies …”&lt;/li&gt;
+      &lt;li&gt;In another paper Plakidas et al. &lt;sup id=&quot;fnref:2&quot;&gt;&lt;a href=&quot;#fn:2&quot; class=&quot;footnote&quot;&gt;2&lt;/a&gt;&lt;/sup&gt; extend the previous finding and say “… this potentially implies a heavy workload for package maintainers when they depend on a package that is frequently updated”&lt;/li&gt;
+      &lt;li&gt;These statements mirror my hesitation to depend on other packages if in fact X task can be done internally&lt;/li&gt;
+    &lt;/ul&gt;
+  &lt;/li&gt;
+  &lt;li&gt;Contributors: if you do write your own internal functions, or borrow from elsewhere, new contributors to your package may need to understand your internal function instead of an imported function from another package - but the plus side is if the function resides in your own package you can change it easily.&lt;/li&gt;
+  &lt;li&gt;Rapid development phase: often package development involves a rapid change phase where you want to get to a working prototype first, then refine later. During this development phase it makes sense to use off the shelf packages to get things working. Later, you may want to swap out packages or write your own R or compiled code to speed things up, or introduce different behavior, etc.&lt;/li&gt;
+&lt;/ul&gt;
+
+&lt;h3 id=&quot;but&quot;&gt;but&lt;/h3&gt;
+
+&lt;p&gt;There are of course good reasons to just import the package that’s best at doing X or Y and leave it at that. Sometimes I do that too. I don’t always stay on my hill.&lt;/p&gt;
+
+&lt;p&gt;And: Maybe I’m totally wrong here? Maybe I should be at all times using other packages to do X, Y, and Z? Despite the dozens of packages I maintain, I am fully aware I could be completely wrong here.&lt;/p&gt;
+
+&lt;p&gt;&lt;br /&gt;&lt;/p&gt;
+
+&lt;hr /&gt;
+
+&lt;p&gt;thanks to &lt;a href=&quot;https://masalmon.eu/&quot;&gt;Maëlle Salmon&lt;/a&gt; for helpful advice on this post!&lt;/p&gt;
+
+&lt;h3 id=&quot;references&quot;&gt;references&lt;/h3&gt;
+
+&lt;div class=&quot;footnotes&quot;&gt;
+  &lt;ol&gt;
+    &lt;li id=&quot;fn:1&quot;&gt;
+      &lt;p&gt;Claes, M., Mens, T., &amp;amp; Grosjean, P. (2014). On the maintainability of CRAN packages. 2014 Software Evolution Week - IEEE Conference on Software Maintenance, Reengineering, and Reverse Engineering (CSMR-WCRE). &lt;a href=&quot;https://doi.org/10.1109/csmr-wcre.2014.6747183&quot;&gt;https://doi.org/10.1109/csmr-wcre.2014.6747183&lt;/a&gt; &lt;a href=&quot;#fnref:1&quot; class=&quot;reversefootnote&quot;&gt;&amp;#8617;&lt;/a&gt;&lt;/p&gt;
+    &lt;/li&gt;
+    &lt;li id=&quot;fn:2&quot;&gt;
+      &lt;p&gt;Plakidas, K., Schall, D., &amp;amp; Zdun, U. (2017). Evolution of the R software ecosystem: Metrics, relationships, and their impact on qualities. Journal of Systems and Software, 132, 119–146. &lt;a href=&quot;https://doi.org/10.1016/j.jss.2017.06.095&quot;&gt;https://doi.org/10.1016/j.jss.2017.06.095&lt;/a&gt; &lt;a href=&quot;#fnref:2&quot; class=&quot;reversefootnote&quot;&gt;&amp;#8617;&lt;/a&gt;&lt;/p&gt;
+    &lt;/li&gt;
+  &lt;/ol&gt;
+&lt;/div&gt;
+</description>
+        <pubDate>Tue, 02 Oct 2018 00:00:00 -0700</pubDate>
+        <link>https://recology.info/2018/10/limiting-dependencies/</link>
+        <guid isPermaLink="true">https://recology.info/2018/10/limiting-dependencies/</guid>
+        
+        <category>R</category>
+        
+        <category>open source</category>
+        
+        <category>code</category>
+        
+        
+      </item>
+    
+      <item>
         <title>Balancing user friendliness and code fragility</title>
-        <description>&lt;p&gt;I occassionally think about these various topics and ping back and forth between them, thinking I’ve got to make a package more user friendly, then back to thinking oh, I really should make this package easier to maintain, but what if that makes it less user friendly?&lt;/p&gt;
+        <description>&lt;p&gt;I occasionally think about these various topics and ping back and forth between them, thinking I’ve got to make a package more user friendly, then back to thinking oh, I really should make this package easier to maintain, but what if that makes it less user friendly?&lt;/p&gt;
 
 &lt;p&gt;I’ve wanted to get these thoughts written down for a while now, so here goes.&lt;/p&gt;
 
@@ -57,15 +165,48 @@
 &lt;p&gt;Here’s how &lt;code class=&quot;highlighter-rouge&quot;&gt;foo()&lt;/code&gt; might handle the paging internally:&lt;/p&gt;
 
 &lt;div class=&quot;language-r highlighter-rouge&quot;&gt;&lt;div class=&quot;highlight&quot;&gt;&lt;pre class=&quot;highlight&quot;&gt;&lt;code&gt;&lt;span class=&quot;n&quot;&gt;myGET&lt;/span&gt;&lt;span class=&quot;w&quot;&gt; &lt;/span&gt;&lt;span class=&quot;o&quot;&gt;&amp;lt;-&lt;/span&gt;&lt;span class=&quot;w&quot;&gt; &lt;/span&gt;&lt;span class=&quot;k&quot;&gt;function&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;x&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt;&lt;span class=&quot;w&quot;&gt; &lt;/span&gt;&lt;span class=&quot;p&quot;&gt;{&lt;/span&gt;&lt;span class=&quot;w&quot;&gt;
-    &lt;/span&gt;&lt;span class=&quot;n&quot;&gt;conn&lt;/span&gt;&lt;span class=&quot;w&quot;&gt; &lt;/span&gt;&lt;span class=&quot;o&quot;&gt;&amp;lt;-&lt;/span&gt;&lt;span class=&quot;w&quot;&gt; &lt;/span&gt;&lt;span class=&quot;n&quot;&gt;crul&lt;/span&gt;&lt;span class=&quot;o&quot;&gt;::&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;HttpClient&lt;/span&gt;&lt;span class=&quot;o&quot;&gt;$&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;new&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;s2&quot;&gt;&quot;https://someurl.com&quot;&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt;&lt;span class=&quot;w&quot;&gt;
-    &lt;/span&gt;&lt;span class=&quot;n&quot;&gt;conn&lt;/span&gt;&lt;span class=&quot;o&quot;&gt;$&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;get&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;()&lt;/span&gt;&lt;span class=&quot;w&quot;&gt;
+  &lt;/span&gt;&lt;span class=&quot;n&quot;&gt;conn&lt;/span&gt;&lt;span class=&quot;w&quot;&gt; &lt;/span&gt;&lt;span class=&quot;o&quot;&gt;&amp;lt;-&lt;/span&gt;&lt;span class=&quot;w&quot;&gt; &lt;/span&gt;&lt;span class=&quot;n&quot;&gt;crul&lt;/span&gt;&lt;span class=&quot;o&quot;&gt;::&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;HttpClient&lt;/span&gt;&lt;span class=&quot;o&quot;&gt;$&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;new&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;s2&quot;&gt;&quot;https://someurl.com&quot;&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt;&lt;span class=&quot;w&quot;&gt;
+  &lt;/span&gt;&lt;span class=&quot;n&quot;&gt;res&lt;/span&gt;&lt;span class=&quot;w&quot;&gt; &lt;/span&gt;&lt;span class=&quot;o&quot;&gt;&amp;lt;-&lt;/span&gt;&lt;span class=&quot;w&quot;&gt; &lt;/span&gt;&lt;span class=&quot;n&quot;&gt;conn&lt;/span&gt;&lt;span class=&quot;o&quot;&gt;$&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;get&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;()&lt;/span&gt;&lt;span class=&quot;w&quot;&gt;
+  &lt;/span&gt;&lt;span class=&quot;n&quot;&gt;txt&lt;/span&gt;&lt;span class=&quot;w&quot;&gt; &lt;/span&gt;&lt;span class=&quot;o&quot;&gt;&amp;lt;-&lt;/span&gt;&lt;span class=&quot;w&quot;&gt; &lt;/span&gt;&lt;span class=&quot;n&quot;&gt;res&lt;/span&gt;&lt;span class=&quot;o&quot;&gt;$&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;parse&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;encoding&lt;/span&gt;&lt;span class=&quot;w&quot;&gt; &lt;/span&gt;&lt;span class=&quot;o&quot;&gt;=&lt;/span&gt;&lt;span class=&quot;w&quot;&gt; &lt;/span&gt;&lt;span class=&quot;s2&quot;&gt;&quot;UTF-8&quot;&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt;&lt;span class=&quot;w&quot;&gt;
+  &lt;/span&gt;&lt;span class=&quot;n&quot;&gt;jsonlite&lt;/span&gt;&lt;span class=&quot;o&quot;&gt;::&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;fromJSON&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;txt&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt;&lt;span class=&quot;w&quot;&gt;
 &lt;/span&gt;&lt;span class=&quot;p&quot;&gt;}&lt;/span&gt;&lt;span class=&quot;w&quot;&gt;
 
 &lt;/span&gt;&lt;span class=&quot;n&quot;&gt;foo&lt;/span&gt;&lt;span class=&quot;w&quot;&gt; &lt;/span&gt;&lt;span class=&quot;o&quot;&gt;&amp;lt;-&lt;/span&gt;&lt;span class=&quot;w&quot;&gt; &lt;/span&gt;&lt;span class=&quot;k&quot;&gt;function&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;limit&lt;/span&gt;&lt;span class=&quot;w&quot;&gt; &lt;/span&gt;&lt;span class=&quot;o&quot;&gt;=&lt;/span&gt;&lt;span class=&quot;w&quot;&gt; &lt;/span&gt;&lt;span class=&quot;m&quot;&gt;10&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt;&lt;span class=&quot;w&quot;&gt; &lt;/span&gt;&lt;span class=&quot;p&quot;&gt;{&lt;/span&gt;&lt;span class=&quot;w&quot;&gt;
-    &lt;/span&gt;&lt;span class=&quot;k&quot;&gt;if&lt;/span&gt;&lt;span class=&quot;w&quot;&gt; &lt;/span&gt;&lt;span class=&quot;p&quot;&gt;()&lt;/span&gt;&lt;span class=&quot;w&quot;&gt;
-    &lt;/span&gt;&lt;span class=&quot;n&quot;&gt;myGET&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;limit&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt;&lt;span class=&quot;w&quot;&gt;
+  &lt;/span&gt;&lt;span class=&quot;n&quot;&gt;limit&lt;/span&gt;&lt;span class=&quot;w&quot;&gt; &lt;/span&gt;&lt;span class=&quot;o&quot;&gt;&amp;lt;-&lt;/span&gt;&lt;span class=&quot;w&quot;&gt; &lt;/span&gt;&lt;span class=&quot;n&quot;&gt;plyr&lt;/span&gt;&lt;span class=&quot;o&quot;&gt;::&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;round_any&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;limit&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt;&lt;span class=&quot;w&quot;&gt; &lt;/span&gt;&lt;span class=&quot;m&quot;&gt;10&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt;&lt;span class=&quot;w&quot;&gt;
+  &lt;/span&gt;&lt;span class=&quot;n&quot;&gt;out&lt;/span&gt;&lt;span class=&quot;w&quot;&gt; &lt;/span&gt;&lt;span class=&quot;o&quot;&gt;&amp;lt;-&lt;/span&gt;&lt;span class=&quot;w&quot;&gt; &lt;/span&gt;&lt;span class=&quot;nf&quot;&gt;list&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;()&lt;/span&gt;&lt;span class=&quot;w&quot;&gt;
+  &lt;/span&gt;&lt;span class=&quot;k&quot;&gt;for&lt;/span&gt;&lt;span class=&quot;w&quot;&gt; &lt;/span&gt;&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;i&lt;/span&gt;&lt;span class=&quot;w&quot;&gt; &lt;/span&gt;&lt;span class=&quot;k&quot;&gt;in&lt;/span&gt;&lt;span class=&quot;w&quot;&gt; &lt;/span&gt;&lt;span class=&quot;n&quot;&gt;seq&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;limit&lt;/span&gt;&lt;span class=&quot;w&quot;&gt; &lt;/span&gt;&lt;span class=&quot;o&quot;&gt;/&lt;/span&gt;&lt;span class=&quot;w&quot;&gt; &lt;/span&gt;&lt;span class=&quot;m&quot;&gt;10&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;))&lt;/span&gt;&lt;span class=&quot;w&quot;&gt; &lt;/span&gt;&lt;span class=&quot;n&quot;&gt;out&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;[[&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;i&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;]]&lt;/span&gt;&lt;span class=&quot;w&quot;&gt; &lt;/span&gt;&lt;span class=&quot;o&quot;&gt;&amp;lt;-&lt;/span&gt;&lt;span class=&quot;w&quot;&gt; &lt;/span&gt;&lt;span class=&quot;n&quot;&gt;myGET&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;limit&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt;&lt;span class=&quot;w&quot;&gt; &lt;/span&gt;&lt;span class=&quot;n&quot;&gt;page&lt;/span&gt;&lt;span class=&quot;w&quot;&gt; &lt;/span&gt;&lt;span class=&quot;o&quot;&gt;=&lt;/span&gt;&lt;span class=&quot;w&quot;&gt; &lt;/span&gt;&lt;span class=&quot;n&quot;&gt;i&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt;&lt;span class=&quot;w&quot;&gt;
+  &lt;/span&gt;&lt;span class=&quot;n&quot;&gt;df&lt;/span&gt;&lt;span class=&quot;w&quot;&gt; &lt;/span&gt;&lt;span class=&quot;o&quot;&gt;&amp;lt;-&lt;/span&gt;&lt;span class=&quot;w&quot;&gt; &lt;/span&gt;&lt;span class=&quot;n&quot;&gt;dplyr&lt;/span&gt;&lt;span class=&quot;o&quot;&gt;::&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;bind_rows&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;out&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt;&lt;span class=&quot;w&quot;&gt;
+  &lt;/span&gt;&lt;span class=&quot;nf&quot;&gt;return&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;df&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt;&lt;span class=&quot;w&quot;&gt;
 &lt;/span&gt;&lt;span class=&quot;p&quot;&gt;}&lt;/span&gt;&lt;span class=&quot;w&quot;&gt;
 &lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;&lt;/div&gt;
+
+&lt;blockquote&gt;
+  &lt;p&gt;This is psuedocode, so you can’t run this.&lt;/p&gt;
+&lt;/blockquote&gt;
+
+&lt;p&gt;In general I like to return data.frame’s to users whenever possible as I think most users are most familiar with data.frame’s.&lt;/p&gt;
+
+&lt;p&gt;In the above example we need to do a few things when dealing with pagination:&lt;/p&gt;
+
+&lt;ul&gt;
+  &lt;li&gt;sort out how many requests to make. the above doesn’t yet check that the &lt;code class=&quot;highlighter-rouge&quot;&gt;limit&lt;/code&gt; value is a numeric or integer, and there’s all kinds of edge cases depending on what number is given by the user with respect to pagination&lt;/li&gt;
+  &lt;li&gt;make each http request. I used a for loop, but anything similar can be used. one needs to decide how to handle errors if you’re doing multiple requests. do you stop with an error if there’s an error in one of the requests, or do you catch that and proceed? If you do catch it how do you let the user know, or do you just remove that error from results?&lt;/li&gt;
+  &lt;li&gt;combine results into a single output (data.frame most likely/ideally). we want the user to get the same results back whether they request one page of results or many, so we need to do the work to make sure the output looks the same. This step also introduces possible pain points in that any result record can have novel things in it that cause your result combining code to error. Do you do a minimal combination approach (e.g. let &lt;code class=&quot;highlighter-rouge&quot;&gt;jsonlite::fromJSON&lt;/code&gt; convert to list/data.frame’s where possible; but this means that there can be nested lists in data.frame’s, which many users do not like); or do you roll your own bespoke data munging/combination code to make sure the output data.frame is really easy to use with no nested lists, etc.?  If you do the latter that will most likely be slower, but will be better output for the user. However, maybe most users want to combine the data on their own, so perhaps you should take up as little time as possible parsing/munging data so the user has to wait less time.&lt;/li&gt;
+&lt;/ul&gt;
+
+&lt;p&gt;The overall message here is that there’s many points throughout this process that require decisions to be made with respect to how much complexity you’d like to take care of yourself as the developer vs. how much you’d like to leave up to the user.&lt;/p&gt;
+
+&lt;p&gt;With complexity inside the function, there’s more to maintain and more possible bugs, but it’s easier for the user.&lt;/p&gt;
+
+&lt;p&gt;With complexity exposed to the user, and simpler code inside the function, each user has to sort out how to work with the output and/or do the pagination (or whatever it is) themselves. But with less complexity inside the function, there will likely be fewer bugs.&lt;/p&gt;
+
+&lt;blockquote&gt;
+  &lt;p&gt;Note: i’ve been trying to make pagination with web APIs easier, check out the Paginator helper in the crul package &lt;a href=&quot;https://github.com/ropensci/crul/blob/master/R/paginator.R&quot;&gt;https://github.com/ropensci/crul/blob/master/R/paginator.R&lt;/a&gt;&lt;/p&gt;
+&lt;/blockquote&gt;
+
+&lt;h2 id=&quot;so-what&quot;&gt;So what?&lt;/h2&gt;
+
+&lt;p&gt;Perhaps others have figured this out and I’m the only one struggling with this? I’m sure I’ll continue to go back and forth on this pendulum. Would love to know how others think about this.&lt;/p&gt;
 
 </description>
         <pubDate>Fri, 27 Jul 2018 00:00:00 -0700</pubDate>
