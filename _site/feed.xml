@@ -5,9 +5,119 @@
     <description>code and such</description>
     <link>https://recology.info/</link>
     <atom:link href="https://recology.info/feed.xml" rel="self" type="application/rss+xml"/>
-    <pubDate>Tue, 19 Feb 2019 09:39:14 -0800</pubDate>
-    <lastBuildDate>Tue, 19 Feb 2019 09:39:14 -0800</lastBuildDate>
+    <pubDate>Mon, 04 Mar 2019 09:33:57 -0800</pubDate>
+    <lastBuildDate>Mon, 04 Mar 2019 09:33:57 -0800</lastBuildDate>
     <generator>Jekyll v3.7.3</generator>
+    
+      <item>
+        <title>Exceptions in control flow in R</title>
+        <description>&lt;p&gt;I was listening to a Bike Shed podcast &lt;a href=&quot;http://bikeshed.fm/189&quot;&gt;episode 189, “It’s Gonna Work, Definitely, No Problems Whatsoever”&lt;/a&gt;, and starting at 27:44 there was a conversation about exception handling. Specifically it was about exception handling in control flow when doing requests to web APIs. This topic piqued my interest straight away as I do a lot of API stuff (making and wrapping).&lt;/p&gt;
+
+&lt;p&gt;The part of the conversation that I want to address is their conclusion that exceptions in control flow are an anti-pattern.&lt;/p&gt;
+
+&lt;p&gt;My first reaction to this was one of vehement disagreement because in my experience wrapping web APIs raising exceptions on HTTP status codes of 400 and 500 series is the norm. They argued that there are better ways of handling these cases. After a while I thought maybe the topic is worth thinking harder about rather than going with my gut reaction.&lt;/p&gt;
+
+&lt;p&gt;Let’s take a step back first and look at some concepts before diving further into this.&lt;/p&gt;
+
+&lt;h2 id=&quot;control-flow&quot;&gt;control flow&lt;/h2&gt;
+
+&lt;p&gt;&lt;a href=&quot;https://en.wikipedia.org/wiki/Control_flow&quot;&gt;Control flow&lt;/a&gt; in programming is&lt;/p&gt;
+
+&lt;blockquote&gt;
+  &lt;p&gt;the order in which individual statements … are executed or evaluated … a control flow statement is a statement, the execution of which results in a choice being made as to which of two or more paths to follow.&lt;/p&gt;
+&lt;/blockquote&gt;
+
+&lt;p&gt;&lt;a href=&quot;https://stat.ethz.ch/R-manual/R-devel/library/base/html/Control.html&quot;&gt;Control flow in R&lt;/a&gt; has an overview of control flow in R. Control flow constructs in R include &lt;code class=&quot;highlighter-rouge&quot;&gt;if/else&lt;/code&gt;, &lt;code class=&quot;highlighter-rouge&quot;&gt;for&lt;/code&gt;, &lt;code class=&quot;highlighter-rouge&quot;&gt;while&lt;/code&gt;, &lt;code class=&quot;highlighter-rouge&quot;&gt;repeat&lt;/code&gt;, &lt;code class=&quot;highlighter-rouge&quot;&gt;break&lt;/code&gt;, &lt;code class=&quot;highlighter-rouge&quot;&gt;next&lt;/code&gt;.&lt;/p&gt;
+
+&lt;h2 id=&quot;exceptions&quot;&gt;exceptions&lt;/h2&gt;
+
+&lt;p&gt;Exceptions are&lt;/p&gt;
+
+&lt;blockquote&gt;
+  &lt;p&gt;anomalous or exceptional conditions requiring special processing - often changing the normal flow of program execution (source: &lt;a href=&quot;https://en.wikipedia.org/wiki/Exception_handling&quot;&gt;wikiex&lt;/a&gt;)&lt;/p&gt;
+&lt;/blockquote&gt;
+
+&lt;p&gt;In R, exception handling can be done with &lt;code class=&quot;highlighter-rouge&quot;&gt;try&lt;/code&gt;, &lt;code class=&quot;highlighter-rouge&quot;&gt;tryCatch&lt;/code&gt;, &lt;code class=&quot;highlighter-rouge&quot;&gt;withCallingHandlers&lt;/code&gt; and others. Often &lt;code class=&quot;highlighter-rouge&quot;&gt;warning()&lt;/code&gt; is used to signal to the user what happened, but does not stop execution, and can be suppressed with &lt;code class=&quot;highlighter-rouge&quot;&gt;suppressWarnings()&lt;/code&gt;. To stop execution, &lt;code class=&quot;highlighter-rouge&quot;&gt;stop()&lt;/code&gt; is used.&lt;/p&gt;
+
+&lt;p&gt;&lt;br /&gt;&lt;/p&gt;
+
+&lt;h2 id=&quot;back-to-web-api-exceptions-and-control-flow-in-r&quot;&gt;back to web API exceptions and control flow in R&lt;/h2&gt;
+
+&lt;p&gt;Note the word &lt;strong&gt;exceptional&lt;/strong&gt; abovein our definition of exceptions. The BikeShed pod hosts were surprised to see exceptions raised with bad API requests because they didn’t think a bad API request was &lt;strong&gt;exceptional&lt;/strong&gt;, but rather an excepted result given certain conditions.&lt;/p&gt;
+
+&lt;p&gt;They observed that most Ruby API wrappers did have the behavior of rasing an exception on a 400/500 series API status, but they disagreed with this approach.&lt;/p&gt;
+
+&lt;p&gt;In R world, most API wrappers in my experience also follow the pattern of raising an exception stopping the code flow on a 400/500 series HTTP error.&lt;/p&gt;
+
+&lt;p&gt;What would it look like to not stop code execution flow when 400/500 series errors are returned from web API requests? What would need to change from the current setup? How would users be affected?&lt;/p&gt;
+
+&lt;p&gt;A typical R function that makes a web API request looks like the following:&lt;/p&gt;
+
+&lt;div class=&quot;language-r highlighter-rouge&quot;&gt;&lt;div class=&quot;highlight&quot;&gt;&lt;pre class=&quot;highlight&quot;&gt;&lt;code&gt;&lt;span class=&quot;n&quot;&gt;foo&lt;/span&gt;&lt;span class=&quot;w&quot;&gt; &lt;/span&gt;&lt;span class=&quot;o&quot;&gt;=&lt;/span&gt;&lt;span class=&quot;w&quot;&gt; &lt;/span&gt;&lt;span class=&quot;k&quot;&gt;function&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;path&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt;&lt;span class=&quot;w&quot;&gt; &lt;/span&gt;&lt;span class=&quot;n&quot;&gt;query&lt;/span&gt;&lt;span class=&quot;w&quot;&gt; &lt;/span&gt;&lt;span class=&quot;o&quot;&gt;=&lt;/span&gt;&lt;span class=&quot;w&quot;&gt; &lt;/span&gt;&lt;span class=&quot;nf&quot;&gt;list&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;())&lt;/span&gt;&lt;span class=&quot;w&quot;&gt; &lt;/span&gt;&lt;span class=&quot;p&quot;&gt;{&lt;/span&gt;&lt;span class=&quot;w&quot;&gt;
+  &lt;/span&gt;&lt;span class=&quot;n&quot;&gt;conn&lt;/span&gt;&lt;span class=&quot;w&quot;&gt; &lt;/span&gt;&lt;span class=&quot;o&quot;&gt;=&lt;/span&gt;&lt;span class=&quot;w&quot;&gt; &lt;/span&gt;&lt;span class=&quot;n&quot;&gt;crul&lt;/span&gt;&lt;span class=&quot;o&quot;&gt;::&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;HttpClient&lt;/span&gt;&lt;span class=&quot;o&quot;&gt;$&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;new&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;s2&quot;&gt;&quot;https://httpbin.org&quot;&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt;&lt;span class=&quot;w&quot;&gt;
+  &lt;/span&gt;&lt;span class=&quot;n&quot;&gt;res&lt;/span&gt;&lt;span class=&quot;w&quot;&gt; &lt;/span&gt;&lt;span class=&quot;o&quot;&gt;=&lt;/span&gt;&lt;span class=&quot;w&quot;&gt; &lt;/span&gt;&lt;span class=&quot;n&quot;&gt;conn&lt;/span&gt;&lt;span class=&quot;o&quot;&gt;$&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;get&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;path&lt;/span&gt;&lt;span class=&quot;w&quot;&gt; &lt;/span&gt;&lt;span class=&quot;o&quot;&gt;=&lt;/span&gt;&lt;span class=&quot;w&quot;&gt; &lt;/span&gt;&lt;span class=&quot;n&quot;&gt;path&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt;&lt;span class=&quot;w&quot;&gt; &lt;/span&gt;&lt;span class=&quot;n&quot;&gt;query&lt;/span&gt;&lt;span class=&quot;w&quot;&gt; &lt;/span&gt;&lt;span class=&quot;o&quot;&gt;=&lt;/span&gt;&lt;span class=&quot;w&quot;&gt; &lt;/span&gt;&lt;span class=&quot;n&quot;&gt;query&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt;&lt;span class=&quot;w&quot;&gt;
+  &lt;/span&gt;&lt;span class=&quot;n&quot;&gt;res&lt;/span&gt;&lt;span class=&quot;o&quot;&gt;$&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;raise_for_status&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;()&lt;/span&gt;&lt;span class=&quot;w&quot;&gt;
+  &lt;/span&gt;&lt;span class=&quot;n&quot;&gt;res&lt;/span&gt;&lt;span class=&quot;o&quot;&gt;$&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;parse&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;s2&quot;&gt;&quot;UTF-8&quot;&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt;&lt;span class=&quot;w&quot;&gt;
+&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;}&lt;/span&gt;&lt;span class=&quot;w&quot;&gt;
+&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;&lt;/div&gt;
+
+&lt;p&gt;On a successful request all is good and we get back the JSON payload&lt;/p&gt;
+
+&lt;div class=&quot;language-r highlighter-rouge&quot;&gt;&lt;div class=&quot;highlight&quot;&gt;&lt;pre class=&quot;highlight&quot;&gt;&lt;code&gt;&lt;span class=&quot;n&quot;&gt;foo&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;path&lt;/span&gt;&lt;span class=&quot;w&quot;&gt; &lt;/span&gt;&lt;span class=&quot;o&quot;&gt;=&lt;/span&gt;&lt;span class=&quot;w&quot;&gt; &lt;/span&gt;&lt;span class=&quot;s2&quot;&gt;&quot;get&quot;&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt;&lt;span class=&quot;w&quot;&gt; &lt;/span&gt;&lt;span class=&quot;n&quot;&gt;query&lt;/span&gt;&lt;span class=&quot;w&quot;&gt; &lt;/span&gt;&lt;span class=&quot;o&quot;&gt;=&lt;/span&gt;&lt;span class=&quot;w&quot;&gt; &lt;/span&gt;&lt;span class=&quot;nf&quot;&gt;list&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;apple&lt;/span&gt;&lt;span class=&quot;w&quot;&gt; &lt;/span&gt;&lt;span class=&quot;o&quot;&gt;=&lt;/span&gt;&lt;span class=&quot;w&quot;&gt; &lt;/span&gt;&lt;span class=&quot;s2&quot;&gt;&quot;pink lady&quot;&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;))&lt;/span&gt;&lt;span class=&quot;w&quot;&gt;
+&lt;/span&gt;&lt;span class=&quot;c1&quot;&gt;#&amp;gt; [1] &quot;{\n  \&quot;args\&quot;: {\n    \&quot;\&quot;: \&quot;pink lady\&quot;\n  }, ...&lt;/span&gt;&lt;span class=&quot;w&quot;&gt;
+&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;&lt;/div&gt;
+
+&lt;p&gt;When there is a 400/500 series code the line &lt;code class=&quot;highlighter-rouge&quot;&gt;res$raise_for_status()&lt;/code&gt; throws an error, stopping execution&lt;/p&gt;
+
+&lt;div class=&quot;language-r highlighter-rouge&quot;&gt;&lt;div class=&quot;highlight&quot;&gt;&lt;pre class=&quot;highlight&quot;&gt;&lt;code&gt;&lt;span class=&quot;n&quot;&gt;foo&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;path&lt;/span&gt;&lt;span class=&quot;w&quot;&gt; &lt;/span&gt;&lt;span class=&quot;o&quot;&gt;=&lt;/span&gt;&lt;span class=&quot;w&quot;&gt; &lt;/span&gt;&lt;span class=&quot;s2&quot;&gt;&quot;status/400&quot;&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt;&lt;span class=&quot;w&quot;&gt;
+&lt;/span&gt;&lt;span class=&quot;c1&quot;&gt;#&amp;gt; Error: Bad Request (HTTP 400)&lt;/span&gt;&lt;span class=&quot;w&quot;&gt;
+&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;&lt;/div&gt;
+
+&lt;p&gt;Instead of raising an error we could throw a warning and proceed to the next step&lt;/p&gt;
+
+&lt;div class=&quot;language-r highlighter-rouge&quot;&gt;&lt;div class=&quot;highlight&quot;&gt;&lt;pre class=&quot;highlight&quot;&gt;&lt;code&gt;&lt;span class=&quot;n&quot;&gt;foo&lt;/span&gt;&lt;span class=&quot;w&quot;&gt; &lt;/span&gt;&lt;span class=&quot;o&quot;&gt;=&lt;/span&gt;&lt;span class=&quot;w&quot;&gt; &lt;/span&gt;&lt;span class=&quot;k&quot;&gt;function&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;path&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt;&lt;span class=&quot;w&quot;&gt; &lt;/span&gt;&lt;span class=&quot;n&quot;&gt;query&lt;/span&gt;&lt;span class=&quot;w&quot;&gt; &lt;/span&gt;&lt;span class=&quot;o&quot;&gt;=&lt;/span&gt;&lt;span class=&quot;w&quot;&gt; &lt;/span&gt;&lt;span class=&quot;nf&quot;&gt;list&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;())&lt;/span&gt;&lt;span class=&quot;w&quot;&gt; &lt;/span&gt;&lt;span class=&quot;p&quot;&gt;{&lt;/span&gt;&lt;span class=&quot;w&quot;&gt;
+  &lt;/span&gt;&lt;span class=&quot;n&quot;&gt;conn&lt;/span&gt;&lt;span class=&quot;w&quot;&gt; &lt;/span&gt;&lt;span class=&quot;o&quot;&gt;=&lt;/span&gt;&lt;span class=&quot;w&quot;&gt; &lt;/span&gt;&lt;span class=&quot;n&quot;&gt;crul&lt;/span&gt;&lt;span class=&quot;o&quot;&gt;::&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;HttpClient&lt;/span&gt;&lt;span class=&quot;o&quot;&gt;$&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;new&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;s2&quot;&gt;&quot;https://httpbin.org&quot;&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt;&lt;span class=&quot;w&quot;&gt;
+  &lt;/span&gt;&lt;span class=&quot;n&quot;&gt;res&lt;/span&gt;&lt;span class=&quot;w&quot;&gt; &lt;/span&gt;&lt;span class=&quot;o&quot;&gt;=&lt;/span&gt;&lt;span class=&quot;w&quot;&gt; &lt;/span&gt;&lt;span class=&quot;n&quot;&gt;conn&lt;/span&gt;&lt;span class=&quot;o&quot;&gt;$&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;get&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;path&lt;/span&gt;&lt;span class=&quot;w&quot;&gt; &lt;/span&gt;&lt;span class=&quot;o&quot;&gt;=&lt;/span&gt;&lt;span class=&quot;w&quot;&gt; &lt;/span&gt;&lt;span class=&quot;n&quot;&gt;path&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt;&lt;span class=&quot;w&quot;&gt; &lt;/span&gt;&lt;span class=&quot;n&quot;&gt;query&lt;/span&gt;&lt;span class=&quot;w&quot;&gt; &lt;/span&gt;&lt;span class=&quot;o&quot;&gt;=&lt;/span&gt;&lt;span class=&quot;w&quot;&gt; &lt;/span&gt;&lt;span class=&quot;n&quot;&gt;query&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt;&lt;span class=&quot;w&quot;&gt;
+  &lt;/span&gt;&lt;span class=&quot;k&quot;&gt;if&lt;/span&gt;&lt;span class=&quot;w&quot;&gt; &lt;/span&gt;&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;res&lt;/span&gt;&lt;span class=&quot;o&quot;&gt;$&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;status_code&lt;/span&gt;&lt;span class=&quot;w&quot;&gt; &lt;/span&gt;&lt;span class=&quot;o&quot;&gt;&amp;gt;=&lt;/span&gt;&lt;span class=&quot;w&quot;&gt; &lt;/span&gt;&lt;span class=&quot;m&quot;&gt;400&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt;&lt;span class=&quot;w&quot;&gt; &lt;/span&gt;&lt;span class=&quot;p&quot;&gt;{&lt;/span&gt;&lt;span class=&quot;w&quot;&gt;
+    &lt;/span&gt;&lt;span class=&quot;n&quot;&gt;warning&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;sprintf&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;s2&quot;&gt;&quot;HTTP %s %s&quot;&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt;&lt;span class=&quot;w&quot;&gt; &lt;/span&gt;&lt;span class=&quot;n&quot;&gt;res&lt;/span&gt;&lt;span class=&quot;o&quot;&gt;$&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;status_code&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt;&lt;span class=&quot;w&quot;&gt; &lt;/span&gt;&lt;span class=&quot;n&quot;&gt;res&lt;/span&gt;&lt;span class=&quot;o&quot;&gt;$&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;status_http&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;()&lt;/span&gt;&lt;span class=&quot;o&quot;&gt;$&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;explanation&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;))&lt;/span&gt;&lt;span class=&quot;w&quot;&gt;
+  &lt;/span&gt;&lt;span class=&quot;p&quot;&gt;}&lt;/span&gt;&lt;span class=&quot;w&quot;&gt;
+  &lt;/span&gt;&lt;span class=&quot;n&quot;&gt;res&lt;/span&gt;&lt;span class=&quot;o&quot;&gt;$&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;parse&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;s2&quot;&gt;&quot;UTF-8&quot;&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt;&lt;span class=&quot;w&quot;&gt;
+&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;}&lt;/span&gt;&lt;span class=&quot;w&quot;&gt;
+&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;&lt;/div&gt;
+
+&lt;div class=&quot;language-r highlighter-rouge&quot;&gt;&lt;div class=&quot;highlight&quot;&gt;&lt;pre class=&quot;highlight&quot;&gt;&lt;code&gt;&lt;span class=&quot;n&quot;&gt;foo&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;path&lt;/span&gt;&lt;span class=&quot;w&quot;&gt; &lt;/span&gt;&lt;span class=&quot;o&quot;&gt;=&lt;/span&gt;&lt;span class=&quot;w&quot;&gt; &lt;/span&gt;&lt;span class=&quot;s2&quot;&gt;&quot;status/400&quot;&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt;&lt;span class=&quot;w&quot;&gt;
+&lt;/span&gt;&lt;span class=&quot;c1&quot;&gt;#&amp;gt; [1] &quot;&quot;&lt;/span&gt;&lt;span class=&quot;w&quot;&gt;
+&lt;/span&gt;&lt;span class=&quot;c1&quot;&gt;#&amp;gt; Warning message:&lt;/span&gt;&lt;span class=&quot;w&quot;&gt;
+&lt;/span&gt;&lt;span class=&quot;c1&quot;&gt;#&amp;gt; In foo(path = &quot;status/400&quot;) :&lt;/span&gt;&lt;span class=&quot;w&quot;&gt;
+&lt;/span&gt;&lt;span class=&quot;c1&quot;&gt;#&amp;gt;  HTTP 400 Bad request syntax or unsupported method&lt;/span&gt;&lt;span class=&quot;w&quot;&gt;
+&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;&lt;/div&gt;
+
+&lt;p&gt;This is fine, but there’s a few scenarios in which this will be problematic:&lt;/p&gt;
+
+&lt;ol&gt;
+  &lt;li&gt;asdff&lt;/li&gt;
+  &lt;li&gt;adsfdsf&lt;/li&gt;
+&lt;/ol&gt;
+
+&lt;h2 id=&quot;conclusion&quot;&gt;conclusion&lt;/h2&gt;
+
+&lt;p&gt;xxx&lt;/p&gt;
+
+</description>
+        <pubDate>Mon, 04 Mar 2019 00:00:00 -0800</pubDate>
+        <link>https://recology.info/2019/03/control-flow-exceptions/</link>
+        <guid isPermaLink="true">https://recology.info/2019/03/control-flow-exceptions/</guid>
+        
+        <category>R</category>
+        
+        <category>control flow</category>
+        
+        <category>exceptions</category>
+        
+        <category>exception handling</category>
+        
+        
+      </item>
     
       <item>
         <title>Notes on porting Ruby to R</title>
@@ -1299,239 +1409,6 @@ it’s greater than 20&lt;/p&gt;
         <category>R</category>
         
         <category>Ruby</category>
-        
-        
-      </item>
-    
-      <item>
-        <title>Web APIs with Sinatra, Mongo, Docker, and Caddy</title>
-        <description>&lt;h2 id=&quot;the-problem&quot;&gt;The problem&lt;/h2&gt;
-
-&lt;p&gt;The R community has a package distribution thing called &lt;a href=&quot;https://cran.rstudio.com/web/packages/&quot;&gt;CRAN&lt;/a&gt; just like Ruby has &lt;a href=&quot;https://rubygems.org/&quot;&gt;Rubygems&lt;/a&gt;, and Python has &lt;a href=&quot;https://pypi.python.org/pypi&quot;&gt;Pypi&lt;/a&gt;, etc. On all packages on CRAN, the CRAN maintainers run checks on each package on multiple versions of R and on many operating systems. They report those results on a page associated with the package, like &lt;a href=&quot;https://cran.rstudio.com/web/checks/check_results_crul.html&quot;&gt;this one&lt;/a&gt;.&lt;/p&gt;
-
-&lt;p&gt;You might be thinking: okay, but we have Travis-CI and friends, so who cares about that?  Well, it’s these checks that CRAN runs that will determine if your package on CRAN leads to emails to you asking for changes, and possibly the package being taken down if e.g., they email and you don’t respond for a period of time.&lt;/p&gt;
-
-&lt;p&gt;So CRAN provides these package checks. Now what?  Ideally, these would be available through an API so that the data is machine readable, which then makes many other things possible (see &lt;a href=&quot;#whats-next&quot;&gt;What’s Next&lt;/a&gt; below).&lt;/p&gt;
-
-&lt;p&gt;So how to build the API?&lt;/p&gt;
-
-&lt;h2 id=&quot;building-the-cran-checks-api&quot;&gt;Building the CRAN checks API&lt;/h2&gt;
-
-&lt;p&gt;On GitHub: &lt;a href=&quot;https://github.com/ropensci/cchecksapi&quot;&gt;https://github.com/ropensci/cchecksapi&lt;/a&gt;&lt;/p&gt;
-
-&lt;p&gt;My main goal learning goals with this API tech wise were two fold:&lt;/p&gt;
-
-&lt;ul&gt;
-  &lt;li&gt;learn how to dockerize the application&lt;/li&gt;
-  &lt;li&gt;learn how to use MongoDB&lt;/li&gt;
-&lt;/ul&gt;
-
-&lt;p&gt;I hadn’t Dockerized a web API myself before, so that was an important goal - and I had actually never used MongoDB, but wanted to give it a shot to get familiar with it.&lt;/p&gt;
-
-&lt;p&gt;The whole stack is:&lt;/p&gt;
-
-&lt;ul&gt;
-  &lt;li&gt;language: Ruby&lt;/li&gt;
-  &lt;li&gt;web API framework: Sinatra&lt;/li&gt;
-  &lt;li&gt;http Ruby gem: faraday&lt;/li&gt;
-  &lt;li&gt;database: mongodb&lt;/li&gt;
-  &lt;li&gt;server: caddy&lt;/li&gt;
-  &lt;li&gt;container: all wrapped up in docker (docker-compose)&lt;/li&gt;
-  &lt;li&gt;hosting: Amazon EC2&lt;/li&gt;
-  &lt;li&gt;scheduling: crontab&lt;/li&gt;
-&lt;/ul&gt;
-
-&lt;p&gt;At a high level, the system is as so:&lt;/p&gt;
-
-&lt;ul&gt;
-  &lt;li&gt;Once a day a few Ruby scripts (&lt;a href=&quot;https://github.com/ropensci/cchecksapi/blob/master/scrape.rb&quot;&gt;for packages&lt;/a&gt;, &lt;a href=&quot;https://github.com/ropensci/cchecksapi/blob/master/scrape_maintainer.rb&quot;&gt;for maintainers&lt;/a&gt;):
-    &lt;ul&gt;
-      &lt;li&gt;collects the names of packages on CRAN from Gábor Csárdi’s &lt;a href=&quot;https://crandb.r-pkg.org&quot;&gt;https://crandb.r-pkg.org&lt;/a&gt; API and maintainer emails from CRAN itself, then&lt;/li&gt;
-      &lt;li&gt;goes out to the CRAN website and collects check results for each package, then&lt;/li&gt;
-      &lt;li&gt;insert data into a MongoDB database&lt;/li&gt;
-    &lt;/ul&gt;
-  &lt;/li&gt;
-  &lt;li&gt;The API provides routes for getting data on specific packages by name, or all packages, and data on all packages for any given maintainers email adddress, or all maintainers
-    &lt;ul&gt;
-      &lt;li&gt;API calls make a query into the MongoDB database matching on the package name or maintainer email address&lt;/li&gt;
-      &lt;li&gt;data is given back as JSON&lt;/li&gt;
-    &lt;/ul&gt;
-  &lt;/li&gt;
-&lt;/ul&gt;
-
-&lt;p&gt;The API doesn’t currently use caching, but may add if it seems needed.&lt;/p&gt;
-
-&lt;h2 id=&quot;ruby-and-sinatra&quot;&gt;Ruby and Sinatra&lt;/h2&gt;
-
-&lt;p&gt;I really like Ruby. It’s a language that is fun to use, the community is great, and there’s tons of packages.  Ruby is great for making web stuff, including web APIs. When doing web stuff, for me that means web APIs. For web APIs in Ruby, Rails is too heavy for all the stuff I do - that’s where &lt;a href=&quot;http://www.sinatrarb.com/&quot;&gt;Sinatra&lt;/a&gt; comes in.&lt;/p&gt;
-
-&lt;p&gt;Sinatra is a lightweight framework for making web apps/APIs. I make all my web APIs with Sinatra, and have had few complaints. Some may say “you should use X or Y because faster”, or whatever, but Sinatra is plenty fast for my use cases. Not every use case is “we’re Facebook”, or “we’re Google”.&lt;/p&gt;
-
-&lt;p&gt;Until recently I’ve been very much manually managing my Sinatra web APIs on servers - that is, installing/updating everything on the server itself, without using containers or any configuration management. This blog post is the blog post I would have wanted to read when I was figuring out how to dockerize my web APIs.&lt;/p&gt;
-
-&lt;h2 id=&quot;the-api&quot;&gt;The API&lt;/h2&gt;
-
-&lt;p&gt;The main meat of the API is definitions of routes. In addition, I’ve included a number of rules about what HTTP verbs are allowed to be used, what headers to send in each response, how to respond to client and server failures, etc.&lt;/p&gt;
-
-&lt;p&gt;This is what one of the route definitions looks like:&lt;/p&gt;
-
-&lt;div class=&quot;language-ruby highlighter-rouge&quot;&gt;&lt;div class=&quot;highlight&quot;&gt;&lt;pre class=&quot;highlight&quot;&gt;&lt;code&gt;&lt;span class=&quot;n&quot;&gt;get&lt;/span&gt; &lt;span class=&quot;s1&quot;&gt;'/pkgs/?'&lt;/span&gt; &lt;span class=&quot;k&quot;&gt;do&lt;/span&gt;
-  &lt;span class=&quot;n&quot;&gt;headers_get&lt;/span&gt;
-  &lt;span class=&quot;k&quot;&gt;begin&lt;/span&gt;
-    &lt;span class=&quot;n&quot;&gt;lim&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;=&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;params&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;[&lt;/span&gt;&lt;span class=&quot;ss&quot;&gt;:limit&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;]&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;||&lt;/span&gt; &lt;span class=&quot;mi&quot;&gt;10&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;).&lt;/span&gt;&lt;span class=&quot;nf&quot;&gt;to_i&lt;/span&gt;
-    &lt;span class=&quot;n&quot;&gt;off&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;=&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;params&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;[&lt;/span&gt;&lt;span class=&quot;ss&quot;&gt;:offset&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;]&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;||&lt;/span&gt; &lt;span class=&quot;mi&quot;&gt;0&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;).&lt;/span&gt;&lt;span class=&quot;nf&quot;&gt;to_i&lt;/span&gt;
-    &lt;span class=&quot;k&quot;&gt;raise&lt;/span&gt; &lt;span class=&quot;no&quot;&gt;Exception&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;.&lt;/span&gt;&lt;span class=&quot;nf&quot;&gt;new&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;s1&quot;&gt;'limit too large (max 1000)'&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt; &lt;span class=&quot;k&quot;&gt;unless&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;lim&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;&amp;lt;=&lt;/span&gt; &lt;span class=&quot;mi&quot;&gt;1000&lt;/span&gt;
-    &lt;span class=&quot;n&quot;&gt;d&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;=&lt;/span&gt; &lt;span class=&quot;vg&quot;&gt;$cks&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;.&lt;/span&gt;&lt;span class=&quot;nf&quot;&gt;find&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;({},&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;{&lt;/span&gt;&lt;span class=&quot;s2&quot;&gt;&quot;limit&quot;&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;=&amp;gt;&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;lim&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt; &lt;span class=&quot;s2&quot;&gt;&quot;skip&quot;&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;=&amp;gt;&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;off&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;})&lt;/span&gt;
-    &lt;span class=&quot;n&quot;&gt;dat&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;=&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;d&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;.&lt;/span&gt;&lt;span class=&quot;nf&quot;&gt;to_a&lt;/span&gt;
-    &lt;span class=&quot;k&quot;&gt;raise&lt;/span&gt; &lt;span class=&quot;no&quot;&gt;Exception&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;.&lt;/span&gt;&lt;span class=&quot;nf&quot;&gt;new&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;s1&quot;&gt;'no results found'&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt; &lt;span class=&quot;k&quot;&gt;if&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;d&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;.&lt;/span&gt;&lt;span class=&quot;nf&quot;&gt;nil?&lt;/span&gt;
-    &lt;span class=&quot;p&quot;&gt;{&lt;/span&gt; &lt;span class=&quot;ss&quot;&gt;found: &lt;/span&gt;&lt;span class=&quot;n&quot;&gt;d&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;.&lt;/span&gt;&lt;span class=&quot;nf&quot;&gt;count&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt; &lt;span class=&quot;ss&quot;&gt;count: &lt;/span&gt;&lt;span class=&quot;n&quot;&gt;dat&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;.&lt;/span&gt;&lt;span class=&quot;nf&quot;&gt;length&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt; &lt;span class=&quot;ss&quot;&gt;offset: &lt;/span&gt;&lt;span class=&quot;kp&quot;&gt;nil&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt; &lt;span class=&quot;ss&quot;&gt;error: &lt;/span&gt;&lt;span class=&quot;kp&quot;&gt;nil&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt;
-      &lt;span class=&quot;ss&quot;&gt;data: &lt;/span&gt;&lt;span class=&quot;n&quot;&gt;dat&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;}.&lt;/span&gt;&lt;span class=&quot;nf&quot;&gt;to_json&lt;/span&gt;
-  &lt;span class=&quot;k&quot;&gt;rescue&lt;/span&gt; &lt;span class=&quot;no&quot;&gt;Exception&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;=&amp;gt;&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;e&lt;/span&gt;
-    &lt;span class=&quot;n&quot;&gt;halt&lt;/span&gt; &lt;span class=&quot;mi&quot;&gt;400&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;{&lt;/span&gt; &lt;span class=&quot;ss&quot;&gt;count: &lt;/span&gt;&lt;span class=&quot;mi&quot;&gt;0&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt; &lt;span class=&quot;ss&quot;&gt;error: &lt;/span&gt;&lt;span class=&quot;p&quot;&gt;{&lt;/span&gt; &lt;span class=&quot;ss&quot;&gt;message: &lt;/span&gt;&lt;span class=&quot;n&quot;&gt;e&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;.&lt;/span&gt;&lt;span class=&quot;nf&quot;&gt;message&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;},&lt;/span&gt; &lt;span class=&quot;ss&quot;&gt;data: &lt;/span&gt;&lt;span class=&quot;kp&quot;&gt;nil&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;}.&lt;/span&gt;&lt;span class=&quot;nf&quot;&gt;to_json&lt;/span&gt;
-  &lt;span class=&quot;k&quot;&gt;end&lt;/span&gt;
-&lt;span class=&quot;k&quot;&gt;end&lt;/span&gt;
-&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;&lt;/div&gt;
-
-&lt;p&gt;This code chunk is for the &lt;code class=&quot;highlighter-rouge&quot;&gt;/pkgs&lt;/code&gt; route on the API (check it out at &lt;a href=&quot;https://cranchecks.info/pkgs&quot;&gt;https://cranchecks.info/pkgs&lt;/a&gt;). The &lt;code class=&quot;highlighter-rouge&quot;&gt;headers_get&lt;/code&gt; bit sends a pre-defined set of headers in the response. The &lt;code class=&quot;highlighter-rouge&quot;&gt;begin ... rescue ... end&lt;/code&gt; bit is a “try catch” thing - leading to a JSON failure response in case there is a failure - and a JSON response on success.&lt;/p&gt;
-
-&lt;h2 id=&quot;collecting-data-and-mongodb&quot;&gt;Collecting data and MongoDB&lt;/h2&gt;
-
-&lt;p&gt;As stated above, data is updated once a day. The code for scraping data on the package level and maintainer level is pretty similar. For both, the steps are the following: a) collect all names (for &lt;code class=&quot;highlighter-rouge&quot;&gt;/pkgs&lt;/code&gt; that’s package names from &lt;a href=&quot;https://crandb.r-pkg.org&quot;&gt;https://crandb.r-pkg.org&lt;/a&gt;; for &lt;code class=&quot;highlighter-rouge&quot;&gt;/maintainers&lt;/code&gt; that’s maintainer email addresses from &lt;a href=&quot;https://cran.rstudio.com/web/checks/check_summary_by_maintainer.html&quot;&gt;https://cran.rstudio.com/web/checks/check_summary_by_maintainer.html&lt;/a&gt;), b) for each package name or maintainer email scrape CRAN check results, c) with all data collected drop data in MongoDB and then load all new data (maybe this could be an update step?). You can see the gory details on GitHub for &lt;a href=&quot;https://github.com/ropensci/cchecksapi/blob/master/scrape.rb&quot;&gt;packages&lt;/a&gt; and &lt;a href=&quot;https://github.com/ropensci/cchecksapi/blob/master/scrape_maintainer.rb&quot;&gt;maintainers&lt;/a&gt;.&lt;/p&gt;
-
-&lt;p&gt;Those steps above in code for packages is like the following:&lt;/p&gt;
-
-&lt;div class=&quot;language-ruby highlighter-rouge&quot;&gt;&lt;div class=&quot;highlight&quot;&gt;&lt;pre class=&quot;highlight&quot;&gt;&lt;code&gt;&lt;span class=&quot;k&quot;&gt;def&lt;/span&gt; &lt;span class=&quot;nf&quot;&gt;scrape_all&lt;/span&gt;
-  &lt;span class=&quot;n&quot;&gt;pkgs&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;=&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;cran_packages&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;;&lt;/span&gt; &lt;span class=&quot;c1&quot;&gt;# get all pkg names&lt;/span&gt;
-  &lt;span class=&quot;n&quot;&gt;out&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;=&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;[]&lt;/span&gt; &lt;span class=&quot;c1&quot;&gt;# make an array&lt;/span&gt;
-  &lt;span class=&quot;n&quot;&gt;pkgs&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;.&lt;/span&gt;&lt;span class=&quot;nf&quot;&gt;each&lt;/span&gt; &lt;span class=&quot;k&quot;&gt;do&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;|&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;x&lt;/span&gt;&lt;span class=&quot;o&quot;&gt;|&lt;/span&gt; &lt;span class=&quot;c1&quot;&gt;# for each pkg, scrape check results&lt;/span&gt;
-    &lt;span class=&quot;n&quot;&gt;out&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;&amp;lt;&amp;lt;&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;scrape_pkg&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;x&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt;
-  &lt;span class=&quot;k&quot;&gt;end&lt;/span&gt;
-  &lt;span class=&quot;k&quot;&gt;if&lt;/span&gt; &lt;span class=&quot;vg&quot;&gt;$cks&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;.&lt;/span&gt;&lt;span class=&quot;nf&quot;&gt;count&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;&amp;gt;&lt;/span&gt; &lt;span class=&quot;mi&quot;&gt;0&lt;/span&gt;
-    &lt;span class=&quot;vg&quot;&gt;$cks&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;.&lt;/span&gt;&lt;span class=&quot;nf&quot;&gt;drop&lt;/span&gt; &lt;span class=&quot;c1&quot;&gt;# drop data in Mongo&lt;/span&gt;
-    &lt;span class=&quot;vg&quot;&gt;$cks&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;=&lt;/span&gt; &lt;span class=&quot;vg&quot;&gt;$mongo&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;[&lt;/span&gt;&lt;span class=&quot;ss&quot;&gt;:checks&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;]&lt;/span&gt; &lt;span class=&quot;c1&quot;&gt;# recreate database in Mongo&lt;/span&gt;
-  &lt;span class=&quot;k&quot;&gt;end&lt;/span&gt;
-  &lt;span class=&quot;vg&quot;&gt;$cks&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;.&lt;/span&gt;&lt;span class=&quot;nf&quot;&gt;insert_many&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;out&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;.&lt;/span&gt;&lt;span class=&quot;nf&quot;&gt;map&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;{&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;|&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;e&lt;/span&gt;&lt;span class=&quot;o&quot;&gt;|&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;prep_mongo&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;e&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;})&lt;/span&gt; &lt;span class=&quot;c1&quot;&gt;# load new data into Mongo&lt;/span&gt;
-&lt;span class=&quot;k&quot;&gt;end&lt;/span&gt;
-&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;&lt;/div&gt;
-
-&lt;p&gt;&lt;code class=&quot;highlighter-rouge&quot;&gt;$cks&lt;/code&gt; is the MongoDB database connection.&lt;/p&gt;
-
-&lt;h2 id=&quot;docker&quot;&gt;Docker&lt;/h2&gt;
-
-&lt;p&gt;For containerizing the API, I used Docker. A colleague had used &lt;a href=&quot;https://docs.docker.com/compose/&quot;&gt;Docker Compose&lt;/a&gt;, and it was a really easy experience spinning up and taking down the application we were working on. So I wanted to learn how to do that myself. After trial and error, finally got to a solution for this API. Here is my &lt;code class=&quot;highlighter-rouge&quot;&gt;docker-compose.yml&lt;/code&gt; file:&lt;/p&gt;
-
-&lt;pre&gt;&lt;code class=&quot;language-Dockerfile&quot;&gt;mongo:
-  image: mongo
-  volumes:
-    - $HOME/data/mongodb:/data/db # persists data to disk outside container
-  restart: always
-  ports:
-    - &quot;27017:27017&quot;
-
-api:
-  build: .
-  ports:
-    - &quot;8834:8834&quot;
-  links:
-    - mongo
-&lt;/code&gt;&lt;/pre&gt;
-
-&lt;p&gt;This specifies the container for MongoDB and for the API, and specifies in the API container to link to the mongo container.&lt;/p&gt;
-
-&lt;p&gt;To build and run do&lt;/p&gt;
-
-&lt;div class=&quot;highlighter-rouge&quot;&gt;&lt;div class=&quot;highlight&quot;&gt;&lt;pre class=&quot;highlight&quot;&gt;&lt;code&gt;docker-compose build &amp;amp;&amp;amp; docker-compose up -d
-&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;&lt;/div&gt;
-
-&lt;p&gt;The &lt;code class=&quot;highlighter-rouge&quot;&gt;-d&lt;/code&gt; flag is for daemonize, i.e., run in the background. To kill them run&lt;/p&gt;
-
-&lt;div class=&quot;highlighter-rouge&quot;&gt;&lt;div class=&quot;highlight&quot;&gt;&lt;pre class=&quot;highlight&quot;&gt;&lt;code&gt;docker-compose stop &amp;amp;&amp;amp; docker-compose rm
-&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;&lt;/div&gt;
-
-&lt;h2 id=&quot;caddy-server&quot;&gt;Caddy server&lt;/h2&gt;
-
-&lt;p&gt;Caddy is great server. I never really used Nginx, so I can’t compare the two really - I just know that Caddy is super easy. To install, check out the installation page &lt;a href=&quot;https://caddyserver.com/download&quot;&gt;https://caddyserver.com/download&lt;/a&gt;, and it’s easy as something like &lt;code class=&quot;highlighter-rouge&quot;&gt;curl https://getcaddy.com | bash -s personal&lt;/code&gt; (depends on configuration options on that page and license choice).&lt;/p&gt;
-
-&lt;p&gt;I know there’s an option to run a separate container with Caddy, but I run Caddy outside containers.&lt;/p&gt;
-
-&lt;p&gt;My &lt;code class=&quot;highlighter-rouge&quot;&gt;Caddyfile&lt;/code&gt; has something similar to the following:&lt;/p&gt;
-
-&lt;div class=&quot;highlighter-rouge&quot;&gt;&lt;div class=&quot;highlight&quot;&gt;&lt;pre class=&quot;highlight&quot;&gt;&lt;code&gt;cranchecks.info {
-  gzip
-  tls email@foobar.com
-
-  log / logfile.log &quot;{remote} - [{when}] {method} {uri} {query} {proto} {status} {size} {&amp;gt;User-Agent}&quot; {
-     rotate_size 3
-  }
-
-  proxy / localhost:8834 {
-    transparent
-  }
-}
-&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;&lt;/div&gt;
-
-&lt;ul&gt;
-  &lt;li&gt;&lt;code class=&quot;highlighter-rouge&quot;&gt;gzip&lt;/code&gt; tells Caddy to serve gzipp’ed content (see &lt;a href=&quot;https://caddyserver.com/docs/gzip&quot;&gt;https://caddyserver.com/docs/gzip&lt;/a&gt;)&lt;/li&gt;
-  &lt;li&gt;&lt;code class=&quot;highlighter-rouge&quot;&gt;tls&lt;/code&gt; says use the given email for registering with &lt;a href=&quot;https://letsencrypt.org/&quot;&gt;Letsencrypt&lt;/a&gt; (see &lt;a href=&quot;https://caddyserver.com/docs/tls&quot;&gt;https://caddyserver.com/docs/tls&lt;/a&gt;)&lt;/li&gt;
-  &lt;li&gt;&lt;code class=&quot;highlighter-rouge&quot;&gt;log&lt;/code&gt; line specifies how to log requests (and &lt;code class=&quot;highlighter-rouge&quot;&gt;rotate_size&lt;/code&gt; says start a new file when the current one reaches 3 MB) (see &lt;a href=&quot;https://caddyserver.com/docs/log&quot;&gt;https://caddyserver.com/docs/log&lt;/a&gt;)&lt;/li&gt;
-  &lt;li&gt;&lt;code class=&quot;highlighter-rouge&quot;&gt;proxy&lt;/code&gt; is for specifying reverse proxy (see &lt;a href=&quot;https://caddyserver.com/docs/proxy&quot;&gt;https://caddyserver.com/docs/proxy&lt;/a&gt;)&lt;/li&gt;
-&lt;/ul&gt;
-
-&lt;h2 id=&quot;whats-next&quot;&gt;What’s Next&lt;/h2&gt;
-
-&lt;p&gt;There’s still more work to do.&lt;/p&gt;
-
-&lt;ul&gt;
-  &lt;li&gt;Better &lt;code class=&quot;highlighter-rouge&quot;&gt;/maintainers&lt;/code&gt; results
-    &lt;ul&gt;
-      &lt;li&gt;right now, we have two arrays of results, one from the html table on the CRAN results page and the other from the text below it. This duplication isn’t ideal.&lt;/li&gt;
-      &lt;li&gt;it would be helpful to have a summary across all packages for any given maintainer&lt;/li&gt;
-    &lt;/ul&gt;
-  &lt;/li&gt;
-  &lt;li&gt;Better &lt;code class=&quot;highlighter-rouge&quot;&gt;/pkgs&lt;/code&gt; results
-    &lt;ul&gt;
-      &lt;li&gt;it would be helpful to have a summary across all R versions and platforms for any given package&lt;/li&gt;
-    &lt;/ul&gt;
-  &lt;/li&gt;
-  &lt;li&gt;Include actual CRAN check results - CRAN check results can include output of the failures (whether they’re in examples or the test suite, or an installation error). The API doesn’t currently include that output, but thinking about how it could.&lt;/li&gt;
-  &lt;li&gt;Possibly update data more often. Right now we update once per day. Seems like results do roll in at different times though, perhaps as builds are done for each pkg?&lt;/li&gt;
-  &lt;li&gt;Notification service:  package maintainers can opt-in to notifications when their checks are failing so they can be on top of fixes quickly.  This could be managed through the API itself, with no GUI, but to make it palatable to all types may want to make a super simple web page to sign up.&lt;/li&gt;
-&lt;/ul&gt;
-
-&lt;p&gt;Check out the &lt;a href=&quot;https://github.com/ropensci/cchecksapi/issues&quot;&gt;issue tracker&lt;/a&gt; to follow progress or file a feature request or bug.&lt;/p&gt;
-
-&lt;p&gt;&lt;br /&gt;&lt;/p&gt;
-
-&lt;hr /&gt;
-
-&lt;h2 id=&quot;thanks&quot;&gt;Thanks&lt;/h2&gt;
-
-&lt;p&gt;Thanks to &lt;a href=&quot;https://github.com/gaborcsardi&quot;&gt;Gábor Csárdi&lt;/a&gt; for the idea to make a &lt;code class=&quot;highlighter-rouge&quot;&gt;/maintainers&lt;/code&gt; route.&lt;/p&gt;
-
-&lt;h2 id=&quot;further-reading&quot;&gt;Further reading&lt;/h2&gt;
-
-&lt;p&gt;In a &lt;a href=&quot;http://blog.cloud66.com/deploying-rest-apis-to-docker-using-ruby-and-sinatra/&quot;&gt;similar post&lt;/a&gt; Cloud66 folks talked about deploying an API with the same stack essentially: Sinatra, MongoDB, and Docker.&lt;/p&gt;
-
-&lt;h2 id=&quot;ps&quot;&gt;p.s.&lt;/h2&gt;
-
-&lt;p&gt;I mostly write about R software, so some readers may use R: if you want to make a web API but only know R, try learning Ruby!  It can’t hurt to learn Ruby, and you’ll be happy you did.&lt;/p&gt;
-
-</description>
-        <pubDate>Tue, 14 Nov 2017 00:00:00 -0800</pubDate>
-        <link>https://recology.info/2017/11/sinatra-mongo-docker-caddy/</link>
-        <guid isPermaLink="true">https://recology.info/2017/11/sinatra-mongo-docker-caddy/</guid>
-        
-        <category>API</category>
-        
-        <category>ruby</category>
-        
-        <category>docker</category>
-        
-        <category>caddy</category>
-        
-        <category>mongo</category>
-        
-        <category>sinatra</category>
         
         
       </item>

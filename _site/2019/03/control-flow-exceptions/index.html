@@ -1,0 +1,435 @@
+<!DOCTYPE html>
+<html>
+
+  <head>
+  <meta charset="utf-8">
+  <meta http-equiv="X-UA-Compatible" content="IE=edge">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+
+  <title>Exceptions in control flow in R</title>
+  <meta name="description" content="I was listening to a Bike Shed podcast episode 189, “It’s Gonna Work, Definitely, No Problems Whatsoever”, and starting at 27:44 there was a conversation abo...">
+  <link href='https://fonts.googleapis.com/css?family=PT+Sans:400,700,400italic,700italic|Source+Sans+Pro:400,700,200,300|Josefin+Sans:400,600,700,300' rel='stylesheet' type='text/css'>
+  <link href="https://maxcdn.bootstrapcdn.com/font-awesome/4.5.0/css/font-awesome.min.css" rel="stylesheet">
+
+  <link rel="stylesheet" href="/css/style.css">
+  <link rel="canonical" href="http://localhost:4000/2019/03/control-flow-exceptions/">
+  <link rel="alternate" type="application/rss+xml" title="recology" href="http://localhost:4000/feed.xml">
+</head>
+
+
+  <body>
+
+    
+<div class="wrapper">
+  <center> <a href="/index.html"><div class="site-title">   recology </div></a></center>
+</div>
+<div class="wrapper site-description">
+<center>  code and such </center>
+</div>
+<div class="wrapper">
+  <div class="trigger site-navigation">
+    <a class="page-link" href="/">HOME</a>
+
+    
+    
+    
+    
+    
+    
+
+    <span class="exclamationMark">/</span><a class="page-link" href="/archives/">Archives</a>
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+  </div>
+</div>
+
+
+    <div class="page-content">
+      <div class="wrapper">
+        <article class="post" itemscope itemtype="http://schema.org/BlogPosting">
+
+  <header class="post-header">
+    <h1 class="post-title" itemprop="name headline"><a class="post-title-link"  href="/2019/03/control-flow-exceptions/">Exceptions in control flow in R</a></h1>
+  <center>  <p class="post-meta"><time datetime="2019-03-04T00:00:00-08:00" itemprop="datePublished">Mar 4, 2019</time></p>
+    <!-- 
+     <div class="">
+       <center><p ><strong><span class="authorKeyword">Author</span><span class="small-site-title"> <h2 style="letter-spacing: 3px !important;
+       text-transform: uppercase !important;">Scott Chamberlain</h2></span></strong></p></center>
+
+     </div>
+      -->
+   </center>
+  </header>
+
+  <div class="post-content" itemprop="articleBody">
+    <p>I was listening to a Bike Shed podcast <a href="http://bikeshed.fm/189">episode 189, “It’s Gonna Work, Definitely, No Problems Whatsoever”</a>, and starting at 27:44 there was a conversation about exception handling. Specifically it was about exception handling in control flow when doing web API requests. This topic piqued my interest straight away as I do a lot of API stuff (making and wrapping).</p>
+
+<p>The part of the conversation that I want to address is their conclusion that exceptions in control flow are an anti-pattern. Seems this is a general pattern in programming languages, e.g., this <a href="https://softwareengineering.stackexchange.com/a/189225/329940">SO thread</a>. But on the contrary there are some languages in which exceptions in control flow are considered normal behavior; e.g., Python (<a href="https://softwareengineering.stackexchange.com/a/318542/329940">this</a>, <a href="https://softwareengineering.stackexchange.com/a/351121/329940">this</a>).</p>
+
+<p>My first reaction to this was one of vehement disagreement because in my experience wrapping web APIs raising exceptions on HTTP status codes of 400 and 500 series is the norm, in at least R and Ruby. They argued that there are better ways of handling these cases. After a whg with my gut reaction.</p>
+
+<p>Let’s take a step back first and look at some concepts before diving further into this.
+ile I thought maybe the topic is worth thinking harder about rather than goin</p>
+<h2 id="control-flow">control flow</h2>
+
+<p><a href="https://en.wikipedia.org/wiki/Control_flow">Control flow</a> in programming is</p>
+
+<blockquote>
+  <p>the order in which individual statements … are executed or evaluated … a control flow statement is a statement, the execution of which results in a choice being made as to which of two or more paths to follow.</p>
+</blockquote>
+
+<p><a href="https://stat.ethz.ch/R-manual/R-devel/library/base/html/Control.html">Control flow in R</a> has an overview of control flow in R. Control flow constructs in R include <code class="highlighter-rouge">if/else</code>, <code class="highlighter-rouge">for</code>, <code class="highlighter-rouge">while</code>, <code class="highlighter-rouge">repeat</code>, <code class="highlighter-rouge">break</code>, <code class="highlighter-rouge">next</code>.</p>
+
+<h2 id="exceptions">exceptions</h2>
+
+<p>Exceptions are</p>
+
+<blockquote>
+  <p>anomalous or exceptional conditions requiring special processing - often changing the normal flow of program execution (source: <a href="https://en.wikipedia.org/wiki/Exception_handling">wikiex</a>)</p>
+</blockquote>
+
+<p>In R, exception handling can be done with <code class="highlighter-rouge">try</code>, <code class="highlighter-rouge">tryCatch</code>, <code class="highlighter-rouge">withCallingHandlers</code> and others. Often <code class="highlighter-rouge">warning()</code> is used to signal to the user what happened, but does not stop execution, and can be suppressed with <code class="highlighter-rouge">suppressWarnings()</code>. To stop execution, <code class="highlighter-rouge">stop()</code> is used.</p>
+
+<p><br /></p>
+
+<h2 id="back-to-web-api-exceptions-and-control-flow-in-r">back to web API exceptions and control flow in R</h2>
+
+<p>Note the word <strong>exceptional</strong> above in our definition of exceptions. The BikeShed pod hosts were surprised to see exceptions raised with bad API requests because they didn’t think a bad API request was <strong>exceptional</strong>, but rather an expected result given certain conditions (e.g., an HTTP 400 series client error means the client did something wrong and perhaps the server gave back a useful error message to help fix the request).</p>
+
+<p>They observed that most Ruby API wrappers did have the behavior of rasing an exception on a 400/500 series API status, but they disagreed with this approach.</p>
+
+<p>In R world, most API wrappers in my experience also follow the pattern of raising an exception stopping the code flow on a 400/500 series HTTP error.
+<!-- (the exception to this rule that I've used in some of my packages is when there is a common use case to iterate over A LOT of inputs, in which stopping execution would be painful) --></p>
+
+<p>What would it look like to not stop code execution flow when 400/500 series errors are returned from web API requests? What would need to change from the current setup? How would users be affected?</p>
+
+<p>A typical R function that makes a web API request looks like the following:</p>
+
+<div class="language-r highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="n">foo</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="k">function</span><span class="p">(</span><span class="n">path</span><span class="p">,</span><span class="w"> </span><span class="n">query</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nf">list</span><span class="p">())</span><span class="w"> </span><span class="p">{</span><span class="w">
+  </span><span class="n">conn</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">crul</span><span class="o">::</span><span class="n">HttpClient</span><span class="o">$</span><span class="n">new</span><span class="p">(</span><span class="s2">"https://httpbin.org"</span><span class="p">)</span><span class="w">
+  </span><span class="n">res</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">conn</span><span class="o">$</span><span class="n">get</span><span class="p">(</span><span class="n">path</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">path</span><span class="p">,</span><span class="w"> </span><span class="n">query</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">query</span><span class="p">)</span><span class="w">
+  </span><span class="n">res</span><span class="o">$</span><span class="n">raise_for_status</span><span class="p">()</span><span class="w">
+  </span><span class="n">res</span><span class="o">$</span><span class="n">parse</span><span class="p">(</span><span class="s2">"UTF-8"</span><span class="p">)</span><span class="w">
+</span><span class="p">}</span><span class="w">
+</span></code></pre></div></div>
+
+<p>On a successful request all is good and we get back the JSON payload</p>
+
+<div class="language-r highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="n">foo</span><span class="p">(</span><span class="n">path</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"get"</span><span class="p">,</span><span class="w"> </span><span class="n">query</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nf">list</span><span class="p">(</span><span class="n">apple</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"pink lady"</span><span class="p">))</span><span class="w">
+</span><span class="c1">#&gt; [1] "{\n  \"args\": {\n    \"\": \"pink lady\"\n  }, ...</span><span class="w">
+</span></code></pre></div></div>
+
+<p>When there is a 400/500 series code the line <code class="highlighter-rouge">res$raise_for_status()</code> throws an error, stopping execution</p>
+
+<div class="language-r highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="n">foo</span><span class="p">(</span><span class="n">path</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"status/400"</span><span class="p">)</span><span class="w">
+</span><span class="c1">#&gt; Error: Bad Request (HTTP 400)</span><span class="w">
+</span></code></pre></div></div>
+
+<p>Instead of raising an error we could throw a warning and proceed to the next step</p>
+
+<div class="language-r highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="n">bar</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="k">function</span><span class="p">(</span><span class="n">path</span><span class="p">,</span><span class="w"> </span><span class="n">query</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nf">list</span><span class="p">())</span><span class="w"> </span><span class="p">{</span><span class="w">
+  </span><span class="n">conn</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">crul</span><span class="o">::</span><span class="n">HttpClient</span><span class="o">$</span><span class="n">new</span><span class="p">(</span><span class="s2">"https://httpbin.org"</span><span class="p">)</span><span class="w">
+  </span><span class="n">res</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">conn</span><span class="o">$</span><span class="n">get</span><span class="p">(</span><span class="n">path</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">path</span><span class="p">,</span><span class="w"> </span><span class="n">query</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">query</span><span class="p">)</span><span class="w">
+  </span><span class="k">if</span><span class="w"> </span><span class="p">(</span><span class="n">res</span><span class="o">$</span><span class="n">status_code</span><span class="w"> </span><span class="o">&gt;=</span><span class="w"> </span><span class="m">400</span><span class="p">)</span><span class="w"> </span><span class="p">{</span><span class="w">
+    </span><span class="n">warning</span><span class="p">(</span><span class="n">sprintf</span><span class="p">(</span><span class="s2">"HTTP %s %s"</span><span class="p">,</span><span class="w"> </span><span class="n">res</span><span class="o">$</span><span class="n">status_code</span><span class="p">,</span><span class="w"> </span><span class="n">res</span><span class="o">$</span><span class="n">status_http</span><span class="p">()</span><span class="o">$</span><span class="n">explanation</span><span class="p">))</span><span class="w">
+  </span><span class="p">}</span><span class="w">
+  </span><span class="n">res</span><span class="o">$</span><span class="n">parse</span><span class="p">(</span><span class="s2">"UTF-8"</span><span class="p">)</span><span class="w">
+</span><span class="p">}</span><span class="w">
+</span></code></pre></div></div>
+
+<div class="language-r highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="n">bar</span><span class="p">(</span><span class="n">path</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"status/400"</span><span class="p">)</span><span class="w">
+</span><span class="c1">#&gt; [1] ""</span><span class="w">
+</span><span class="c1">#&gt; Warning message:</span><span class="w">
+</span><span class="c1">#&gt; In bar(path = "status/400") :</span><span class="w">
+</span><span class="c1">#&gt;  HTTP 400 Bad request syntax or unsupported method</span><span class="w">
+</span></code></pre></div></div>
+
+<p>This is fine, but there’s a few scenarios in which this will be problematic:</p>
+
+<ol>
+  <li>Many APIs <strong>DO NOT</strong> return the same content-type on a 400 series error, and even more common on 500 series errors. In fact, often JSON APIs return an HTML error page, which may or may not contain a meaningul message, instead of the same content type as a successful response (e.g., JSON).</li>
+  <li>Rather then simply parsing the response <code class="highlighter-rouge">res$parse("UTF-8")</code>, the downstream code may be more complex (e.g., selecting particular fields/keys), and may fail out (and in R, this often means useless error messages for the user).</li>
+</ol>
+
+<p>If we take their advice and don’t fail out on 400/500 series codes, what would that look like? One could do something like:</p>
+
+<div class="language-r highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="n">hello_world</span><span class="w"> </span><span class="o">&lt;-</span><span class="w"> </span><span class="k">function</span><span class="p">(</span><span class="n">path</span><span class="p">,</span><span class="w"> </span><span class="n">query</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nf">list</span><span class="p">())</span><span class="w"> </span><span class="p">{</span><span class="w">
+  </span><span class="n">conn</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">crul</span><span class="o">::</span><span class="n">HttpClient</span><span class="o">$</span><span class="n">new</span><span class="p">(</span><span class="s2">"https://httpbin.org"</span><span class="p">)</span><span class="w">
+  </span><span class="n">res</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">conn</span><span class="o">$</span><span class="n">get</span><span class="p">(</span><span class="n">path</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">path</span><span class="p">,</span><span class="w"> </span><span class="n">query</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">query</span><span class="p">)</span><span class="w">
+  </span><span class="k">if</span><span class="w"> </span><span class="p">(</span><span class="n">res</span><span class="o">$</span><span class="n">status_code</span><span class="w"> </span><span class="o">&gt;=</span><span class="w"> </span><span class="m">400</span><span class="p">)</span><span class="w"> </span><span class="p">{</span><span class="w">
+    </span><span class="n">warning</span><span class="p">(</span><span class="n">sprintf</span><span class="p">(</span><span class="s2">"HTTP %s %s"</span><span class="p">,</span><span class="w"> </span><span class="n">res</span><span class="o">$</span><span class="n">status_code</span><span class="p">,</span><span class="w"> </span><span class="n">res</span><span class="o">$</span><span class="n">status_http</span><span class="p">()</span><span class="o">$</span><span class="n">explanation</span><span class="p">))</span><span class="w">
+  </span><span class="p">}</span><span class="w">
+  </span><span class="n">res</span><span class="w">
+</span><span class="p">}</span><span class="w">
+</span></code></pre></div></div>
+
+<p>We still get the warning on an error</p>
+
+<div class="language-r highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="n">hello_world</span><span class="p">(</span><span class="n">path</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"status/400"</span><span class="p">)</span><span class="w">
+</span><span class="c1">#&gt; Warning message:</span><span class="w">
+</span><span class="c1">#&gt; In hello_world(path = "status/400") :</span><span class="w">
+</span><span class="c1">#&gt;   HTTP 400 Bad request syntax or unsupported method</span><span class="w">
+</span></code></pre></div></div>
+
+<p>But also we return the response object (<code class="highlighter-rouge">HttpResponse</code> from the <code class="highlighter-rouge">crul</code> package in this case):</p>
+
+<div class="language-r highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="c1">#&gt; &lt;crul response&gt;</span><span class="w">
+</span><span class="c1">#&gt;   url: https://httpbin.org/status/400</span><span class="w">
+</span><span class="c1">#&gt;   request_headers:</span><span class="w">
+</span><span class="c1">#&gt;     User-Agent: libcurl/7.54.0 r-curl/3.3 crul/0.7.0</span><span class="w">
+</span><span class="c1">#&gt;     Accept-Encoding: gzip, deflate</span><span class="w">
+</span><span class="c1">#&gt;     Accept: application/json, text/xml, application/xml, */*</span><span class="w">
+</span><span class="c1">#&gt;   response_headers:</span><span class="w">
+</span><span class="c1">#&gt;     status: HTTP/1.1 400 BAD REQUEST</span><span class="w">
+</span><span class="c1">#&gt;     access-control-allow-credentials: true</span><span class="w">
+</span><span class="c1">#&gt;     access-control-allow-origin: *</span><span class="w">
+</span><span class="c1">#&gt;     content-type: text/html; charset=utf-8</span><span class="w">
+</span><span class="c1">#&gt;     date: Mon, 04 Mar 2019 17:49:39 GMT</span><span class="w">
+</span><span class="c1">#&gt;     server: nginx</span><span class="w">
+</span><span class="c1">#&gt;     content-length: 0</span><span class="w">
+</span><span class="c1">#&gt;     connection: keep-alive</span><span class="w">
+</span><span class="c1">#&gt;   status: 400</span><span class="w">
+</span></code></pre></div></div>
+
+<p>Now the user can explore the response body, response headers, etc. and decide on their own what to do instead of the function failing out and returning nothing.</p>
+
+<p>This approach is fine if your users are more advanced, but most packages/libraries are probably trying to give back a data object that users are familiar with. In R, that is clearly the data.frame. When there is a 400/500 series error, one option is to return an empty data.frame and throw a warning about the error, hopefully with enough information for the user to fix the request. This is probably best for naive users, but any package has some more advanced users that would benefit from more information; and more information will help a naive user + the maintainer debug a problem eaiser.</p>
+
+<p>The next more complicated option would be a list that can have the same format regardless of errors or not:</p>
+
+<div class="language-r highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="n">func</span><span class="w"> </span><span class="o">&lt;-</span><span class="w"> </span><span class="k">function</span><span class="p">()</span><span class="w"> </span><span class="p">{</span><span class="w">
+  </span><span class="n">res</span><span class="w"> </span><span class="o">&lt;-</span><span class="w"> </span><span class="n">hello_world</span><span class="p">(</span><span class="n">path</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"status/400"</span><span class="p">)</span><span class="w">
+  </span><span class="n">mssg</span><span class="w"> </span><span class="o">&lt;-</span><span class="w"> </span><span class="n">sprintf</span><span class="p">(</span><span class="s2">"HTTP %s %s"</span><span class="p">,</span><span class="w"> </span><span class="n">res</span><span class="o">$</span><span class="n">status_code</span><span class="p">,</span><span class="w"> </span><span class="n">res</span><span class="o">$</span><span class="n">status_http</span><span class="p">()</span><span class="o">$</span><span class="n">explanation</span><span class="p">)</span><span class="w">
+  </span><span class="nf">list</span><span class="p">(</span><span class="n">data</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">res</span><span class="o">$</span><span class="n">parse</span><span class="p">(</span><span class="s2">"UTF-8"</span><span class="p">),</span><span class="w"> </span><span class="n">error</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">mssg</span><span class="p">)</span><span class="w">
+</span><span class="p">}</span><span class="w">
+</span></code></pre></div></div>
+
+<p>gives</p>
+
+<div class="language-r highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="n">func</span><span class="p">()</span><span class="w">
+</span><span class="c1">#&gt; $data</span><span class="w">
+</span><span class="c1">#&gt; [1] ""</span><span class="w">
+</span><span class="c1">#&gt; </span><span class="w">
+</span><span class="c1">#&gt; $error</span><span class="w">
+</span><span class="c1">#&gt; [1] "HTTP 400 Bad request syntax or unsupported method"</span><span class="w">
+</span></code></pre></div></div>
+
+<p>Or possibly something more complex where you can build in accessors to make it easy to get data the user expects, but also dig into the HTTP response object itself if needed:</p>
+
+<div class="language-r highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="n">Response</span><span class="w"> </span><span class="o">&lt;-</span><span class="w"> </span><span class="n">R</span><span class="m">6</span><span class="o">::</span><span class="n">R</span><span class="m">6</span><span class="n">Class</span><span class="p">(</span><span class="s2">"Response"</span><span class="p">,</span><span class="w">
+  </span><span class="n">public</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nf">list</span><span class="p">(</span><span class="w">
+    </span><span class="n">x</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="kc">NULL</span><span class="p">,</span><span class="w">
+    </span><span class="n">initialize</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="k">function</span><span class="p">(</span><span class="n">resp</span><span class="p">)</span><span class="w"> </span><span class="n">self</span><span class="o">$</span><span class="n">x</span><span class="w"> </span><span class="o">&lt;-</span><span class="w"> </span><span class="n">resp</span><span class="p">,</span><span class="w">
+    </span><span class="n">data</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="k">function</span><span class="p">()</span><span class="w"> </span><span class="n">self</span><span class="o">$</span><span class="n">x</span><span class="o">$</span><span class="n">parse</span><span class="p">(</span><span class="s2">"UTF-8"</span><span class="p">),</span><span class="w">
+    </span><span class="n">error</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="k">function</span><span class="p">()</span><span class="w"> </span><span class="p">{</span><span class="w">
+      </span><span class="n">sprintf</span><span class="p">(</span><span class="s2">"HTTP %s %s"</span><span class="p">,</span><span class="w"> </span><span class="n">self</span><span class="o">$</span><span class="n">x</span><span class="o">$</span><span class="n">status_code</span><span class="p">,</span><span class="w"> </span><span class="n">self</span><span class="o">$</span><span class="n">x</span><span class="o">$</span><span class="n">status_http</span><span class="p">()</span><span class="o">$</span><span class="n">explanation</span><span class="p">)</span><span class="w">
+    </span><span class="p">}</span><span class="w">
+  </span><span class="p">)</span><span class="w">
+</span><span class="p">)</span><span class="w">
+</span><span class="n">myfunc</span><span class="w"> </span><span class="o">&lt;-</span><span class="w"> </span><span class="k">function</span><span class="p">()</span><span class="w"> </span><span class="p">{</span><span class="w">
+  </span><span class="n">res</span><span class="w"> </span><span class="o">&lt;-</span><span class="w"> </span><span class="n">hello_world</span><span class="p">(</span><span class="n">path</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"status/400"</span><span class="p">)</span><span class="w">
+  </span><span class="n">Response</span><span class="o">$</span><span class="n">new</span><span class="p">(</span><span class="n">res</span><span class="p">)</span><span class="w">
+</span><span class="p">}</span><span class="w">
+</span></code></pre></div></div>
+
+<p>Which gives:</p>
+
+<div class="language-r highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="n">out</span><span class="w"> </span><span class="o">&lt;-</span><span class="w"> </span><span class="n">myfunc</span><span class="p">()</span><span class="w">
+</span><span class="c1"># the HTTP message</span><span class="w">
+</span><span class="n">out</span><span class="o">$</span><span class="n">error</span><span class="p">()</span><span class="w">
+</span><span class="c1">#&gt; [1] "HTTP 400 Bad request syntax or unsupported method"</span><span class="w">
+</span><span class="c1"># the response body, parsed</span><span class="w">
+</span><span class="n">out</span><span class="o">$</span><span class="n">data</span><span class="p">()</span><span class="w">
+</span><span class="c1">#&gt; [1] ""</span><span class="w">
+</span><span class="c1"># the full HTTP response object</span><span class="w">
+</span><span class="n">out</span><span class="o">$</span><span class="n">x</span><span class="w">
+</span></code></pre></div></div>
+
+<h2 id="what-about-users-handling-exceptions-on-their-side">what about users handling exceptions on their side?</h2>
+
+<p>If one sticks swith erroring out of excecution flow with 400/500 series errors, the user can still handle it on their end. For example, if they are using a function in a loop/appply type call, they can use <code class="highlighter-rouge">tryCatch</code> or similar and check for an error and proceed one of two or more ways depending on the error or successful request. Of course this assumes that the user knows how to do this.</p>
+
+<p>Additionally, this means that each user will handle errors in different ways, possibly making mistakes in the process - arguing for the developer of the package to handle exceptions instead.</p>
+
+<h2 id="its-too-complex-just-fail-out">it’s too complex, just fail out</h2>
+
+<p>One reason I like to fail out on 400/500 series errors in my packages is that there is often significant data munging of the response. Failing out makes my life easier as I don’t have to worry about what to do with HTTP responses that fail. In the world I run in of smallish APIs for science/research, API failure behavior often is not very good; it’s typically unpredictable, changes from time to time, and failure response bodies are often just their HTML failure page, leading to brittle code for parsing that HTML as that HTML can change often. It’d be great if every API was as good as Github’s for example, but we’ll never be in that place.</p>
+
+<h2 id="performance-considerations">performance considerations</h2>
+
+<p>In reading about exceptions in control flow, there’s a common thread about performance (e.g., <a href="https://stackoverflow.com/questions/13835817/are-exceptions-in-c-really-slow">c++</a>, <a href="https://simonecarletti.com/blog/2010/01/how-slow-are-ruby-exceptions/">Ruby 1</a>, <a href="https://www.honeybadger.io/blog/benchmarking-exceptions-in-ruby-yep-theyre-slow/">Ruby 2</a>). That is, if throwing exceptions is a slow procedure, that’s one reason to avoid them. But if exceptions aren’t slow then that’s not a great argument for avoiding them.</p>
+
+<p>I haven’t seen anything on performance an exceptions in R, though I’m sure there’s something out there.</p>
+
+<p>Even if exceptions are a slowish procedure, there is an argument to be made that failing early also saves time; that is, if you get a 400/500 series error you aren’t then spending time with downstream processing of the response. However, then the user has less information. Trade-offs all the way down.</p>
+
+<h2 id="conclusion">conclusion</h2>
+
+<p>I’m not sure if I’ll change anything in packages I maintain or not. I’ll keep thinking aobut this and ask around to gauge others opinions on this. Part of me wants to follow the avoid exceptions path, but I worry about two things. First, the complexity increases for me as the developer. If I don’t fail out, then I have to deal with parsing somehow every response. It’s not as simple as giving back the HTTP response; I ideally want to give users a data structure they are familiar with, i.e., a data.frame. Second, for the user, if I give back a list or an <code class="highlighter-rouge">R6</code> object, that increases complexity on their side. Is the benefit of more information worth the cost of more complexity for the user? I’ve no idea.</p>
+
+
+  </div>
+
+  <footer class="postNavigation">
+  
+    <a class="postPrev" href="/2019/02/ruby-ports-to-r/">
+        &laquo; Notes on porting Ruby to R
+    </a>
+  
+  
+  </footer>
+
+
+</article>
+
+      </div>
+    </div>
+
+    <footer class="site-footer">
+
+  <div class="wrapper">
+
+    <h2 class="footer-heading small-site-title">Scott Chamberlain</h2>
+
+    <div class="footer-col-wrapper">
+      <div class="footer-col footer-col-1">
+        <ul class="contact-list footer-content">
+          <li>Theme: <a href="http://github.com/hemangsk/Gravity">Gravity</a></li>
+          <li>Made with <i class="fa fa-heart"></i> on <a href="http://jekyllrb.com"><span style="color:black">{ { Jekyll } }</a></span></li>
+
+
+        </ul>
+      </div>
+
+      <div class="footer-col footer-col-2 footer-content">
+        <ul class="social-media-list">
+          
+          <li>
+            <a href="https://github.com/sckott"><span class="icon icon--github"><svg viewBox="0 0 16 16"><path fill="#828282" d="M7.999,0.431c-4.285,0-7.76,3.474-7.76,7.761 c0,3.428,2.223,6.337,5.307,7.363c0.388,0.071,0.53-0.168,0.53-0.374c0-0.184-0.007-0.672-0.01-1.32 c-2.159,0.469-2.614-1.04-2.614-1.04c-0.353-0.896-0.862-1.135-0.862-1.135c-0.705-0.481,0.053-0.472,0.053-0.472 c0.779,0.055,1.189,0.8,1.189,0.8c0.692,1.186,1.816,0.843,2.258,0.645c0.071-0.502,0.271-0.843,0.493-1.037 C4.86,11.425,3.049,10.76,3.049,7.786c0-0.847,0.302-1.54,0.799-2.082C3.768,5.507,3.501,4.718,3.924,3.65 c0,0,0.652-0.209,2.134,0.796C6.677,4.273,7.34,4.187,8,4.184c0.659,0.003,1.323,0.089,1.943,0.261 c1.482-1.004,2.132-0.796,2.132-0.796c0.423,1.068,0.157,1.857,0.077,2.054c0.497,0.542,0.798,1.235,0.798,2.082 c0,2.981-1.814,3.637-3.543,3.829c0.279,0.24,0.527,0.713,0.527,1.437c0,1.037-0.01,1.874-0.01,2.129 c0,0.208,0.14,0.449,0.534,0.373c3.081-1.028,5.302-3.935,5.302-7.362C15.76,3.906,12.285,0.431,7.999,0.431z"/></svg>
+</span><span class="username">sckott</span></a>
+
+          </li>
+          
+
+          
+          <li>
+            <a href="https://twitter.com/sckottie"><span class="icon icon--twitter"><svg viewBox="0 0 16 16"><path fill="#828282" d="M15.969,3.058c-0.586,0.26-1.217,0.436-1.878,0.515c0.675-0.405,1.194-1.045,1.438-1.809c-0.632,0.375-1.332,0.647-2.076,0.793c-0.596-0.636-1.446-1.033-2.387-1.033c-1.806,0-3.27,1.464-3.27,3.27 c0,0.256,0.029,0.506,0.085,0.745C5.163,5.404,2.753,4.102,1.14,2.124C0.859,2.607,0.698,3.168,0.698,3.767 c0,1.134,0.577,2.135,1.455,2.722C1.616,6.472,1.112,6.325,0.671,6.08c0,0.014,0,0.027,0,0.041c0,1.584,1.127,2.906,2.623,3.206 C3.02,9.402,2.731,9.442,2.433,9.442c-0.211,0-0.416-0.021-0.615-0.059c0.416,1.299,1.624,2.245,3.055,2.271 c-1.119,0.877-2.529,1.4-4.061,1.4c-0.264,0-0.524-0.015-0.78-0.046c1.447,0.928,3.166,1.469,5.013,1.469 c6.015,0,9.304-4.983,9.304-9.304c0-0.142-0.003-0.283-0.009-0.423C14.976,4.29,15.531,3.714,15.969,3.058z"/></svg>
+</span><span class="username">sckottie</span></a>
+
+          </li>
+          
+        </ul>
+      </div>
+
+      <div class="footer-col footer-col-3 site-description">
+        <p style="display:inline">code and such</p>
+        <a href="/feed.xml"><i class="fa fa-rss fa-lg"></i></a>&nbsp;
+      </div>
+    </div>
+
+  </div>
+
+</footer>
+
+
+    <!--[if !(lt IE 8)]><!-->
+    <script type="text/javascript">
+      (function(){
+        var e = document.createElement('script'); e.type='text/javascript'; e.async = true;
+        e.src = 'https://www.eff.org/doa/widget.min.js';
+        var s = document.getElementsByTagName('script')[0]; s.parentNode.insertBefore(e, s);
+      })();
+    </script>
+    <!--<![endif]-->
+
+  </body>
+
+</html>
