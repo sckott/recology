@@ -44,7 +44,7 @@ In R, exception handling can be done with `try`, `tryCatch`, `withCallingHandler
 
 Note the word **exceptional** above in our definition of exceptions. The BikeShed pod hosts were surprised to see exceptions raised with bad API requests because they didn't think a bad API request was **exceptional**, but rather an expected result given certain conditions (e.g., an HTTP 400 series client error means the client did something wrong and perhaps the server gave back a useful error message to help fix the request).
 
-They observed that most Ruby API wrappers did have the behavior of rasing an exception on a 400/500 series API status, but they disagreed with this approach.
+They observed that most Ruby API wrappers did have the behavior of raising an exception on a 400/500 series API status, but they disagreed with this approach.
 
 In R world, most API wrappers in my experience also follow the pattern of raising an exception stopping the code flow on a 400/500 series HTTP error.
 <!-- (the exception to this rule that I've used in some of my packages is when there is a common use case to iterate over A LOT of inputs, in which stopping execution would be painful) -->
@@ -147,7 +147,7 @@ But also we return the response object (`HttpResponse` from the `crul` package i
 
 Now the user can explore the response body, response headers, etc. and decide on their own what to do instead of the function failing out and returning nothing.
 
-This approach is fine if your users are more advanced, but most packages/libraries are probably trying to give back a data object that users are familiar with. In R, that is clearly the data.frame. When there is a 400/500 series error, one option is to return an empty data.frame and throw a warning about the error, hopefully with enough information for the user to fix the request. This is probably best for naive users, but any package has some more advanced users that would benefit from more information; and more information will help a naive user + the maintainer debug a problem eaiser.
+This approach is fine if your users are more advanced, but most packages/libraries are probably trying to give back a data object that users are familiar with. In R, that is clearly the data.frame. When there is a 400/500 series error, one option is to return an empty data.frame and throw a warning about the error, hopefully with enough information for the user to fix the request. This is probably best for naive users, but any package has some more advanced users that would benefit from more information; and more information will help a naive user + the maintainer debug a problem easier.
 
 The next more complicated option would be a list that can have the same format regardless of errors or not:
 
@@ -223,7 +223,7 @@ Even if exceptions are a slowish procedure, there is an argument to be made that
 
 ## conclusion
 
-I'm not sure if I'll change anything in packages I maintain or not. I'll keep thinking aobut this and ask around to gauge others opinions on this. Part of me wants to follow the avoid exceptions path, but I worry about two things. First, the complexity increases for me as the developer. If I don't fail out, then I have to deal with parsing somehow every response. It's not as simple as giving back the HTTP response; I ideally want to give users a data structure they are familiar with, i.e., a data.frame. Second, for the user, if I give back a list or an `R6` object, that increases complexity on their side. Is the benefit of more information worth the cost of more complexity for the user? I've no idea. 
+I'm not sure if I'll change anything in packages I maintain or not. I'll keep thinking about this and ask around to gauge others opinions on this. Part of me wants to follow the avoid exceptions path, but I worry about two things. First, the complexity increases for me as the developer. If I don't fail out, then I have to deal with parsing somehow every response. It's not as simple as giving back the HTTP response; I ideally want to give users a data structure they are familiar with, i.e., a data.frame. Second, for the user, if I give back a list or an `R6` object, that increases complexity on their side. Is the benefit of more information worth the cost of more complexity for the user? I've no idea. 
 
 
 
