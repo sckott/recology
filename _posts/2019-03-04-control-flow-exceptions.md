@@ -223,7 +223,7 @@ Even if exceptions are a slowish procedure, there is an argument to be made that
 
 ## conclusion
 
-I'm not sure if I'll change anything in packages I maintain or not. I'll keep thinking aobut this and ask around to gauge others opinions on this. Part of me wants to follow the avoid exceptions path, but I worry about two things. First, the complexity increases for me as the developer. If I don't fail out, then I have to deal with parsing somehow every response. It's not as simple as giving back the HTTP response; I ideally want to give users a data structure they are familiar with, i.e., a data.frame. Second, for the user, if I give back a list or an `R6` object, that increases complexity on their side. Is the benefit of more information worth the cost of more complexity for the user? I've no idea. 
+I'm not sure if I'll change anything in packages I maintain or not. I'll keep thinking about this and ask around to gauge others opinions on this. Part of me wants to follow the avoid exceptions path, but I worry about two things. First, the complexity increases for me as the developer. If I don't fail out, then I have to deal with parsing somehow every response. It's not as simple as giving back the HTTP response; I ideally want to give users a data structure they are familiar with, i.e., a data.frame. Second, for the user, if I give back a list or an `R6` object, that increases complexity on their side. Is the benefit of more information worth the cost of more complexity for the user? I've no idea. 
 
 
 
