@@ -44,7 +44,7 @@ In R, exception handling can be done with `try`, `tryCatch`, `withCallingHandler
 
 Note the word **exceptional** above in our definition of exceptions. The BikeShed pod hosts were surprised to see exceptions raised with bad API requests because they didn't think a bad API request was **exceptional**, but rather an expected result given certain conditions (e.g., an HTTP 400 series client error means the client did something wrong and perhaps the server gave back a useful error message to help fix the request).
 
-They observed that most Ruby API wrappers did have the behavior of rasing an exception on a 400/500 series API status, but they disagreed with this approach.
+They observed that most Ruby API wrappers did have the behavior of raising an exception on a 400/500 series API status, but they disagreed with this approach.
 
 In R world, most API wrappers in my experience also follow the pattern of raising an exception stopping the code flow on a 400/500 series HTTP error.
 <!-- (the exception to this rule that I've used in some of my packages is when there is a common use case to iterate over A LOT of inputs, in which stopping execution would be painful) -->
