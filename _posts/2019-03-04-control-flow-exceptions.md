@@ -147,7 +147,7 @@ But also we return the response object (`HttpResponse` from the `crul` package i
 
 Now the user can explore the response body, response headers, etc. and decide on their own what to do instead of the function failing out and returning nothing.
 
-This approach is fine if your users are more advanced, but most packages/libraries are probably trying to give back a data object that users are familiar with. In R, that is clearly the data.frame. When there is a 400/500 series error, one option is to return an empty data.frame and throw a warning about the error, hopefully with enough information for the user to fix the request. This is probably best for naive users, but any package has some more advanced users that would benefit from more information; and more information will help a naive user + the maintainer debug a problem eaiser.
+This approach is fine if your users are more advanced, but most packages/libraries are probably trying to give back a data object that users are familiar with. In R, that is clearly the data.frame. When there is a 400/500 series error, one option is to return an empty data.frame and throw a warning about the error, hopefully with enough information for the user to fix the request. This is probably best for naive users, but any package has some more advanced users that would benefit from more information; and more information will help a naive user + the maintainer debug a problem easier.
 
 The next more complicated option would be a list that can have the same format regardless of errors or not:
 
