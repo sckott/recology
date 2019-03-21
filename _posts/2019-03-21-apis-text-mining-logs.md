@@ -80,6 +80,21 @@ library(rex)
 logs <- "~/pubpatterns_api_calls.log"
 ```
 
+The logs look like (IP addresses removed, some user agents shortened):
+
+```
+[28/Nov/2018:20:09:49 +0000] GET /api/members/  HTTP/2.0 200 4844 Mozilla/5.0 ...
+[28/Nov/2018:20:23:15 +0000] GET /api/members/317/  HTTP/2.0 200 228 Mozilla/5.0 ...
+[29/Nov/2018:01:52:58 +0000] GET /api/members/19/  HTTP/1.1 400 65 fulltext/1.1.0
+[29/Nov/2018:01:52:58 +0000] GET /api/members/2308/  HTTP/1.1 400 65 fulltext/1.1.0
+[29/Nov/2018:01:52:59 +0000] GET /api/members/239/  HTTP/1.1 400 65 fulltext/1.1.0
+[29/Nov/2018:01:53:00 +0000] GET /api/members/2581/  HTTP/1.1 400 65 fulltext/1.1.0
+[29/Nov/2018:01:53:00 +0000] GET /api/members/27/  HTTP/1.1 400 65 fulltext/1.1.0
+[29/Nov/2018:01:53:01 +0000] GET /api/members/297/  HTTP/1.1 200 336 fulltext/1.1.0
+[29/Nov/2018:01:53:01 +0000] GET /api/members/7995/  HTTP/1.1 400 65 fulltext/1.1.0
+[29/Nov/2018:10:46:53 +0000] GET /api/members/unknown/  HTTP/1.1 400 65 fulltext/1.1.0.9130
+```
+
 Use the awesome [rex][] package from Kevin Ushey et al. to parse the logs, pulling out
 just the Crossref member ID in the API request, as well as the HTTP status code. There
 are of course other API requests in the logs, but we're only interested here in the ones
