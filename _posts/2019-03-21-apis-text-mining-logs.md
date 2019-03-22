@@ -19,7 +19,7 @@ tags:
 [fulltext][] is an R package I maintain to obtain full text versions of research articles
 for text mining.
 
-It's a hard problem, with a sphagetti web of code. One of the hard problems is 
+It's a hard problem, with a spaghetti web of code. One of the hard problems is 
 figuring out what the URL is for the full text version of an article. Publishers
 do not have consistent URL patterns through time, and so you can not set rules once 
 and never revisit them. 
