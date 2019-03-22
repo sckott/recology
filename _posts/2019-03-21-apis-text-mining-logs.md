@@ -35,7 +35,7 @@ really hit the spot, which lead to the creation of the [ftdoi API][ftdoi].
 ## the ftdoi API
 
 The [ftdoi API][ftdoi] is a web API, with it's main goal for getting a best guess at
-the URL for the full text version of an article from it's DOI (this is done via the 
+the URL for the full text version of an article from its DOI (this is done via the 
 `/api/doi/{doi}/` route). The API gives back URLs for all those possible, including
 pdf, xml, and html. Most publishers only give full text as PDF, but when XML is
 available we give those URLs as well.
