@@ -1,0 +1,90 @@
+I"�-<p>I occasionally think about these various topics and ping back and forth between them, thinking I’ve got to make a package more user friendly, then back to thinking oh, I really should make this package easier to maintain, but what if that makes it less user friendly?</p>
+
+<p>I’ve wanted to get these thoughts written down for a while now, so here goes.</p>
+
+<h2 id="user-friendliness-and-code-fragility">User friendliness and code fragility</h2>
+
+<p>It’s an unassailable good to make your code more user friendly. There’s no point of making your package harder to use unless you really don’t want people using it.</p>
+
+<p>Having said that, can a user friendly API come at the cost of code simplicity/maintainability?</p>
+
+<p>An example of user friendly code vs. not user friendly code is: Let’s say you have a function <code class="highlighter-rouge">foo()</code>. There’s a lot of things you can do to make the function user friendly, e.g., the function:</p>
+
+<ul>
+  <li>errors/returns as early as possible</li>
+  <li>has good documentation</li>
+  <li>has well named parameters</li>
+  <li>returns easy to understand output (see also good docs)</li>
+  <li>handles complexity sufficiently so the user doesn’t have to</li>
+</ul>
+
+<p>This is all well and good, and most of the points above don’t have to trade off with making code more complex/harder to maintain. However, the last point does I think.</p>
+
+<p>That is, handling complexity for the user is a good thing, BUT it makes for more code and probably more complex code. I’ll highlight one particular example of this that I often deal with.</p>
+
+<h2 id="pagination">Pagination</h2>
+
+<p>I make many packages that interact with web APIs, many of which have pagination. Pagination is just as it sounds: you don’t get back all possible results for your query but instead you get back a certain number of results, then you have to request the next set, and so on. This helps lighten the load on the server delivering the data. And pagination is useful for users so you can get a sense of what the data looks like without have to wait for all the data, which in some cases can be quite large.</p>
+
+<p>Here’s the question: Do you let the user handle pagination themselves with parameters to a function <code class="highlighter-rouge">foo()</code>? Or do you handle pagination internally within the function <code class="highlighter-rouge">foo()</code> with the user just stating how many results they want? The former scenario means that if the user wants 30 results they do:</p>
+
+<div class="language-r highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="n">foo</span><span class="p">(</span><span class="n">limit</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="m">10</span><span class="p">,</span><span class="w"> </span><span class="n">page</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="m">1</span><span class="p">)</span><span class="w">
+</span><span class="n">foo</span><span class="p">(</span><span class="n">limit</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="m">10</span><span class="p">,</span><span class="w"> </span><span class="n">page</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="m">2</span><span class="p">)</span><span class="w">
+</span><span class="n">foo</span><span class="p">(</span><span class="n">limit</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="m">10</span><span class="p">,</span><span class="w"> </span><span class="n">page</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="m">3</span><span class="p">)</span><span class="w">
+</span><span class="c1"># ... and so on</span><span class="w">
+</span></code></pre></div></div>
+
+<p>While the latter means:</p>
+
+<div class="language-r highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="n">foo</span><span class="p">(</span><span class="n">limit</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="m">30</span><span class="p">)</span><span class="w">
+</span></code></pre></div></div>
+
+<p>The second example is definitely easier for the user. There are still three HTTP requests being made, so probably the code runs no faster, but it’s easier from a user standpoint.</p>
+
+<p>Here’s how <code class="highlighter-rouge">foo()</code> might handle the paging internally:</p>
+
+<div class="language-r highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="n">myGET</span><span class="w"> </span><span class="o">&lt;-</span><span class="w"> </span><span class="k">function</span><span class="p">(</span><span class="n">x</span><span class="p">)</span><span class="w"> </span><span class="p">{</span><span class="w">
+  </span><span class="n">conn</span><span class="w"> </span><span class="o">&lt;-</span><span class="w"> </span><span class="n">crul</span><span class="o">::</span><span class="n">HttpClient</span><span class="o">$</span><span class="n">new</span><span class="p">(</span><span class="s2">"https://someurl.com"</span><span class="p">)</span><span class="w">
+  </span><span class="n">res</span><span class="w"> </span><span class="o">&lt;-</span><span class="w"> </span><span class="n">conn</span><span class="o">$</span><span class="n">get</span><span class="p">()</span><span class="w">
+  </span><span class="n">txt</span><span class="w"> </span><span class="o">&lt;-</span><span class="w"> </span><span class="n">res</span><span class="o">$</span><span class="n">parse</span><span class="p">(</span><span class="n">encoding</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"UTF-8"</span><span class="p">)</span><span class="w">
+  </span><span class="n">jsonlite</span><span class="o">::</span><span class="n">fromJSON</span><span class="p">(</span><span class="n">txt</span><span class="p">)</span><span class="w">
+</span><span class="p">}</span><span class="w">
+
+</span><span class="n">foo</span><span class="w"> </span><span class="o">&lt;-</span><span class="w"> </span><span class="k">function</span><span class="p">(</span><span class="n">limit</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="m">10</span><span class="p">)</span><span class="w"> </span><span class="p">{</span><span class="w">
+  </span><span class="n">limit</span><span class="w"> </span><span class="o">&lt;-</span><span class="w"> </span><span class="n">plyr</span><span class="o">::</span><span class="n">round_any</span><span class="p">(</span><span class="n">limit</span><span class="p">,</span><span class="w"> </span><span class="m">10</span><span class="p">)</span><span class="w">
+  </span><span class="n">out</span><span class="w"> </span><span class="o">&lt;-</span><span class="w"> </span><span class="nf">list</span><span class="p">()</span><span class="w">
+  </span><span class="k">for</span><span class="w"> </span><span class="p">(</span><span class="n">i</span><span class="w"> </span><span class="k">in</span><span class="w"> </span><span class="n">seq</span><span class="p">(</span><span class="n">limit</span><span class="w"> </span><span class="o">/</span><span class="w"> </span><span class="m">10</span><span class="p">))</span><span class="w"> </span><span class="n">out</span><span class="p">[[</span><span class="n">i</span><span class="p">]]</span><span class="w"> </span><span class="o">&lt;-</span><span class="w"> </span><span class="n">myGET</span><span class="p">(</span><span class="n">limit</span><span class="p">,</span><span class="w"> </span><span class="n">page</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">i</span><span class="p">)</span><span class="w">
+  </span><span class="n">df</span><span class="w"> </span><span class="o">&lt;-</span><span class="w"> </span><span class="n">dplyr</span><span class="o">::</span><span class="n">bind_rows</span><span class="p">(</span><span class="n">out</span><span class="p">)</span><span class="w">
+  </span><span class="nf">return</span><span class="p">(</span><span class="n">df</span><span class="p">)</span><span class="w">
+</span><span class="p">}</span><span class="w">
+</span></code></pre></div></div>
+
+<blockquote>
+  <p>This is psuedocode, so you can’t run this.</p>
+</blockquote>
+
+<p>In general I like to return data.frame’s to users whenever possible as I think most users are most familiar with data.frame’s.</p>
+
+<p>In the above example we need to do a few things when dealing with pagination:</p>
+
+<ul>
+  <li>sort out how many requests to make. the above doesn’t yet check that the <code class="highlighter-rouge">limit</code> value is a numeric or integer, and there’s all kinds of edge cases depending on what number is given by the user with respect to pagination</li>
+  <li>make each http request. I used a for loop, but anything similar can be used. one needs to decide how to handle errors if you’re doing multiple requests. do you stop with an error if there’s an error in one of the requests, or do you catch that and proceed? If you do catch it how do you let the user know, or do you just remove that error from results?</li>
+  <li>combine results into a single output (data.frame most likely/ideally). we want the user to get the same results back whether they request one page of results or many, so we need to do the work to make sure the output looks the same. This step also introduces possible pain points in that any result record can have novel things in it that cause your result combining code to error. Do you do a minimal combination approach (e.g. let <code class="highlighter-rouge">jsonlite::fromJSON</code> convert to list/data.frame’s where possible; but this means that there can be nested lists in data.frame’s, which many users do not like); or do you roll your own bespoke data munging/combination code to make sure the output data.frame is really easy to use with no nested lists, etc.?  If you do the latter that will most likely be slower, but will be better output for the user. However, maybe most users want to combine the data on their own, so perhaps you should take up as little time as possible parsing/munging data so the user has to wait less time.</li>
+</ul>
+
+<p>The overall message here is that there’s many points throughout this process that require decisions to be made with respect to how much complexity you’d like to take care of yourself as the developer vs. how much you’d like to leave up to the user.</p>
+
+<p>With complexity inside the function, there’s more to maintain and more possible bugs, but it’s easier for the user.</p>
+
+<p>With complexity exposed to the user, and simpler code inside the function, each user has to sort out how to work with the output and/or do the pagination (or whatever it is) themselves. But with less complexity inside the function, there will likely be fewer bugs.</p>
+
+<blockquote>
+  <p>Note: i’ve been trying to make pagination with web APIs easier, check out the Paginator helper in the crul package <a href="https://github.com/ropensci/crul/blob/master/R/paginator.R">https://github.com/ropensci/crul/blob/master/R/paginator.R</a></p>
+</blockquote>
+
+<h2 id="so-what">So what?</h2>
+
+<p>Perhaps others have figured this out and I’m the only one struggling with this? I’m sure I’ll continue to go back and forth on this pendulum. Would love to know how others think about this.</p>
+
+:ET

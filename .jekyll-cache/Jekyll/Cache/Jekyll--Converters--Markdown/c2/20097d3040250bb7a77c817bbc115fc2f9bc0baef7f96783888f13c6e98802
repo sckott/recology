@@ -1,0 +1,179 @@
+I";G<p>The bad thing about making software is that you can sometimes make it easier
+for someone to shoot themselves in the foot. The good thing about software
+is that you can make more software to help them not shoot a foot off.</p>
+
+<p>The R package <a href="https://github.com/ropensci/vcr">vcr</a>, an R port of the <a href="https://github.com/vcr/vcr">Ruby library</a> of the same name,
+records and plays back HTTP requests. Some HTTP requests can have secrets (e.g.,
+passwords, API keys, etc.) in their requests and/or responses. These secrets
+can then accidentally end up on the internet, where bad people may find them.
+These secrets are sometimes called “truffles”.</p>
+
+<p>There’s a suite of tools out there for finding these truffles (e.g.,
+<a href="https://github.com/dxa4481/truffleHog">truffleHog</a>, <a href="https://github.com/awslabs/git-secrets">gitsecrets</a>) that use tools like regex and entropy.</p>
+
+<p>Despite there being existing tools, users tend to use things that are
+built in the language(s) they know; that are easy to incorporate into 
+their existing workflows. Towards this end, I’ve been working on a new
+R package <a href="https://github.com/ropenscilabs/trufflesniffer">trufflesniffer</a>.</p>
+
+<p>trufflesniffer doesn’t do any fancy entropy stuff, and doesn’t try to
+find secrets without any informed knowledge. Rather, the user supplies
+the secrets that they want to look for and trufflesniffer looks for
+them. In the future I’d look to see if it can be used without
+any user inputs.</p>
+
+<p>terminology:</p>
+
+<ul>
+  <li>snif: search for a secret</li>
+</ul>
+
+<h2 id="install">Install</h2>
+
+<div class="language-r highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="n">remotes</span><span class="o">::</span><span class="n">install_github</span><span class="p">(</span><span class="s2">"ropenscilabs/trufflesniffer"</span><span class="p">)</span><span class="w">
+</span></code></pre></div></div>
+
+<div class="language-r highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="n">library</span><span class="p">(</span><span class="n">trufflesniffer</span><span class="p">)</span><span class="w">
+</span></code></pre></div></div>
+
+<h2 id="directory">directory</h2>
+
+<p>You can “snif” a file directory or a package: <code class="highlighter-rouge">snif_one()</code></p>
+
+<div class="language-r highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="c1"># crete a directory</span><span class="w">
+</span><span class="n">Sys.setenv</span><span class="p">(</span><span class="n">A_KEY</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"a8d#d%d7g7g4012a4s2"</span><span class="p">)</span><span class="w">
+</span><span class="n">path</span><span class="w"> </span><span class="o">&lt;-</span><span class="w"> </span><span class="n">file.path</span><span class="p">(</span><span class="n">tempdir</span><span class="p">(),</span><span class="w"> </span><span class="s2">"foobar"</span><span class="p">)</span><span class="w">
+</span><span class="n">dir.create</span><span class="p">(</span><span class="n">path</span><span class="p">)</span><span class="w">
+
+</span><span class="c1"># no matches</span><span class="w">
+</span><span class="n">snif_one</span><span class="p">(</span><span class="n">path</span><span class="p">,</span><span class="w"> </span><span class="n">Sys.getenv</span><span class="p">(</span><span class="s2">"A_KEY"</span><span class="p">))</span><span class="w">
+</span><span class="c1">#&gt; named list()</span><span class="w">
+
+</span><span class="c1"># add files with the secret</span><span class="w">
+</span><span class="n">cat</span><span class="p">(</span><span class="n">paste0</span><span class="p">(</span><span class="s2">"foo\nbar\nhello\nworld\n"</span><span class="p">,</span><span class="w"> 
+    </span><span class="n">Sys.getenv</span><span class="p">(</span><span class="s2">"A_KEY"</span><span class="p">),</span><span class="w"> </span><span class="s2">"\n"</span><span class="p">),</span><span class="w"> </span><span class="n">file</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">file.path</span><span class="p">(</span><span class="n">path</span><span class="p">,</span><span class="w"> </span><span class="s2">"stuff.R"</span><span class="p">))</span><span class="w">
+
+</span><span class="c1"># matches! prints the line number where the key was found</span><span class="w">
+</span><span class="n">snif_one</span><span class="p">(</span><span class="n">path</span><span class="p">,</span><span class="w"> </span><span class="n">Sys.getenv</span><span class="p">(</span><span class="s2">"A_KEY"</span><span class="p">))</span><span class="w">
+</span><span class="c1">#&gt; $stuff.R</span><span class="w">
+</span><span class="c1">#&gt; [1] 5</span><span class="w">
+</span></code></pre></div></div>
+
+<h2 id="package">package</h2>
+
+<p>snif through a whole package</p>
+
+<div class="language-r highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="n">foo</span><span class="w"> </span><span class="o">&lt;-</span><span class="w"> </span><span class="k">function</span><span class="p">(</span><span class="n">key</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="kc">NULL</span><span class="p">)</span><span class="w"> </span><span class="p">{</span><span class="w">
+  </span><span class="k">if</span><span class="w"> </span><span class="p">(</span><span class="nf">is.null</span><span class="p">(</span><span class="n">key</span><span class="p">))</span><span class="w"> </span><span class="n">key</span><span class="w"> </span><span class="o">&lt;-</span><span class="w"> </span><span class="s2">"mysecretkey"</span><span class="w">
+</span><span class="p">}</span><span class="w">
+</span><span class="n">package.skeleton</span><span class="p">(</span><span class="n">name</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"mypkg"</span><span class="p">,</span><span class="w"> </span><span class="n">list</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"foo"</span><span class="p">,</span><span class="w"> </span><span class="n">path</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">tempdir</span><span class="p">())</span><span class="w">
+</span><span class="c1">#&gt; Creating directories ...</span><span class="w">
+</span><span class="c1">#&gt; Creating DESCRIPTION ...</span><span class="w">
+</span><span class="c1">#&gt; Creating NAMESPACE ...</span><span class="w">
+</span><span class="c1">#&gt; Creating Read-and-delete-me ...</span><span class="w">
+</span><span class="c1">#&gt; Saving functions and data ...</span><span class="w">
+</span><span class="c1">#&gt; Making help files ...</span><span class="w">
+</span><span class="c1">#&gt; Done.</span><span class="w">
+</span><span class="c1">#&gt; Further steps are described in '/var/folders/fc/n7g_vrvn0sx_st0p8lxb3ts40000gn/T//RtmpXxwNfD/mypkg/Read-and-delete-me'.</span><span class="w">
+</span><span class="n">pkgpath</span><span class="w"> </span><span class="o">&lt;-</span><span class="w"> </span><span class="n">file.path</span><span class="p">(</span><span class="n">tempdir</span><span class="p">(),</span><span class="w"> </span><span class="s2">"mypkg"</span><span class="p">)</span><span class="w">
+</span><span class="n">list.files</span><span class="p">(</span><span class="n">pkgpath</span><span class="p">,</span><span class="w"> </span><span class="n">recursive</span><span class="o">=</span><span class="kc">TRUE</span><span class="p">)</span><span class="w">
+</span><span class="c1">#&gt; [1] "DESCRIPTION"          "man/foo.Rd"           "man/mypkg-package.Rd"</span><span class="w">
+</span><span class="c1">#&gt; [4] "NAMESPACE"            "R/foo.R"              "Read-and-delete-me"</span><span class="w">
+
+</span><span class="c1"># check the package</span><span class="w">
+</span><span class="n">snif_secrets_pkg</span><span class="p">(</span><span class="n">dir</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">pkgpath</span><span class="p">,</span><span class="w"> </span><span class="n">secrets</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nf">c</span><span class="p">(</span><span class="s2">"mysecretkey"</span><span class="p">))</span><span class="w">
+</span><span class="c1">#&gt; $mysecretkey</span><span class="w">
+</span><span class="c1">#&gt; $mysecretkey$foo.R</span><span class="w">
+</span><span class="c1">#&gt; [1] 3</span><span class="w">
+</span></code></pre></div></div>
+
+<h2 id="fixtures">fixtures</h2>
+
+<p>snif specifically in a packages’s test fixtures.</p>
+
+<p>Create a package</p>
+
+<div class="language-r highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="n">foo</span><span class="w"> </span><span class="o">&lt;-</span><span class="w"> </span><span class="k">function</span><span class="p">(</span><span class="n">key</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="kc">NULL</span><span class="p">)</span><span class="w"> </span><span class="p">{</span><span class="w">
+  </span><span class="k">if</span><span class="w"> </span><span class="p">(</span><span class="nf">is.null</span><span class="p">(</span><span class="n">key</span><span class="p">))</span><span class="w"> </span><span class="n">key</span><span class="w"> </span><span class="o">&lt;-</span><span class="w"> </span><span class="s2">"a2s323223asd423adsf4"</span><span class="w">
+</span><span class="p">}</span><span class="w">
+</span><span class="n">package.skeleton</span><span class="p">(</span><span class="s2">"herpkg"</span><span class="p">,</span><span class="w"> </span><span class="n">list</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"foo"</span><span class="p">,</span><span class="w"> </span><span class="n">path</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">tempdir</span><span class="p">())</span><span class="w">
+</span><span class="c1">#&gt; Creating directories ...</span><span class="w">
+</span><span class="c1">#&gt; Creating DESCRIPTION ...</span><span class="w">
+</span><span class="c1">#&gt; Creating NAMESPACE ...</span><span class="w">
+</span><span class="c1">#&gt; Creating Read-and-delete-me ...</span><span class="w">
+</span><span class="c1">#&gt; Saving functions and data ...</span><span class="w">
+</span><span class="c1">#&gt; Making help files ...</span><span class="w">
+</span><span class="c1">#&gt; Done.</span><span class="w">
+</span><span class="c1">#&gt; Further steps are described in '/var/folders/fc/n7g_vrvn0sx_st0p8lxb3ts40000gn/T//RtmpXxwNfD/herpkg/Read-and-delete-me'.</span><span class="w">
+</span><span class="n">pkgpath</span><span class="w"> </span><span class="o">&lt;-</span><span class="w"> </span><span class="n">file.path</span><span class="p">(</span><span class="n">tempdir</span><span class="p">(),</span><span class="w"> </span><span class="s2">"herpkg"</span><span class="p">)</span><span class="w">
+</span><span class="n">dir.create</span><span class="p">(</span><span class="n">file.path</span><span class="p">(</span><span class="n">pkgpath</span><span class="p">,</span><span class="w"> </span><span class="s2">"tests/testthat"</span><span class="p">),</span><span class="w"> </span><span class="n">recursive</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="kc">TRUE</span><span class="p">)</span><span class="w">
+</span><span class="n">dir.create</span><span class="p">(</span><span class="n">file.path</span><span class="p">(</span><span class="n">pkgpath</span><span class="p">,</span><span class="w"> </span><span class="s2">"tests/fixtures"</span><span class="p">),</span><span class="w"> </span><span class="n">recursive</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="kc">TRUE</span><span class="p">)</span><span class="w">
+</span><span class="n">cat</span><span class="p">(</span><span class="s2">"library(vcr)
+vcr::vcr_configure('../fixtures', 
+  filter_sensitive_data = list('&lt;&lt;mytoken&gt;&gt;' = Sys.getenv('MY_KEY'))
+)\n"</span><span class="p">,</span><span class="w"> </span><span class="n">file</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">file.path</span><span class="p">(</span><span class="n">pkgpath</span><span class="p">,</span><span class="w"> </span><span class="s2">"tests/testthat/helper-herpkg.R"</span><span class="p">))</span><span class="w">
+</span><span class="n">cat</span><span class="p">(</span><span class="s2">"a2s323223asd423adsf4\n"</span><span class="p">,</span><span class="w"> 
+  </span><span class="n">file</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">file.path</span><span class="p">(</span><span class="n">pkgpath</span><span class="p">,</span><span class="w"> </span><span class="s2">"tests/fixtures/foo.yml"</span><span class="p">))</span><span class="w">
+</span><span class="c1"># check that you have a pkg at herpkg</span><span class="w">
+</span><span class="n">list.files</span><span class="p">(</span><span class="n">pkgpath</span><span class="p">)</span><span class="w">
+</span><span class="c1">#&gt; [1] "DESCRIPTION"        "man"                "NAMESPACE"         </span><span class="w">
+</span><span class="c1">#&gt; [4] "R"                  "Read-and-delete-me" "tests"</span><span class="w">
+</span><span class="n">list.files</span><span class="p">(</span><span class="n">file.path</span><span class="p">(</span><span class="n">pkgpath</span><span class="p">,</span><span class="w"> </span><span class="s2">"tests/testthat"</span><span class="p">))</span><span class="w">
+</span><span class="c1">#&gt; [1] "helper-herpkg.R"</span><span class="w">
+</span><span class="n">cat</span><span class="p">(</span><span class="n">readLines</span><span class="p">(</span><span class="n">file.path</span><span class="p">(</span><span class="n">pkgpath</span><span class="p">,</span><span class="w"> </span><span class="s2">"tests/testthat/helper-herpkg.R"</span><span class="p">)),</span><span class="w">
+  </span><span class="n">sep</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"\n"</span><span class="p">)</span><span class="w">
+</span><span class="c1">#&gt; library(vcr)</span><span class="w">
+</span><span class="c1">#&gt; vcr::vcr_configure('../fixtures', </span><span class="w">
+</span><span class="c1">#&gt;   filter_sensitive_data = list('&lt;&lt;mytoken&gt;&gt;' = Sys.getenv('MY_KEY'))</span><span class="w">
+</span><span class="c1">#&gt; )</span><span class="w">
+</span><span class="n">list.files</span><span class="p">(</span><span class="n">file.path</span><span class="p">(</span><span class="n">pkgpath</span><span class="p">,</span><span class="w"> </span><span class="s2">"tests/fixtures"</span><span class="p">))</span><span class="w">
+</span><span class="c1">#&gt; [1] "foo.yml"</span><span class="w">
+</span><span class="n">readLines</span><span class="p">(</span><span class="n">file.path</span><span class="p">(</span><span class="n">pkgpath</span><span class="p">,</span><span class="w"> </span><span class="s2">"tests/fixtures/foo.yml"</span><span class="p">))</span><span class="w">
+</span><span class="c1">#&gt; [1] "a2s323223asd423adsf4"</span><span class="w">
+</span></code></pre></div></div>
+
+<p>Check the package</p>
+
+<div class="language-r highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="n">Sys.setenv</span><span class="p">(</span><span class="s1">'MY_KEY'</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s1">'a2s323223asd423adsf4'</span><span class="p">)</span><span class="w">
+</span><span class="n">snif_secrets_fixtures</span><span class="p">(</span><span class="n">pkgpath</span><span class="p">)</span><span class="w">
+</span><span class="c1">#&gt; $MY_KEY</span><span class="w">
+</span><span class="c1">#&gt; $MY_KEY$foo.yml</span><span class="w">
+</span><span class="c1">#&gt; [1] 1</span><span class="w">
+</span></code></pre></div></div>
+
+<h2 id="sniffer">sniffer</h2>
+
+<p>The function <code class="highlighter-rouge">sniffer()</code> wraps the function <code class="highlighter-rouge">snif_secrets_fixtures()</code> and
+pretty prints to optimize non-interactive use. Run from within R or from the 
+command line non-interactively.</p>
+
+<p>Example where a secret is found:</p>
+
+<div class="language-r highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="n">sniffer</span><span class="p">(</span><span class="n">pkgpath</span><span class="p">)</span><span class="w">
+</span></code></pre></div></div>
+
+<p><img src="/public/img/2020-01-30-test-truffles/found.png" alt="found" /></p>
+
+<p>Example where a secret is not found:</p>
+
+<div class="language-r highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="n">Sys.unsetenv</span><span class="p">(</span><span class="s1">'MY_KEY'</span><span class="p">)</span><span class="w">
+</span><span class="n">sniffer</span><span class="p">(</span><span class="n">pkgpath</span><span class="p">)</span><span class="w">
+</span></code></pre></div></div>
+
+<p><img src="/public/img/2020-01-30-test-truffles/notfound.png" alt="found" /></p>
+
+<h2 id="to-do">To do</h2>
+
+<p>There’s more to do. trufflesniffer hasn’t been tested thoroughly yet; i’ll do
+more testing to make the experience better. In addition, it’d probably be 
+best to integrate this into the R vcr package so that the user doesn’t have to
+take an extra step to make sure they aren’t going to put any secrets on
+the web.</p>
+
+<hr />
+
+<p><br /></p>
+
+<p>ack: trufflesniffer uses R packages <a href="https://github.com/r-lib/cli">cli</a> and <a href="https://github.com/r-lib/crayon">crayon</a></p>
+
+:ET

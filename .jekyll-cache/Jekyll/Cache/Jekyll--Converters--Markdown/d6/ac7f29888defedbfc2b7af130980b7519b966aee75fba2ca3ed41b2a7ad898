@@ -1,0 +1,124 @@
+I"�G<p>In rOpenSci - as in presumably most open source projects - we want the entire project to be sustainable, but also each individual software project to be sustainable.</p>
+
+<p>A big part of each software project (aka R package in this case) being sustainable is the people making it, particularly whether:</p>
+
+<ul>
+  <li>how many contributors a project has, and</li>
+  <li>how contributions are spread across contibutors</li>
+</ul>
+
+<p>There are discussions going on about how to increase contributors to any given project. But the first thing to do is to do an assesment of where you’re at. One way to do that is visualization.</p>
+
+<p>We can look at a sort of proxy of contributions, git commits, to get at this. This isn’t perfect because everyone differs in their “commit style”, where some make a lot of changes in a single commit, while others spread changes across commits. (one could look at additions/deletions of actual code for example)</p>
+
+<p>In terms of where to get data, one could get it from the API of any of Github, Gitlab, Bitbucket, or using whatever local git repos you have on your machine. rOpenSci has a nice git R client called <a href="https://github.com/ropensci/git2r">git2r</a> maintained by <a href="https://github.com/stewid">Stefan Widgren</a>. I have a lot of rOpenSci’s R packages locally on my machine, though not all of them.</p>
+
+<p>Below is a first attempt at starting to look at the distribution of commits across rOpenSci packages. The visualization is meant to get a quick look across packages in terms of a) number of contributors to a package, and b) distribution of commits across each contributor within a package.</p>
+
+<h2 id="the-actual-work">the actual work</h2>
+
+<p>Load libraries</p>
+
+<div class="language-r highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="n">library</span><span class="p">(</span><span class="n">git2r</span><span class="p">)</span><span class="w">
+</span><span class="n">library</span><span class="p">(</span><span class="n">ggplot2</span><span class="p">)</span><span class="w">
+</span><span class="n">library</span><span class="p">(</span><span class="n">dplyr</span><span class="p">)</span><span class="w">
+</span></code></pre></div></div>
+
+<p>Get directory paths. I was interested in specific packages, so I made a text file of certain repos, rather than getting all repos in my <code class="highlighter-rouge">github/ropensci</code> folder on my machine</p>
+
+<div class="language-r highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="n">dirs</span><span class="w"> </span><span class="o">&lt;-</span><span class="w"> </span><span class="n">readLines</span><span class="p">(</span><span class="s2">"dirs.txt"</span><span class="p">)</span><span class="w">
+</span><span class="n">paths</span><span class="w"> </span><span class="o">&lt;-</span><span class="w"> </span><span class="n">file.path</span><span class="p">(</span><span class="n">path.expand</span><span class="p">(</span><span class="s2">"~/github/ropensci"</span><span class="p">),</span><span class="w"> </span><span class="n">dirs</span><span class="p">)</span><span class="w">
+</span></code></pre></div></div>
+
+<p>Function to get data.frame of commit authors</p>
+
+<div class="language-r highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="n">make_authors_table</span><span class="w"> </span><span class="o">&lt;-</span><span class="w"> </span><span class="k">function</span><span class="p">(</span><span class="n">x</span><span class="p">)</span><span class="w"> </span><span class="p">{</span><span class="w">  
+  </span><span class="n">repo</span><span class="w"> </span><span class="o">&lt;-</span><span class="w"> </span><span class="n">git2r</span><span class="o">::</span><span class="n">repository</span><span class="p">(</span><span class="n">x</span><span class="p">)</span><span class="w">
+  </span><span class="n">res</span><span class="w"> </span><span class="o">&lt;-</span><span class="w"> </span><span class="n">commits</span><span class="p">(</span><span class="n">repo</span><span class="p">)</span><span class="w">
+  </span><span class="n">auths</span><span class="w"> </span><span class="o">&lt;-</span><span class="w"> </span><span class="n">vapply</span><span class="p">(</span><span class="n">res</span><span class="p">,</span><span class="w"> </span><span class="k">function</span><span class="p">(</span><span class="n">z</span><span class="p">)</span><span class="w"> </span><span class="n">z</span><span class="o">@</span><span class="n">author</span><span class="o">@</span><span class="n">name</span><span class="p">,</span><span class="w"> </span><span class="n">character</span><span class="p">(</span><span class="m">1</span><span class="p">))</span><span class="w">
+  </span><span class="n">tmp</span><span class="w"> </span><span class="o">&lt;-</span><span class="w"> </span><span class="n">data.frame</span><span class="p">(</span><span class="n">table</span><span class="p">(</span><span class="n">auths</span><span class="p">),</span><span class="w"> </span><span class="n">stringsAsFactors</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="kc">FALSE</span><span class="p">)</span><span class="w">
+  </span><span class="n">tmp</span><span class="o">$</span><span class="n">auths</span><span class="w"> </span><span class="o">&lt;-</span><span class="w"> </span><span class="nf">as.character</span><span class="p">(</span><span class="n">tmp</span><span class="o">$</span><span class="n">auths</span><span class="p">)</span><span class="w">
+  </span><span class="n">tmp</span><span class="w">
+</span><span class="p">}</span><span class="w">
+</span></code></pre></div></div>
+
+<p>Get commit authors for each directory</p>
+
+<div class="language-r highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="n">dat</span><span class="w"> </span><span class="o">&lt;-</span><span class="w"> </span><span class="n">lapply</span><span class="p">(</span><span class="n">paths</span><span class="p">,</span><span class="w"> </span><span class="n">make_authors_table</span><span class="p">)</span><span class="w">
+</span><span class="n">dat</span><span class="w"> </span><span class="o">&lt;-</span><span class="w"> </span><span class="n">stats</span><span class="o">::</span><span class="n">setNames</span><span class="p">(</span><span class="n">dat</span><span class="p">,</span><span class="w"> </span><span class="n">basename</span><span class="p">(</span><span class="n">paths</span><span class="p">))</span><span class="w">
+</span></code></pre></div></div>
+
+<p>Remove those with no rows (i.e., commits)</p>
+
+<div class="language-r highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="n">dat</span><span class="w"> </span><span class="o">&lt;-</span><span class="w"> </span><span class="n">Filter</span><span class="p">(</span><span class="k">function</span><span class="p">(</span><span class="n">z</span><span class="p">)</span><span class="w"> </span><span class="n">NROW</span><span class="p">(</span><span class="n">z</span><span class="p">)</span><span class="w"> </span><span class="o">&gt;</span><span class="w"> </span><span class="m">0</span><span class="p">,</span><span class="w"> </span><span class="n">dat</span><span class="p">)</span><span class="w">
+</span></code></pre></div></div>
+
+<p>Since person names for commits can vary depending on where the person makes the commit from (a git GUI vs. cli vs. Github web interface, etc.), I made a little table for deduping names, and cleaned up each package’s commit summary.</p>
+
+<div class="language-r highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="n">dups</span><span class="w"> </span><span class="o">&lt;-</span><span class="w"> </span><span class="n">read.csv</span><span class="p">(</span><span class="s2">"github_dups.csv"</span><span class="p">,</span><span class="w"> </span><span class="n">stringsAsFactors</span><span class="o">=</span><span class="kc">FALSE</span><span class="p">)</span><span class="w">
+</span><span class="n">dups</span><span class="o">$</span><span class="n">duplicates</span><span class="w"> </span><span class="o">&lt;-</span><span class="w"> </span><span class="n">vapply</span><span class="p">(</span><span class="n">dups</span><span class="o">$</span><span class="n">duplicates</span><span class="p">,</span><span class="w"> </span><span class="k">function</span><span class="p">(</span><span class="n">z</span><span class="p">)</span><span class="w"> </span><span class="n">gsub</span><span class="p">(</span><span class="s2">","</span><span class="p">,</span><span class="w"> </span><span class="s2">"|"</span><span class="p">,</span><span class="w"> </span><span class="n">z</span><span class="p">),</span><span class="w"> </span><span class="n">character</span><span class="p">(</span><span class="m">1</span><span class="p">))</span><span class="w">
+</span><span class="n">dat</span><span class="w"> </span><span class="o">&lt;-</span><span class="w"> </span><span class="n">lapply</span><span class="p">(</span><span class="n">dat</span><span class="p">,</span><span class="w"> </span><span class="k">function</span><span class="p">(</span><span class="n">z</span><span class="p">)</span><span class="w"> </span><span class="p">{</span><span class="w">
+  </span><span class="n">z</span><span class="o">$</span><span class="n">auths</span><span class="w"> </span><span class="o">&lt;-</span><span class="w"> </span><span class="n">unname</span><span class="p">(</span><span class="n">vapply</span><span class="p">(</span><span class="n">z</span><span class="o">$</span><span class="n">auths</span><span class="p">,</span><span class="w"> </span><span class="k">function</span><span class="p">(</span><span class="n">w</span><span class="p">)</span><span class="w"> </span><span class="p">{</span><span class="w">
+      </span><span class="n">mtch</span><span class="w"> </span><span class="o">&lt;-</span><span class="w"> </span><span class="n">grepl</span><span class="p">(</span><span class="n">w</span><span class="p">,</span><span class="w"> </span><span class="n">dups</span><span class="o">$</span><span class="n">duplicates</span><span class="p">)</span><span class="w">
+      </span><span class="k">if</span><span class="w"> </span><span class="p">(</span><span class="nf">any</span><span class="p">(</span><span class="n">mtch</span><span class="p">))</span><span class="w"> </span><span class="n">dups</span><span class="o">$</span><span class="n">name_to_use</span><span class="p">[</span><span class="n">mtch</span><span class="p">]</span><span class="w"> </span><span class="k">else</span><span class="w"> </span><span class="n">w</span><span class="w">
+  </span><span class="p">},</span><span class="w"> </span><span class="n">character</span><span class="p">(</span><span class="m">1</span><span class="p">)))</span><span class="w">
+  </span><span class="n">aggregate</span><span class="p">(</span><span class="n">Freq</span><span class="w"> </span><span class="o">~</span><span class="w"> </span><span class="n">auths</span><span class="p">,</span><span class="w"> </span><span class="n">data</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">z</span><span class="p">,</span><span class="w"> </span><span class="n">FUN</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">sum</span><span class="p">)</span><span class="w">
+</span><span class="p">})</span><span class="w">
+</span></code></pre></div></div>
+
+<p>Reorder each data.frame by number of commits (the <code class="highlighter-rouge">Freq</code> column)</p>
+
+<div class="language-r highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="n">dat</span><span class="w"> </span><span class="o">&lt;-</span><span class="w"> </span><span class="n">lapply</span><span class="p">(</span><span class="n">dat</span><span class="p">,</span><span class="w"> </span><span class="k">function</span><span class="p">(</span><span class="n">x</span><span class="p">)</span><span class="w"> </span><span class="n">dplyr</span><span class="o">::</span><span class="n">arrange</span><span class="p">(</span><span class="n">x</span><span class="p">,</span><span class="w"> </span><span class="n">Freq</span><span class="p">))</span><span class="w">
+</span></code></pre></div></div>
+
+<p>Combine into single data.frame, and make a column <code class="highlighter-rouge">order</code> so ggplot doesn’t mess up our ordering in each facet</p>
+
+<div class="language-r highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="n">df</span><span class="w"> </span><span class="o">&lt;-</span><span class="w"> </span><span class="n">dplyr</span><span class="o">::</span><span class="n">bind_rows</span><span class="p">(</span><span class="n">dat</span><span class="p">,</span><span class="w"> </span><span class="n">.id</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s1">'id'</span><span class="p">)</span><span class="w">
+</span><span class="n">df</span><span class="o">$</span><span class="n">order</span><span class="w"> </span><span class="o">&lt;-</span><span class="w"> </span><span class="nf">seq_len</span><span class="p">(</span><span class="n">NROW</span><span class="p">(</span><span class="n">df</span><span class="p">))</span><span class="w">
+</span><span class="n">head</span><span class="p">(</span><span class="n">df</span><span class="p">)</span><span class="w">
+</span><span class="c1">#&gt;      id         auths Freq order</span><span class="w">
+</span><span class="c1">#&gt; 1 agent        jeroen    8     1</span><span class="w">
+</span><span class="c1">#&gt; 2 ALA4R   Dave Martin    1     2</span><span class="w">
+</span><span class="c1">#&gt; 3 ALA4R        mbohun    1     3</span><span class="w">
+</span><span class="c1">#&gt; 4 ALA4R rforge rforge    1     4</span><span class="w">
+</span><span class="c1">#&gt; 5 ALA4R   Tom Saleeba    3     5</span><span class="w">
+</span><span class="c1">#&gt; 6 ALA4R       Tasilee   53     6</span><span class="w">
+</span></code></pre></div></div>
+
+<p>Make the plot</p>
+
+<ul>
+  <li>Each panel is an ropensci package</li>
+  <li>Each dot is a person for the most part (I tried to remove duplicates, but there’s still some)</li>
+  <li>Dots are arranged from less to more commits (from left to right)</li>
+</ul>
+
+<div class="language-r highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="n">ggplot</span><span class="p">(</span><span class="n">df</span><span class="p">,</span><span class="w"> </span><span class="n">aes</span><span class="p">(</span><span class="n">order</span><span class="p">,</span><span class="w"> </span><span class="n">Freq</span><span class="p">))</span><span class="w"> </span><span class="o">+</span><span class="w"> 
+  </span><span class="n">geom_point</span><span class="p">(</span><span class="n">size</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="m">0.5</span><span class="p">)</span><span class="w"> </span><span class="o">+</span><span class="w"> 
+  </span><span class="n">facet_wrap</span><span class="p">(</span><span class="o">~</span><span class="w"> </span><span class="n">id</span><span class="p">,</span><span class="w"> </span><span class="n">scales</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"free"</span><span class="p">)</span><span class="w"> </span><span class="o">+</span><span class="w">
+  </span><span class="n">theme</span><span class="p">(</span><span class="w">
+    </span><span class="n">axis.title.x</span><span class="o">=</span><span class="n">element_blank</span><span class="p">(),</span><span class="w">
+    </span><span class="n">axis.text.x</span><span class="o">=</span><span class="n">element_blank</span><span class="p">(),</span><span class="w">
+    </span><span class="n">axis.ticks.x</span><span class="o">=</span><span class="n">element_blank</span><span class="p">(),</span><span class="w">
+    </span><span class="n">axis.title.y</span><span class="o">=</span><span class="n">element_blank</span><span class="p">(),</span><span class="w">
+    </span><span class="n">axis.text.y</span><span class="o">=</span><span class="n">element_blank</span><span class="p">(),</span><span class="w">
+    </span><span class="n">axis.ticks.y</span><span class="o">=</span><span class="n">element_blank</span><span class="p">(),</span><span class="w">
+    </span><span class="n">panel.grid.major</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">element_blank</span><span class="p">(),</span><span class="w">
+    </span><span class="n">panel.grid.minor</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">element_blank</span><span class="p">(),</span><span class="w">
+    </span><span class="n">strip.background</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">element_blank</span><span class="p">(),</span><span class="w">
+    </span><span class="n">strip.text.x</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">element_blank</span><span class="p">()</span><span class="w">
+  </span><span class="p">)</span><span class="w">
+</span></code></pre></div></div>
+
+<p><a href="https://i.imgur.com/LMpbt5K.png"><img src="https://i.imgur.com/LMpbt5K.png" /></a></p>
+
+<p>Curious what the packages are? Check out <a href="https://i.imgur.com/5ZfHJXq.png">the same plot but with facet titles with package names</a>.</p>
+
+<h2 id="some-observations">Some observations</h2>
+
+<ul>
+  <li>There’s quite a few packages with a single contributor. These could be targeted first possibly for getting at least one additional contrib.</li>
+  <li>Of those that have more than one contributor, there’s often a large jump between the person with the most commits and the next most. We could target making that a smoother transition - that is, less of a jump between the main contributor and the others</li>
+</ul>
+
+:ET

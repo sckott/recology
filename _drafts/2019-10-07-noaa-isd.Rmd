@@ -1,0 +1,148 @@
+---
+name: noaa-isd
+layout: post
+title: "NOAA ISD data in R"
+date: 2019-10-07
+author: Scott Chamberlain
+sourceslug: _drafts/2019-10-07-noaa-isd.Rmd
+tags:
+- R
+- NOAA
+- climate
+---
+
+```{r, echo=FALSE}
+knitr::opts_chunk$set(
+  collapse = TRUE,
+  comment = "#>"
+)
+options(tibble.max_extra_cols = 15)
+options(dplyr.max_extra_cols = 15)
+```
+
+## NOAA Integrated Surface Data (ISD)
+
+NOAA hosts [Integrated Surface Data](https://www.ncdc.noaa.gov/isd), global
+hourly data from ~35,000 stations worldwide (w/ best coverage in North America,
+Europe, Australia, and parts of Asia), with data as far back as 1901; the data
+sums up to around 600 GB!
+
+## isdparser and rnoaa
+
+[rnoaa][ghrnoaa] is a large-ish R package, with functions for accessing many different
+data sources provided by NOAA.
+
+One of those data sources is the ISD. All the internals for ISD data were at
+one point inside rnoaa, but a while we broke off ISD parsing specifically (
+that is, you've already downloaded an ISD data file, but only need to parse
+the data in that file) into a new package called [isdparser][]. The format of 
+data in ISD files is many lines like:
+
+> 0076104270999991928040106004+51183+008483FM-12+025799999V020999990
+> 04619999999N0000001N9+99999+99999999999ADDAY141061GF10899199905100
+> 0251999999MD1310742+9999MW1451EQDQ01+000742APC3
+
+Where spatial positions determine where a variable starts and ends, and then
+each line also has optional data on the end of the line. It is definitely
+not a fun job to parse this data; thus a package just to deal with these in
+isdparser.
+
+## Install packages
+
+```{r eval=FALSE}
+install.packages(c("isdparser", "rnoaa"))
+```
+
+```{r}
+library(rnoaa)
+library(isdparser)
+```
+
+## ISD in isdparser
+
+isdparser assumes you already have or will get an ISD file yourself. 
+There are of course example files you'd get from NOAA ISD in isdparser
+package.
+
+The isdparser package has three main functions:
+
+- `isd_parse()` - Parse a NOAA ISD data file
+- `isd_parse_line()` - Parse a single line of a NOAA ISD data file
+- `isd_transform()` - Transform variables in output of `isd_parse()/isd_parse_line()`;
+uses `isd_metadata`, a data.frame with metadata on units and scaling factors for
+each variable
+
+Read all lines in an ISD file
+
+```{r}
+library(isdparser)
+path <- system.file('extdata/104270-99999-1928.gz', package = "isdparser")
+isd_parse(path)
+```
+
+Read line by line
+
+```{r}
+path <- system.file('extdata/024130-99999-2016.gz', package = "isdparser")
+lns <- readLines(path, encoding = "latin1")
+isd_parse_line(lns[1])
+```
+
+With `isd_transform()` you can transform the data variables (including date,
+latitude, longitude) to appropriate units.
+
+```{r}
+path <- system.file('extdata/104270-99999-1928.gz', package = "isdparser")
+res <- isd_parse(path)
+isd_transform(res)
+```
+
+You can also use `isd_transform()` on the output of `rnoaa::isd()`:
+
+```{r}
+x <- isd(104270, 99999, year = 1928)
+head(x, n = 3)
+head(isd_transform(x), n = 3)
+```
+
+## ISD in rnoaa
+
+rnoaa has four functions for working with ISD data:
+
+- `isd()` - Get ISD data for a given year and station, downloads data, then
+uses `isdparser::isd_parse` to parse the data
+- `isd_read()` - Read/parse an ISD data file (if already downloaded), thin wrapper
+around `isdparser::isd_parse`. Good fit if you already have somem ISD files.
+- `isd_stations()` - Fetch a data.frame of ISD stations and their metadata
+- `isd_stations_search()` - Search for ISD stations by latitude, longitude,
+radius, and bounding box
+
+If you don't already have station identifiers in mind, you'll probably want to
+start with searching for stations (searching from
+a randomish spot on the coast in California, USA):
+
+```{r}
+library(rnoaa)
+isd_stations_search(lat = 38.4, lon = -123, radius = 25)
+```
+
+Gives 7 stations. The Sonoma County Airport station seems like a good one to use,
+with data from 2000 up to January 2019.
+
+Then download data from that station with `isd()`
+
+```{r}
+isd(usaf = 724957, wban = 23213, year = 2008)
+```
+
+## To do
+
+- ISD data is also [available in CSV format](https://github.com/ropensci/isdparser/issues/16)
+as of last year. I haven't looked into it yet, but it's on the to do list
+
+
+[ghrnoaa]: https://github.com/ropensci/rnoaa/
+[crnoaa]: https://cloud.r-project.org/web/packages/rnoaa/
+[ghisdp]: https://github.com/ropensci/isdparser/
+[cisdp]: https://cloud.r-project.org/web/packages/isdparser/
+[isdparser]: https://github.com/ropensci/isdparser/

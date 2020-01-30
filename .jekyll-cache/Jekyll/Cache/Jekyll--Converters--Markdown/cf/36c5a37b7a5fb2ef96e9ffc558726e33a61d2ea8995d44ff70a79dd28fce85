@@ -1,0 +1,102 @@
+I"�<p>GenBank IDs, accession numbers and GI identifiers, are the two types of identifiers for entries in GenBank. (see <a href="http://www.ncbi.nlm.nih.gov/Sitemap/sequenceIDs.html">this page</a> for why there are two types of identifiers). Actually, <a href="http://www.ncbi.nlm.nih.gov/news/03-02-2016-phase-out-of-GI-numbers/">recent news</a> from NCBI is that GI identifiers will be phased out by September this year, which affects what I’ll talk about below.</p>
+
+<p>There are a lot of sequences in GenBank. Sometimes you have identifiers and you want to check if they exist in GenBank, or want to get one type from another (accession from GI, or vice versa; although GI phase out will make this use case no longer needed), or just get a bunch of identifiers for software testing purposes perhaps.</p>
+
+<p>Currently, the ENTREZ web services aren’t super performant or easy to use for the above use cases. Thus, I’ve built out a RESTful API for these use cases, called <a href="https://github.com/sckott/gbids">gbids</a>.</p>
+
+<p><code class="highlighter-rouge">gbids</code> on GitHub: <a href="https://github.com/sckott/gbids">sckott/gbids</a></p>
+
+<p>Here’s the tech stack:</p>
+
+<ul>
+  <li>API: Ruby/Sinatra</li>
+  <li>Storage: MySQL</li>
+  <li>Caching: Redis
+    <ul>
+      <li>each key cached for 3 hours</li>
+    </ul>
+  </li>
+  <li>Server: Caddy
+    <ul>
+      <li>https</li>
+    </ul>
+  </li>
+  <li>Authentication: none</li>
+</ul>
+
+<p>Will soon have a cron job update when new dump is available every Sunday, but for now we’re about a month behind the current dump of identifiers. If usage of the API picks up, I’ll know it’s worth maintaining and make sure data is up to date.</p>
+
+<p>The base url is <a href="https://gbids.xyz">https://gbids.xyz</a>.</p>
+
+<p>Here’s a rundown of the API routes:</p>
+
+<ul>
+  <li><code class="highlighter-rouge">/</code> re-routes to <code class="highlighter-rouge">/heartbeat</code></li>
+  <li><code class="highlighter-rouge">/heartbeat</code> - list routes</li>
+  <li><code class="highlighter-rouge">/acc</code> - <code class="highlighter-rouge">GET</code> - list accession ids</li>
+  <li><code class="highlighter-rouge">/acc/:id,:id,...</code> - <code class="highlighter-rouge">GET</code> - submit many accession numbers, get back boolean (match or no match)</li>
+  <li><code class="highlighter-rouge">/acc</code> - <code class="highlighter-rouge">POST</code></li>
+  <li><code class="highlighter-rouge">/gi</code> - <code class="highlighter-rouge">GET</code> - list gi numbers</li>
+  <li><code class="highlighter-rouge">/gi/:id,:id,...</code> - <code class="highlighter-rouge">GET</code> - submit many gi numbers, get back boolean (match or no match)</li>
+  <li><code class="highlighter-rouge">/gi</code> - <code class="highlighter-rouge">POST</code></li>
+  <li><code class="highlighter-rouge">/acc2gi/:id,:id,...</code> - <code class="highlighter-rouge">GET</code> - get gi numbers from accession numbers</li>
+  <li><code class="highlighter-rouge">/acc2gi</code> - <code class="highlighter-rouge">POST</code></li>
+  <li><code class="highlighter-rouge">/gi2acc/:id,:id,...</code> - <code class="highlighter-rouge">GET</code> - get accession numbers from gi numbers</li>
+  <li><code class="highlighter-rouge">/gi2acc</code> - <code class="highlighter-rouge">POST</code></li>
+</ul>
+
+<p>Of course after GI identifiers are phased out, all <code class="highlighter-rouge">gi</code> routes will be removed.</p>
+
+<p>The API docs are at <a href="http://recology.info/gbidsdocs">recology.info/gbidsdocs</a> - let me know if you have any feedback on those.</p>
+
+<p>I also have a status page up at <a href="http://recology.info/gbidsstatus/">recology.info/gbidsstatus</a> - it’s not automated, I have to update the status manually, but I do update that page whenever I’m doing maintenance and the API will be down, or if it goes down due to any other reason.</p>
+
+<h2 id="examples">examples</h2>
+
+<p>Request to list accession identifiers, limit to 5</p>
+
+<div class="highlighter-rouge"><div class="highlight"><pre class="highlight"><code>curl 'https://gbids.xyz/acc?limit=5' | jq .
+{
+  "matched": 692006925,
+  "returned": 5,
+  "data": [
+    "A00002",
+    "A00003",
+    "X17276",
+    "X60065",
+    "CAA42669"
+  ],
+  "error": null
+}
+</code></pre></div></div>
+
+<p>Request to match accession identifiers, some exist, while some do not</p>
+
+<div class="highlighter-rouge"><div class="highlight"><pre class="highlight"><code>curl 'https://gbids.xyz/acc/AACY024124486,AACY024124483,asdfd,asdf,AACY024124476' | jq .
+{
+  "matched": 3,
+  "returned": 5,
+  "data": {
+    "AACY024124486": true,
+    "AACY024124483": true,
+    "asdfd": false,
+    "asdf": false,
+    "AACY024124476": true
+  },
+  "error": null
+}
+</code></pre></div></div>
+
+<h2 id="to-do">to do</h2>
+
+<p>I think it’d probably be worth adding routes for getting accession from taxonomy id and vice versa since that’s something that is currently not very easy. We could use the dumped accession2taxid data from ftp://ftp.ncbi.nih.gov/pub/taxonomy/accession2taxid/</p>
+
+<h2 id="feedback">feedback!</h2>
+
+<p>If you think this could be potentially useful, do try it out and send any feedback. I watch logs from the API, so I’m hoping for an increase in usage so I know people find it useful.</p>
+
+<p>Since servers aren’t free, costs add up, and if I don’t see usage pick up I’ll discontinue the service at some point. So do use it!</p>
+
+<p>And if anyone can offer free servers, I’d gladly take advantage of that. I’ve applied for AWS research grant, but won’t hear back for a few months.</p>
+
+:ET

@@ -1,0 +1,277 @@
+I"�[<p>It is getting easier to get data directly into R from the web. Often R packages that retrieve data from the web return useful R data structures to users like a data.frame. This is a good thing of course to make things user friendly.</p>
+
+<p>However, what if you want to drill down into the data that’s returned from a query to a database in R?  What if you want to get that nice data.frame in R, but you think you may want to look at the raw data later? The raw data from web queries are often JSON or XML data. This type of data, especially JSON, can be easily stored in schemaless so-called NoSQL databases, and queried later.</p>
+
+<p>A brief aside: What are JSON and XML? This is what JSON looks like (ps if you ever wonder if your JSON is correct, go <a href="http://jsonlint.com/">here</a>):</p>
+
+<figure class="highlight"><pre><code class="language-bash" data-lang="bash"><span class="o">{</span>
+  <span class="s2">"name"</span>: <span class="s2">"joe"</span>,
+  <span class="s2">"hobby"</span>: <span class="s2">"codemonkey"</span>,
+  <span class="s2">"lives"</span>: <span class="o">[</span>
+      <span class="o">{</span>
+          <span class="s2">"city"</span>: <span class="s2">"San Jose"</span>,
+          <span class="s2">"state"</span>: <span class="s2">"CA"</span>
+      <span class="o">}</span>
+  <span class="o">]</span>
+<span class="o">}</span></code></pre></figure>
+
+<p>This is what XML looks like:</p>
+
+<figure class="highlight"><pre><code class="language-bash" data-lang="bash">&lt;?xml <span class="nv">version</span><span class="o">=</span><span class="s2">"1.0"</span> <span class="nv">encoding</span><span class="o">=</span><span class="s2">"UTF-8"</span> ?&gt;
+  &lt;name&gt;joe&lt;/name&gt;
+	&lt;hobby&gt;codemonkey&lt;/hobby&gt;
+	&lt;lives&gt;
+		&lt;city&gt;San Jose&lt;/city&gt;
+		&lt;state&gt;CA&lt;/state&gt;
+	&lt;/lives&gt;</code></pre></figure>
+
+<p>But don’t worry if it looks complicated - the project I talk about below, sofa, tries to make the interface to JSON and XML easy. Web APIs almost always return either JSON or XML, so this is the raw data.</p>
+
+<p>So here’s the use case I imagine, or workflow:</p>
+
+<ul>
+  <li>Query a database on the web, and choose to write the raw data to a local database.</li>
+  <li>Do whatever you want with the output R object - analyze, visualize, etc.</li>
+  <li>Now you want to go back and search through some of the raw data. But, that query took an hour. Since you wrote it to a local database, you can search the data.</li>
+  <li>If you hadn’t written it locally, you would have to make a new web call.</li>
+</ul>
+
+<p>Note that if you are doing calls to web APIs that get small amounts of data you don’t need to worry too much as you can easily just do the call again.</p>
+
+<p>I’ve started an R package to interact with the NoSQL database <a href="http://couchdb.apache.org/">CouchDB</a>. CouchDB is a schemaless database that speaks JSON, so you can store JSON and get back JSON (don’t worry XML, we got you covered - we can just wrap the XML in JSON before putting it in CouchDB). What’s especially cool is you can interact with CouchDB via <a href="http://docs.couchdb.org/en/latest/api-basics.html">a RESTful API</a>. CouchDB doesn’t have full text search built in (though you can build map-reduce <em>Views</em>, basically preset queries on the database), so I added functions (and docs to help) to interact with the <a href="https://github.com/elasticsearch/elasticsearch-river-couchdb/blob/master/README.md">CouchDB River plugin</a> for <a href="http://www.elasticsearch.org/">Elasticsearch</a>, which provides powerful full text search via an API interface. But nevermind the tech details - all this just means you can search on the full text of your stored data.</p>
+
+<p>There are plenty of databases you can interact with from R, so why CouchDB? For one, it makes a lot of sense to write to a NoSQL database since this blog post is dealing with a use case writing JSON, which isn’t a good fit for databases like MySQL, SQLite, PostgreSQL, etc. (<a href="http://wiki.postgresql.org/wiki/What's_new_in_PostgreSQL_9.2#JSON_datatype">though postgres allows you to write JSON</a>). It didn’t have to be CouchDB, but at least to me it seems relatively easy to install, you can interact with it via an HTTP API (if you’re into that, which I am), and it has a nice web interface (navigate to <a href="http://localhost:5984/_utils/">http://localhost:5984/_utils/</a> after starting <code class="highlighter-rouge">couchdb</code>).</p>
+
+<p>Is this for the casual R user? Probably not. But, I imagine there are R users out there that want some more flexibility when it comes to interacting with web data in R. It is nice and tidy to get back an R data.frame from a web call, but having the raw data at your fingertips could be super powerful. I’ll describe using an R package to interact with a web database with <code class="highlighter-rouge">sofa</code> baked in, and discuss a bit about the functions within <code class="highlighter-rouge">sofa</code>.</p>
+
+<hr />
+
+<h3 id="first-start-couchdb-in-your-terminal">First start CouchDB in your terminal</h3>
+
+<p>You can do this from anywhere in your directory. See <a href="http://couchdb.apache.org/">here</a> for instructions on how to install CouchDB.</p>
+
+<div class="language-bash highlighter-rouge"><div class="highlight"><pre class="highlight"><code>couchdb
+</code></pre></div></div>
+
+<h3 id="then-start-elasticsearch-in-your-terminal">Then start elasticsearch in your terminal</h3>
+
+<p>See <a href="https://github.com/sckott/sofa">here</a> for instructions on how to install Elasticsearch and the River CouchDB plugin.</p>
+
+<div class="language-bash highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="nb">cd</span> /usr/local/elasticsearch
+bin/elasticsearch <span class="nt">-f</span>
+</code></pre></div></div>
+
+<hr />
+
+<h3 id="install-sofa">Install sofa</h3>
+
+<figure class="highlight"><pre><code class="language-r" data-lang="r"><span class="c1"># Uncomment these lines if you don't have these packages installed</span><span class="w">
+</span><span class="c1"># install.packages('devtools') library(devtools) install_github('sofa',</span><span class="w">
+</span><span class="c1"># 'schamberlain') install_github('alm', 'ropensci', ref='couch')</span><span class="w">
+</span><span class="n">library</span><span class="p">(</span><span class="n">sofa</span><span class="p">)</span><span class="w">
+</span><span class="n">library</span><span class="p">(</span><span class="n">alm</span><span class="p">)</span></code></pre></figure>
+
+<hr />
+
+<h3 id="simultaneously-write-data-to-couchdb-along-with-api-calls-using-the-alm-package-to-get-altmetrics-data-on-plos-papers-ping-to-make-sure-couchdb-is-on">Simultaneously write data to CouchDB along with API calls using the alm package to get altmetrics data on PLoS papers. Ping to make sure CouchDB is on</h3>
+
+<figure class="highlight"><pre><code class="language-r" data-lang="r"><span class="n">sofa_ping</span><span class="p">()</span></code></pre></figure>
+
+<figure class="highlight"><pre><code class="language-text" data-lang="text">  couchdb   version 
+"Welcome"   "1.2.1" </code></pre></figure>
+
+<hr />
+
+<h3 id="create-a-new-database">Create a new database</h3>
+
+<figure class="highlight"><pre><code class="language-r" data-lang="r"><span class="n">sofa_createdb</span><span class="p">(</span><span class="n">dbname</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"alm_db"</span><span class="p">)</span></code></pre></figure>
+
+<figure class="highlight"><pre><code class="language-text" data-lang="text">  ok 
+TRUE </code></pre></figure>
+
+<hr />
+
+<h3 id="write-couchdb-database-name-to-options">Write couchdb database name to options</h3>
+
+<figure class="highlight"><pre><code class="language-r" data-lang="r"><span class="n">options</span><span class="p">(</span><span class="n">couch_db_name</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"alm_db"</span><span class="p">)</span></code></pre></figure>
+
+<hr />
+
+<h3 id="list-the-databases">List the databases</h3>
+
+<figure class="highlight"><pre><code class="language-r" data-lang="r"><span class="n">sofa_listdbs</span><span class="p">()</span></code></pre></figure>
+
+<figure class="highlight"><pre><code class="language-text" data-lang="text"> [1] "_replicator"                "_users"                    
+ [3] "alm_couchdb"                "alm_db"                    
+ [5] "dudedb"                     "example"                   
+ [7] "poop"                       "rplos_db"                  
+ [9] "shit"                       "shitty"                    
+[11] "shitty2"                    "test_suite_db"             
+[13] "test_suite_db/with_slashes" "test_suite_reports"        
+[15] "testr2couch"                "twitter_db"                </code></pre></figure>
+
+<hr />
+
+<h3 id="search-for-altmetrics-normally-wo-writing-to-a-database">Search for altmetrics normally, w/o writing to a database</h3>
+
+<figure class="highlight"><pre><code class="language-r" data-lang="r"><span class="n">head</span><span class="p">(</span><span class="n">alm</span><span class="p">(</span><span class="n">doi</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"10.1371/journal.pone.0029797"</span><span class="p">))</span></code></pre></figure>
+
+<figure class="highlight"><pre><code class="language-text" data-lang="text">          .id pdf html shares groups comments likes citations total
+1   bloglines  NA   NA     NA     NA       NA    NA         0     0
+2   citeulike  NA   NA      1     NA       NA    NA        NA     1
+3    connotea  NA   NA     NA     NA       NA    NA         0     0
+4    crossref  NA   NA     NA     NA       NA    NA         6     6
+5      nature  NA   NA     NA     NA       NA    NA         4     4
+6 postgenomic  NA   NA     NA     NA       NA    NA         0     0</code></pre></figure>
+
+<hr />
+
+<h3 id="search-for-altmetrics-normally-while-writing-to-a-database">Search for altmetrics normally, while writing to a database</h3>
+
+<figure class="highlight"><pre><code class="language-r" data-lang="r"><span class="n">head</span><span class="p">(</span><span class="n">alm</span><span class="p">(</span><span class="n">doi</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"10.1371/journal.pone.0029797"</span><span class="p">,</span><span class="w"> </span><span class="n">write2couch</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="kc">TRUE</span><span class="p">))</span></code></pre></figure>
+
+<figure class="highlight"><pre><code class="language-text" data-lang="text">          .id pdf html shares groups comments likes citations total
+1   bloglines  NA   NA     NA     NA       NA    NA         0     0
+2   citeulike  NA   NA      1     NA       NA    NA        NA     1
+3    connotea  NA   NA     NA     NA       NA    NA         0     0
+4    crossref  NA   NA     NA     NA       NA    NA         6     6
+5      nature  NA   NA     NA     NA       NA    NA         4     4
+6 postgenomic  NA   NA     NA     NA       NA    NA         0     0</code></pre></figure>
+
+<hr />
+
+<h3 id="make-lots-of-calls-and-write-them-simultaneously">Make lots of calls, and write them simultaneously</h3>
+
+<figure class="highlight"><pre><code class="language-r" data-lang="r"><span class="c1"># install_github('rplos', 'ropensci')</span><span class="w">
+</span><span class="n">library</span><span class="p">(</span><span class="n">rplos</span><span class="p">)</span><span class="w">
+</span><span class="n">dois</span><span class="w"> </span><span class="o">&lt;-</span><span class="w"> </span><span class="n">searchplos</span><span class="p">(</span><span class="n">terms</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"evolution"</span><span class="p">,</span><span class="w"> </span><span class="n">fields</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"id"</span><span class="p">,</span><span class="w"> </span><span class="n">limit</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="m">100</span><span class="p">)</span><span class="w">
+</span><span class="n">out</span><span class="w"> </span><span class="o">&lt;-</span><span class="w"> </span><span class="n">alm</span><span class="p">(</span><span class="n">doi</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nf">as.character</span><span class="p">(</span><span class="n">dois</span><span class="p">[,</span><span class="w"> </span><span class="m">1</span><span class="p">]),</span><span class="w"> </span><span class="n">write2couch</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="kc">TRUE</span><span class="p">)</span><span class="w">
+</span><span class="n">lapply</span><span class="p">(</span><span class="n">out</span><span class="p">[</span><span class="m">1</span><span class="o">:</span><span class="m">2</span><span class="p">],</span><span class="w"> </span><span class="n">head</span><span class="p">)</span></code></pre></figure>
+
+<figure class="highlight"><pre><code class="language-text" data-lang="text">$`01`
+          .id pdf html shares groups comments likes citations total
+1   bloglines  NA   NA     NA     NA       NA    NA         0     0
+2   citeulike  NA   NA      0     NA       NA    NA        NA     0
+3    connotea  NA   NA     NA     NA       NA    NA         0     0
+4    crossref  NA   NA     NA     NA       NA    NA         0     0
+5      nature  NA   NA     NA     NA       NA    NA         0     0
+6 postgenomic  NA   NA     NA     NA       NA    NA         0     0
+
+$`02`
+          .id pdf html shares groups comments likes citations total
+1   bloglines  NA   NA     NA     NA       NA    NA         0     0
+2   citeulike  NA   NA      1     NA       NA    NA        NA     1
+3    connotea  NA   NA     NA     NA       NA    NA         0     0
+4    crossref  NA   NA     NA     NA       NA    NA         2     2
+5      nature  NA   NA     NA     NA       NA    NA         0     0
+6 postgenomic  NA   NA     NA     NA       NA    NA         0     0</code></pre></figure>
+
+<hr />
+
+<h3 id="writing-data-to-couchdb-does-take-a-bit-longer">Writing data to CouchDB does take a bit longer</h3>
+
+<figure class="highlight"><pre><code class="language-r" data-lang="r"><span class="n">system.time</span><span class="p">(</span><span class="n">alm</span><span class="p">(</span><span class="n">doi</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nf">as.character</span><span class="p">(</span><span class="n">dois</span><span class="p">[,</span><span class="w"> </span><span class="m">1</span><span class="p">])[</span><span class="m">1</span><span class="o">:</span><span class="m">60</span><span class="p">],</span><span class="w"> </span><span class="n">write2couch</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="kc">FALSE</span><span class="p">))</span></code></pre></figure>
+
+<figure class="highlight"><pre><code class="language-text" data-lang="text">   user  system elapsed 
+  1.739   0.016   4.554 </code></pre></figure>
+
+<figure class="highlight"><pre><code class="language-r" data-lang="r"><span class="n">system.time</span><span class="p">(</span><span class="n">alm</span><span class="p">(</span><span class="n">doi</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nf">as.character</span><span class="p">(</span><span class="n">dois</span><span class="p">[,</span><span class="w"> </span><span class="m">1</span><span class="p">])[</span><span class="m">1</span><span class="o">:</span><span class="m">60</span><span class="p">],</span><span class="w"> </span><span class="n">write2couch</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="kc">TRUE</span><span class="p">))</span></code></pre></figure>
+
+<figure class="highlight"><pre><code class="language-text" data-lang="text">   user  system elapsed 
+  3.579   0.062   6.460 </code></pre></figure>
+
+<hr />
+
+<h3 id="search-using-elasticsearch">Search using elasticsearch</h3>
+<h4 id="tell-elasticsearch-to-start-indexing-your-database">tell elasticsearch to start indexing your database</h4>
+
+<figure class="highlight"><pre><code class="language-r" data-lang="r"><span class="n">elastic_start</span><span class="p">(</span><span class="n">dbname</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"alm_db"</span><span class="p">)</span></code></pre></figure>
+
+<figure class="highlight"><pre><code class="language-text" data-lang="text">$ok
+[1] TRUE</code></pre></figure>
+
+<hr />
+
+<h4 id="search-your-database">Search your database</h4>
+
+<figure class="highlight"><pre><code class="language-r" data-lang="r"><span class="n">out</span><span class="w"> </span><span class="o">&lt;-</span><span class="w"> </span><span class="n">elastic_search</span><span class="p">(</span><span class="n">dbname</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"alm_db"</span><span class="p">,</span><span class="w"> </span><span class="n">q</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"twitter"</span><span class="p">,</span><span class="w"> </span><span class="n">parse_</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="kc">TRUE</span><span class="p">)</span><span class="w">
+</span><span class="n">out</span><span class="o">$</span><span class="n">hits</span><span class="o">$</span><span class="n">total</span></code></pre></figure>
+
+<figure class="highlight"><pre><code class="language-text" data-lang="text">[1] 679</code></pre></figure>
+
+<hr />
+
+<h3 id="using-views">Using views</h3>
+
+<h4 id="write-a-view---here-letting-key-be-the-default-of-null">Write a view - here letting key be the default of null</h4>
+
+<figure class="highlight"><pre><code class="language-r" data-lang="r"><span class="n">sofa_view_put</span><span class="p">(</span><span class="n">dbname</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"alm_db"</span><span class="p">,</span><span class="w"> </span><span class="n">design_name</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"myview"</span><span class="p">,</span><span class="w"> </span><span class="n">value</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"doc.baseurl"</span><span class="p">)</span></code></pre></figure>
+
+<figure class="highlight"><pre><code class="language-text" data-lang="text">$ok
+[1] TRUE
+
+$id
+[1] "_design/myview"
+
+$rev
+[1] "1-e7c17cff1b96e4595c3781da53e16ad8"</code></pre></figure>
+
+<hr />
+
+<h4 id="get-info-on-your-new-view">Get info on your new view</h4>
+
+<figure class="highlight"><pre><code class="language-r" data-lang="r"><span class="n">sofa_view_get</span><span class="p">(</span><span class="n">dbname</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"alm_db"</span><span class="p">,</span><span class="w"> </span><span class="n">design_name</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"myview"</span><span class="p">)</span></code></pre></figure>
+
+<figure class="highlight"><pre><code class="language-text" data-lang="text">$`_id`
+[1] "_design/myview"
+
+$`_rev`
+[1] "1-e7c17cff1b96e4595c3781da53e16ad8"
+
+$views
+$views$foo
+                                    map 
+"function(doc){emit(null,doc.baseurl)}" </code></pre></figure>
+
+<hr />
+
+<h4 id="get-data-using-a-view">Get data using a view</h4>
+
+<figure class="highlight"><pre><code class="language-r" data-lang="r"><span class="n">out</span><span class="w"> </span><span class="o">&lt;-</span><span class="w"> </span><span class="n">sofa_view_search</span><span class="p">(</span><span class="n">dbname</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"alm_db"</span><span class="p">,</span><span class="w"> </span><span class="n">design_name</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"myview"</span><span class="p">)</span><span class="w">
+</span><span class="nf">length</span><span class="p">(</span><span class="n">out</span><span class="o">$</span><span class="n">rows</span><span class="p">)</span><span class="w">  </span><span class="c1"># 160 results</span></code></pre></figure>
+
+<figure class="highlight"><pre><code class="language-text" data-lang="text">[1] 161</code></pre></figure>
+
+<figure class="highlight"><pre><code class="language-r" data-lang="r"><span class="n">sapply</span><span class="p">(</span><span class="n">out</span><span class="o">$</span><span class="n">rows</span><span class="p">,</span><span class="w"> </span><span class="k">function</span><span class="p">(</span><span class="n">x</span><span class="p">)</span><span class="w"> </span><span class="n">x</span><span class="o">$</span><span class="n">value</span><span class="p">)[</span><span class="m">1</span><span class="o">:</span><span class="m">5</span><span class="p">]</span><span class="w">  </span><span class="c1"># the values, just the API call URLs</span></code></pre></figure>
+
+<figure class="highlight"><pre><code class="language-text" data-lang="text">[1] "http://alm.plos.org/api/v3/articles"
+[2] "http://alm.plos.org/api/v3/articles"
+[3] "http://alm.plos.org/api/v3/articles"
+[4] "http://alm.plos.org/api/v3/articles"
+[5] "http://alm.plos.org/api/v3/articles"</code></pre></figure>
+
+<hr />
+
+<h4 id="delete-the-view">Delete the view</h4>
+
+<figure class="highlight"><pre><code class="language-r" data-lang="r"><span class="n">sofa_view_del</span><span class="p">(</span><span class="n">dbname</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"alm_db"</span><span class="p">,</span><span class="w"> </span><span class="n">design_name</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"myview"</span><span class="p">)</span></code></pre></figure>
+
+<figure class="highlight"><pre><code class="language-text" data-lang="text">[1] ""</code></pre></figure>
+
+<hr />
+
+<h2 id="what-now">What now?</h2>
+
+<p>Well, if no one uses this, then probably nothing. Though, if people think this could be useful:</p>
+
+<ul>
+  <li>It would be cool to make easy hooks into any package making web calls to allow users to write data to CouchDB if they choose to, sort of like the example above with rplos.</li>
+  <li>Perhaps automate some of the setup for CouchDB for users, making system calls so they don’t have to.</li>
+  <li>Performance: As shown above, simultaneously writing data to CouchDB takes longer than not doing so - removing this time difference will make writing to couch more palatable.</li>
+</ul>
+
+<h2 id="what-do-you-think">What do you think?</h2>
+
+<p>What is your reaction to this post?  Do you have a need for this sort of tool?  Do you have similar use cases that could be addressed with <code class="highlighter-rouge">sofa</code>?</p>
+
+:ET

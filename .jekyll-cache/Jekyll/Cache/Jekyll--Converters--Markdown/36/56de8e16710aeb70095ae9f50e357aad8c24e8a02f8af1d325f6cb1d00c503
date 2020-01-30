@@ -1,0 +1,122 @@
+I"4G<p>I was returning to a long-term project I’ve been working on - a package for caching HTTP requests in R called <a href="https://github.com/ropensci/vcr">vcr</a>, a port of the Ruby gem <a href="https://github.com/vcr/vcr">vcr</a> - when you do that thing you do when you are porting a library from one language to another. I stumbled upon some methods/functions I wasn’t familiar with.</p>
+
+<p>For example, <a href="https://apidock.com/ruby/Array/take_while">take_while</a> I had never seeen before. It iterates over an array, returning the elements of the array that evalulate to <code class="highlighter-rouge">true</code> (for those new to Ruby, they use <code class="highlighter-rouge">true</code> instead of <code class="highlighter-rouge">TRUE</code> as we do in R) when passed through the function given. R has lists and vectors - R’s lists are the most similar to Ruby arrays because both can have mixed objects in them (e.g., a string and an integer) while still retaining those objects as is.</p>
+
+<p>In another example, I had never seen <a href="https://apidock.com/ruby/Array/unshift">unshift</a> or it’s sister <a href="https://apidock.com/ruby/v1_9_3_392/Array/shift">shift</a>. <code class="highlighter-rouge">unshift</code> is pretty simple - it prepends objects to the front of the array. <code class="highlighter-rouge">shift</code> has more complicated behavior - called without values passed deletes first element of the array, AND returns that deleted value. With <code class="highlighter-rouge">shift</code> you can also pass an index that is treated as a range (e.g., <code class="highlighter-rouge">1</code> is treated as <code class="highlighter-rouge">0</code> and <code class="highlighter-rouge">1</code>; Ruby has zero based indexing, unlike R’s 1 based indexing).</p>
+
+<p>Anyway, I wanted to explore these new Ruby methods more by trying to implement them in R. Thus, started a bag of functions package called <a href="https://github.com/ropenscilabs/rubfuns">rubfuns</a> for “Ruby functions” to play while being able to have documentation, etc.</p>
+
+<p>It’s entirely possible the stuff in <code class="highlighter-rouge">rubfuns</code> is already implemented in R elsewhere - the point is for me to learn more about both Ruby and R.</p>
+
+<p>A big difference between Ruby and R is that Rubys’s arrays have methods that can be called on them, e.g.</p>
+
+<div class="language-ruby highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="n">a</span> <span class="o">=</span> <span class="p">[</span><span class="mi">1</span><span class="p">,</span> <span class="mi">2</span><span class="p">,</span> <span class="mi">3</span><span class="p">]</span>
+<span class="n">a</span><span class="p">.</span><span class="nf">count</span>
+<span class="o">=&gt;</span> <span class="mi">3</span>
+</code></pre></div></div>
+
+<p>Whereas the equivalent in R requires passing the vector to a method, rather than calling the method on the object itself</p>
+
+<div class="language-r highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="n">a</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nf">c</span><span class="p">(</span><span class="m">1</span><span class="p">,</span><span class="w"> </span><span class="m">2</span><span class="p">,</span><span class="w"> </span><span class="m">3</span><span class="p">)</span><span class="w">
+</span><span class="nf">length</span><span class="p">(</span><span class="n">a</span><span class="p">)</span><span class="w">
+</span><span class="c1">#&gt; [1] 3</span><span class="w">
+</span></code></pre></div></div>
+
+<p>Of course one could create a <code class="highlighter-rouge">R6</code> object in R and add methods to that object that can be called on a vector:</p>
+
+<div class="language-r highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="n">library</span><span class="p">(</span><span class="s2">"R6"</span><span class="p">)</span><span class="w">
+</span><span class="n">Vec</span><span class="w"> </span><span class="o">&lt;-</span><span class="w"> </span><span class="n">R6</span><span class="o">::</span><span class="n">R6Class</span><span class="p">(</span><span class="w">
+  </span><span class="s2">"Vec"</span><span class="p">,</span><span class="w">
+  </span><span class="n">public</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nf">list</span><span class="p">(</span><span class="w">
+    </span><span class="n">x</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="kc">NULL</span><span class="p">,</span><span class="w">
+    </span><span class="n">initialize</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="k">function</span><span class="p">(</span><span class="n">x</span><span class="p">)</span><span class="w"> </span><span class="p">{</span><span class="w">
+      </span><span class="n">self</span><span class="o">$</span><span class="n">x</span><span class="w"> </span><span class="o">&lt;-</span><span class="w"> </span><span class="n">x</span><span class="w">
+    </span><span class="p">},</span><span class="w">
+
+    </span><span class="n">count</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="k">function</span><span class="p">()</span><span class="w"> </span><span class="nf">length</span><span class="p">(</span><span class="n">self</span><span class="o">$</span><span class="n">x</span><span class="p">)</span><span class="w">
+  </span><span class="p">)</span><span class="w">
+</span><span class="p">)</span><span class="w">
+</span></code></pre></div></div>
+
+<div class="language-r highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="n">myvec</span><span class="w"> </span><span class="o">&lt;-</span><span class="w"> </span><span class="n">Vec</span><span class="o">$</span><span class="n">new</span><span class="p">(</span><span class="m">1</span><span class="o">:</span><span class="m">3</span><span class="p">)</span><span class="w">
+</span><span class="n">myvec</span><span class="o">$</span><span class="n">count</span><span class="p">()</span><span class="w">
+</span><span class="c1">#&gt; [1] 3</span><span class="w">
+</span></code></pre></div></div>
+
+<p>But that’s not baked into R itself, so not ideal.</p>
+
+<p><br /><br /></p>
+
+<p>Anyway, on with <code class="highlighter-rouge">rubfuns</code>:</p>
+
+<div class="language-r highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="n">devtools</span><span class="o">::</span><span class="n">install_github</span><span class="p">(</span><span class="s2">"ropenscilabs/rubfuns"</span><span class="p">)</span><span class="w">
+</span></code></pre></div></div>
+
+<div class="language-r highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="n">library</span><span class="p">(</span><span class="s2">"rubfuns"</span><span class="p">)</span><span class="w">
+</span></code></pre></div></div>
+
+<p><code class="highlighter-rouge">take_while</code></p>
+
+<div class="language-r highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="n">x</span><span class="w"> </span><span class="o">&lt;-</span><span class="w"> </span><span class="nf">c</span><span class="p">(</span><span class="m">1</span><span class="p">,</span><span class="w"> </span><span class="m">2</span><span class="p">,</span><span class="w"> </span><span class="m">3</span><span class="p">,</span><span class="w"> </span><span class="m">4</span><span class="p">,</span><span class="w"> </span><span class="m">5</span><span class="p">,</span><span class="w"> </span><span class="m">0</span><span class="p">)</span><span class="w">
+</span><span class="n">x</span><span class="w"> </span><span class="o">%&gt;%</span><span class="w"> </span><span class="n">take_while</span><span class="p">(</span><span class="k">function</span><span class="p">(</span><span class="n">z</span><span class="p">)</span><span class="w"> </span><span class="n">z</span><span class="w"> </span><span class="o">&lt;</span><span class="w"> </span><span class="m">3</span><span class="p">)</span><span class="w">
+</span><span class="c1">#&gt; [1] 1 2 0</span><span class="w">
+</span><span class="n">x</span><span class="w"> </span><span class="o">&lt;-</span><span class="w"> </span><span class="nf">c</span><span class="p">(</span><span class="m">1</span><span class="p">,</span><span class="w"> </span><span class="m">2</span><span class="p">,</span><span class="w"> </span><span class="m">3</span><span class="p">,</span><span class="w"> </span><span class="m">4</span><span class="p">,</span><span class="w"> </span><span class="m">9</span><span class="p">,</span><span class="w"> </span><span class="m">-1</span><span class="p">)</span><span class="w">
+</span><span class="n">x</span><span class="w"> </span><span class="o">%&gt;%</span><span class="w"> </span><span class="n">take_while</span><span class="p">(</span><span class="k">function</span><span class="p">(</span><span class="n">z</span><span class="p">)</span><span class="w"> </span><span class="n">z</span><span class="w"> </span><span class="o">&lt;</span><span class="w"> </span><span class="m">3</span><span class="p">)</span><span class="w">
+</span><span class="c1">#&gt; [1]  1  2 -1</span><span class="w">
+</span></code></pre></div></div>
+
+<p><code class="highlighter-rouge">drop_while</code> is a similar function to <code class="highlighter-rouge">take_while</code> but drops the elements that when passed to the supplied function evaluate to <code class="highlighter-rouge">TRUE</code></p>
+
+<div class="language-r highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="n">x</span><span class="w"> </span><span class="o">&lt;-</span><span class="w"> </span><span class="nf">c</span><span class="p">(</span><span class="m">1</span><span class="p">,</span><span class="w"> </span><span class="m">2</span><span class="p">,</span><span class="w"> </span><span class="m">3</span><span class="p">,</span><span class="w"> </span><span class="m">4</span><span class="p">,</span><span class="w"> </span><span class="m">5</span><span class="p">,</span><span class="w"> </span><span class="m">0</span><span class="p">)</span><span class="w">
+</span><span class="n">x</span><span class="w"> </span><span class="o">%&gt;%</span><span class="w"> </span><span class="n">drop_while</span><span class="p">(</span><span class="k">function</span><span class="p">(</span><span class="n">z</span><span class="p">)</span><span class="w"> </span><span class="n">z</span><span class="w"> </span><span class="o">&lt;</span><span class="w"> </span><span class="m">3</span><span class="p">)</span><span class="w">
+</span><span class="c1">#&gt; [1] 3 4 5</span><span class="w">
+</span><span class="n">x</span><span class="w"> </span><span class="o">&lt;-</span><span class="w"> </span><span class="nf">c</span><span class="p">(</span><span class="m">1</span><span class="p">,</span><span class="w"> </span><span class="m">2</span><span class="p">,</span><span class="w"> </span><span class="m">3</span><span class="p">,</span><span class="w"> </span><span class="m">4</span><span class="p">,</span><span class="w"> </span><span class="m">9</span><span class="p">,</span><span class="w"> </span><span class="m">-1</span><span class="p">)</span><span class="w">
+</span><span class="n">x</span><span class="w"> </span><span class="o">%&gt;%</span><span class="w"> </span><span class="n">drop_while</span><span class="p">(</span><span class="k">function</span><span class="p">(</span><span class="n">z</span><span class="p">)</span><span class="w"> </span><span class="n">z</span><span class="w"> </span><span class="o">&lt;</span><span class="w"> </span><span class="m">3</span><span class="p">)</span><span class="w">
+</span><span class="c1">#&gt; [1] 3 4 9</span><span class="w">
+</span></code></pre></div></div>
+
+<p><code class="highlighter-rouge">delete_at</code> was in interesting function I saw in <a href="https://github.com/vcr/vcr">vcr</a>. It deletes the elements of an array at the positions given (remember, 0 based indexing in Ruby)</p>
+
+<div class="language-r highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="n">x</span><span class="w"> </span><span class="o">&lt;-</span><span class="w"> </span><span class="nf">c</span><span class="p">(</span><span class="m">1</span><span class="p">,</span><span class="w"> </span><span class="m">2</span><span class="p">,</span><span class="w"> </span><span class="m">3</span><span class="p">,</span><span class="w"> </span><span class="m">4</span><span class="p">,</span><span class="w"> </span><span class="m">5</span><span class="p">,</span><span class="w"> </span><span class="m">0</span><span class="p">)</span><span class="w">
+</span><span class="n">delete_at</span><span class="p">(</span><span class="n">x</span><span class="p">,</span><span class="w"> </span><span class="m">5</span><span class="p">)</span><span class="w">
+</span><span class="c1">#&gt; [1] 1 2 3 4 0</span><span class="w">
+</span><span class="n">delete_at</span><span class="p">(</span><span class="n">x</span><span class="p">,</span><span class="w"> </span><span class="m">4</span><span class="o">:</span><span class="m">5</span><span class="p">)</span><span class="w">
+</span><span class="c1">#&gt; [1] 1 2 3 0</span><span class="w">
+</span></code></pre></div></div>
+
+<p><code class="highlighter-rouge">delete_if</code> is similar to <code class="highlighter-rouge">delete_at</code> but instead you pass a function that when evaluates to <code class="highlighter-rouge">TRUE</code> deletes that element</p>
+
+<div class="language-r highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="n">x</span><span class="w"> </span><span class="o">&lt;-</span><span class="w"> </span><span class="nf">c</span><span class="p">(</span><span class="m">1</span><span class="p">,</span><span class="w"> </span><span class="m">2</span><span class="p">,</span><span class="w"> </span><span class="m">3</span><span class="p">,</span><span class="w"> </span><span class="m">4</span><span class="p">,</span><span class="w"> </span><span class="m">5</span><span class="p">,</span><span class="w"> </span><span class="m">0</span><span class="p">)</span><span class="w">
+</span><span class="n">delete_if</span><span class="p">(</span><span class="n">x</span><span class="p">,</span><span class="w"> </span><span class="k">function</span><span class="p">(</span><span class="n">z</span><span class="p">)</span><span class="w"> </span><span class="n">z</span><span class="w"> </span><span class="o">&gt;</span><span class="w"> </span><span class="m">2</span><span class="p">)</span><span class="w">
+</span><span class="c1">#&gt; [1] 1 2 0</span><span class="w">
+</span><span class="n">delete_if</span><span class="p">(</span><span class="n">x</span><span class="p">,</span><span class="w"> </span><span class="k">function</span><span class="p">(</span><span class="n">z</span><span class="p">)</span><span class="w"> </span><span class="n">z</span><span class="w"> </span><span class="o">&lt;</span><span class="w"> </span><span class="m">4</span><span class="p">)</span><span class="w">
+</span><span class="c1">#&gt; [1] 4 5</span><span class="w">
+</span></code></pre></div></div>
+
+<p><code class="highlighter-rouge">unshift</code> is quite simple. it prepends whatever you pass to it to the front of the vector</p>
+
+<div class="language-r highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="n">x</span><span class="w"> </span><span class="o">&lt;-</span><span class="w"> </span><span class="nf">c</span><span class="p">(</span><span class="m">1</span><span class="p">,</span><span class="w"> </span><span class="m">2</span><span class="p">,</span><span class="w"> </span><span class="m">3</span><span class="p">)</span><span class="w">
+</span><span class="n">x</span><span class="w"> </span><span class="o">%&gt;%</span><span class="w"> </span><span class="n">unshift</span><span class="p">(</span><span class="m">4</span><span class="p">)</span><span class="w">
+</span><span class="c1">#&gt; [1] 4 1 2 3</span><span class="w">
+</span></code></pre></div></div>
+
+<p><code class="highlighter-rouge">shift</code> is more complicated. called without any values deletes the first element. called with a value deletes all elements up to and including that value</p>
+
+<div class="language-r highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="n">x</span><span class="w"> </span><span class="o">&lt;-</span><span class="w"> </span><span class="nf">c</span><span class="p">(</span><span class="m">1</span><span class="p">,</span><span class="w"> </span><span class="m">2</span><span class="p">,</span><span class="w"> </span><span class="m">3</span><span class="p">)</span><span class="w">
+</span><span class="n">x</span><span class="w"> </span><span class="o">%&gt;%</span><span class="w"> </span><span class="n">shift</span><span class="w">
+</span><span class="c1">#&gt; [1] 2 3</span><span class="w">
+</span><span class="n">x</span><span class="w"> </span><span class="o">%&gt;%</span><span class="w"> </span><span class="n">shift</span><span class="p">(</span><span class="m">2</span><span class="p">)</span><span class="w">
+</span><span class="c1">#&gt; [1] 3</span><span class="w">
+</span></code></pre></div></div>
+
+<p><br /></p>
+
+<p>That’s all I’ve got so far. Will likely add more functions as time goes on.</p>
+
+<p><br /><br /></p>
+
+<p>Unfortunately we can’t follow what Ruby does by being able to modify the vector or list while also returning something. There are of course ways to achieve this, e.g., <code class="highlighter-rouge">R6</code> solution above or something like <a href="https://github.com/nteetor/zeallot">zeallot</a> - but if it’s not baked into the R language it seems less likely to get wide adoption.</p>
+
+<p><strong>todo</strong>: plan to make sure the functions work with vectors and lists</p>
+
+:ET

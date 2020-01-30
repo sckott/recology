@@ -1,0 +1,737 @@
+I"�<p>We’ve (ropensci) been working on an R client for interacting with <a href="http://www.elasticsearch.org/">Elasticsearch</a> for a while now, first commit was November 2013.</p>
+
+<p>Elasticsearch is a document database built on the JVM. <code class="highlighter-rouge">elastic</code> interacts with the Elasticsearch HTTP API, and includes functions for setting connection details to Elasticsearch instances, loading bulk data, searching for documents with both HTTP query variables and JSON based body requests. In addition, <code class="highlighter-rouge">elastic</code> provides functions for interacting with APIs for indices, documents, nodes, clusters, an interface to the cat API, and more.</p>
+
+<p>Here’s a few examples of what you can do.</p>
+
+<p>Note: <code class="highlighter-rouge">elastic</code> was just pushed to CRAN. It just got accepted, so binaries may not be available, try again soon, or install from Github, or install from source from CRAN like <code class="highlighter-rouge">install.packages("http://cran.r-project.org/src/contrib/elastic_0.3.0.tar.gz", repos=NULL, type="source")</code>.</p>
+
+<h2 id="installation">Installation</h2>
+
+<div class="language-r highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="n">install.packages</span><span class="p">(</span><span class="s2">"elastic"</span><span class="p">)</span><span class="w">
+</span></code></pre></div></div>
+
+<p>Or install development version:</p>
+
+<div class="language-r highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="n">install.packages</span><span class="p">(</span><span class="s2">"devtools"</span><span class="p">)</span><span class="w">
+</span><span class="n">devtools</span><span class="o">::</span><span class="n">install_github</span><span class="p">(</span><span class="s2">"ropensci/elastic"</span><span class="p">)</span><span class="w">
+</span></code></pre></div></div>
+
+<p>Then load package</p>
+
+<div class="language-r highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="n">library</span><span class="p">(</span><span class="s2">"elastic"</span><span class="p">)</span><span class="w">
+</span></code></pre></div></div>
+
+<h2 id="install-elasticsearch">Install Elasticsearch</h2>
+
+<ul>
+  <li><a href="http://www.elasticsearch.org/guide/en/elasticsearch/reference/current/_installation.html">Elasticsearch installation help</a></li>
+</ul>
+
+<p><strong>Unix (linux/osx)</strong></p>
+
+<p>Replace <code class="highlighter-rouge">1.4.1</code> with the version you are working with.</p>
+
+<ul>
+  <li>Download zip or tar file from Elasticsearch <a href="http://www.elasticsearch.org/overview/elkdownloads/">see here for download</a>, e.g., <code class="highlighter-rouge">curl -L -O https://download.elasticsearch.org/elasticsearch/elasticsearch/elasticsearch-1.4.1.tar.gz</code></li>
+  <li>Uncompress it: <code class="highlighter-rouge">tar -xvf elasticsearch-1.4.1.tar.gz</code></li>
+  <li>Move it: <code class="highlighter-rouge">sudo mv /path/to/elasticsearch-1.4.1 /usr/local</code></li>
+  <li>Navigate to /usr/local: <code class="highlighter-rouge">cd /usr/local</code></li>
+  <li>Add shortcut: <code class="highlighter-rouge">sudo ln -s elasticsearch-1.4.1 elasticsearch</code></li>
+</ul>
+
+<p>On OSX, you can install via Homebrew: <code class="highlighter-rouge">brew install elasticsearch</code></p>
+
+<p><strong>Windows</strong></p>
+
+<p>Windows users can follow the above, but unzip the zip file instead of uncompressing the tar file.</p>
+
+<h2 id="start-elasticsearch">Start Elasticsearch</h2>
+
+<ul>
+  <li>Navigate to elasticsearch: <code class="highlighter-rouge">cd /usr/local/elasticsearch</code></li>
+  <li>Start elasticsearch: <code class="highlighter-rouge">bin/elasticsearch</code></li>
+</ul>
+
+<p>I create a little bash shortcut called <code class="highlighter-rouge">es</code> that does both of the above commands in one step (<code class="highlighter-rouge">cd /usr/local/elasticsearch &amp;&amp; bin/elasticsearch</code>).</p>
+
+<p><strong>Note:</strong> Windows users should run the <code class="highlighter-rouge">elasticsearch.bat</code> file</p>
+
+<h2 id="initialize-connection">Initialize connection</h2>
+
+<p>The function <code class="highlighter-rouge">connect()</code> is used before doing anything else to set the connection details to your remote or local elasticsearch store. The details created by <code class="highlighter-rouge">connect()</code> are written to your options for the current session, and are used by <code class="highlighter-rouge">elastic</code> functions.</p>
+
+<div class="language-r highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="n">connect</span><span class="p">()</span><span class="w">
+</span></code></pre></div></div>
+
+<p>On package load, your base url and port are set to <code class="highlighter-rouge">http://127.0.0.1</code> and <code class="highlighter-rouge">9200</code>, respectively. You can of course override these settings per session or for all sessions.</p>
+
+<h2 id="get-data">Get data</h2>
+
+<p>Elasticsearch has a bulk load API to load data in fast. The format is pretty weird though. It’s sort of JSON, but would pass no JSON linter. I include a few data sets in <code class="highlighter-rouge">elastic</code> so it’s easy to get up and running, and so when you run examples in this package they’ll actually run the same way (hopefully).</p>
+
+<h3 id="shakespeare-data">Shakespeare data</h3>
+
+<p>Elasticsearch provides some data on Shakespeare plays. I’ve provided a subset of this data in this package. Get the path for the file specific to your machine:</p>
+
+<div class="language-r highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="n">shakespeare</span><span class="w"> </span><span class="o">&lt;-</span><span class="w"> </span><span class="n">system.file</span><span class="p">(</span><span class="s2">"examples"</span><span class="p">,</span><span class="w"> </span><span class="s2">"shakespeare_data.json"</span><span class="p">,</span><span class="w"> </span><span class="n">package</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"elastic"</span><span class="p">)</span><span class="w">
+</span></code></pre></div></div>
+
+<p>Then load the data into Elasticsearch:</p>
+
+<div class="language-r highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="n">docs_bulk</span><span class="p">(</span><span class="n">shakespeare</span><span class="p">)</span><span class="w">
+</span></code></pre></div></div>
+
+<h3 id="public-library-of-science-plos-data">Public Library of Science (PLOS) data</h3>
+
+<p>A dataset inluded in the <code class="highlighter-rouge">elastic</code> package is metadata for PLOS scholarly articles.</p>
+
+<div class="language-r highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="n">plosdat</span><span class="w"> </span><span class="o">&lt;-</span><span class="w"> </span><span class="n">system.file</span><span class="p">(</span><span class="s2">"examples"</span><span class="p">,</span><span class="w"> </span><span class="s2">"plos_data.json"</span><span class="p">,</span><span class="w"> </span><span class="n">package</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"elastic"</span><span class="p">)</span><span class="w">
+</span><span class="n">docs_bulk</span><span class="p">(</span><span class="n">plosdat</span><span class="p">)</span><span class="w">
+</span></code></pre></div></div>
+
+<h3 id="global-biodiversity-information-facility-gbif-data">Global Biodiversity Information Facility (GBIF) data</h3>
+
+<p>A dataset inluded in the <code class="highlighter-rouge">elastic</code> package is data for GBIF species occurrence records. Get the file path, then load:</p>
+
+<div class="language-r highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="n">gbifdat</span><span class="w"> </span><span class="o">&lt;-</span><span class="w"> </span><span class="n">system.file</span><span class="p">(</span><span class="s2">"examples"</span><span class="p">,</span><span class="w"> </span><span class="s2">"gbif_data.json"</span><span class="p">,</span><span class="w"> </span><span class="n">package</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"elastic"</span><span class="p">)</span><span class="w">
+</span><span class="n">docs_bulk</span><span class="p">(</span><span class="n">gbifdat</span><span class="p">)</span><span class="w">
+</span></code></pre></div></div>
+
+<p>GBIF geo data with a coordinates element to allow <code class="highlighter-rouge">geo_shape</code> queries</p>
+
+<div class="language-r highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="n">gbifgeo</span><span class="w"> </span><span class="o">&lt;-</span><span class="w"> </span><span class="n">system.file</span><span class="p">(</span><span class="s2">"examples"</span><span class="p">,</span><span class="w"> </span><span class="s2">"gbif_geo.json"</span><span class="p">,</span><span class="w"> </span><span class="n">package</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"elastic"</span><span class="p">)</span><span class="w">
+</span><span class="n">docs_bulk</span><span class="p">(</span><span class="n">gbifgeo</span><span class="p">)</span><span class="w">
+</span></code></pre></div></div>
+
+<h2 id="the-search-function">The Search function</h2>
+
+<p>The main interface to searching documents in your Elasticsearch store is the function <code class="highlighter-rouge">Search()</code>. I nearly always develop R software using all lowercase, but R has a function called <code class="highlighter-rouge">search()</code>, and I wanted to avoid collision with that function.</p>
+
+<p><code class="highlighter-rouge">Search()</code> is an interface to both the HTTP search API (in which queries are passed in the URI of the request, meaning queries have to be relatively simple), as well as the POST API, or the Query DSL, in which queries are passed in the body of the request (so can be much more complex).</p>
+
+<p>There are a huge amount of ways you can search Elasticsearch documents - this tutorial covers some of them, and highlights the ways in which you interact with the R outputs.</p>
+
+<h3 id="search-an-index">Search an index</h3>
+
+<div class="language-r highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="n">out</span><span class="w"> </span><span class="o">&lt;-</span><span class="w"> </span><span class="n">Search</span><span class="p">(</span><span class="n">index</span><span class="o">=</span><span class="s2">"shakespeare"</span><span class="p">)</span><span class="w">
+</span><span class="n">out</span><span class="o">$</span><span class="n">hits</span><span class="o">$</span><span class="n">total</span><span class="w">
+</span><span class="c1">#&gt; [1] 5000</span><span class="w">
+</span></code></pre></div></div>
+
+<div class="language-r highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="n">out</span><span class="o">$</span><span class="n">hits</span><span class="o">$</span><span class="n">hits</span><span class="p">[[</span><span class="m">1</span><span class="p">]]</span><span class="w">
+</span><span class="c1">#&gt; $`_index`</span><span class="w">
+</span><span class="c1">#&gt; [1] "shakespeare"</span><span class="w">
+</span><span class="c1">#&gt; </span><span class="w">
+</span><span class="c1">#&gt; $`_type`</span><span class="w">
+</span><span class="c1">#&gt; [1] "line"</span><span class="w">
+</span><span class="c1">#&gt; </span><span class="w">
+</span><span class="c1">#&gt; $`_id`</span><span class="w">
+</span><span class="c1">#&gt; [1] "4"</span><span class="w">
+</span><span class="c1">#&gt; </span><span class="w">
+</span><span class="c1">#&gt; $`_version`</span><span class="w">
+</span><span class="c1">#&gt; [1] 1</span><span class="w">
+</span><span class="c1">#&gt; </span><span class="w">
+</span><span class="c1">#&gt; $`_score`</span><span class="w">
+</span><span class="c1">#&gt; [1] 1</span><span class="w">
+</span><span class="c1">#&gt; </span><span class="w">
+</span><span class="c1">#&gt; $`_source`</span><span class="w">
+</span><span class="c1">#&gt; $`_source`$line_id</span><span class="w">
+</span><span class="c1">#&gt; [1] 5</span><span class="w">
+</span><span class="c1">#&gt; </span><span class="w">
+</span><span class="c1">#&gt; $`_source`$play_name</span><span class="w">
+</span><span class="c1">#&gt; [1] "Henry IV"</span><span class="w">
+</span><span class="c1">#&gt; </span><span class="w">
+</span><span class="c1">#&gt; $`_source`$speech_number</span><span class="w">
+</span><span class="c1">#&gt; [1] 1</span><span class="w">
+</span><span class="c1">#&gt; </span><span class="w">
+</span><span class="c1">#&gt; $`_source`$line_number</span><span class="w">
+</span><span class="c1">#&gt; [1] "1.1.2"</span><span class="w">
+</span><span class="c1">#&gt; </span><span class="w">
+</span><span class="c1">#&gt; $`_source`$speaker</span><span class="w">
+</span><span class="c1">#&gt; [1] "KING HENRY IV"</span><span class="w">
+</span><span class="c1">#&gt; </span><span class="w">
+</span><span class="c1">#&gt; $`_source`$text_entry</span><span class="w">
+</span><span class="c1">#&gt; [1] "Find we a time for frighted peace to pant,"</span><span class="w">
+</span></code></pre></div></div>
+
+<h3 id="search-an-index-by-type">Search an index by type</h3>
+
+<div class="language-r highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="n">Search</span><span class="p">(</span><span class="n">index</span><span class="o">=</span><span class="s2">"shakespeare"</span><span class="p">,</span><span class="w"> </span><span class="n">type</span><span class="o">=</span><span class="s2">"act"</span><span class="p">)</span><span class="o">$</span><span class="n">hits</span><span class="o">$</span><span class="n">hits</span><span class="p">[[</span><span class="m">1</span><span class="p">]]</span><span class="w">
+</span><span class="c1">#&gt; $`_index`</span><span class="w">
+</span><span class="c1">#&gt; [1] "shakespeare"</span><span class="w">
+</span><span class="c1">#&gt; </span><span class="w">
+</span><span class="c1">#&gt; $`_type`</span><span class="w">
+</span><span class="c1">#&gt; [1] "act"</span><span class="w">
+</span><span class="c1">#&gt; </span><span class="w">
+</span><span class="c1">#&gt; $`_id`</span><span class="w">
+</span><span class="c1">#&gt; [1] "2227"</span><span class="w">
+</span><span class="c1">#&gt; </span><span class="w">
+</span><span class="c1">#&gt; $`_version`</span><span class="w">
+</span><span class="c1">#&gt; [1] 1</span><span class="w">
+</span><span class="c1">#&gt; </span><span class="w">
+</span><span class="c1">#&gt; $`_score`</span><span class="w">
+</span><span class="c1">#&gt; [1] 1</span><span class="w">
+</span><span class="c1">#&gt; </span><span class="w">
+</span><span class="c1">#&gt; $`_source`</span><span class="w">
+</span><span class="c1">#&gt; $`_source`$line_id</span><span class="w">
+</span><span class="c1">#&gt; [1] 2228</span><span class="w">
+</span><span class="c1">#&gt; </span><span class="w">
+</span><span class="c1">#&gt; $`_source`$play_name</span><span class="w">
+</span><span class="c1">#&gt; [1] "Henry IV"</span><span class="w">
+</span><span class="c1">#&gt; </span><span class="w">
+</span><span class="c1">#&gt; $`_source`$speech_number</span><span class="w">
+</span><span class="c1">#&gt; [1] 81</span><span class="w">
+</span><span class="c1">#&gt; </span><span class="w">
+</span><span class="c1">#&gt; $`_source`$line_number</span><span class="w">
+</span><span class="c1">#&gt; [1] ""</span><span class="w">
+</span><span class="c1">#&gt; </span><span class="w">
+</span><span class="c1">#&gt; $`_source`$speaker</span><span class="w">
+</span><span class="c1">#&gt; [1] "FALSTAFF"</span><span class="w">
+</span><span class="c1">#&gt; </span><span class="w">
+</span><span class="c1">#&gt; $`_source`$text_entry</span><span class="w">
+</span><span class="c1">#&gt; [1] "ACT IV"</span><span class="w">
+</span></code></pre></div></div>
+
+<h3 id="return-certain-fields">Return certain fields</h3>
+
+<div class="language-r highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="n">Search</span><span class="p">(</span><span class="n">index</span><span class="o">=</span><span class="s2">"shakespeare"</span><span class="p">,</span><span class="w"> </span><span class="n">fields</span><span class="o">=</span><span class="nf">c</span><span class="p">(</span><span class="s1">'play_name'</span><span class="p">,</span><span class="s1">'speaker'</span><span class="p">))</span><span class="o">$</span><span class="n">hits</span><span class="o">$</span><span class="n">hits</span><span class="p">[[</span><span class="m">1</span><span class="p">]]</span><span class="w">
+</span><span class="c1">#&gt; $`_index`</span><span class="w">
+</span><span class="c1">#&gt; [1] "shakespeare"</span><span class="w">
+</span><span class="c1">#&gt; </span><span class="w">
+</span><span class="c1">#&gt; $`_type`</span><span class="w">
+</span><span class="c1">#&gt; [1] "line"</span><span class="w">
+</span><span class="c1">#&gt; </span><span class="w">
+</span><span class="c1">#&gt; $`_id`</span><span class="w">
+</span><span class="c1">#&gt; [1] "4"</span><span class="w">
+</span><span class="c1">#&gt; </span><span class="w">
+</span><span class="c1">#&gt; $`_version`</span><span class="w">
+</span><span class="c1">#&gt; [1] 1</span><span class="w">
+</span><span class="c1">#&gt; </span><span class="w">
+</span><span class="c1">#&gt; $`_score`</span><span class="w">
+</span><span class="c1">#&gt; [1] 1</span><span class="w">
+</span><span class="c1">#&gt; </span><span class="w">
+</span><span class="c1">#&gt; $fields</span><span class="w">
+</span><span class="c1">#&gt; $fields$speaker</span><span class="w">
+</span><span class="c1">#&gt; $fields$speaker[[1]]</span><span class="w">
+</span><span class="c1">#&gt; [1] "KING HENRY IV"</span><span class="w">
+</span><span class="c1">#&gt; </span><span class="w">
+</span><span class="c1">#&gt; </span><span class="w">
+</span><span class="c1">#&gt; $fields$play_name</span><span class="w">
+</span><span class="c1">#&gt; $fields$play_name[[1]]</span><span class="w">
+</span><span class="c1">#&gt; [1] "Henry IV"</span><span class="w">
+</span></code></pre></div></div>
+
+<h3 id="sorting">Sorting</h3>
+
+<div class="language-r highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="n">Search</span><span class="p">(</span><span class="n">index</span><span class="o">=</span><span class="s2">"shakespeare"</span><span class="p">,</span><span class="w"> </span><span class="n">type</span><span class="o">=</span><span class="s2">"act"</span><span class="p">,</span><span class="w"> </span><span class="n">sort</span><span class="o">=</span><span class="s2">"text_entry"</span><span class="p">)</span><span class="o">$</span><span class="n">hits</span><span class="o">$</span><span class="n">hits</span><span class="p">[</span><span class="m">1</span><span class="o">:</span><span class="m">2</span><span class="p">]</span><span class="w">
+</span><span class="c1">#&gt; [[1]]</span><span class="w">
+</span><span class="c1">#&gt; [[1]]$`_index`</span><span class="w">
+</span><span class="c1">#&gt; [1] "shakespeare"</span><span class="w">
+</span><span class="c1">#&gt; </span><span class="w">
+</span><span class="c1">#&gt; [[1]]$`_type`</span><span class="w">
+</span><span class="c1">#&gt; [1] "act"</span><span class="w">
+</span><span class="c1">#&gt; </span><span class="w">
+</span><span class="c1">#&gt; [[1]]$`_id`</span><span class="w">
+</span><span class="c1">#&gt; [1] "2227"</span><span class="w">
+</span><span class="c1">#&gt; </span><span class="w">
+</span><span class="c1">#&gt; [[1]]$`_version`</span><span class="w">
+</span><span class="c1">#&gt; [1] 1</span><span class="w">
+</span><span class="c1">#&gt; </span><span class="w">
+</span><span class="c1">#&gt; [[1]]$`_score`</span><span class="w">
+</span><span class="c1">#&gt; NULL</span><span class="w">
+</span><span class="c1">#&gt; </span><span class="w">
+</span><span class="c1">#&gt; [[1]]$`_source`</span><span class="w">
+</span><span class="c1">#&gt; [[1]]$`_source`$line_id</span><span class="w">
+</span><span class="c1">#&gt; [1] 2228</span><span class="w">
+</span><span class="c1">#&gt; </span><span class="w">
+</span><span class="c1">#&gt; [[1]]$`_source`$play_name</span><span class="w">
+</span><span class="c1">#&gt; [1] "Henry IV"</span><span class="w">
+</span><span class="c1">#&gt; </span><span class="w">
+</span><span class="c1">#&gt; [[1]]$`_source`$speech_number</span><span class="w">
+</span><span class="c1">#&gt; [1] 81</span><span class="w">
+</span><span class="c1">#&gt; </span><span class="w">
+</span><span class="c1">#&gt; [[1]]$`_source`$line_number</span><span class="w">
+</span><span class="c1">#&gt; [1] ""</span><span class="w">
+</span><span class="c1">#&gt; </span><span class="w">
+</span><span class="c1">#&gt; [[1]]$`_source`$speaker</span><span class="w">
+</span><span class="c1">#&gt; [1] "FALSTAFF"</span><span class="w">
+</span><span class="c1">#&gt; </span><span class="w">
+</span><span class="c1">#&gt; [[1]]$`_source`$text_entry</span><span class="w">
+</span><span class="c1">#&gt; [1] "ACT IV"</span><span class="w">
+</span><span class="c1">#&gt; </span><span class="w">
+</span><span class="c1">#&gt; </span><span class="w">
+</span><span class="c1">#&gt; [[1]]$sort</span><span class="w">
+</span><span class="c1">#&gt; [[1]]$sort[[1]]</span><span class="w">
+</span><span class="c1">#&gt; [1] "act"</span><span class="w">
+</span><span class="c1">#&gt; </span><span class="w">
+</span><span class="c1">#&gt; </span><span class="w">
+</span><span class="c1">#&gt; </span><span class="w">
+</span><span class="c1">#&gt; [[2]]</span><span class="w">
+</span><span class="c1">#&gt; [[2]]$`_index`</span><span class="w">
+</span><span class="c1">#&gt; [1] "shakespeare"</span><span class="w">
+</span><span class="c1">#&gt; </span><span class="w">
+</span><span class="c1">#&gt; [[2]]$`_type`</span><span class="w">
+</span><span class="c1">#&gt; [1] "act"</span><span class="w">
+</span><span class="c1">#&gt; </span><span class="w">
+</span><span class="c1">#&gt; [[2]]$`_id`</span><span class="w">
+</span><span class="c1">#&gt; [1] "2633"</span><span class="w">
+</span><span class="c1">#&gt; </span><span class="w">
+</span><span class="c1">#&gt; [[2]]$`_version`</span><span class="w">
+</span><span class="c1">#&gt; [1] 1</span><span class="w">
+</span><span class="c1">#&gt; </span><span class="w">
+</span><span class="c1">#&gt; [[2]]$`_score`</span><span class="w">
+</span><span class="c1">#&gt; NULL</span><span class="w">
+</span><span class="c1">#&gt; </span><span class="w">
+</span><span class="c1">#&gt; [[2]]$`_source`</span><span class="w">
+</span><span class="c1">#&gt; [[2]]$`_source`$line_id</span><span class="w">
+</span><span class="c1">#&gt; [1] 2634</span><span class="w">
+</span><span class="c1">#&gt; </span><span class="w">
+</span><span class="c1">#&gt; [[2]]$`_source`$play_name</span><span class="w">
+</span><span class="c1">#&gt; [1] "Henry IV"</span><span class="w">
+</span><span class="c1">#&gt; </span><span class="w">
+</span><span class="c1">#&gt; [[2]]$`_source`$speech_number</span><span class="w">
+</span><span class="c1">#&gt; [1] 9</span><span class="w">
+</span><span class="c1">#&gt; </span><span class="w">
+</span><span class="c1">#&gt; [[2]]$`_source`$line_number</span><span class="w">
+</span><span class="c1">#&gt; [1] ""</span><span class="w">
+</span><span class="c1">#&gt; </span><span class="w">
+</span><span class="c1">#&gt; [[2]]$`_source`$speaker</span><span class="w">
+</span><span class="c1">#&gt; [1] "ARCHBISHOP OF YORK"</span><span class="w">
+</span><span class="c1">#&gt; </span><span class="w">
+</span><span class="c1">#&gt; [[2]]$`_source`$text_entry</span><span class="w">
+</span><span class="c1">#&gt; [1] "ACT V"</span><span class="w">
+</span><span class="c1">#&gt; </span><span class="w">
+</span><span class="c1">#&gt; </span><span class="w">
+</span><span class="c1">#&gt; [[2]]$sort</span><span class="w">
+</span><span class="c1">#&gt; [[2]]$sort[[1]]</span><span class="w">
+</span><span class="c1">#&gt; [1] "act"</span><span class="w">
+</span></code></pre></div></div>
+
+<h3 id="paging">Paging</h3>
+
+<div class="language-r highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="n">Search</span><span class="p">(</span><span class="n">index</span><span class="o">=</span><span class="s2">"shakespeare"</span><span class="p">,</span><span class="w"> </span><span class="n">size</span><span class="o">=</span><span class="m">1</span><span class="p">,</span><span class="w"> </span><span class="n">from</span><span class="o">=</span><span class="m">1</span><span class="p">,</span><span class="w"> </span><span class="n">fields</span><span class="o">=</span><span class="s1">'text_entry'</span><span class="p">)</span><span class="o">$</span><span class="n">hits</span><span class="w">
+</span><span class="c1">#&gt; $total</span><span class="w">
+</span><span class="c1">#&gt; [1] 5000</span><span class="w">
+</span><span class="c1">#&gt; </span><span class="w">
+</span><span class="c1">#&gt; $max_score</span><span class="w">
+</span><span class="c1">#&gt; [1] 1</span><span class="w">
+</span><span class="c1">#&gt; </span><span class="w">
+</span><span class="c1">#&gt; $hits</span><span class="w">
+</span><span class="c1">#&gt; $hits[[1]]</span><span class="w">
+</span><span class="c1">#&gt; $hits[[1]]$`_index`</span><span class="w">
+</span><span class="c1">#&gt; [1] "shakespeare"</span><span class="w">
+</span><span class="c1">#&gt; </span><span class="w">
+</span><span class="c1">#&gt; $hits[[1]]$`_type`</span><span class="w">
+</span><span class="c1">#&gt; [1] "line"</span><span class="w">
+</span><span class="c1">#&gt; </span><span class="w">
+</span><span class="c1">#&gt; $hits[[1]]$`_id`</span><span class="w">
+</span><span class="c1">#&gt; [1] "9"</span><span class="w">
+</span><span class="c1">#&gt; </span><span class="w">
+</span><span class="c1">#&gt; $hits[[1]]$`_version`</span><span class="w">
+</span><span class="c1">#&gt; [1] 1</span><span class="w">
+</span><span class="c1">#&gt; </span><span class="w">
+</span><span class="c1">#&gt; $hits[[1]]$`_score`</span><span class="w">
+</span><span class="c1">#&gt; [1] 1</span><span class="w">
+</span><span class="c1">#&gt; </span><span class="w">
+</span><span class="c1">#&gt; $hits[[1]]$fields</span><span class="w">
+</span><span class="c1">#&gt; $hits[[1]]$fields$text_entry</span><span class="w">
+</span><span class="c1">#&gt; $hits[[1]]$fields$text_entry[[1]]</span><span class="w">
+</span><span class="c1">#&gt; [1] "Nor more shall trenching war channel her fields,"</span><span class="w">
+</span></code></pre></div></div>
+
+<h3 id="queries">Queries</h3>
+
+<p>Using the <code class="highlighter-rouge">q</code> parameter you can pass in a query, which gets passed in the URI of the query. This type of query is less powerful than the below query passed in the body of the request, using the <code class="highlighter-rouge">body</code> parameter.</p>
+
+<div class="language-r highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="n">Search</span><span class="p">(</span><span class="n">index</span><span class="o">=</span><span class="s2">"shakespeare"</span><span class="p">,</span><span class="w"> </span><span class="n">type</span><span class="o">=</span><span class="s2">"act"</span><span class="p">,</span><span class="w"> </span><span class="n">q</span><span class="o">=</span><span class="s2">"speaker:KING HENRY IV"</span><span class="p">)</span><span class="o">$</span><span class="n">hits</span><span class="o">$</span><span class="n">total</span><span class="w">
+</span><span class="c1">#&gt; [1] 9</span><span class="w">
+</span></code></pre></div></div>
+
+<h3 id="query-dsl-searches---queries-sent-in-the-body-of-the-request">Query DSL searches - queries sent in the body of the request</h3>
+
+<p>Pass in as an R list</p>
+
+<div class="language-r highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="n">aggs</span><span class="w"> </span><span class="o">&lt;-</span><span class="w"> </span><span class="nf">list</span><span class="p">(</span><span class="n">aggs</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nf">list</span><span class="p">(</span><span class="n">stats</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nf">list</span><span class="p">(</span><span class="n">terms</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nf">list</span><span class="p">(</span><span class="n">field</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"text_entry"</span><span class="p">))))</span><span class="w">
+</span><span class="n">Search</span><span class="p">(</span><span class="n">index</span><span class="o">=</span><span class="s2">"shakespeare"</span><span class="p">,</span><span class="w"> </span><span class="n">body</span><span class="o">=</span><span class="n">aggs</span><span class="p">)</span><span class="o">$</span><span class="n">hits</span><span class="o">$</span><span class="n">hits</span><span class="p">[[</span><span class="m">1</span><span class="p">]]</span><span class="w">
+</span><span class="c1">#&gt; $`_index`</span><span class="w">
+</span><span class="c1">#&gt; [1] "shakespeare"</span><span class="w">
+</span><span class="c1">#&gt; </span><span class="w">
+</span><span class="c1">#&gt; $`_type`</span><span class="w">
+</span><span class="c1">#&gt; [1] "line"</span><span class="w">
+</span><span class="c1">#&gt; </span><span class="w">
+</span><span class="c1">#&gt; $`_id`</span><span class="w">
+</span><span class="c1">#&gt; [1] "4"</span><span class="w">
+</span><span class="c1">#&gt; </span><span class="w">
+</span><span class="c1">#&gt; $`_version`</span><span class="w">
+</span><span class="c1">#&gt; [1] 1</span><span class="w">
+</span><span class="c1">#&gt; </span><span class="w">
+</span><span class="c1">#&gt; $`_score`</span><span class="w">
+</span><span class="c1">#&gt; [1] 1</span><span class="w">
+</span><span class="c1">#&gt; </span><span class="w">
+</span><span class="c1">#&gt; $`_source`</span><span class="w">
+</span><span class="c1">#&gt; $`_source`$line_id</span><span class="w">
+</span><span class="c1">#&gt; [1] 5</span><span class="w">
+</span><span class="c1">#&gt; </span><span class="w">
+</span><span class="c1">#&gt; $`_source`$play_name</span><span class="w">
+</span><span class="c1">#&gt; [1] "Henry IV"</span><span class="w">
+</span><span class="c1">#&gt; </span><span class="w">
+</span><span class="c1">#&gt; $`_source`$speech_number</span><span class="w">
+</span><span class="c1">#&gt; [1] 1</span><span class="w">
+</span><span class="c1">#&gt; </span><span class="w">
+</span><span class="c1">#&gt; $`_source`$line_number</span><span class="w">
+</span><span class="c1">#&gt; [1] "1.1.2"</span><span class="w">
+</span><span class="c1">#&gt; </span><span class="w">
+</span><span class="c1">#&gt; $`_source`$speaker</span><span class="w">
+</span><span class="c1">#&gt; [1] "KING HENRY IV"</span><span class="w">
+</span><span class="c1">#&gt; </span><span class="w">
+</span><span class="c1">#&gt; $`_source`$text_entry</span><span class="w">
+</span><span class="c1">#&gt; [1] "Find we a time for frighted peace to pant,"</span><span class="w">
+</span></code></pre></div></div>
+
+<p>Or pass in as json query with newlines, easy to read</p>
+
+<div class="language-r highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="n">aggs</span><span class="w"> </span><span class="o">&lt;-</span><span class="w"> </span><span class="s1">'{
+    "aggs": {
+        "stats" : {
+            "terms" : {
+                "field" : "text_entry"
+            }
+        }
+    }
+}'</span><span class="w">
+</span><span class="n">Search</span><span class="p">(</span><span class="n">index</span><span class="o">=</span><span class="s2">"shakespeare"</span><span class="p">,</span><span class="w"> </span><span class="n">body</span><span class="o">=</span><span class="n">aggs</span><span class="p">)</span><span class="o">$</span><span class="n">hits</span><span class="o">$</span><span class="n">hits</span><span class="p">[[</span><span class="m">1</span><span class="p">]]</span><span class="w">
+</span><span class="c1">#&gt; $`_index`</span><span class="w">
+</span><span class="c1">#&gt; [1] "shakespeare"</span><span class="w">
+</span><span class="c1">#&gt; </span><span class="w">
+</span><span class="c1">#&gt; $`_type`</span><span class="w">
+</span><span class="c1">#&gt; [1] "line"</span><span class="w">
+</span><span class="c1">#&gt; </span><span class="w">
+</span><span class="c1">#&gt; $`_id`</span><span class="w">
+</span><span class="c1">#&gt; [1] "4"</span><span class="w">
+</span><span class="c1">#&gt; </span><span class="w">
+</span><span class="c1">#&gt; $`_version`</span><span class="w">
+</span><span class="c1">#&gt; [1] 1</span><span class="w">
+</span><span class="c1">#&gt; </span><span class="w">
+</span><span class="c1">#&gt; $`_score`</span><span class="w">
+</span><span class="c1">#&gt; [1] 1</span><span class="w">
+</span><span class="c1">#&gt; </span><span class="w">
+</span><span class="c1">#&gt; $`_source`</span><span class="w">
+</span><span class="c1">#&gt; $`_source`$line_id</span><span class="w">
+</span><span class="c1">#&gt; [1] 5</span><span class="w">
+</span><span class="c1">#&gt; </span><span class="w">
+</span><span class="c1">#&gt; $`_source`$play_name</span><span class="w">
+</span><span class="c1">#&gt; [1] "Henry IV"</span><span class="w">
+</span><span class="c1">#&gt; </span><span class="w">
+</span><span class="c1">#&gt; $`_source`$speech_number</span><span class="w">
+</span><span class="c1">#&gt; [1] 1</span><span class="w">
+</span><span class="c1">#&gt; </span><span class="w">
+</span><span class="c1">#&gt; $`_source`$line_number</span><span class="w">
+</span><span class="c1">#&gt; [1] "1.1.2"</span><span class="w">
+</span><span class="c1">#&gt; </span><span class="w">
+</span><span class="c1">#&gt; $`_source`$speaker</span><span class="w">
+</span><span class="c1">#&gt; [1] "KING HENRY IV"</span><span class="w">
+</span><span class="c1">#&gt; </span><span class="w">
+</span><span class="c1">#&gt; $`_source`$text_entry</span><span class="w">
+</span><span class="c1">#&gt; [1] "Find we a time for frighted peace to pant,"</span><span class="w">
+</span></code></pre></div></div>
+
+<p>Or pass in collapsed json string</p>
+
+<div class="language-r highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="n">aggs</span><span class="w"> </span><span class="o">&lt;-</span><span class="w"> </span><span class="s1">'{"aggs":{"stats":{"terms":{"field":"text_entry"}}}}'</span><span class="w">
+</span><span class="n">Search</span><span class="p">(</span><span class="n">index</span><span class="o">=</span><span class="s2">"shakespeare"</span><span class="p">,</span><span class="w"> </span><span class="n">body</span><span class="o">=</span><span class="n">aggs</span><span class="p">)</span><span class="o">$</span><span class="n">hits</span><span class="o">$</span><span class="n">hits</span><span class="p">[[</span><span class="m">1</span><span class="p">]]</span><span class="w">
+</span><span class="c1">#&gt; $`_index`</span><span class="w">
+</span><span class="c1">#&gt; [1] "shakespeare"</span><span class="w">
+</span><span class="c1">#&gt; </span><span class="w">
+</span><span class="c1">#&gt; $`_type`</span><span class="w">
+</span><span class="c1">#&gt; [1] "line"</span><span class="w">
+</span><span class="c1">#&gt; </span><span class="w">
+</span><span class="c1">#&gt; $`_id`</span><span class="w">
+</span><span class="c1">#&gt; [1] "4"</span><span class="w">
+</span><span class="c1">#&gt; </span><span class="w">
+</span><span class="c1">#&gt; $`_version`</span><span class="w">
+</span><span class="c1">#&gt; [1] 1</span><span class="w">
+</span><span class="c1">#&gt; </span><span class="w">
+</span><span class="c1">#&gt; $`_score`</span><span class="w">
+</span><span class="c1">#&gt; [1] 1</span><span class="w">
+</span><span class="c1">#&gt; </span><span class="w">
+</span><span class="c1">#&gt; $`_source`</span><span class="w">
+</span><span class="c1">#&gt; $`_source`$line_id</span><span class="w">
+</span><span class="c1">#&gt; [1] 5</span><span class="w">
+</span><span class="c1">#&gt; </span><span class="w">
+</span><span class="c1">#&gt; $`_source`$play_name</span><span class="w">
+</span><span class="c1">#&gt; [1] "Henry IV"</span><span class="w">
+</span><span class="c1">#&gt; </span><span class="w">
+</span><span class="c1">#&gt; $`_source`$speech_number</span><span class="w">
+</span><span class="c1">#&gt; [1] 1</span><span class="w">
+</span><span class="c1">#&gt; </span><span class="w">
+</span><span class="c1">#&gt; $`_source`$line_number</span><span class="w">
+</span><span class="c1">#&gt; [1] "1.1.2"</span><span class="w">
+</span><span class="c1">#&gt; </span><span class="w">
+</span><span class="c1">#&gt; $`_source`$speaker</span><span class="w">
+</span><span class="c1">#&gt; [1] "KING HENRY IV"</span><span class="w">
+</span><span class="c1">#&gt; </span><span class="w">
+</span><span class="c1">#&gt; $`_source`$text_entry</span><span class="w">
+</span><span class="c1">#&gt; [1] "Find we a time for frighted peace to pant,"</span><span class="w">
+</span></code></pre></div></div>
+
+<h3 id="fuzzy-query">Fuzzy query</h3>
+
+<p>Fuzzy query on numerics</p>
+
+<div class="language-r highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="n">fuzzy</span><span class="w"> </span><span class="o">&lt;-</span><span class="w"> </span><span class="nf">list</span><span class="p">(</span><span class="n">query</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nf">list</span><span class="p">(</span><span class="n">fuzzy</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nf">list</span><span class="p">(</span><span class="n">speech_number</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="m">7</span><span class="p">)))</span><span class="w">
+</span><span class="n">Search</span><span class="p">(</span><span class="n">index</span><span class="o">=</span><span class="s2">"shakespeare"</span><span class="p">,</span><span class="w"> </span><span class="n">body</span><span class="o">=</span><span class="n">fuzzy</span><span class="p">)</span><span class="o">$</span><span class="n">hits</span><span class="o">$</span><span class="n">total</span><span class="w">
+</span><span class="c1">#&gt; [1] 523</span><span class="w">
+</span></code></pre></div></div>
+
+<div class="language-r highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="n">fuzzy</span><span class="w"> </span><span class="o">&lt;-</span><span class="w"> </span><span class="nf">list</span><span class="p">(</span><span class="n">query</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nf">list</span><span class="p">(</span><span class="n">fuzzy</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nf">list</span><span class="p">(</span><span class="n">speech_number</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nf">list</span><span class="p">(</span><span class="n">value</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="m">7</span><span class="p">,</span><span class="w"> </span><span class="n">fuzziness</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="m">4</span><span class="p">))))</span><span class="w">
+</span><span class="n">Search</span><span class="p">(</span><span class="n">index</span><span class="o">=</span><span class="s2">"shakespeare"</span><span class="p">,</span><span class="w"> </span><span class="n">body</span><span class="o">=</span><span class="n">fuzzy</span><span class="p">)</span><span class="o">$</span><span class="n">hits</span><span class="o">$</span><span class="n">total</span><span class="w">
+</span><span class="c1">#&gt; [1] 1499</span><span class="w">
+</span></code></pre></div></div>
+
+<h3 id="range-query">Range query</h3>
+
+<p>With numeric</p>
+
+<div class="language-r highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="n">body</span><span class="w"> </span><span class="o">&lt;-</span><span class="w"> </span><span class="nf">list</span><span class="p">(</span><span class="n">query</span><span class="o">=</span><span class="nf">list</span><span class="p">(</span><span class="n">range</span><span class="o">=</span><span class="nf">list</span><span class="p">(</span><span class="n">decimalLongitude</span><span class="o">=</span><span class="nf">list</span><span class="p">(</span><span class="n">gte</span><span class="o">=</span><span class="m">1</span><span class="p">,</span><span class="w"> </span><span class="n">lte</span><span class="o">=</span><span class="m">3</span><span class="p">))))</span><span class="w">
+</span><span class="n">Search</span><span class="p">(</span><span class="s1">'gbif'</span><span class="p">,</span><span class="w"> </span><span class="n">body</span><span class="o">=</span><span class="n">body</span><span class="p">)</span><span class="o">$</span><span class="n">hits</span><span class="o">$</span><span class="n">total</span><span class="w">
+</span><span class="c1">#&gt; [1] 24</span><span class="w">
+</span></code></pre></div></div>
+
+<div class="language-r highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="n">body</span><span class="w"> </span><span class="o">&lt;-</span><span class="w"> </span><span class="nf">list</span><span class="p">(</span><span class="n">query</span><span class="o">=</span><span class="nf">list</span><span class="p">(</span><span class="n">range</span><span class="o">=</span><span class="nf">list</span><span class="p">(</span><span class="n">decimalLongitude</span><span class="o">=</span><span class="nf">list</span><span class="p">(</span><span class="n">gte</span><span class="o">=</span><span class="m">2.9</span><span class="p">,</span><span class="w"> </span><span class="n">lte</span><span class="o">=</span><span class="m">10</span><span class="p">))))</span><span class="w">
+</span><span class="n">Search</span><span class="p">(</span><span class="s1">'gbif'</span><span class="p">,</span><span class="w"> </span><span class="n">body</span><span class="o">=</span><span class="n">body</span><span class="p">)</span><span class="o">$</span><span class="n">hits</span><span class="o">$</span><span class="n">total</span><span class="w">
+</span><span class="c1">#&gt; [1] 166</span><span class="w">
+</span></code></pre></div></div>
+
+<p>With dates</p>
+
+<div class="language-r highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="n">body</span><span class="w"> </span><span class="o">&lt;-</span><span class="w"> </span><span class="nf">list</span><span class="p">(</span><span class="n">query</span><span class="o">=</span><span class="nf">list</span><span class="p">(</span><span class="n">range</span><span class="o">=</span><span class="nf">list</span><span class="p">(</span><span class="n">eventDate</span><span class="o">=</span><span class="nf">list</span><span class="p">(</span><span class="n">gte</span><span class="o">=</span><span class="s2">"2012-01-01"</span><span class="p">,</span><span class="w"> </span><span class="n">lte</span><span class="o">=</span><span class="s2">"now"</span><span class="p">))))</span><span class="w">
+</span><span class="n">Search</span><span class="p">(</span><span class="s1">'gbif'</span><span class="p">,</span><span class="w"> </span><span class="n">body</span><span class="o">=</span><span class="n">body</span><span class="p">)</span><span class="o">$</span><span class="n">hits</span><span class="o">$</span><span class="n">total</span><span class="w">
+</span><span class="c1">#&gt; [1] 899</span><span class="w">
+</span></code></pre></div></div>
+
+<div class="language-r highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="n">body</span><span class="w"> </span><span class="o">&lt;-</span><span class="w"> </span><span class="nf">list</span><span class="p">(</span><span class="n">query</span><span class="o">=</span><span class="nf">list</span><span class="p">(</span><span class="n">range</span><span class="o">=</span><span class="nf">list</span><span class="p">(</span><span class="n">eventDate</span><span class="o">=</span><span class="nf">list</span><span class="p">(</span><span class="n">gte</span><span class="o">=</span><span class="s2">"2014-01-01"</span><span class="p">,</span><span class="w"> </span><span class="n">lte</span><span class="o">=</span><span class="s2">"now"</span><span class="p">))))</span><span class="w">
+</span><span class="n">Search</span><span class="p">(</span><span class="s1">'gbif'</span><span class="p">,</span><span class="w"> </span><span class="n">body</span><span class="o">=</span><span class="n">body</span><span class="p">)</span><span class="o">$</span><span class="n">hits</span><span class="o">$</span><span class="n">total</span><span class="w">
+</span><span class="c1">#&gt; [1] 685</span><span class="w">
+</span></code></pre></div></div>
+
+<h3 id="highlighting">Highlighting</h3>
+
+<div class="language-r highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="n">body</span><span class="w"> </span><span class="o">&lt;-</span><span class="w"> </span><span class="s1">'{
+ "query": {
+   "query_string": {
+     "query" : "cell"
+   }
+ },
+ "highlight": {
+   "fields": {
+     "title": {"number_of_fragments": 2}
+   }
+ }
+}'</span><span class="w">
+</span><span class="n">out</span><span class="w"> </span><span class="o">&lt;-</span><span class="w"> </span><span class="n">Search</span><span class="p">(</span><span class="s1">'plos'</span><span class="p">,</span><span class="w"> </span><span class="s1">'article'</span><span class="p">,</span><span class="w"> </span><span class="n">body</span><span class="o">=</span><span class="n">body</span><span class="p">)</span><span class="w">
+</span><span class="n">out</span><span class="o">$</span><span class="n">hits</span><span class="o">$</span><span class="n">total</span><span class="w">
+</span><span class="c1">#&gt; [1] 57</span><span class="w">
+</span></code></pre></div></div>
+
+<div class="language-r highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="n">sapply</span><span class="p">(</span><span class="n">out</span><span class="o">$</span><span class="n">hits</span><span class="o">$</span><span class="n">hits</span><span class="p">,</span><span class="w"> </span><span class="k">function</span><span class="p">(</span><span class="n">x</span><span class="p">)</span><span class="w"> </span><span class="n">x</span><span class="o">$</span><span class="n">highlight</span><span class="o">$</span><span class="n">title</span><span class="p">[[</span><span class="m">1</span><span class="p">]])[</span><span class="m">8</span><span class="o">:</span><span class="m">10</span><span class="p">]</span><span class="w">
+</span><span class="c1">#&gt; [1] "c-FLIP Protects Eosinophils from TNF-α-Mediated &lt;em&gt;Cell&lt;/em&gt; Death In Vivo"                          </span><span class="w">
+</span><span class="c1">#&gt; [2] "DUSP1 Is a Novel Target for Enhancing Pancreatic Cancer &lt;em&gt;Cell&lt;/em&gt; Sensitivity to Gemcitabine"     </span><span class="w">
+</span><span class="c1">#&gt; [3] "Carbon Ion Radiation Inhibits Glioma and Endothelial &lt;em&gt;Cell&lt;/em&gt; Migration Induced by Secreted VEGF"</span><span class="w">
+</span></code></pre></div></div>
+
+<h3 id="scrolling-search---instead-of-paging">Scrolling search - instead of paging</h3>
+
+<div class="language-r highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="n">Search</span><span class="p">(</span><span class="s1">'shakespeare'</span><span class="p">,</span><span class="w"> </span><span class="n">q</span><span class="o">=</span><span class="s2">"a*"</span><span class="p">)</span><span class="o">$</span><span class="n">hits</span><span class="o">$</span><span class="n">total</span><span class="w">
+</span><span class="c1">#&gt; [1] 2747</span><span class="w">
+</span><span class="n">res</span><span class="w"> </span><span class="o">&lt;-</span><span class="w"> </span><span class="n">Search</span><span class="p">(</span><span class="n">index</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s1">'shakespeare'</span><span class="p">,</span><span class="w"> </span><span class="n">q</span><span class="o">=</span><span class="s2">"a*"</span><span class="p">,</span><span class="w"> </span><span class="n">scroll</span><span class="o">=</span><span class="s2">"1m"</span><span class="p">)</span><span class="w">
+</span><span class="n">res</span><span class="w"> </span><span class="o">&lt;-</span><span class="w"> </span><span class="n">Search</span><span class="p">(</span><span class="n">index</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s1">'shakespeare'</span><span class="p">,</span><span class="w"> </span><span class="n">q</span><span class="o">=</span><span class="s2">"a*"</span><span class="p">,</span><span class="w"> </span><span class="n">scroll</span><span class="o">=</span><span class="s2">"1m"</span><span class="p">,</span><span class="w"> </span><span class="n">search_type</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"scan"</span><span class="p">)</span><span class="w">
+</span><span class="nf">length</span><span class="p">(</span><span class="n">scroll</span><span class="p">(</span><span class="n">scroll_id</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">res</span><span class="o">$</span><span class="n">`_scroll_id`</span><span class="p">)</span><span class="o">$</span><span class="n">hits</span><span class="o">$</span><span class="n">hits</span><span class="p">)</span><span class="w">
+</span><span class="c1">#&gt; [1] 50</span><span class="w">
+</span></code></pre></div></div>
+
+<div class="language-r highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="n">res</span><span class="w"> </span><span class="o">&lt;-</span><span class="w"> </span><span class="n">Search</span><span class="p">(</span><span class="n">index</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s1">'shakespeare'</span><span class="p">,</span><span class="w"> </span><span class="n">q</span><span class="o">=</span><span class="s2">"a*"</span><span class="p">,</span><span class="w"> </span><span class="n">scroll</span><span class="o">=</span><span class="s2">"5m"</span><span class="p">,</span><span class="w"> </span><span class="n">search_type</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"scan"</span><span class="p">)</span><span class="w">
+</span><span class="n">out</span><span class="w"> </span><span class="o">&lt;-</span><span class="w"> </span><span class="nf">list</span><span class="p">()</span><span class="w">
+</span><span class="n">hits</span><span class="w"> </span><span class="o">&lt;-</span><span class="w"> </span><span class="m">1</span><span class="w">
+</span><span class="k">while</span><span class="p">(</span><span class="n">hits</span><span class="w"> </span><span class="o">!=</span><span class="w"> </span><span class="m">0</span><span class="p">){</span><span class="w">
+  </span><span class="n">res</span><span class="w"> </span><span class="o">&lt;-</span><span class="w"> </span><span class="n">scroll</span><span class="p">(</span><span class="n">scroll_id</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">res</span><span class="o">$</span><span class="n">`_scroll_id`</span><span class="p">)</span><span class="w">
+  </span><span class="n">hits</span><span class="w"> </span><span class="o">&lt;-</span><span class="w"> </span><span class="nf">length</span><span class="p">(</span><span class="n">res</span><span class="o">$</span><span class="n">hits</span><span class="o">$</span><span class="n">hits</span><span class="p">)</span><span class="w">
+  </span><span class="k">if</span><span class="p">(</span><span class="n">hits</span><span class="w"> </span><span class="o">&gt;</span><span class="w"> </span><span class="m">0</span><span class="p">)</span><span class="w">
+    </span><span class="n">out</span><span class="w"> </span><span class="o">&lt;-</span><span class="w"> </span><span class="nf">c</span><span class="p">(</span><span class="n">out</span><span class="p">,</span><span class="w"> </span><span class="n">res</span><span class="o">$</span><span class="n">hits</span><span class="o">$</span><span class="n">hits</span><span class="p">)</span><span class="w">
+</span><span class="p">}</span><span class="w">
+</span><span class="nf">length</span><span class="p">(</span><span class="n">out</span><span class="p">)</span><span class="w">
+</span><span class="c1">#&gt; [1] 2747</span><span class="w">
+</span></code></pre></div></div>
+
+<p>Woohoo! Collected all 2747 documents in very little time.</p>
+
+<h2 id="the-cat-api">The cat API</h2>
+
+<p>List cat methods</p>
+
+<div class="language-r highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="n">cat_</span><span class="p">()</span><span class="w">
+</span><span class="c1">#&gt; =^.^=</span><span class="w">
+</span><span class="c1">#&gt; /_cat/allocation</span><span class="w">
+</span><span class="c1">#&gt; /_cat/shards</span><span class="w">
+</span><span class="c1">#&gt; /_cat/shards/{index}</span><span class="w">
+</span><span class="c1">#&gt; /_cat/master</span><span class="w">
+</span><span class="c1">#&gt; /_cat/nodes</span><span class="w">
+</span><span class="c1">#&gt; /_cat/indices</span><span class="w">
+</span><span class="c1">#&gt; /_cat/indices/{index}</span><span class="w">
+</span><span class="c1">#&gt; /_cat/segments</span><span class="w">
+</span><span class="c1">#&gt; /_cat/segments/{index}</span><span class="w">
+</span><span class="c1">#&gt; /_cat/count</span><span class="w">
+</span><span class="c1">#&gt; /_cat/count/{index}</span><span class="w">
+</span><span class="c1">#&gt; /_cat/recovery</span><span class="w">
+</span><span class="c1">#&gt; /_cat/recovery/{index}</span><span class="w">
+</span><span class="c1">#&gt; /_cat/health</span><span class="w">
+</span><span class="c1">#&gt; /_cat/pending_tasks</span><span class="w">
+</span><span class="c1">#&gt; /_cat/aliases</span><span class="w">
+</span><span class="c1">#&gt; /_cat/aliases/{alias}</span><span class="w">
+</span><span class="c1">#&gt; /_cat/thread_pool</span><span class="w">
+</span><span class="c1">#&gt; /_cat/plugins</span><span class="w">
+</span><span class="c1">#&gt; /_cat/fielddata</span><span class="w">
+</span><span class="c1">#&gt; /_cat/fielddata/{fields}</span><span class="w">
+</span></code></pre></div></div>
+
+<p>Get aliases</p>
+
+<div class="language-r highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="n">cat_aliases</span><span class="p">()</span><span class="w">
+</span><span class="c1">#&gt; things plos - - - </span><span class="w">
+</span><span class="c1">#&gt; stuff  plos - - -</span><span class="w">
+</span></code></pre></div></div>
+
+<p>Get indices</p>
+
+<div class="language-r highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="n">cat_indices</span><span class="p">()</span><span class="w">
+</span><span class="c1">#&gt; yellow open plosmore     5 1  1000  0   3.5mb   3.5mb </span><span class="w">
+</span><span class="c1">#&gt; yellow open leotheadfadf 5 1     0  0    575b    575b </span><span class="w">
+</span><span class="c1">#&gt; red    open alsothat     3 2                          </span><span class="w">
+</span><span class="c1">#&gt; yellow open gbif         5 1   899  0     1mb     1mb </span><span class="w">
+</span><span class="c1">#&gt; yellow open gbifgeopoint 5 1     0  0    575b    575b </span><span class="w">
+</span><span class="c1">#&gt; yellow open gbifnewgeo   5 1     2  0   5.8kb   5.8kb </span><span class="w">
+</span><span class="c1">#&gt; yellow open plos         5 1  1202 39  14.2mb  14.2mb </span><span class="w">
+</span><span class="c1">#&gt; yellow open leothedog    5 1     0  0    575b    575b </span><span class="w">
+</span><span class="c1">#&gt; yellow open shakespeare  5 1  5000  0     1mb     1mb </span><span class="w">
+</span><span class="c1">#&gt; yellow open gbifgeo      5 1   600  0 861.9kb 861.9kb </span><span class="w">
+</span><span class="c1">#&gt; yellow open plosbigdata  5 1 20000  0  53.6mb  53.6mb </span><span class="w">
+</span><span class="c1">#&gt; yellow open mapuris      5 1    31  0  34.4kb  34.4kb </span><span class="w">
+</span><span class="c1">#&gt; yellow open leothelion   5 1     0  0    575b    575b</span><span class="w">
+</span></code></pre></div></div>
+
+<p>Get nodes</p>
+
+<div class="language-r highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="n">cat_nodes</span><span class="p">()</span><span class="w">
+</span><span class="c1">#&gt; Scotts-MacBook-Pro.local 192.168.1.104 6 79 3.44 d * Hellfire</span><span class="w">
+</span></code></pre></div></div>
+
+<h2 id="work-with-indices">Work with indices</h2>
+
+<div class="language-r highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="n">out</span><span class="w"> </span><span class="o">&lt;-</span><span class="w"> </span><span class="n">index_get</span><span class="p">(</span><span class="n">index</span><span class="o">=</span><span class="s1">'shakespeare'</span><span class="p">)</span><span class="w">
+</span><span class="nf">names</span><span class="p">(</span><span class="n">out</span><span class="o">$</span><span class="n">shakespeare</span><span class="o">$</span><span class="n">mappings</span><span class="p">)</span><span class="w">
+</span><span class="c1">#&gt; [1] "line"  "scene" "act"</span><span class="w">
+</span></code></pre></div></div>
+
+<p>Check for index existence</p>
+
+<div class="language-r highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="n">index_exists</span><span class="p">(</span><span class="n">index</span><span class="o">=</span><span class="s1">'shakespeare'</span><span class="p">)</span><span class="w">
+</span><span class="c1">#&gt; [1] TRUE</span><span class="w">
+</span></code></pre></div></div>
+
+<p>Delete an index</p>
+
+<div class="language-r highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="n">index_delete</span><span class="p">(</span><span class="n">index</span><span class="o">=</span><span class="s1">'plos'</span><span class="p">)</span><span class="w">
+</span><span class="c1">#&gt; $acknowledged</span><span class="w">
+</span><span class="c1">#&gt; [1] TRUE</span><span class="w">
+</span></code></pre></div></div>
+
+<p>Create an index</p>
+
+<div class="language-r highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="n">index_create</span><span class="p">(</span><span class="n">index</span><span class="o">=</span><span class="s1">'twitter'</span><span class="p">)</span><span class="w">
+</span><span class="c1">#&gt; $acknowledged</span><span class="w">
+</span><span class="c1">#&gt; [1] TRUE</span><span class="w">
+</span></code></pre></div></div>
+
+<h2 id="work-with-documents">Work with documents</h2>
+
+<p>Get a document</p>
+
+<div class="language-r highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="n">docs_get</span><span class="p">(</span><span class="n">index</span><span class="o">=</span><span class="s1">'shakespeare'</span><span class="p">,</span><span class="w"> </span><span class="n">type</span><span class="o">=</span><span class="s1">'line'</span><span class="p">,</span><span class="w"> </span><span class="n">id</span><span class="o">=</span><span class="m">10</span><span class="p">)</span><span class="w">
+</span><span class="c1">#&gt; $`_index`</span><span class="w">
+</span><span class="c1">#&gt; [1] "shakespeare"</span><span class="w">
+</span><span class="c1">#&gt; </span><span class="w">
+</span><span class="c1">#&gt; $`_type`</span><span class="w">
+</span><span class="c1">#&gt; [1] "line"</span><span class="w">
+</span><span class="c1">#&gt; </span><span class="w">
+</span><span class="c1">#&gt; $`_id`</span><span class="w">
+</span><span class="c1">#&gt; [1] "10"</span><span class="w">
+</span><span class="c1">#&gt; </span><span class="w">
+</span><span class="c1">#&gt; $`_version`</span><span class="w">
+</span><span class="c1">#&gt; [1] 1</span><span class="w">
+</span><span class="c1">#&gt; </span><span class="w">
+</span><span class="c1">#&gt; $found</span><span class="w">
+</span><span class="c1">#&gt; [1] TRUE</span><span class="w">
+</span><span class="c1">#&gt; </span><span class="w">
+</span><span class="c1">#&gt; $`_source`</span><span class="w">
+</span><span class="c1">#&gt; $`_source`$line_id</span><span class="w">
+</span><span class="c1">#&gt; [1] 11</span><span class="w">
+</span><span class="c1">#&gt; </span><span class="w">
+</span><span class="c1">#&gt; $`_source`$play_name</span><span class="w">
+</span><span class="c1">#&gt; [1] "Henry IV"</span><span class="w">
+</span><span class="c1">#&gt; </span><span class="w">
+</span><span class="c1">#&gt; $`_source`$speech_number</span><span class="w">
+</span><span class="c1">#&gt; [1] 1</span><span class="w">
+</span><span class="c1">#&gt; </span><span class="w">
+</span><span class="c1">#&gt; $`_source`$line_number</span><span class="w">
+</span><span class="c1">#&gt; [1] "1.1.8"</span><span class="w">
+</span><span class="c1">#&gt; </span><span class="w">
+</span><span class="c1">#&gt; $`_source`$speaker</span><span class="w">
+</span><span class="c1">#&gt; [1] "KING HENRY IV"</span><span class="w">
+</span><span class="c1">#&gt; </span><span class="w">
+</span><span class="c1">#&gt; $`_source`$text_entry</span><span class="w">
+</span><span class="c1">#&gt; [1] "Nor bruise her flowerets with the armed hoofs"</span><span class="w">
+</span></code></pre></div></div>
+
+<p>Get certain fields</p>
+
+<div class="language-r highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="n">docs_get</span><span class="p">(</span><span class="n">index</span><span class="o">=</span><span class="s1">'shakespeare'</span><span class="p">,</span><span class="w"> </span><span class="n">type</span><span class="o">=</span><span class="s1">'line'</span><span class="p">,</span><span class="w"> </span><span class="n">id</span><span class="o">=</span><span class="m">10</span><span class="p">,</span><span class="w"> </span><span class="n">fields</span><span class="o">=</span><span class="nf">c</span><span class="p">(</span><span class="s1">'play_name'</span><span class="p">,</span><span class="s1">'speaker'</span><span class="p">))</span><span class="w">
+</span><span class="c1">#&gt; $`_index`</span><span class="w">
+</span><span class="c1">#&gt; [1] "shakespeare"</span><span class="w">
+</span><span class="c1">#&gt; </span><span class="w">
+</span><span class="c1">#&gt; $`_type`</span><span class="w">
+</span><span class="c1">#&gt; [1] "line"</span><span class="w">
+</span><span class="c1">#&gt; </span><span class="w">
+</span><span class="c1">#&gt; $`_id`</span><span class="w">
+</span><span class="c1">#&gt; [1] "10"</span><span class="w">
+</span><span class="c1">#&gt; </span><span class="w">
+</span><span class="c1">#&gt; $`_version`</span><span class="w">
+</span><span class="c1">#&gt; [1] 1</span><span class="w">
+</span><span class="c1">#&gt; </span><span class="w">
+</span><span class="c1">#&gt; $found</span><span class="w">
+</span><span class="c1">#&gt; [1] TRUE</span><span class="w">
+</span><span class="c1">#&gt; </span><span class="w">
+</span><span class="c1">#&gt; $fields</span><span class="w">
+</span><span class="c1">#&gt; $fields$play_name</span><span class="w">
+</span><span class="c1">#&gt; $fields$play_name[[1]]</span><span class="w">
+</span><span class="c1">#&gt; [1] "Henry IV"</span><span class="w">
+</span><span class="c1">#&gt; </span><span class="w">
+</span><span class="c1">#&gt; </span><span class="w">
+</span><span class="c1">#&gt; $fields$speaker</span><span class="w">
+</span><span class="c1">#&gt; $fields$speaker[[1]]</span><span class="w">
+</span><span class="c1">#&gt; [1] "KING HENRY IV"</span><span class="w">
+</span></code></pre></div></div>
+
+<p>Test for existence of the document</p>
+
+<div class="language-r highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="n">docs_get</span><span class="p">(</span><span class="n">index</span><span class="o">=</span><span class="s1">'plos'</span><span class="p">,</span><span class="w"> </span><span class="n">type</span><span class="o">=</span><span class="s1">'article'</span><span class="p">,</span><span class="w"> </span><span class="n">id</span><span class="o">=</span><span class="m">1</span><span class="p">,</span><span class="w"> </span><span class="n">exists</span><span class="o">=</span><span class="kc">TRUE</span><span class="p">)</span><span class="w">
+</span><span class="c1">#&gt; [1] FALSE</span><span class="w">
+</span></code></pre></div></div>
+
+<div class="language-r highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="n">docs_get</span><span class="p">(</span><span class="n">index</span><span class="o">=</span><span class="s1">'plos'</span><span class="p">,</span><span class="w"> </span><span class="n">type</span><span class="o">=</span><span class="s1">'article'</span><span class="p">,</span><span class="w"> </span><span class="n">id</span><span class="o">=</span><span class="m">123456</span><span class="p">,</span><span class="w"> </span><span class="n">exists</span><span class="o">=</span><span class="kc">TRUE</span><span class="p">)</span><span class="w">
+</span><span class="c1">#&gt; [1] FALSE</span><span class="w">
+</span></code></pre></div></div>
+
+<h2 id="thats-it">Thats it</h2>
+
+<p>Let us know if you have any feedback!</p>
+:ET

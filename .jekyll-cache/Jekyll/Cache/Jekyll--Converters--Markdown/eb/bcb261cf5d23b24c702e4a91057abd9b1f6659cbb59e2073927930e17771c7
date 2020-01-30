@@ -1,0 +1,283 @@
+I"�f<p><a href="http://get.gaug.es/">Gaug.es</a> is a really nice looking analytics platform as an alternative to Google Analytics. It is a paid service, but not that expensive really.</p>
+
+<p>We’ve made an R package to interact with the Gaug.es API called <code class="highlighter-rouge">rgauges</code>. Find it <a href="https://github.com/ropensci/rgauges">on Github</a> and <a href="http://cran.r-project.org/web/packages/rgauges/index.html">on CRAN</a>.</p>
+
+<p>Although working with the Gaug.es API is nice and easy, they don’t keep hourly visit stats and provide those via the API, so that you have to continually collect them yourself if you want them. That’s what I have done for my own website.</p>
+
+<p>It took a few steps to get this data:</p>
+
+<ul>
+  <li>I wrote a little Ruby script using <a href="http://rubygems.org/gems/twelve">Twelve gem</a> to collect data from the Gaug.es API every day at the same time, which just gets the patst 24 hours of data. This script makes a call to the Gaug.es API and sends the data to a <a href="http://couchdb.apache.org/">CouchDB</a> database hosted on <a href="https://cloudant.com/">Cloudant</a>. In reality, the script is is embeded in a rack app as I don’t think you can throw up a standalone script to Heroku. Here’s the script:</li>
+</ul>
+
+<div class="language-ruby highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="k">class</span> <span class="nc">MyApp</span>
+  <span class="nb">require</span> <span class="s1">'couchrest'</span>
+  <span class="nb">require</span> <span class="s1">'twelve'</span>
+  <span class="nb">require</span> <span class="s1">'date'</span>
+  <span class="nb">require</span> <span class="s1">'time'</span>
+  
+  <span class="k">def</span> <span class="nc">self</span><span class="o">.</span><span class="nf">getgaugesdata_scott</span>
+    <span class="n">bfg</span> <span class="o">=</span> <span class="no">Twelve</span><span class="p">.</span><span class="nf">new</span><span class="p">(</span><span class="s1">'&lt;gaugeskey&gt;'</span><span class="p">)</span>
+    <span class="n">out</span> <span class="o">=</span> <span class="n">bfg</span><span class="p">.</span><span class="nf">gauges</span><span class="p">(</span><span class="s1">'&lt;gaugeskey&gt;'</span><span class="p">)[</span><span class="s1">'recent_hours'</span><span class="p">]</span>
+    <span class="n">yip</span> <span class="o">=</span> <span class="p">{</span> <span class="s2">"from_url"</span><span class="o">=&gt;</span> <span class="s2">"http://sckott.github.io/"</span><span class="p">,</span> <span class="s2">"coll_date"</span><span class="o">=&gt;</span> <span class="no">Date</span><span class="p">.</span><span class="nf">today</span><span class="p">.</span><span class="nf">to_s</span><span class="p">,</span> <span class="s2">"coll_time"</span><span class="o">=&gt;</span> <span class="no">Time</span><span class="p">.</span><span class="nf">now</span><span class="p">.</span><span class="nf">utc</span><span class="p">.</span><span class="nf">localtime</span><span class="p">.</span><span class="nf">to_s</span><span class="p">,</span> <span class="s2">"recent_hours"</span><span class="o">=&gt;</span> <span class="n">out</span> <span class="p">}</span>
+    <span class="vi">@db</span> <span class="o">=</span> <span class="no">CouchRest</span><span class="p">.</span><span class="nf">database!</span><span class="p">(</span><span class="s2">"https://app16517180.heroku:&lt;key&gt;@app16517180.heroku.cloudant.com/gaugesdb_scott"</span><span class="p">)</span>
+    <span class="vi">@db</span><span class="p">.</span><span class="nf">save_doc</span><span class="p">(</span><span class="n">yip</span><span class="p">)</span>
+
+  <span class="k">def</span> <span class="nf">call</span> <span class="n">env</span>
+    <span class="p">[</span><span class="mi">200</span><span class="p">,</span> <span class="p">{</span><span class="s2">"Content-Type"</span> <span class="o">=&gt;</span> <span class="s2">"text/html"</span><span class="p">},</span> <span class="p">[</span><span class="s2">"no output printed here"</span><span class="p">]]</span> 
+  <span class="k">end</span>
+<span class="k">end</span>
+</code></pre></div></div>
+
+<ul>
+  <li>
+    <p>One little catch though: I run the Ruby script on Heroku, so I don’t have to do it locally, but Heroku free instance goes down unless it’s doing something. So I used a little service called <a href="http://uptimerobot.com/">UptimeRobot</a> to ping the Heroku app every 5 minutes. UptimeRobot also is giving you uptime stats too on your app, which I don’t really need, but is a cool feature.</p>
+  </li>
+  <li>
+    <p>And that’s it. Now the data is stored from each day’s collection of visitor stats to a free Cloudant CouchDB database.</p>
+  </li>
+</ul>
+
+<h2 id="regular-gauges-data">Regular Gaug.es data</h2>
+
+<p>First, let’s look at what you can do with data that Gaug.es does give to you, using the <code class="highlighter-rouge">rgauges</code> R package.</p>
+
+<hr />
+
+<h3 id="install-rgauges">Install rgauges</h3>
+
+<figure class="highlight"><pre><code class="language-r" data-lang="r"><span class="n">install.packages</span><span class="p">(</span><span class="s2">"devtools"</span><span class="p">)</span><span class="w">
+</span><span class="n">library</span><span class="p">(</span><span class="n">devtools</span><span class="p">)</span><span class="w">
+</span><span class="n">install_github</span><span class="p">(</span><span class="s2">"rgauges"</span><span class="p">,</span><span class="w"> </span><span class="s2">"ropensci"</span><span class="p">)</span></code></pre></figure>
+
+<h3 id="load-rgauges-and-other-dependency-libraries">Load rgauges and other dependency libraries</h3>
+
+<figure class="highlight"><pre><code class="language-r" data-lang="r"><span class="n">library</span><span class="p">(</span><span class="n">rgauges</span><span class="p">)</span><span class="w">
+</span><span class="n">library</span><span class="p">(</span><span class="n">ggplot2</span><span class="p">)</span></code></pre></figure>
+
+<h3 id="your-info">Your info</h3>
+
+<figure class="highlight"><pre><code class="language-r" data-lang="r"><span class="n">gs_me</span><span class="p">()</span></code></pre></figure>
+
+<figure class="highlight"><pre><code class="language-text" data-lang="text">## $user
+## $user$name
+## [1] "Scott Chamberlain"
+## 
+## $user$email
+## [1] "myrmecocystus@gmail.com"
+## 
+## $user$id
+## [1] "4eddbafb613f5d5139000001"
+## 
+## $user$last_name
+## [1] "Chamberlain"
+## 
+## $user$urls
+## $user$urls$self
+## [1] "https://secure.gaug.es/me"
+## 
+## $user$urls$clients
+## [1] "https://secure.gaug.es/clients"
+## 
+## $user$urls$gauges
+## [1] "https://secure.gaug.es/gauges"
+## 
+## 
+## $user$first_name
+## [1] "Scott"</code></pre></figure>
+
+<h4 id="traffic">Traffic</h4>
+
+<figure class="highlight"><pre><code class="language-r" data-lang="r"><span class="n">gs_traffic</span><span class="p">(</span><span class="n">id</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"4efd83a6f5a1f5158a000004"</span><span class="p">)</span></code></pre></figure>
+
+<figure class="highlight"><pre><code class="language-text" data-lang="text">## $metadata
+## $metadata$views
+## [1] 386
+## 
+## $metadata$urls
+## $metadata$urls$older
+## [1] "https://secure.gaug.es/gauges/4efd83a6f5a1f5158a000004/traffic?date=2013-12-01"
+## 
+## $metadata$urls$newer
+## NULL
+## 
+## 
+## $metadata$date
+## [1] "2014-01-17"
+## 
+## $metadata$people
+## [1] 208
+## 
+## 
+## $data
+##    views       date people
+## 1      7 2014-01-01      5
+## 2     17 2014-01-02      7
+## 3     39 2014-01-03     17
+## 4     15 2014-01-04      9
+## 5     14 2014-01-05      7
+## 6     33 2014-01-06     22
+## 7     19 2014-01-07     11
+## 8     15 2014-01-08     11
+## 9     53 2014-01-09     24
+## 10    53 2014-01-10     13
+## 11    14 2014-01-11      9
+## 12    11 2014-01-12     10
+## 13    14 2014-01-13     14
+## 14    11 2014-01-14      9
+## 15    23 2014-01-15     16
+## 16    16 2014-01-16     14
+## 17    32 2014-01-17     25</code></pre></figure>
+
+<h3 id="screenbrowser-information">Screen/browser information</h3>
+
+<figure class="highlight"><pre><code class="language-r" data-lang="r"><span class="n">gs_reso</span><span class="p">(</span><span class="n">id</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"4efd83a6f5a1f5158a000004"</span><span class="p">)</span></code></pre></figure>
+
+<figure class="highlight"><pre><code class="language-text" data-lang="text">## $browser_height
+##   views title
+## 1   190   600
+## 2    77   768
+## 3    53   900
+## 4    38   480
+## 5    28  1024
+## 
+## $browser_width
+##   views title
+## 1   153  1280
+## 2    91  1024
+## 3    58  1600
+## 4    36   800
+## 5    30  1440
+## 6     6  2000
+## 7     6   320
+## 8     6   480
+## 
+## $screen_width
+##   views title
+## 1   176  1280
+## 2    90  1600
+## 3    55  1440
+## 4    35  1024
+## 5    14  2000
+## 6     6   320
+## 7     6   480
+## 8     4   800</code></pre></figure>
+
+<h3 id="visualize-traffic-data">Visualize traffic data</h3>
+
+<p>You’ll need to load ggplot2</p>
+
+<figure class="highlight"><pre><code class="language-r" data-lang="r"><span class="n">library</span><span class="p">(</span><span class="n">ggplot2</span><span class="p">)</span><span class="w">
+</span><span class="n">out</span><span class="w"> </span><span class="o">&lt;-</span><span class="w"> </span><span class="n">gs_gauge_detail</span><span class="p">(</span><span class="n">id</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"4efd83a6f5a1f5158a000004"</span><span class="p">)</span><span class="w">
+</span><span class="n">vis_gauge</span><span class="p">(</span><span class="n">out</span><span class="p">)</span></code></pre></figure>
+
+<figure class="highlight"><pre><code class="language-text" data-lang="text">## Using hour, time as id variables
+## Using date as id variables
+## Using date as id variables</code></pre></figure>
+
+<p><img src="/public/img/2014-01-17-rgauges-hourly/unnamed-chunk-4.png" alt="center" /></p>
+
+<figure class="highlight"><pre><code class="language-text" data-lang="text">## NULL</code></pre></figure>
+
+<hr />
+<hr />
+
+<h2 id="historic-hourly-gauges-data">Historic hourly Gaug.es data</h2>
+
+<p>Now let’s play with the hourly data. To do that we aren’t going to use <code class="highlighter-rouge">rgauges</code>, but rather call the Cloudant API. CouchDB provides a RESTful API out of the box, so we can do a call like <code class="highlighter-rouge">https://app16517180.heroku.cloudant.com/gaugesdb_scott/_all_docs?limit=20</code> to get metadata (or other calls to get the documents themselves). (note: that url won’t work for you since you don’t have my login info)</p>
+
+<h3 id="get-some-data">Get some data</h3>
+
+<figure class="highlight"><pre><code class="language-r" data-lang="r"><span class="n">library</span><span class="p">(</span><span class="n">devtools</span><span class="p">)</span><span class="w">
+</span><span class="n">install_github</span><span class="p">(</span><span class="s2">"sckott/sofa"</span><span class="p">)</span><span class="w">  </span><span class="c1"># or install_github('sofa', 'sckott')</span></code></pre></figure>
+
+<figure class="highlight"><pre><code class="language-r" data-lang="r"><span class="n">library</span><span class="p">(</span><span class="n">sofa</span><span class="p">)</span><span class="w">
+</span><span class="n">cloudant_name</span><span class="w"> </span><span class="o">&lt;-</span><span class="w"> </span><span class="s2">"app16517180.heroku"</span><span class="w">
+</span><span class="n">cloudant_pwd</span><span class="w"> </span><span class="o">&lt;-</span><span class="w"> </span><span class="n">getOption</span><span class="p">(</span><span class="s2">"sofa_cloudant_heroku"</span><span class="p">)[[</span><span class="m">2</span><span class="p">]]</span><span class="w">
+</span><span class="n">cushion</span><span class="p">(</span><span class="n">sofa_cloudant</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nf">c</span><span class="p">(</span><span class="n">cloudant_name</span><span class="p">,</span><span class="w"> </span><span class="n">cloudant_pwd</span><span class="p">))</span><span class="w">
+</span><span class="n">dat</span><span class="w"> </span><span class="o">&lt;-</span><span class="w"> </span><span class="n">sofa_alldocs</span><span class="p">(</span><span class="n">cushion</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"sofa_cloudant"</span><span class="p">,</span><span class="w"> </span><span class="n">dbname</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"gaugesdb_scott"</span><span class="p">,</span><span class="w"> </span><span class="n">include_docs</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"true"</span><span class="p">)</span></code></pre></figure>
+
+<h3 id="manipulate-and-visualize">Manipulate and visualize</h3>
+
+<figure class="highlight"><pre><code class="language-r" data-lang="r"><span class="n">library</span><span class="p">(</span><span class="n">plyr</span><span class="p">)</span><span class="w">
+</span><span class="n">dates</span><span class="w"> </span><span class="o">&lt;-</span><span class="w"> </span><span class="n">ldply</span><span class="p">(</span><span class="n">dat</span><span class="o">$</span><span class="n">rows</span><span class="p">,</span><span class="w"> </span><span class="k">function</span><span class="p">(</span><span class="n">x</span><span class="p">)</span><span class="w"> </span><span class="n">x</span><span class="o">$</span><span class="n">doc</span><span class="o">$</span><span class="n">coll_date</span><span class="p">)</span><span class="w">
+</span><span class="nf">min</span><span class="p">(</span><span class="n">dates</span><span class="o">$</span><span class="n">V1</span><span class="p">)</span></code></pre></figure>
+
+<figure class="highlight"><pre><code class="language-text" data-lang="text">## [1] "2013-06-26"</code></pre></figure>
+
+<figure class="highlight"><pre><code class="language-r" data-lang="r"><span class="nf">max</span><span class="p">(</span><span class="n">dates</span><span class="o">$</span><span class="n">V1</span><span class="p">)</span></code></pre></figure>
+
+<figure class="highlight"><pre><code class="language-text" data-lang="text">## [1] "2014-01-16"</code></pre></figure>
+
+<figure class="highlight"><pre><code class="language-r" data-lang="r"><span class="nf">length</span><span class="p">(</span><span class="n">dates</span><span class="o">$</span><span class="n">V1</span><span class="p">)</span></code></pre></figure>
+
+<figure class="highlight"><pre><code class="language-text" data-lang="text">## [1] 198</code></pre></figure>
+
+<p>So we’ve got 198 days of data, first collected near end of June, and most recent yesterday. Now get actual visits data</p>
+
+<figure class="highlight"><pre><code class="language-r" data-lang="r"><span class="n">df</span><span class="w"> </span><span class="o">&lt;-</span><span class="w"> </span><span class="n">ldply</span><span class="p">(</span><span class="n">dat</span><span class="o">$</span><span class="n">rows</span><span class="p">,</span><span class="w"> </span><span class="k">function</span><span class="p">(</span><span class="n">x</span><span class="p">)</span><span class="w"> </span><span class="p">{</span><span class="w">
+    </span><span class="n">y</span><span class="w"> </span><span class="o">&lt;-</span><span class="w"> </span><span class="n">do.call</span><span class="p">(</span><span class="n">rbind</span><span class="p">,</span><span class="w"> </span><span class="n">lapply</span><span class="p">(</span><span class="n">x</span><span class="o">$</span><span class="n">doc</span><span class="o">$</span><span class="n">recent_hours</span><span class="p">,</span><span class="w"> </span><span class="n">data.frame</span><span class="p">))</span><span class="w">
+    </span><span class="n">data.frame</span><span class="p">(</span><span class="n">date</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">x</span><span class="o">$</span><span class="n">doc</span><span class="o">$</span><span class="n">coll_date</span><span class="p">,</span><span class="w"> </span><span class="n">y</span><span class="p">)</span><span class="w">
+</span><span class="p">})</span><span class="w">
+</span><span class="n">df</span><span class="o">$</span><span class="n">date</span><span class="w"> </span><span class="o">&lt;-</span><span class="w"> </span><span class="n">as.Date</span><span class="p">(</span><span class="n">df</span><span class="o">$</span><span class="n">date</span><span class="p">)</span><span class="w">
+</span><span class="n">df</span><span class="o">$</span><span class="n">hour</span><span class="w"> </span><span class="o">&lt;-</span><span class="w"> </span><span class="nf">as.numeric</span><span class="p">(</span><span class="n">df</span><span class="o">$</span><span class="n">hour</span><span class="p">)</span><span class="w">
+
+</span><span class="n">library</span><span class="p">(</span><span class="n">reshape2</span><span class="p">)</span><span class="w">
+</span><span class="n">df_melt</span><span class="w"> </span><span class="o">&lt;-</span><span class="w"> </span><span class="n">melt</span><span class="p">(</span><span class="n">df</span><span class="p">,</span><span class="w"> </span><span class="n">id.vars</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nf">c</span><span class="p">(</span><span class="s2">"date"</span><span class="p">,</span><span class="w"> </span><span class="s2">"hour"</span><span class="p">))</span><span class="w">
+</span><span class="n">head</span><span class="p">(</span><span class="n">df_melt</span><span class="p">)</span></code></pre></figure>
+
+<figure class="highlight"><pre><code class="language-text" data-lang="text">##         date hour variable value
+## 1 2013-09-18    1    views     2
+## 2 2013-09-18    2    views     3
+## 3 2013-09-18    3    views     2
+## 4 2013-09-18    4    views     0
+## 5 2013-09-18    5    views     1
+## 6 2013-09-18    6    views    10</code></pre></figure>
+
+<p>We need to combine the date and hour in to one date time string:</p>
+
+<figure class="highlight"><pre><code class="language-r" data-lang="r"><span class="n">df_melt</span><span class="w"> </span><span class="o">&lt;-</span><span class="w"> </span><span class="n">transform</span><span class="p">(</span><span class="n">df_melt</span><span class="p">,</span><span class="w"> </span><span class="n">datetime</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">as.POSIXct</span><span class="p">(</span><span class="n">paste</span><span class="p">(</span><span class="n">date</span><span class="p">,</span><span class="w"> </span><span class="n">sprintf</span><span class="p">(</span><span class="s2">"%s:00:00"</span><span class="p">,</span><span class="w"> 
+    </span><span class="n">hour</span><span class="p">))))</span><span class="w">
+</span><span class="n">head</span><span class="p">(</span><span class="n">df_melt</span><span class="p">)</span></code></pre></figure>
+
+<figure class="highlight"><pre><code class="language-text" data-lang="text">##         date hour variable value            datetime
+## 1 2013-09-18    1    views     2 2013-09-18 01:00:00
+## 2 2013-09-18    2    views     3 2013-09-18 02:00:00
+## 3 2013-09-18    3    views     2 2013-09-18 03:00:00
+## 4 2013-09-18    4    views     0 2013-09-18 04:00:00
+## 5 2013-09-18    5    views     1 2013-09-18 05:00:00
+## 6 2013-09-18    6    views    10 2013-09-18 06:00:00</code></pre></figure>
+
+<p>Now plot all data</p>
+
+<figure class="highlight"><pre><code class="language-r" data-lang="r"><span class="n">library</span><span class="p">(</span><span class="n">ggplot2</span><span class="p">);</span><span class="w"> </span><span class="n">library</span><span class="p">(</span><span class="n">scales</span><span class="p">)</span><span class="w">
+
+</span><span class="n">gauge_theme</span><span class="w"> </span><span class="o">&lt;-</span><span class="w"> </span><span class="k">function</span><span class="p">(){</span><span class="w">
+  </span><span class="nf">list</span><span class="p">(</span><span class="n">theme</span><span class="p">(</span><span class="n">panel.grid.major</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">element_blank</span><span class="p">(),</span><span class="w">
+             </span><span class="n">panel.grid.minor</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">element_blank</span><span class="p">(),</span><span class="w">
+             </span><span class="n">legend.position</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nf">c</span><span class="p">(</span><span class="m">0.85</span><span class="p">,</span><span class="m">0.85</span><span class="p">),</span><span class="w">
+             </span><span class="n">legend.key</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">element_blank</span><span class="p">()))</span><span class="w">
+</span><span class="p">}</span><span class="w">
+
+</span><span class="n">ggplot</span><span class="p">(</span><span class="n">df_melt</span><span class="p">,</span><span class="w"> </span><span class="n">aes</span><span class="p">(</span><span class="n">datetime</span><span class="p">,</span><span class="w"> </span><span class="n">value</span><span class="p">,</span><span class="w"> </span><span class="n">group</span><span class="o">=</span><span class="n">variable</span><span class="p">,</span><span class="w"> </span><span class="n">colour</span><span class="o">=</span><span class="n">variable</span><span class="p">))</span><span class="w"> </span><span class="o">+</span><span class="w">
+    </span><span class="n">theme_bw</span><span class="p">(</span><span class="n">base_size</span><span class="o">=</span><span class="m">18</span><span class="p">)</span><span class="w"> </span><span class="o">+</span><span class="w"> 
+    </span><span class="n">geom_line</span><span class="p">(</span><span class="n">size</span><span class="o">=</span><span class="m">2</span><span class="p">)</span><span class="w"> </span><span class="o">+</span><span class="w">
+    </span><span class="n">scale_color_brewer</span><span class="p">(</span><span class="n">name</span><span class="o">=</span><span class="s2">""</span><span class="p">,</span><span class="w"> </span><span class="n">palette</span><span class="o">=</span><span class="m">3</span><span class="p">)</span><span class="w"> </span><span class="o">+</span><span class="w">
+    </span><span class="n">labs</span><span class="p">(</span><span class="n">x</span><span class="o">=</span><span class="s2">""</span><span class="p">,</span><span class="w"> </span><span class="n">y</span><span class="o">=</span><span class="s2">""</span><span class="p">)</span><span class="w"> </span><span class="o">+</span><span class="w">
+    </span><span class="n">gauge_theme</span><span class="p">()</span></code></pre></figure>
+
+<p><img src="/public/img/2014-01-17-rgauges-hourly/unnamed-chunk-8.png" alt="center" /></p>
+
+<p>And just one day</p>
+
+<figure class="highlight"><pre><code class="language-r" data-lang="r"><span class="n">oneday</span><span class="w"> </span><span class="o">&lt;-</span><span class="w"> </span><span class="n">df_melt</span><span class="p">[</span><span class="w"> </span><span class="nf">as.character</span><span class="p">(</span><span class="n">df_melt</span><span class="o">$</span><span class="n">date</span><span class="p">)</span><span class="w"> </span><span class="o">%in%</span><span class="w"> </span><span class="s2">"2013-11-12"</span><span class="p">,</span><span class="w"> </span><span class="p">]</span><span class="w">
+</span><span class="n">ggplot</span><span class="p">(</span><span class="n">oneday</span><span class="p">,</span><span class="w"> </span><span class="n">aes</span><span class="p">(</span><span class="n">datetime</span><span class="p">,</span><span class="w"> </span><span class="n">value</span><span class="p">,</span><span class="w"> </span><span class="n">group</span><span class="o">=</span><span class="n">variable</span><span class="p">,</span><span class="w"> </span><span class="n">colour</span><span class="o">=</span><span class="n">variable</span><span class="p">))</span><span class="w"> </span><span class="o">+</span><span class="w">
+    </span><span class="n">theme_bw</span><span class="p">(</span><span class="n">base_size</span><span class="o">=</span><span class="m">18</span><span class="p">)</span><span class="w"> </span><span class="o">+</span><span class="w"> 
+    </span><span class="n">geom_line</span><span class="p">(</span><span class="n">size</span><span class="o">=</span><span class="m">2</span><span class="p">)</span><span class="w"> </span><span class="o">+</span><span class="w">
+    </span><span class="n">scale_color_brewer</span><span class="p">(</span><span class="n">name</span><span class="o">=</span><span class="s2">""</span><span class="p">,</span><span class="w"> </span><span class="n">palette</span><span class="o">=</span><span class="m">3</span><span class="p">)</span><span class="w"> </span><span class="o">+</span><span class="w">
+    </span><span class="n">labs</span><span class="p">(</span><span class="n">x</span><span class="o">=</span><span class="s2">""</span><span class="p">,</span><span class="w"> </span><span class="n">y</span><span class="o">=</span><span class="s2">""</span><span class="p">)</span><span class="w"> </span><span class="o">+</span><span class="w">
+    </span><span class="n">gauge_theme</span><span class="p">()</span></code></pre></figure>
+
+<p><img src="/public/img/2014-01-17-rgauges-hourly/unnamed-chunk-9.png" alt="center" /></p>
+
+:ET

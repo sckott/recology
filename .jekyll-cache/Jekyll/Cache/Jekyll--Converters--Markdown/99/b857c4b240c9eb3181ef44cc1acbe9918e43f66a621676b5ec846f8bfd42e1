@@ -1,0 +1,245 @@
+I"HY<h2 id="acquiring-full-text-articles">Acquiring full text articles</h2>
+
+<p><a href="https://github.com/ropensci/fulltext/">fulltext</a> is an R package I maintain to obtain full text versions of research articles
+for text mining.</p>
+
+<p>It’s a hard problem, with a spaghetti web of code. One of the hard problems is 
+figuring out what the URL is for the full text version of an article. Publishers
+do not have consistent URL patterns through time, and so you can not set rules once 
+and never revisit them.</p>
+
+<p>The <a href="https://github.com/CrossRef/rest-api-doc">Crossref API</a> has links available to 
+full text versions for publishers that choose to share them. However, even if 
+publishers choose to share their full text links, they may be out of date or completely
+wrong (not actually lead to the full text).</p>
+
+<p>There’s a variety of other APIs out there for getting links to articles, but none 
+really hit the spot, which lead to the creation of the <a href="https://ftdoi.org/">ftdoi API</a>.</p>
+
+<h2 id="the-ftdoi-api">the ftdoi API</h2>
+
+<p>The <a href="https://ftdoi.org/">ftdoi API</a> is a web API, with it’s main goal for getting a best guess at
+the URL for the full text version of an article from its DOI (this is done via the 
+<code class="highlighter-rouge">/api/doi/{doi}/</code> route). The API gives back URLs for all those possible, including
+pdf, xml, and html. Most publishers only give full text as PDF, but when XML is
+available we give those URLs as well.</p>
+
+<p>The API uses the rules maintained in the <a href="https://github.com/ropenscilabs/pubpatterns/tree/master/src">pubpatterns</a>
+repo. The rules are only rough guidelines though and often require at least one 
+step of making a web request to the publishers site or another site, that’s NOT 
+specified in the pubpatterns rules. For example, the <a href="https://github.com/ropenscilabs/pubpatterns/blob/master/src/biorxiv.json">Biorxiv file</a>
+has notes about how to get the parts necessary for the full URL, but the actual logic 
+to do so in in the API code base <a href="https://github.com/ropenscilabs/pubpatternsapi/blob/master/utils.rb#L590-L601">here</a>.</p>
+
+<p>The ftdoi API caches responses for requests for 24 hrs, so even if a request takes 5 seconds
+or so to process, at least for the next 24 hrs it will be nearly instantaneous. We don’t 
+want to cache indefinitely because URLs may be changed at any time by the publishers.</p>
+
+<p>The <code class="highlighter-rouge">fulltext</code> package uses the ftdoi API internally, mostly hidden from users, to 
+get a full text URL.</p>
+
+<h2 id="but-why-an-api">But why an API?</h2>
+
+<p>Why not just have a set of rules in the <code class="highlighter-rouge">fulltext</code> R package, and go from there?
+An API was relatively easy for me to stand up, and i think it has many benefits:
+can be used by anything/anyone, not just R users; updates to publisher specific
+rules for generating URLs can evolve independently of <code class="highlighter-rouge">fulltext</code>; the logs
+can be used as a tool to improve the API.</p>
+
+<h2 id="what-do-people-actually-want">what do people actually want?</h2>
+
+<p>The ftdoi API has been running for a while now, maybe a year or so, and I’ve been 
+collecting logs. Seems smart to look at the logs to determine what publishers 
+users are requesting articles from that the ftdoi API does not currently support,
+so that the API can hopefully add those publishers. For obvious reasons, I can’t share
+the log data.</p>
+
+<p>Load packages and define file path.</p>
+
+<div class="language-r highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="n">library</span><span class="p">(</span><span class="n">rcrossref</span><span class="p">)</span><span class="w">
+</span><span class="n">library</span><span class="p">(</span><span class="n">dplyr</span><span class="p">)</span><span class="w">
+</span><span class="n">library</span><span class="p">(</span><span class="n">rex</span><span class="p">)</span><span class="w">
+</span><span class="n">logs</span><span class="w"> </span><span class="o">&lt;-</span><span class="w"> </span><span class="s2">"~/pubpatterns_api_calls.log"</span><span class="w">
+</span></code></pre></div></div>
+
+<p>The logs look like (IP addresses removed, some user agents shortened):</p>
+
+<div class="highlighter-rouge"><div class="highlight"><pre class="highlight"><code>[28/Nov/2018:20:09:49 +0000] GET /api/members/  HTTP/2.0 200 4844 Mozilla/5.0 ...
+[28/Nov/2018:20:23:15 +0000] GET /api/members/317/  HTTP/2.0 200 228 Mozilla/5.0 ...
+[29/Nov/2018:01:52:58 +0000] GET /api/members/19/  HTTP/1.1 400 65 fulltext/1.1.0
+[29/Nov/2018:01:52:58 +0000] GET /api/members/2308/  HTTP/1.1 400 65 fulltext/1.1.0
+[29/Nov/2018:01:52:59 +0000] GET /api/members/239/  HTTP/1.1 400 65 fulltext/1.1.0
+[29/Nov/2018:01:53:00 +0000] GET /api/members/2581/  HTTP/1.1 400 65 fulltext/1.1.0
+[29/Nov/2018:01:53:00 +0000] GET /api/members/27/  HTTP/1.1 400 65 fulltext/1.1.0
+[29/Nov/2018:01:53:01 +0000] GET /api/members/297/  HTTP/1.1 200 336 fulltext/1.1.0
+[29/Nov/2018:01:53:01 +0000] GET /api/members/7995/  HTTP/1.1 400 65 fulltext/1.1.0
+[29/Nov/2018:10:46:53 +0000] GET /api/members/unknown/  HTTP/1.1 400 65 fulltext/1.1.0.9130
+</code></pre></div></div>
+
+<p>Use the awesome <a href="https://github.com/kevinushey/rex/">rex</a> package from Kevin Ushey et al. to parse the logs, pulling out
+just the Crossref member ID in the API request, as well as the HTTP status code. There
+are of course other API requests in the logs, but we’re only interested here in the ones
+to the <code class="highlighter-rouge">/api/doi/{doi}/</code> route.</p>
+
+<div class="language-r highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="n">df</span><span class="w"> </span><span class="o">&lt;-</span><span class="w"> </span><span class="n">tbl_df</span><span class="p">(</span><span class="n">scan</span><span class="p">(</span><span class="n">logs</span><span class="p">,</span><span class="w"> </span><span class="n">what</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"character"</span><span class="p">,</span><span class="w"> </span><span class="n">sep</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"\n"</span><span class="p">)</span><span class="w"> </span><span class="o">%&gt;%</span><span class="w">
+  </span><span class="n">re_matches</span><span class="p">(</span><span class="w">
+    </span><span class="n">rex</span><span class="p">(</span><span class="w">
+      </span><span class="s2">"/api/members/"</span><span class="p">,</span><span class="w">
+        </span><span class="n">capture</span><span class="p">(</span><span class="n">name</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"route"</span><span class="p">,</span><span class="w">
+          </span><span class="n">one_or_more</span><span class="p">(</span><span class="n">numbers</span><span class="p">)</span><span class="w">
+        </span><span class="p">),</span><span class="w">
+      </span><span class="s2">"/"</span><span class="p">,</span><span class="w">
+
+      </span><span class="n">space</span><span class="p">,</span><span class="w"> </span><span class="n">space</span><span class="p">,</span><span class="w"> </span><span class="s2">"HTTP/"</span><span class="p">,</span><span class="w"> </span><span class="n">numbers</span><span class="p">,</span><span class="w"> </span><span class="s2">"."</span><span class="p">,</span><span class="w"> </span><span class="n">numbers</span><span class="p">,</span><span class="w"> </span><span class="n">space</span><span class="p">,</span><span class="w">
+
+      </span><span class="n">capture</span><span class="p">(</span><span class="n">name</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"status_code"</span><span class="p">,</span><span class="w">
+        </span><span class="n">one_or_more</span><span class="p">(</span><span class="n">numbers</span><span class="p">)</span><span class="w">
+      </span><span class="p">)</span><span class="w">
+    </span><span class="p">)</span><span class="w">
+  </span><span class="p">))</span><span class="w">
+</span><span class="n">df</span><span class="o">$</span><span class="n">route</span><span class="w"> </span><span class="o">&lt;-</span><span class="w"> </span><span class="nf">as.numeric</span><span class="p">(</span><span class="n">df</span><span class="o">$</span><span class="n">route</span><span class="p">)</span><span class="w">
+</span><span class="n">df</span><span class="w">
+</span><span class="c1">#&gt; # A tibble: 896,035 x 2</span><span class="w">
+</span><span class="c1">#&gt;    route status_code</span><span class="w">
+</span><span class="c1">#&gt;    &lt;dbl&gt; &lt;chr&gt;      </span><span class="w">
+</span><span class="c1">#&gt;  1    NA &lt;NA&gt;       </span><span class="w">
+</span><span class="c1">#&gt;  2   317 200        </span><span class="w">
+</span><span class="c1">#&gt;  3    19 400        </span><span class="w">
+</span><span class="c1">#&gt;  4  2308 400        </span><span class="w">
+</span><span class="c1">#&gt;  5   239 400        </span><span class="w">
+</span><span class="c1">#&gt;  6  2581 400        </span><span class="w">
+</span><span class="c1">#&gt;  7    27 400        </span><span class="w">
+</span><span class="c1">#&gt;  8   297 200        </span><span class="w">
+</span><span class="c1">#&gt;  9  7995 400        </span><span class="w">
+</span><span class="c1">#&gt; 10    NA &lt;NA&gt;       </span><span class="w">
+</span><span class="c1">#&gt; # … with 896,025 more rows</span><span class="w">
+</span></code></pre></div></div>
+
+<p>Filter to those requests that resulted in a 400 HTTP status code, that is, they 
+resulted in no returned data, indicating that we likely do not have a mapping for that 
+Crossref member.</p>
+
+<div class="language-r highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="n">res</span><span class="w"> </span><span class="o">&lt;-</span><span class="w"> </span><span class="n">df</span><span class="w"> </span><span class="o">%&gt;%</span><span class="w">
+  </span><span class="n">filter</span><span class="p">(</span><span class="n">status_code</span><span class="w"> </span><span class="o">==</span><span class="w"> </span><span class="m">400</span><span class="p">)</span><span class="w"> </span><span class="o">%&gt;%</span><span class="w">
+  </span><span class="n">select</span><span class="p">(</span><span class="n">route</span><span class="p">)</span><span class="w"> </span><span class="o">%&gt;%</span><span class="w"> 
+  </span><span class="n">group_by</span><span class="p">(</span><span class="n">route</span><span class="p">)</span><span class="w"> </span><span class="o">%&gt;%</span><span class="w">
+  </span><span class="n">summarize</span><span class="p">(</span><span class="n">count</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">n</span><span class="p">())</span><span class="w"> </span><span class="o">%&gt;%</span><span class="w"> 
+  </span><span class="n">arrange</span><span class="p">(</span><span class="n">desc</span><span class="p">(</span><span class="n">count</span><span class="p">))</span><span class="w">
+</span><span class="n">res</span><span class="w">
+</span><span class="c1">#&gt; # A tibble: 530 x 2</span><span class="w">
+</span><span class="c1">#&gt;    route  count</span><span class="w">
+</span><span class="c1">#&gt;    &lt;dbl&gt;  &lt;int&gt;</span><span class="w">
+</span><span class="c1">#&gt;  1    10 345045</span><span class="w">
+</span><span class="c1">#&gt;  2   530   7165</span><span class="w">
+</span><span class="c1">#&gt;  3   286   3062</span><span class="w">
+</span><span class="c1">#&gt;  4   276   2975</span><span class="w">
+</span><span class="c1">#&gt;  5   239   2493</span><span class="w">
+</span><span class="c1">#&gt;  6  8611   1085</span><span class="w">
+</span><span class="c1">#&gt;  7    56    853</span><span class="w">
+</span><span class="c1">#&gt;  8   235    722</span><span class="w">
+</span><span class="c1">#&gt;  9   382    706</span><span class="w">
+</span><span class="c1">#&gt; 10   175    590</span><span class="w">
+</span><span class="c1">#&gt; # … with 520 more rows</span><span class="w">
+</span></code></pre></div></div>
+
+<p>Add crossref metadata</p>
+
+<div class="language-r highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="p">(</span><span class="n">members</span><span class="w"> </span><span class="o">&lt;-</span><span class="w"> </span><span class="n">cr_members</span><span class="p">(</span><span class="n">res</span><span class="o">$</span><span class="n">route</span><span class="p">))</span><span class="w">
+</span><span class="c1">#&gt; $meta</span><span class="w">
+</span><span class="c1">#&gt; NULL</span><span class="w">
+</span><span class="c1">#&gt; </span><span class="w">
+</span><span class="c1">#&gt; $data</span><span class="w">
+</span><span class="c1">#&gt; # A tibble: 530 x 56</span><span class="w">
+</span><span class="c1">#&gt;       id primary_name location last_status_che… total.dois current.dois</span><span class="w">
+</span><span class="c1">#&gt;    &lt;int&gt; &lt;chr&gt;        &lt;chr&gt;    &lt;date&gt;           &lt;chr&gt;      &lt;chr&gt;       </span><span class="w">
+</span><span class="c1">#&gt;  1    10 American Me… 330 N. … 2019-03-20       600092     14714       </span><span class="w">
+</span><span class="c1">#&gt;  2   530 FapUNIFESP … FAP-UNI… 2019-03-20       353338     38339       </span><span class="w">
+</span><span class="c1">#&gt;  3   286 Oxford Univ… Academi… 2019-03-20       3696643    289338      </span><span class="w">
+</span><span class="c1">#&gt;  4   276 Ovid Techno… 100 Riv… 2019-03-20       2059352    167272      </span><span class="w">
+</span><span class="c1">#&gt;  5   239 BMJ          BMA Hou… 2019-03-20       891239     61267       </span><span class="w">
+</span><span class="c1">#&gt;  6  8611 AME Publish… c/o NAN… 2019-03-20       20067      15666       </span><span class="w">
+</span><span class="c1">#&gt;  7    56 Cambridge U… The Edi… 2019-03-20       1529029    84018       </span><span class="w">
+</span><span class="c1">#&gt;  8   235 American So… 1752 N … 2019-03-20       178890     13984       </span><span class="w">
+</span><span class="c1">#&gt;  9   382 Joule Inc.   1031 Ba… 2019-03-20       12666      1868        </span><span class="w">
+</span><span class="c1">#&gt; 10   175 The Royal S… 6 Carlt… 2019-03-20       89219      7262        </span><span class="w">
+</span><span class="c1">#&gt; # … with 520 more rows, and 50 more variables: backfile.dois &lt;chr&gt;,</span><span class="w">
+</span><span class="c1">#&gt; #   prefixes &lt;chr&gt;, coverge.affiliations.current &lt;chr&gt;,</span><span class="w">
+</span><span class="c1">#&gt; #   coverge.similarity.checking.current &lt;chr&gt;,</span><span class="w">
+</span><span class="c1">#&gt; #   coverge.funders.backfile &lt;chr&gt;, coverge.licenses.backfile &lt;chr&gt;,</span><span class="w">
+</span><span class="c1">#&gt; #   coverge.funders.current &lt;chr&gt;, coverge.affiliations.backfile &lt;chr&gt;,</span><span class="w">
+</span><span class="c1">#&gt; #   coverge.resource.links.backfile &lt;chr&gt;, coverge.orcids.backfile &lt;chr&gt;,</span><span class="w">
+</span><span class="c1">#&gt; #   coverge.update.policies.current &lt;chr&gt;,</span><span class="w">
+</span><span class="c1">#&gt; #   coverge.open.references.backfile &lt;chr&gt;, coverge.orcids.current &lt;chr&gt;,</span><span class="w">
+</span><span class="c1">#&gt; #   coverge.similarity.checking.backfile &lt;chr&gt;,</span><span class="w">
+</span><span class="c1">#&gt; #   coverge.references.backfile &lt;chr&gt;,</span><span class="w">
+</span><span class="c1">#&gt; #   coverge.award.numbers.backfile &lt;chr&gt;,</span><span class="w">
+</span><span class="c1">#&gt; #   coverge.update.policies.backfile &lt;chr&gt;,</span><span class="w">
+</span><span class="c1">#&gt; #   coverge.licenses.current &lt;chr&gt;, coverge.award.numbers.current &lt;chr&gt;,</span><span class="w">
+</span><span class="c1">#&gt; #   coverge.abstracts.backfile &lt;chr&gt;,</span><span class="w">
+</span><span class="c1">#&gt; #   coverge.resource.links.current &lt;chr&gt;, coverge.abstracts.current &lt;chr&gt;,</span><span class="w">
+</span><span class="c1">#&gt; #   coverge.open.references.current &lt;chr&gt;,</span><span class="w">
+</span><span class="c1">#&gt; #   coverge.references.current &lt;chr&gt;,</span><span class="w">
+</span><span class="c1">#&gt; #   flags.deposits.abstracts.current &lt;chr&gt;,</span><span class="w">
+</span><span class="c1">#&gt; #   flags.deposits.orcids.current &lt;chr&gt;, flags.deposits &lt;chr&gt;,</span><span class="w">
+</span><span class="c1">#&gt; #   flags.deposits.affiliations.backfile &lt;chr&gt;,</span><span class="w">
+</span><span class="c1">#&gt; #   flags.deposits.update.policies.backfile &lt;chr&gt;,</span><span class="w">
+</span><span class="c1">#&gt; #   flags.deposits.similarity.checking.backfile &lt;chr&gt;,</span><span class="w">
+</span><span class="c1">#&gt; #   flags.deposits.award.numbers.current &lt;chr&gt;,</span><span class="w">
+</span><span class="c1">#&gt; #   flags.deposits.resource.links.current &lt;chr&gt;,</span><span class="w">
+</span><span class="c1">#&gt; #   flags.deposits.articles &lt;chr&gt;,</span><span class="w">
+</span><span class="c1">#&gt; #   flags.deposits.affiliations.current &lt;chr&gt;,</span><span class="w">
+</span><span class="c1">#&gt; #   flags.deposits.funders.current &lt;chr&gt;,</span><span class="w">
+</span><span class="c1">#&gt; #   flags.deposits.references.backfile &lt;chr&gt;,</span><span class="w">
+</span><span class="c1">#&gt; #   flags.deposits.abstracts.backfile &lt;chr&gt;,</span><span class="w">
+</span><span class="c1">#&gt; #   flags.deposits.licenses.backfile &lt;chr&gt;,</span><span class="w">
+</span><span class="c1">#&gt; #   flags.deposits.award.numbers.backfile &lt;chr&gt;,</span><span class="w">
+</span><span class="c1">#&gt; #   flags.deposits.open.references.backfile &lt;chr&gt;,</span><span class="w">
+</span><span class="c1">#&gt; #   flags.deposits.open.references.current &lt;chr&gt;,</span><span class="w">
+</span><span class="c1">#&gt; #   flags.deposits.references.current &lt;chr&gt;,</span><span class="w">
+</span><span class="c1">#&gt; #   flags.deposits.resource.links.backfile &lt;chr&gt;,</span><span class="w">
+</span><span class="c1">#&gt; #   flags.deposits.orcids.backfile &lt;chr&gt;,</span><span class="w">
+</span><span class="c1">#&gt; #   flags.deposits.funders.backfile &lt;chr&gt;,</span><span class="w">
+</span><span class="c1">#&gt; #   flags.deposits.update.policies.current &lt;chr&gt;,</span><span class="w">
+</span><span class="c1">#&gt; #   flags.deposits.similarity.checking.current &lt;chr&gt;,</span><span class="w">
+</span><span class="c1">#&gt; #   flags.deposits.licenses.current &lt;chr&gt;, names &lt;chr&gt;, tokens &lt;chr&gt;</span><span class="w">
+</span><span class="c1">#&gt; </span><span class="w">
+</span><span class="c1">#&gt; $facets</span><span class="w">
+</span><span class="c1">#&gt; NULL</span><span class="w">
+</span></code></pre></div></div>
+
+<p>Add Crossref member names to the log data.</p>
+
+<div class="language-r highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="n">alldat</span><span class="w"> </span><span class="o">&lt;-</span><span class="w"> </span><span class="n">left_join</span><span class="p">(</span><span class="n">res</span><span class="p">,</span><span class="w"> </span><span class="n">select</span><span class="p">(</span><span class="n">members</span><span class="o">$</span><span class="n">data</span><span class="p">,</span><span class="w"> </span><span class="n">id</span><span class="p">,</span><span class="w"> </span><span class="n">primary_name</span><span class="p">),</span><span class="w">
+  </span><span class="n">by</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nf">c</span><span class="p">(</span><span class="s2">"route"</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"id"</span><span class="p">))</span><span class="w">
+</span><span class="n">alldat</span><span class="w">
+</span><span class="c1">#&gt; # A tibble: 530 x 3</span><span class="w">
+</span><span class="c1">#&gt;    route  count primary_name                             </span><span class="w">
+</span><span class="c1">#&gt;    &lt;dbl&gt;  &lt;int&gt; &lt;chr&gt;                                    </span><span class="w">
+</span><span class="c1">#&gt;  1    10 345045 American Medical Association (AMA)       </span><span class="w">
+</span><span class="c1">#&gt;  2   530   7165 FapUNIFESP (SciELO)                      </span><span class="w">
+</span><span class="c1">#&gt;  3   286   3062 Oxford University Press (OUP)            </span><span class="w">
+</span><span class="c1">#&gt;  4   276   2975 Ovid Technologies (Wolters Kluwer Health)</span><span class="w">
+</span><span class="c1">#&gt;  5   239   2493 BMJ                                      </span><span class="w">
+</span><span class="c1">#&gt;  6  8611   1085 AME Publishing Company                   </span><span class="w">
+</span><span class="c1">#&gt;  7    56    853 Cambridge University Press (CUP)         </span><span class="w">
+</span><span class="c1">#&gt;  8   235    722 American Society for Microbiology        </span><span class="w">
+</span><span class="c1">#&gt;  9   382    706 Joule Inc.                               </span><span class="w">
+</span><span class="c1">#&gt; 10   175    590 The Royal Society                        </span><span class="w">
+</span><span class="c1">#&gt; # … with 520 more rows</span><span class="w">
+</span></code></pre></div></div>
+
+<p>Theres <strong>A LOT</strong> of requests to the American Medical Association. Coming in
+a distant second is FapUNIFESP (SciELO), then the Oxford University Press,
+Ovid Technologies (Wolters Kluwer Health), BMJ, and AME Publishing Company, 
+all with greater than 1000 requests.</p>
+
+<p>These are some clear leads for publishers to work into the ftdoi API, working
+my way down the data.frame to less frequently requested publishers.</p>
+
+<h2 id="more-work-to-do">more work to do</h2>
+
+<p>I’ve got a good list of publishers which I know users want URLs for, so 
+I can get started implementing rules/etc. for those publishers. And I can 
+repeat this process from time to time to add more publishers in high demand.</p>
+
+:ET
