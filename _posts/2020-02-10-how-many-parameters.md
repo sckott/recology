@@ -19,7 +19,7 @@ in between. How many parameters is too many? Does it even matter how many
 parameters there are in a function?
 
 There's AFAIK no "correct" answer to this question. And surely the "best
-practice" varies among programming lanugages. What do folks say about
+practice" varies among programming languages. What do folks say about
 this and what should we be doing in R?
 
 ## From other languages
@@ -53,13 +53,17 @@ Some general threads on this topic:
 - [Software engineering Stackexchange][so2]
 - [Stackoverflow][so3]
 
+## Data
+
+Data for this post, created below, is in the github repo [sckott/howmanyparams](https://github.com/sckott/howmanyparams).
+
 ## What about R?
 
 What do the data show in the R language? Just like the blog post on php above,
 let's have a look at a lot of R packages to get a general data informed
 consensus on how many parameters are used per function.
 
-It's incredibly likely that there is a better way to do what i've done
+It's incredibly likely that there is a better way to do what I've done
 below; but this is my hacky way of getting to the data.
 
 What I've done in words:
@@ -88,7 +92,7 @@ my current setup, and put binaries into a temporary directory
 so they are cleaned up on exiting R.
 
 ```r
-path <- "/Volumes/GD-Jr/fran/params"
+path <- "/some/path"
 binaries <- file.path(tempdir(), "binaries")
 dir.create(path)
 dir.create(binaries)
@@ -127,7 +131,7 @@ pkg_names <- unname(installed.packages()[,"Package"])
 ```
 
 Run each package through the `do_one()` function. This had to be stopped and
-re-started a few times.
+re-started a few times. This failed for quite a few packages - I wasn't trying to get every single package, just a large set of packages to get an idea of what packages do on average.
 
 ```r
 tbls <- stats::setNames(lapply(pkg_names, do_one_safe), pkg_names)
@@ -140,6 +144,7 @@ df <- dplyr::bind_rows(tbls, .id = "pkg")
 readr::write_csv(df, "params_per_fxn.csv")
 ```
 
+> note: you can get this data at [sckott/howmanyparams](https://github.com/sckott/howmanyparams#how-many-parameters)
 
 ```r
 df <- readr::read_csv("~/params_per_fxn.csv")
@@ -190,18 +195,16 @@ with a mean of 5 arguments, and the most common value at 4.
 In terms of getting around the too many arguments thing, there's talk of
 using global variables, which seems like generally a bad idea; unless perhaps
 they are environment variables that are meant to be set by the user in
-non-interactive environnments, etc.
+non-interactive environments, etc.
 
-Other solutions are to use `...` in R, or similarly `**kwargs` or `**args`, or
-the newly added `...` in Ruby. With this approach you could have very few parameters
+Other solutions are to use `...` in R, or similarly `**kwargs` or `*args` in Python ([ref.](https://pythontips.com/2013/08/04/args-and-kwargs-in-python-explained/)), or
+the newly added `...` in Ruby ([ref](https://eregon.me/blog/2019/11/10/the-delegation-challenge-of-ruby27.html)). With this approach you could have very few parameters
 defined in the function, and then internally within the function handle any parameter
 filtering, etc. The downside of this in R is that you don't get the automated
 checks making sure all function arguments are documented, and there's no documented
 arguments that don't exist in the function.
 
-I'm not suggesting a solution is needed though. This definitely seems like an
-everyone's got one situation - i.e., there's no right answer, but rather lots
-of opinions. 
+I'm not suggesting a solution is needed though; there's probably no right answer, but rather lots of opinions.
 
 Having said that, the average R function does use about 4 arguments, so if you 
 keep your functions to around 4 arguments you'll be approaching the sort of
