@@ -69,9 +69,9 @@ Some of the databases have indices to speed up queries, making them a bit larger
 
 Three new data sources were added:
 
-- NCBI - all of this work was done by [Zebulun Arendsee](https://github.com/arendsee)
-- World Flora Online - the replacement for The Plant List
-- Wikidata - UPDATE ME WITH INFO, ZENODO DOWN RIGHT NOW
+- [NCBI taxonomy](https://www.ncbi.nlm.nih.gov/taxonomy) - all of this work was done by [Zebulun Arendsee](https://github.com/arendsee)
+- [World Flora Online](http://www.worldfloraonline.org/) - the replacement for The Plant List
+- [Wikidata](https://zenodo.org/record/1213477) - the table `wikidata-taxon-info`, extracted taxon objects from Wikidata, last updated April 2018, on Zenodo
 
 <br>
 
@@ -127,7 +127,7 @@ These functions are quite fast too:
 x <- taxize::names_list(rank = "species", size = 10000L)
 system.time(name2taxid(x, db = "gbif", out_type = "summary"))
 #>    user  system elapsed 
-#>   0.074   0.014   0.092
+#>   0.096   0.206   1.053
 ```
 
 <br>
