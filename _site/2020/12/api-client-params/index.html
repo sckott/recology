@@ -1,0 +1,353 @@
+<!DOCTYPE html>
+<html>
+
+  <head>
+  <meta charset="utf-8">
+  <meta http-equiv="X-UA-Compatible" content="IE=edge">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+
+  <title>API client design: how to deal with lots of parameters</title>
+  <meta name="description" content="In February this year I wroute about how many parameters functions should have, looking at some other languages, with a detailed look at R. On a related topic …">
+  <link href='https://fonts.googleapis.com/css?family=PT+Sans:400,700,400italic,700italic|Source+Sans+Pro:400,700,200,300|Josefin+Sans:400,600,700,300' rel='stylesheet' type='text/css'>
+  <link href="https://maxcdn.bootstrapcdn.com/font-awesome/4.5.0/css/font-awesome.min.css" rel="stylesheet">
+
+  <script async defer data-domain="recology.info" src="https://plausible.io/js/plausible.js"></script>
+
+  <link rel="stylesheet" href="/css/style.css">
+  <link rel="canonical" href="http://localhost:4000/2020/12/api-client-params/">
+  <link rel="alternate" type="application/rss+xml" title="recology" href="http://localhost:4000/feed.xml">
+</head>
+
+
+  <body>
+
+    
+<div class="wrapper">
+  <center> <a href="/index.html"><div class="site-title">   recology </div></a></center>
+</div>
+<div class="wrapper site-description">
+<center>code and such</center>
+<br>
+<center><a href="#mc-embedded-subscribe" style="font-size:18px">Subscribe</a></center>
+</div>
+<div class="wrapper">
+  <div class="trigger site-navigation">
+    <a class="page-link" href="/">HOME</a>
+
+    
+    
+    
+    
+    
+    
+
+    <span class="exclamationMark">/</span><a class="page-link" href="/archives/">Archives</a>
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+  </div>
+</div>
+
+
+    <div class="page-content">
+      <div class="wrapper">
+        <article class="post" itemscope itemtype="http://schema.org/BlogPosting">
+
+  <header class="post-header">
+    <h1 class="post-title" itemprop="name headline"><a class="post-title-link"  href="/2020/12/api-client-params/">API client design: how to deal with lots of parameters</a></h1>
+  <center>  <p class="post-meta"><time datetime="2020-12-21T00:00:00-08:00" itemprop="datePublished">Dec 21, 2020</time></p>
+   </center>
+  </header>
+
+  <div class="post-content" itemprop="articleBody">
+    <p>In February this year I wroute about <a href="https://recology.info/2020/02/how-many-parameters/">how many parameters functions should have</a>, looking at some other languages, with a detailed look at R. On a related topic …</p>
+
+<p>As I work on many R packages that are API clients for various web services, I began wondering: What is the best way to deal with API routes that have a lot of parameters?</p>
+
+<p>The general programming wisdom I’ve seen is that a function should have no more than 3-4 parameters (e.g., <a href="https://stackoverflow.com/questions/174968/how-many-parameters-are-too-many">this long SO thread</a>, or <a href="https://softwareengineering.stackexchange.com/questions/331803/techniques-for-minimising-number-of-function-arguments">this one</a>). So should one do anything different from a normal function when that function is connecting to a web API route with a lot of parameters? I’ve not found very much spilled ink on this exact topic, but I’ll discuss what I have found.</p>
+
+<h2 id="use-cases">Use cases?</h2>
+
+<p>A Software Engineering StackExchange thread <a href="https://softwareengineering.stackexchange.com/questions/196895/how-to-handle-many-arguments-in-an-api-wrapper">How to handle many arguments in an API wrapper?</a> had a couple ideas. One idea is to consider use cases, and then make separate functions covering those use cases. This might work, but I haven’t explored it thoroughly for a real API route yet. Pondering on it though I doubt this would work since you’d have to pre-emptively think about all the different scenarios users might dream up, which seems like a fools errand.</p>
+
+<h2 id="builder-pattern">Builder pattern</h2>
+
+<p>Another concept brought up in the thread mentioned above was the <a href="https://en.wikipedia.org/wiki/Builder_pattern">Builder pattern</a>. It’s hard for me to understand the idea in abstract - <a href="https://medium.com/kkempin/builder-design-pattern-in-ruby-dfa2d557ff1b">here’s a nicer discussion of this in Ruby</a>.</p>
+
+<p>This is a good concept to know about, but I don’t think is appropriate for the issue at hand, of how to handle many API parameters.</p>
+
+<h2 id="named-parameter-map">Named parameter map</h2>
+
+<p>Another idea in that thread was to use a named parameter map. In R this would look something like this (imagine a lot more parameters though):</p>
+
+<div class="language-r highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="n">foo</span><span class="w"> </span><span class="o">&lt;-</span><span class="w"> </span><span class="k">function</span><span class="p">(</span><span class="n">args</span><span class="p">)</span><span class="w"> </span><span class="p">{</span><span class="w">
+  </span><span class="n">get</span><span class="p">(</span><span class="s2">"/some-api-route"</span><span class="p">,</span><span class="w"> </span><span class="n">args</span><span class="p">)</span><span class="w">
+</span><span class="p">}</span><span class="w">
+</span><span class="n">api_args</span><span class="w"> </span><span class="o">&lt;-</span><span class="w"> </span><span class="nf">list</span><span class="p">(</span><span class="n">query</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"*:*"</span><span class="p">,</span><span class="w"> </span><span class="n">limit</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="m">10</span><span class="p">)</span><span class="w">
+</span><span class="n">my_args</span><span class="w"> </span><span class="o">&lt;-</span><span class="w"> </span><span class="n">modifyList</span><span class="p">(</span><span class="n">api_args</span><span class="p">,</span><span class="w"> </span><span class="nf">list</span><span class="p">(</span><span class="n">query</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"bears"</span><span class="p">,</span><span class="w"> </span><span class="n">limit</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="m">300</span><span class="p">))</span><span class="w">
+</span><span class="n">foo</span><span class="p">(</span><span class="n">my_args</span><span class="p">)</span><span class="w">
+</span></code></pre></div></div>
+
+<p>That is, the above would replace this:</p>
+
+<div class="language-r highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="n">foo</span><span class="w"> </span><span class="o">&lt;-</span><span class="w"> </span><span class="k">function</span><span class="p">(</span><span class="n">query</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"*:*"</span><span class="p">,</span><span class="w"> </span><span class="n">limit</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="m">10</span><span class="p">)</span><span class="w"> </span><span class="p">{</span><span class="w">
+  </span><span class="n">get</span><span class="p">(</span><span class="s2">"/some-api-route"</span><span class="p">,</span><span class="w"> </span><span class="nf">list</span><span class="p">(</span><span class="n">query</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">query</span><span class="p">,</span><span class="w"> </span><span class="n">limit</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">limit</span><span class="p">))</span><span class="w">
+</span><span class="p">}</span><span class="w">
+</span><span class="n">foo</span><span class="p">(</span><span class="n">query</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"*:*"</span><span class="p">,</span><span class="w"> </span><span class="n">limit</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="m">10</span><span class="p">)</span><span class="w">
+</span></code></pre></div></div>
+
+<p>So in the first code block the function no longer has a lot of parameters in it. The drawback of this in R (and I’m sure is similar in other languages) is that users lose the autocomplete helpers that most modern IDE’s and text editors have - helping users type less and quickly get a tip on what each parameter is intended to do and importantly (if the developer has documented the function well) what types the parameters expects and what (if any) options there are to pass to the parameter.</p>
+
+<p>Of course a user can “just” read the docs to figure out what each parameter expects, but it sure can save a lot of time if the help is right there in the tooltips of the IDE/text editor. In addition, in R there’s automated checking that parameters in functions are also documented, which is nice for making sure parameters and docs don’t get out of sync. You’d lose this by using a parameter map - though you could document the parameter map - and perhaps wire together some custom code to make sure the parameters in the parameter map are all handled by the function. This does seem like a lot of fuss though compared to simply having the parameters in the function itself.</p>
+
+<p>This approach probably becomes more attractive if a client has many functions that take the same parameters - in which a named parameter map could handle the parameters and any logic behind checking those parameters.</p>
+
+<h2 id="include-no-parameters-in-the-function">Include no parameters in the function</h2>
+
+<p>In other words: Pass all parameters on to the API w/o including any of them in the function - i.e., let the API handle any problems in parameters.</p>
+
+<p>Another approach I’ve not seen written about but that I’ve seen in code is having a rather lite wrapper around an API and letting the API itself sort out any problems due to user inputs.</p>
+
+<p>An example is the <a href="https://gh.r-lib.org/">gh R package</a>, a client for the GitHub API. For query parameters you can pass in named parameters through the ellipsis <code class="language-plaintext highlighter-rouge">...</code>, all of which are passed as query parameters. The gh package does no checking of these parameters (that I know of); simply passes them to the GitHub API. The GitHub API happens to apparently ignore invalid (silently drop) parameters and invalid valuses of parameters (here, “stuff” is an invalid value for the <code class="language-plaintext highlighter-rouge">page</code> parameter).</p>
+
+<div class="language-r highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="n">x</span><span class="w"> </span><span class="o">&lt;-</span><span class="w"> </span><span class="n">gh</span><span class="p">(</span><span class="s2">"GET /users/{username}/repos"</span><span class="p">,</span><span class="w"> </span><span class="n">username</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"gaborcsardi"</span><span class="p">,</span><span class="w"> </span><span class="n">page</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"stuff"</span><span class="p">)</span><span class="w">
+</span><span class="nf">length</span><span class="p">(</span><span class="n">x</span><span class="p">)</span><span class="w">
+</span><span class="c1">#&gt; 30</span><span class="w">
+</span></code></pre></div></div>
+
+<p>I don’t hate this solution, but I don’t love it either. This approach is highly dependent on a well designed API that fails gracefully, with informative error messages and with correct status codes, etc. I would say  most APIs are not as nice as GitHub’s, at least in the scientific API space in which I work.</p>
+
+<p>One plus side of this approach is the R package gh only has one parameter (<code class="language-plaintext highlighter-rouge">...</code>) to handle all query parameters, so you do solve the too many query parameters problem.</p>
+
+<p>Another upside to this approach is you do not have to keep up with any changes in parameters on each API route - for example, an API route could drop one parameter, and add another, and the R client wouldn’t have to change anything (assuming the change in parameters wasn’t associated with a change that breaks code in the client).</p>
+
+<p>A major downside of this approach is that the user often has to mount a time-consuming expedition to figure out what parameters are accepted. Some API clients may document them, and some will simply direct users to the web APIs docs. I think this part alone makes this solution (include no parameters in the function) not a good one since the user experience can be so bad if the documentation is not good. And all developers know its much easier for their docs to get out of date than their code.</p>
+
+<h2 id="include-some-parameters-in-the-function">Include some parameters in the function</h2>
+
+<p>Another approach is to define some query parameters in the function, and handle all others via R’s ellipsis (<code class="language-plaintext highlighter-rouge">...</code>) - or similar in other languages. I’ve seen this relatively often and have used it myself. It’s often used when there’s a clear smaller set of important parameters - those can be put in the function as named parameters. And then there’s a long tail of other parameters that the maintainer thinks are not likely to be used very often. Those can be looked up by the user in the API docs for whatever API the client interacts with.</p>
+
+<p>An example of this is the rOpenSci package <a href="https://docs.ropensci.org/rtweet/">rtweet</a> - a client for the Twitter API. In the <a href="https://docs.ropensci.org/rtweet/reference/search_tweets.html#arguments">search_tweets() function</a> there are a half dozen or so named parameters in the function, but then the ellipsis handles all other parameters.</p>
+
+<p>The drawback to this approach is that no two APIs behave the same way. In the case of Twitter they silently ignore/drop parameters they do not support (same as the GitHub API, see above). For example:</p>
+
+<div class="language-r highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="n">library</span><span class="p">(</span><span class="n">rtweet</span><span class="p">)</span><span class="w">
+</span><span class="n">search_tweets</span><span class="p">(</span><span class="s2">"hillaryclinton"</span><span class="p">,</span><span class="w"> </span><span class="n">n</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="m">3</span><span class="p">,</span><span class="w"> </span><span class="n">foo</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"bar"</span><span class="p">)</span><span class="w">
+</span></code></pre></div></div>
+
+<p>Works just fine even though <code class="language-plaintext highlighter-rouge">foo</code> is absolutely not a parameter supported by the Twitter API. They must ignore parameters they don’t support. This is same behavior as the GitHub API we saw above.</p>
+
+<p>In the case of Twitter and GitHub one might want to raise errors on unsupported parameters client side in rtweet to avoid any use confusion of parameters being silently dropped.</p>
+
+<h2 id="grouping-similar-parameters-together">Grouping similar parameters together</h2>
+
+<p>Many threads (e.g., <a href="https://softwareengineering.stackexchange.com/a/352676/329940">this one</a>) suggest that similar parameters could be grouped together to reduce the number of parameters passed to a function. For example, if a function has the parameters <code class="language-plaintext highlighter-rouge">latitude</code> and <code class="language-plaintext highlighter-rouge">longitude</code> you could group those into a single parameter called e.g., <code class="language-plaintext highlighter-rouge">coordinates</code>.</p>
+
+<div class="language-r highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="c1"># Original function, each parameter separate</span><span class="w">
+</span><span class="n">foo</span><span class="w"> </span><span class="o">&lt;-</span><span class="w"> </span><span class="k">function</span><span class="p">(</span><span class="n">latitude</span><span class="p">,</span><span class="w"> </span><span class="n">longitude</span><span class="p">)</span><span class="w"> </span><span class="p">{</span><span class="w">
+    </span><span class="c1"># do something with latitude/longitude</span><span class="w">
+    </span><span class="n">latitude</span><span class="w">
+    </span><span class="n">longitude</span><span class="w">
+</span><span class="p">}</span><span class="w">
+
+</span><span class="c1"># Modified function, grouping the two parameters into one</span><span class="w">
+</span><span class="n">foo</span><span class="w"> </span><span class="o">&lt;-</span><span class="w"> </span><span class="k">function</span><span class="p">(</span><span class="n">coordinates</span><span class="p">)</span><span class="w"> </span><span class="p">{</span><span class="w">
+    </span><span class="c1"># do something with latitude/longitude</span><span class="w">
+    </span><span class="n">coordinates</span><span class="o">$</span><span class="n">latitude</span><span class="w">
+    </span><span class="n">coordinates</span><span class="o">$</span><span class="n">longitude</span><span class="w">
+</span><span class="p">}</span><span class="w">
+</span></code></pre></div></div>
+
+<p>Though I’ve not tried this approach myself, it might be a good compromise between a function not handling any parameters (i.e., just passing all to the web API unhandled) and handling every parameter individually.</p>
+
+<h2 id="closing-thoughts">Closing thoughts</h2>
+
+<p>The benefit of documenting API query parameters in a client package is that you can tell the user what each parameters expects in language they can understand. That is, if you simply direct users to the docs for the web API with which the client interacts, the API docs could be not very good and/or specify types expected that the user may not understand. In addition, there may be edge cases or similar with some parameters that are not documented in the API docs but that you can document in the client docs for each parameter.</p>
+
+<p>I would say the vast majority of web API clients I use that do succeed in having very few parameters also have docs in which it’s a nightmare trying to figure out what parameters each method accepts. That is, the pursuit of very few parameters at least is correlated with a very poor user experience  - in my experience.</p>
+
+
+  </div>
+
+  <footer class="postNavigation">
+  
+    <a class="postPrev" href="/2020/09/archived-pkgs/">
+        &laquo; stories behind archived packages
+    </a>
+  
+  
+  </footer>
+
+
+</article>
+
+      </div>
+    </div>
+
+    <footer class="site-footer">
+
+  <div class="wrapper">
+
+    <h2 class="footer-heading small-site-title">Scott Chamberlain</h2>
+
+    <div class="footer-col-wrapper">
+      <div class="footer-col footer-col-1">
+        <ul class="contact-list footer-content">
+          <li>Theme: <a href="http://github.com/hemangsk/Gravity">Gravity</a></li>
+          <li>Made with <i class="fa fa-heart"></i> on <a href="http://jekyllrb.com"><span style="color:black">{ { Jekyll } }</a></span></li>
+
+
+        </ul>
+      </div>
+
+      <div class="footer-col footer-col-2 footer-content">
+        <ul class="social-media-list">
+          
+          <li>
+            <a href="https://github.com/sckott"><span class="icon icon--github"><svg viewBox="0 0 16 16"><path fill="#828282" d="M7.999,0.431c-4.285,0-7.76,3.474-7.76,7.761 c0,3.428,2.223,6.337,5.307,7.363c0.388,0.071,0.53-0.168,0.53-0.374c0-0.184-0.007-0.672-0.01-1.32 c-2.159,0.469-2.614-1.04-2.614-1.04c-0.353-0.896-0.862-1.135-0.862-1.135c-0.705-0.481,0.053-0.472,0.053-0.472 c0.779,0.055,1.189,0.8,1.189,0.8c0.692,1.186,1.816,0.843,2.258,0.645c0.071-0.502,0.271-0.843,0.493-1.037 C4.86,11.425,3.049,10.76,3.049,7.786c0-0.847,0.302-1.54,0.799-2.082C3.768,5.507,3.501,4.718,3.924,3.65 c0,0,0.652-0.209,2.134,0.796C6.677,4.273,7.34,4.187,8,4.184c0.659,0.003,1.323,0.089,1.943,0.261 c1.482-1.004,2.132-0.796,2.132-0.796c0.423,1.068,0.157,1.857,0.077,2.054c0.497,0.542,0.798,1.235,0.798,2.082 c0,2.981-1.814,3.637-3.543,3.829c0.279,0.24,0.527,0.713,0.527,1.437c0,1.037-0.01,1.874-0.01,2.129 c0,0.208,0.14,0.449,0.534,0.373c3.081-1.028,5.302-3.935,5.302-7.362C15.76,3.906,12.285,0.431,7.999,0.431z"/></svg>
+</span><span class="username">sckott</span></a>
+
+          </li>
+          
+
+          
+          <li>
+            <a href="https://twitter.com/sckottie"><span class="icon icon--twitter"><svg viewBox="0 0 16 16"><path fill="#828282" d="M15.969,3.058c-0.586,0.26-1.217,0.436-1.878,0.515c0.675-0.405,1.194-1.045,1.438-1.809c-0.632,0.375-1.332,0.647-2.076,0.793c-0.596-0.636-1.446-1.033-2.387-1.033c-1.806,0-3.27,1.464-3.27,3.27 c0,0.256,0.029,0.506,0.085,0.745C5.163,5.404,2.753,4.102,1.14,2.124C0.859,2.607,0.698,3.168,0.698,3.767 c0,1.134,0.577,2.135,1.455,2.722C1.616,6.472,1.112,6.325,0.671,6.08c0,0.014,0,0.027,0,0.041c0,1.584,1.127,2.906,2.623,3.206 C3.02,9.402,2.731,9.442,2.433,9.442c-0.211,0-0.416-0.021-0.615-0.059c0.416,1.299,1.624,2.245,3.055,2.271 c-1.119,0.877-2.529,1.4-4.061,1.4c-0.264,0-0.524-0.015-0.78-0.046c1.447,0.928,3.166,1.469,5.013,1.469 c6.015,0,9.304-4.983,9.304-9.304c0-0.142-0.003-0.283-0.009-0.423C14.976,4.29,15.531,3.714,15.969,3.058z"/></svg>
+</span><span class="username">sckottie</span></a>
+
+          </li>
+          
+        </ul>
+      </div>
+
+      <div class="footer-col footer-col-3 site-description">
+        <p style="display:inline">RSS</p>
+        <a href="/feed.xml"><i class="fa fa-rss fa-lg"></i></a>&nbsp;
+      </div>
+
+      <!-- Begin Mailchimp Signup Form -->
+      <link href="//cdn-images.mailchimp.com/embedcode/horizontal-slim-10_7.css" rel="stylesheet" type="text/css">
+      <style type="text/css">
+        #mc_embed_signup{background:#fff; clear:left; font:14px Helvetica,Arial,sans-serif; width:100%;}
+      </style>
+      <div id="mc_embed_signup">
+      <form action="https://recology.us7.list-manage.com/subscribe/post?u=8c97c072b016bf98033ec69cd&amp;id=3bc4378262" method="post" id="mc-embedded-subscribe-form" name="mc-embedded-subscribe-form" class="validate" target="_blank" novalidate>
+          <div id="mc_embed_signup_scroll">
+        
+        <input type="email" value="" name="EMAIL" class="email" id="mce-EMAIL" placeholder="email address" required>
+          <div style="position: absolute; left: -5000px;" aria-hidden="true"><input type="text" name="b_8c97c072b016bf98033ec69cd_3bc4378262" tabindex="-1" value=""></div>
+          <div class="clear"><input type="submit" value="Subscribe" name="subscribe" id="mc-embedded-subscribe" class="button"></div>
+          </div>
+      </form>
+      </div>
+
+      <!--End mc_embed_signup-->
+    </div>
+
+  </div>
+
+</footer>
+
+
+    <!--[if !(lt IE 8)]><!-->
+    <script type="text/javascript">
+      (function(){
+        var e = document.createElement('script'); e.type='text/javascript'; e.async = true;
+        e.src = 'https://www.eff.org/doa/widget.min.js';
+        var s = document.getElementsByTagName('script')[0]; s.parentNode.insertBefore(e, s);
+      })();
+    </script>
+    <!--<![endif]-->
+
+  </body>
+
+</html>
