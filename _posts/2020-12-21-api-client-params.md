@@ -1,7 +1,7 @@
 ---
 name: api-client-params
 layout: post
-title: "API client design: how to deal with lots of parameters"
+title: "API client design: how to deal with lots of parameters?"
 date: 2020-12-21
 author: Scott Chamberlain
 sourceslug: _drafts/2020-12-21-api-client-params.md
