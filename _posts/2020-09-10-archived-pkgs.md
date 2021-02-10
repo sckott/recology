@@ -98,8 +98,8 @@ The following are brief stories of why each package was archived on CRAN.
 - **[rjsonapi][]**: [JSON:API](https://jsonapi.org/) is a cool idea - a sort of specification for building APIs in JSON. REST APIs are incredibly variable - this is an attempto standardize it a bit. I thought perhaps JSON:API would be adopted widely and that an R client would be useful for consuming JSON:API services - however, I've seen only very few APIs using JSON:API.
 - **[originr][]**: The idea with `originr` originally was to centralize in one package tools for biologists to get data on "nativity" of species in their studies: are species X and Y native to A, B, and C countries. I was lucky to get a collaborator ([Ignasi Bartomeus](https://github.com/ibartomeus)) to help on that package. The package simply was not used much at all, and the data sources used were very flaky, making for a buggy user experience.
 - **[geoaxe][]**: This package always had a very narrow scope. It was created to solve a problem in two widely used packages: [rgbif][] and [spocc][]. In both of those packages we needed to take user input of a Well-known text (WKT) string representing a polygon in which the user wanted to search for something in a remote data source. And with that WKT we would chop up the polygon into smaller polygons to be submitted in multiple (spatial) requests instead of one very large (spatial) request. I didn't want to depend on the heavy `rgdal` depenency, so I cooked up `geoaxe` that only used `sp` and `rgeos`. `geoaxe` lasted for many years, but there's better tools out there now, so it was archived.
-- **[lawn][]**: This package started out when I was trying to see what we could do in spatial R packages. Jeroen had recently created the [V8][] package so you could leverage bundled Javascript libraries in R. [turf.js]() was a neat project for Javascript for spatial analysis and built in a modular, approachable manner - I thought. So collaborator [Jeff Hollister](https://github.com/jhollist) and I wrapped turf.js in R. It was not used that much - and especially not used much after the rise of sf and related "tidy" spatial packages, leading to archival.
-- **[geoops][]**: This package was a direct extension of `lawn`. I wanted to learn how to make an R package mostly out of C++, with just a thin layer of R on top. Like `lawn`, `geoops` was not used much at all as far as I could tell, maybe partly because it focused only on GeoJSON - but this was also during the rise of `sf` and friends. I moved it to my own personal account just as a little C++ in R playground in case I want to brush up on that.
+- **[lawn][]**: This package started out when I was trying to see what we could do in spatial R packages, specifically around GeoJSON. Jeroen had recently created the [V8][] package so you could leverage bundled Javascript libraries in R. [turf.js](https://turfjs.org/) was a neat project for Javascript for spatial analysis and built in a modular, approachable manner - I thought. So collaborator [Jeff Hollister](https://github.com/jhollist) and I wrapped turf.js in R. It was not used that much - and especially not used much after the rise of sf and related "tidy" spatial packages, leading to archival.
+- **[geoops][]**: This package was a follow on from `lawn`, in exploring more GeoJSON focused work. I wanted to learn how to make an R package mostly out of C++, with just a thin layer of R on top. Like `lawn`, `geoops` was not used much at all as far as I could tell, maybe partly because it focused only on GeoJSON - but this was also during the rise of `sf` and friends. I moved it to my own personal account just as a little C++ in R playground in case I want to brush up on that.
 - **[pleiades][]**: I don't remember how or why this package started. It was a client for Pleiades (<https://pleiades.stoa.org/home>), a database of historical geographic information about the ancient world. It was used very, very little as far as I could tell - so was archived.
 - **[rif][]**: This package was started after a some exploration of what R work we (rOpenSci) could do in the neuroscience field. It was a client for the Neuroscience Information Framework (<https://neuinfo.org/>), a database of neuroscience information. Another package not used - so was archived.
 - **[rbraries][]**: This package started because I thought rOpenSci would make use of the metadata around R package downloads/etc. that <https://libraries.io/> collected. We never ended up using the data - and no one seemed to use the package - so was archived.
@@ -124,12 +124,13 @@ As a summary of the lists above, a list of the major reasons each package was ar
   - rtimes
   - originr
   - geaoxe
-  - lawn
-  - geoops
   - pleiades
   - rif
   - rbraries
   - ccafs
+- The fall of the GeoJSON-verse [^1]
+  - lawn
+  - geoops
 - Bad/retired service
   - rtimes
   - seaaroundus
@@ -147,7 +148,9 @@ As a summary of the lists above, a list of the major reasons each package was ar
 - Out of scope
   - rsunlight
 
+Footnotes:
 
+[^1]: although, `geojsonsf` is very successful so I think my projects were just crap I guess :)
 
 [mapr]: https://github.com/ropensci/mapr
 [spocc]: https://github.com/ropensci/spocc
@@ -158,6 +161,7 @@ As a summary of the lists above, a list of the major reasons each package was ar
 [solrium]: https://github.com/ropensci/solrium
 [binomen]: https://github.com/ropensci/binomen
 [taxa]: https://github.com/ropensci/taxa
+[rgbif]: https://github.com/ropensci/rgbif
 [nneo]: https://github.com/ropensci-archive/nneo
 [seaaroundus]: https://github.com/ropensci-archive/seaaroundus
 [rgauges]: https://github.com/ropensci-archive/rgauges
@@ -174,3 +178,4 @@ As a summary of the lists above, a list of the major reasons each package was ar
 [rif]: https://github.com/ropensci-archive/rif
 [rbraries]: https://github.com/ropensci-archive/rbraries
 [ccafs]: https://github.com/ropensci-archive/ccafs
+[V8]: https://github.com/jeroen/v8
