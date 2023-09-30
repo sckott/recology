@@ -8,7 +8,7 @@ sourceslug: _drafts/2021-11-27-mocking-redirects.Rmd
 tags:
 - R
 - http
-- api
+- API
 ---
 
 

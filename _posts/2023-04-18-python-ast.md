@@ -6,7 +6,7 @@ date: 2023-04-18
 author: Scott Chamberlain
 sourceslug: _drafts/2023-04-18-python-ast.Rmd
 tags:
-- Python
+- python
 - programming
 - ast
 ---

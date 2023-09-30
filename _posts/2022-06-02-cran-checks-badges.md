@@ -6,7 +6,7 @@ date: 2022-06-02
 author: Scott Chamberlain
 sourceslug: _posts/2022-06-02-cran-checks-badges.md
 tags:
-- r
+- R
 - cran
 ---
 

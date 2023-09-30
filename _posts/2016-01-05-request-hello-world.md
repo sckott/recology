@@ -7,7 +7,7 @@ author: Scott Chamberlain
 sourceslug: _drafts/2016-01-05-request-hello-world.Rmd
 tags:
 - R
-- api
+- API
 - http
 - DSL
 - httr

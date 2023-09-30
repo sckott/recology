@@ -9,8 +9,8 @@ tags:
 - R
 - altmetrics
 - ecology
-- evolution
-- doi
+- Evolution
+- DOI
 ---
 
 
@@ -59,7 +59,7 @@ while (is.character(token) == TRUE) {
 
 *********
 
-### Yay!  Hopefully it worked if you tried it.  Let's see how long the list of journal titles is. 
+### Yay!  Hopefully it worked if you tried it.  Let's see how long the list of journal titles is.
 
 {% highlight r linenos %}
 sapply(nameslist, length)  # length of each list
@@ -91,7 +91,7 @@ length(allnames)
 *********
 
 
-### Now, let's use some `regex` to pull out the journal titles that are likely ecology and evolutionary biology journals.  The `^` symbol says "the string must start here". The `\\s` means whitespace.  The `[]` lets you specify a set of letters you are looking for, e.g., `[Ee]` means capital `E` *OR* lowercase `e`.  I threw in titles that had the words systematic and natrualist too.  Tried to trim any whitespace as well using the `stringr` package. 
+### Now, let's use some `regex` to pull out the journal titles that are likely ecology and evolutionary biology journals.  The `^` symbol says "the string must start here". The `\\s` means whitespace.  The `[]` lets you specify a set of letters you are looking for, e.g., `[Ee]` means capital `E` *OR* lowercase `e`.  I threw in titles that had the words systematic and natrualist too.  Tried to trim any whitespace as well using the `stringr` package.
 
 {% highlight r linenos %}
 library(stringr)

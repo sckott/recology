@@ -11,7 +11,7 @@ tags:
 - exceptions
 - exception handling
 - API
-- HTTP
+- http
 ---
 
 I was listening to a Bike Shed podcast [episode 189, "It's Gonna Work, Definitely, No Problems Whatsoever"](http://bikeshed.fm/189), and starting at 27:44 there was a conversation about exception handling. Specifically it was about exception handling in control flow when doing web API requests. This topic piqued my interest straight away as I do a lot of API stuff (making and wrapping).

@@ -7,8 +7,8 @@ author: Scott Chamberlain
 sourceslug: _drafts/2014-12-08-icanhaz-altmetrics.Rmd
 tags:
 - R
-- Python
-- Ruby
+- python
+- ruby
 - API
 - altmetrics
 ---

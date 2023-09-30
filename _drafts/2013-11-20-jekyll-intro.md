@@ -5,7 +5,7 @@ title: Jekyll - an intro
 date: 2013-11-20
 author: Scott Chamberlain
 tags:
-- r
+- R
 - github
 - jekyll
 - ruby
@@ -93,7 +93,7 @@ Github gives you one repo that you can name `<yourgithubusername>.github.io` tha
 
 *Beginners take note:* Instead of the command line, you could use a Git GUI, from Github ([OSX](http://mac.github.com/), [Windows](http://windows.github.com/)), or others, e.g., [GitBox](http://gitboxapp.com/).
 
-### Other info 
+### Other info
 
 That's the basics of how to get started. Inevitably, you'll run into problems with various dependencies. The [Jekyll site](http://jekyllrb.com/) has a lot of documntation now, so go there for help - and see a roundup of links below. 
 

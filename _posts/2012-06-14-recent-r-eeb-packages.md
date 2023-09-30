@@ -9,7 +9,7 @@ tags:
 - R
 - python
 - ecology
-- evolution
+- Evolution
 ---
 
 Many R packages/tools have come out recently for doing ecology and evolution. All of the below were described in Methods in Ecology and Evolution, except for spider, which came out in [Molecular Ecology Resources][mer]. Here are some highlights.

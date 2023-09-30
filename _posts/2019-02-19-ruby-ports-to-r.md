@@ -7,7 +7,7 @@ author: Scott Chamberlain
 sourceslug: _posts/2019-02-19-ruby-ports-to-r.md
 tags:
 - R
-- Ruby
+- ruby
 ---
 
 In doing a number of ports of Ruby gems to R ([vcr][], [webmockr][]), I've noticed a few differences between the languages that are fun to dive into, at least for me.
