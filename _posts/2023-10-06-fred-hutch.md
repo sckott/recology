@@ -17,7 +17,7 @@ I'm super thrilled to have landed a job (Software and Reproducibility Software D
 
 I'm excited to help support the DASL mission to help cancer patients, care providers and researchers. 
 
-In addition, I get to do a bunch (maybe all?) of software work as opensource. After two jobs where opensource wasn't really part of the job, it's such a treat to get back to doing opensource work. Perhaps it will mostly be conversing with Fred Hutch people, but the goal is to make tools that will help far beyond Fred Hutch.
+In addition, I get to do a bunch (maybe all?) of software work as opensource, mostly in R and Python. After two jobs where opensource wasn't really part of the job, it's such a treat to get back to doing opensource work. Perhaps it will mostly be conversing with Fred Hutch people, but the goal is to make tools that will help far beyond Fred Hutch.
 
 
 
