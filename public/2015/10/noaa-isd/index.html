@@ -1,0 +1,410 @@
+<!DOCTYPE html>
+<html lang="en" dir="auto">
+
+<head><script src="/livereload.js?mindelay=10&amp;v=2&amp;port=1313&amp;path=livereload" data-no-instant defer></script><meta charset="utf-8">
+<meta http-equiv="X-UA-Compatible" content="IE=edge">
+<meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
+<meta name="robots" content="noindex, nofollow">
+<title>noaa - Integrated Surface Database data | Recology</title>
+<meta name="keywords" content="R, API, climate">
+<meta name="description" content="I&rsquo;ve recently made some improvements to the functions that work with ISD (Integrated Surface Database) data.
+isd data
+The isd() function now caches more intelligently. We now cache using .rds files via saveRDS/readRDS, whereas we used to use .csv files, which take up much more disk space, and we have to worry about not changing data formats on reading data back into an R session. This has the downside that you can&rsquo;t just go directly to open up a cached file in your favorite spreadsheet viewer, but you can do that manually after reading in to R.">
+<meta name="author" content="Scott Chamberlain">
+<link rel="canonical" href="http://localhost:1313/2015/10/noaa-isd/">
+<link crossorigin="anonymous" href="/assets/css/stylesheet.f4cda22486791d430ef692108ba33a982c3c552eca57e99456bb55aa4bd22568.css" integrity="sha256-9M2iJIZ5HUMO9pIQi6M6mCw8VS7KV&#43;mUVrtVqkvSJWg=" rel="preload stylesheet" as="style">
+<link rel="icon" href="http://localhost:1313/favicon.ico">
+<link rel="icon" type="image/png" sizes="16x16" href="http://localhost:1313/favicon-16x16.png">
+<link rel="icon" type="image/png" sizes="32x32" href="http://localhost:1313/favicon-32x32.png">
+<link rel="apple-touch-icon" href="http://localhost:1313/apple-touch-icon.png">
+<link rel="mask-icon" href="http://localhost:1313/safari-pinned-tab.svg">
+<meta name="theme-color" content="#2e2e33">
+<meta name="msapplication-TileColor" content="#2e2e33">
+<link rel="alternate" hreflang="en" href="http://localhost:1313/2015/10/noaa-isd/">
+<noscript>
+    <style>
+        #theme-toggle,
+        .top-link {
+            display: none;
+        }
+
+    </style>
+    <style>
+        @media (prefers-color-scheme: dark) {
+            :root {
+                --theme: rgb(29, 30, 32);
+                --entry: rgb(46, 46, 51);
+                --primary: rgb(218, 218, 219);
+                --secondary: rgb(155, 156, 157);
+                --tertiary: rgb(65, 66, 68);
+                --content: rgb(196, 196, 197);
+                --code-block-bg: rgb(46, 46, 51);
+                --code-bg: rgb(55, 56, 62);
+                --border: rgb(51, 51, 51);
+            }
+
+            .list {
+                background: var(--theme);
+            }
+
+            .list:not(.dark)::-webkit-scrollbar-track {
+                background: 0 0;
+            }
+
+            .list:not(.dark)::-webkit-scrollbar-thumb {
+                border-color: var(--theme);
+            }
+        }
+
+    </style>
+</noscript>
+</head>
+
+<body class="" id="top">
+<script>
+    if (localStorage.getItem("pref-theme") === "dark") {
+        document.body.classList.add('dark');
+    } else if (localStorage.getItem("pref-theme") === "light") {
+        document.body.classList.remove('dark')
+    } else if (window.matchMedia('(prefers-color-scheme: dark)').matches) {
+        document.body.classList.add('dark');
+    }
+
+</script>
+
+<header class="header">
+    <nav class="nav">
+        <div class="logo">
+            <a href="http://localhost:1313/" accesskey="h" title="Recology (Alt + H)">Recology</a>
+            <div class="logo-switches">
+                <button id="theme-toggle" accesskey="t" title="(Alt + T)">
+                    <svg id="moon" xmlns="http://www.w3.org/2000/svg" width="24" height="18" viewBox="0 0 24 24"
+                        fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
+                        stroke-linejoin="round">
+                        <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path>
+                    </svg>
+                    <svg id="sun" xmlns="http://www.w3.org/2000/svg" width="24" height="18" viewBox="0 0 24 24"
+                        fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
+                        stroke-linejoin="round">
+                        <circle cx="12" cy="12" r="5"></circle>
+                        <line x1="12" y1="1" x2="12" y2="3"></line>
+                        <line x1="12" y1="21" x2="12" y2="23"></line>
+                        <line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line>
+                        <line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line>
+                        <line x1="1" y1="12" x2="3" y2="12"></line>
+                        <line x1="21" y1="12" x2="23" y2="12"></line>
+                        <line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line>
+                        <line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line>
+                    </svg>
+                </button>
+                <ul class="lang-switch"><li>|</li>
+                </ul>
+            </div>
+        </div>
+        <ul id="menu">
+            <li>
+                <a href="http://localhost:1313/" title="Home">
+                    <span>Home</span>
+                </a>
+            </li>
+            <li>
+                <a href="http://localhost:1313/about" title="About">
+                    <span>About</span>
+                </a>
+            </li>
+            <li>
+                <a href="http://localhost:1313/archives" title="Archive">
+                    <span>Archive</span>
+                </a>
+            </li>
+            <li>
+                <a href="http://localhost:1313/search" title="Search (Alt &#43; /)" accesskey=/>
+                    <span>Search</span>
+                </a>
+            </li>
+            <li>
+                <a href="http://localhost:1313/index.xml" title="RSS">
+                    <span>RSS</span>
+                </a>
+            </li>
+        </ul>
+    </nav>
+</header>
+<main class="main">
+
+<article class="post-single">
+  <header class="post-header">
+    
+    <h1 class="post-title entry-hint-parent">
+      noaa - Integrated Surface Database data
+    </h1>
+    <div class="post-meta"><span title='2015-10-21 00:00:00 +0000 UTC'>October 21, 2015</span>&nbsp;·&nbsp;4 min&nbsp;·&nbsp;Scott Chamberlain
+
+</div>
+  </header> 
+  <div class="post-content"><p>I&rsquo;ve recently made some improvements to the functions that work with ISD
+(Integrated Surface Database) data.</p>
+<p><strong>isd data</strong></p>
+<ul>
+<li>The <code>isd()</code> function now caches more intelligently. We now cache using
+<code>.rds</code> files via <code>saveRDS</code>/<code>readRDS</code>, whereas we used to use <code>.csv</code> files,
+which take up much more disk space, and we have to worry about not changing
+data formats on reading data back into an R session. This has the downside
+that you can&rsquo;t just go directly to open up a cached file in your favorite
+spreadsheet viewer, but you can do that manually after reading in to R.</li>
+<li>In addition, <code>isd()</code> now has a function <code>cleanup</code>, if <code>TRUE</code> after
+downloading the data file from NOAA&rsquo;s ftp server and processing, we delete
+the file. That&rsquo;s fine since we have the cached processed file. But you
+can choose not to cleanup the original data files.</li>
+<li>Data processing in <code>isd()</code> is improved as well. We convert key variables
+to appropriate classes to be more useful.</li>
+</ul>
+<p><strong>isd stations</strong></p>
+<ul>
+<li>In <code>isd_stations()</code>, there&rsquo;s now a cached version of the station data in
+the package, or you can get optionally get fresh station data from NOAA&rsquo;s
+FTP server.</li>
+<li>There&rsquo;s a new function <code>isd_stations_search()</code> that uses the station data
+to allow you to search for stations via either:
+<ul>
+<li>A bounding box</li>
+<li>Radius froma point</li>
+</ul>
+</li>
+</ul>
+<h2 id="install">Install<a hidden class="anchor" aria-hidden="true" href="#install">#</a></h2>
+<p>For examples below, you&rsquo;ll need the development version:</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-r" data-lang="r"><span style="display:flex;"><span>devtools<span style="color:#f92672">::</span><span style="color:#a6e22e">install_github</span>(<span style="color:#e6db74">&#34;ropensci/rnoaa&#34;</span>)
+</span></span></code></pre></div><p>Load <code>rnoaa</code></p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-r" data-lang="r"><span style="display:flex;"><span><span style="color:#a6e22e">library</span>(<span style="color:#e6db74">&#34;rnoaa&#34;</span>)
+</span></span></code></pre></div><h2 id="isd-stations">ISD stations<a hidden class="anchor" aria-hidden="true" href="#isd-stations">#</a></h2>
+<h3 id="get-stations">Get stations<a hidden class="anchor" aria-hidden="true" href="#get-stations">#</a></h3>
+<p>There&rsquo;s a cached version of the station data in the package, or you can get fresh
+station data from NOAA&rsquo;s FTP server.</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-r" data-lang="r"><span style="display:flex;"><span>stations <span style="color:#f92672">&lt;-</span> <span style="color:#a6e22e">isd_stations</span>()
+</span></span><span style="display:flex;"><span><span style="color:#a6e22e">head</span>(stations)
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt;   usaf  wban station_name ctry state icao lat lon elev_m    begin      end</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; 1 7005 99999   CWOS 07005                  NA  NA     NA 20120127 20120127</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; 2 7011 99999   CWOS 07011                  NA  NA     NA 20111025 20121129</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; 3 7018 99999   WXPOD 7018                   0   0   7018 20110309 20130730</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; 4 7025 99999   CWOS 07025                  NA  NA     NA 20120127 20120127</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; 5 7026 99999   WXPOD 7026   AF              0   0   7026 20120713 20141120</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; 6 7034 99999   CWOS 07034                  NA  NA     NA 20121024 20121106</span>
+</span></span></code></pre></div><h3 id="filter-and-visualize-stations">Filter and visualize stations<a hidden class="anchor" aria-hidden="true" href="#filter-and-visualize-stations">#</a></h3>
+<p>In addition to getting the entire station data.frame, you can also search for stations,
+either with a bounding box or within a radius from a point. First, the bounding box</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-r" data-lang="r"><span style="display:flex;"><span>bbox <span style="color:#f92672">&lt;-</span> <span style="color:#a6e22e">c</span>(<span style="color:#ae81ff">-125.0</span>, <span style="color:#ae81ff">38.4</span>, <span style="color:#ae81ff">-121.8</span>, <span style="color:#ae81ff">40.9</span>)
+</span></span><span style="display:flex;"><span>out <span style="color:#f92672">&lt;-</span> <span style="color:#a6e22e">isd_stations_search</span>(bbox <span style="color:#f92672">=</span> bbox)
+</span></span><span style="display:flex;"><span><span style="color:#a6e22e">head</span>(out)
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt;     usaf  wban                          station_name ctry state icao</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; 1 720193 99999 LONNIE POOL FLD / WEAVERVILLE AIRPORT   US    CA KO54</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; 2 724834 99999                        POINT CABRILLO   US    CA     </span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; 3 724953 99999                              RIO NIDO   US    CA     </span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; 4 724957 23213                 SONOMA COUNTY AIRPORT   US    CA KSTS</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; 5 724957 99999                  C M SCHULZ SONOMA CO   US    CA KSTS</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; 6 724970 99999                  CHICO CALIFORNIA MAP   US    CA  CIC</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt;   elev_m    begin      end      lon    lat</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; 1  716.0 20101030 20150831 -122.922 40.747</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; 2   20.0 19810906 19871007 -123.820 39.350</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; 3 -999.0 19891111 19900303 -122.917 38.517</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; 4   34.8 20000101 20150831 -122.810 38.504</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; 5   38.0 19430404 19991231 -122.817 38.517</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; 6   69.0 19420506 19760305 -121.850 39.783</span>
+</span></span></code></pre></div><p>Where is the bounding box? (you&rsquo;ll need <a href="https://cran.rstudio.com/web/packages/lawn/">lawn</a>, or you can vizualize some other way)</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-r" data-lang="r"><span style="display:flex;"><span><span style="color:#a6e22e">library</span>(<span style="color:#e6db74">&#34;lawn&#34;</span>)
+</span></span><span style="display:flex;"><span>lawn<span style="color:#f92672">::</span><span style="color:#a6e22e">lawn_bbox_polygon</span>(bbox) <span style="color:#f92672">%&gt;%</span> view
+</span></span></code></pre></div><p><img loading="lazy" src="/2015-10-21-noaa-isd/bbox_area.png" alt="plot1"  />
+</p>
+<p>Vizualize station subset - yep, looks right</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-r" data-lang="r"><span style="display:flex;"><span><span style="color:#a6e22e">library</span>(<span style="color:#e6db74">&#34;leaflet&#34;</span>)
+</span></span><span style="display:flex;"><span><span style="color:#a6e22e">leaflet</span>(data <span style="color:#f92672">=</span> out) <span style="color:#f92672">%&gt;%</span>
+</span></span><span style="display:flex;"><span>  <span style="color:#a6e22e">addTiles</span>() <span style="color:#f92672">%&gt;%</span>
+</span></span><span style="display:flex;"><span>  <span style="color:#a6e22e">addCircles</span>()
+</span></span></code></pre></div><p><img loading="lazy" src="/2015-10-21-noaa-isd/bbox_result.png" alt="plot1"  />
+</p>
+<p>Next, search with a lat/lon coordinate, with a radius. That is, we search for stations
+within X km from the coordinate.</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-r" data-lang="r"><span style="display:flex;"><span>out <span style="color:#f92672">&lt;-</span> <span style="color:#a6e22e">isd_stations_search</span>(lat <span style="color:#f92672">=</span> <span style="color:#ae81ff">38.4</span>, lon <span style="color:#f92672">=</span> <span style="color:#ae81ff">-123</span>, radius <span style="color:#f92672">=</span> <span style="color:#ae81ff">250</span>)
+</span></span><span style="display:flex;"><span><span style="color:#a6e22e">head</span>(out)
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt;     usaf  wban             station_name ctry state icao elev_m    begin</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; 1 690070 93217            FRITZSCHE AAF   US    CA KOAR   43.0 19600404</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; 2 720267 23224 AUBURN MUNICIPAL AIRPORT   US    CA KAUN  466.7 20060101</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; 3 720267 99999         AUBURN MUNICIPAL   US    CA KAUN  468.0 20040525</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; 4 720406 99999      GNOSS FIELD AIRPORT   US    CA KDVO    0.6 20071114</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; 5 720576   174       UNIVERSITY AIRPORT   US    CA KEDU   21.0 20130101</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; 6 720576 99999                    DAVIS   US    CA KEDU   21.0 20080721</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt;        end      lon    lat</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; 1 19930831 -121.767 36.683</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; 2 20150831 -121.082 38.955</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; 3 20051231 -121.082 38.955</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; 4 20150831 -122.550 38.150</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; 5 20150831 -121.783 38.533</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; 6 20121231 -121.783 38.533</span>
+</span></span></code></pre></div><p>Again, compare search area to stations found</p>
+<p><em>search area</em></p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-r" data-lang="r"><span style="display:flex;"><span>pt <span style="color:#f92672">&lt;-</span> lawn<span style="color:#f92672">::</span><span style="color:#a6e22e">lawn_point</span>(<span style="color:#a6e22e">c</span>(<span style="color:#ae81ff">-123</span>, <span style="color:#ae81ff">38.4</span>))
+</span></span><span style="display:flex;"><span>lawn<span style="color:#f92672">::</span><span style="color:#a6e22e">lawn_buffer</span>(pt, dist <span style="color:#f92672">=</span> <span style="color:#ae81ff">250</span>) <span style="color:#f92672">%&gt;%</span> view
+</span></span></code></pre></div><p><img loading="lazy" src="/2015-10-21-noaa-isd/circle_radius.png" alt="plot1"  />
+</p>
+<p><em>stations found</em></p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-r" data-lang="r"><span style="display:flex;"><span><span style="color:#a6e22e">leaflet</span>(data <span style="color:#f92672">=</span> out) <span style="color:#f92672">%&gt;%</span>
+</span></span><span style="display:flex;"><span>  <span style="color:#a6e22e">addTiles</span>() <span style="color:#f92672">%&gt;%</span>
+</span></span><span style="display:flex;"><span>  <span style="color:#a6e22e">addCircles</span>()
+</span></span></code></pre></div><p><img loading="lazy" src="/2015-10-21-noaa-isd/lastplot.png" alt="plot1"  />
+</p>
+<h2 id="isd-data">ISD data<a hidden class="anchor" aria-hidden="true" href="#isd-data">#</a></h2>
+<h3 id="get-isd-data">Get ISD data<a hidden class="anchor" aria-hidden="true" href="#get-isd-data">#</a></h3>
+<p>Here, I get data for four stations.</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-r" data-lang="r"><span style="display:flex;"><span>res1 <span style="color:#f92672">&lt;-</span> <span style="color:#a6e22e">isd</span>(usaf<span style="color:#f92672">=</span><span style="color:#e6db74">&#34;011690&#34;</span>, wban<span style="color:#f92672">=</span><span style="color:#e6db74">&#34;99999&#34;</span>, year<span style="color:#f92672">=</span><span style="color:#ae81ff">1993</span>)
+</span></span><span style="display:flex;"><span>res2 <span style="color:#f92672">&lt;-</span> <span style="color:#a6e22e">isd</span>(usaf<span style="color:#f92672">=</span><span style="color:#e6db74">&#34;172007&#34;</span>, wban<span style="color:#f92672">=</span><span style="color:#e6db74">&#34;99999&#34;</span>, year<span style="color:#f92672">=</span><span style="color:#ae81ff">2015</span>)
+</span></span><span style="display:flex;"><span>res3 <span style="color:#f92672">&lt;-</span> <span style="color:#a6e22e">isd</span>(usaf<span style="color:#f92672">=</span><span style="color:#e6db74">&#34;702700&#34;</span>, wban<span style="color:#f92672">=</span><span style="color:#e6db74">&#34;00489&#34;</span>, year<span style="color:#f92672">=</span><span style="color:#ae81ff">2015</span>)
+</span></span><span style="display:flex;"><span>res4 <span style="color:#f92672">&lt;-</span> <span style="color:#a6e22e">isd</span>(usaf<span style="color:#f92672">=</span><span style="color:#e6db74">&#34;109711&#34;</span>, wban<span style="color:#f92672">=</span><span style="color:#ae81ff">99999</span>, year<span style="color:#f92672">=</span><span style="color:#ae81ff">1970</span>)
+</span></span></code></pre></div><p>Then, combine data, with <code>rnoaa:::rbind.isd()</code></p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-r" data-lang="r"><span style="display:flex;"><span>res_all <span style="color:#f92672">&lt;-</span> <span style="color:#a6e22e">rbind</span>(res1, res2, res3, res4)
+</span></span></code></pre></div><p>Add date time</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-r" data-lang="r"><span style="display:flex;"><span><span style="color:#a6e22e">library</span>(<span style="color:#e6db74">&#34;lubridate&#34;</span>)
+</span></span><span style="display:flex;"><span>res_all<span style="color:#f92672">$</span>date_time <span style="color:#f92672">&lt;-</span> <span style="color:#a6e22e">ymd_hm</span>(
+</span></span><span style="display:flex;"><span>  <span style="color:#a6e22e">sprintf</span>(<span style="color:#e6db74">&#34;%s %s&#34;</span>, <span style="color:#a6e22e">as.character</span>(res_all<span style="color:#f92672">$</span>date), res_all<span style="color:#f92672">$</span>time)
+</span></span><span style="display:flex;"><span>)
+</span></span></code></pre></div><p>Remove 999&rsquo;s (NOAA&rsquo;s way to indicate missing/no data)</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-r" data-lang="r"><span style="display:flex;"><span><span style="color:#a6e22e">library</span>(<span style="color:#e6db74">&#34;dplyr&#34;</span>)
+</span></span><span style="display:flex;"><span>res_all <span style="color:#f92672">&lt;-</span> res_all <span style="color:#f92672">%&gt;%</span> <span style="color:#a6e22e">filter</span>(temperature <span style="color:#f92672">&lt;</span> <span style="color:#ae81ff">900</span>)
+</span></span></code></pre></div><h3 id="visualize-isd-data">Visualize ISD data<a hidden class="anchor" aria-hidden="true" href="#visualize-isd-data">#</a></h3>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-r" data-lang="r"><span style="display:flex;"><span><span style="color:#a6e22e">library</span>(<span style="color:#e6db74">&#34;ggplot2&#34;</span>)
+</span></span><span style="display:flex;"><span><span style="color:#a6e22e">ggplot</span>(res_all, <span style="color:#a6e22e">aes</span>(date_time, temperature)) <span style="color:#f92672">+</span>
+</span></span><span style="display:flex;"><span>  <span style="color:#a6e22e">geom_line</span>() <span style="color:#f92672">+</span> 
+</span></span><span style="display:flex;"><span>  <span style="color:#a6e22e">facet_wrap</span>(<span style="color:#f92672">~</span>usaf_station, scales <span style="color:#f92672">=</span> <span style="color:#e6db74">&#34;free_x&#34;</span>)
+</span></span></code></pre></div><p><img loading="lazy" src="/2015-10-21-noaa-isd/unnamed-chunk-12-1.png" alt="img"  />
+</p>
+
+
+  </div>
+
+  <footer class="post-footer">
+    <ul class="post-tags">
+      <li><a href="http://localhost:1313/tags/r/">R</a></li>
+      <li><a href="http://localhost:1313/tags/api/">API</a></li>
+      <li><a href="http://localhost:1313/tags/climate/">Climate</a></li>
+    </ul>
+  </footer>
+</article>
+    </main>
+    
+<footer class="footer">
+    <span>&copy; 2024 <a href="http://localhost:1313/">Recology</a></span>
+    <span>
+        Powered by
+        <a href="https://gohugo.io/" rel="noopener noreferrer" target="_blank">Hugo</a> &
+        <a href="https://github.com/adityatelange/hugo-PaperMod/" rel="noopener" target="_blank">PaperMod</a>
+    </span>
+</footer>
+<a href="#top" aria-label="go to top" title="Go to Top (Alt + G)" class="top-link" id="top-link" accesskey="g">
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 12 6" fill="currentColor">
+        <path d="M12 6H0l6-6z" />
+    </svg>
+</a>
+
+<script>
+    let menu = document.getElementById('menu')
+    if (menu) {
+        menu.scrollLeft = localStorage.getItem("menu-scroll-position");
+        menu.onscroll = function () {
+            localStorage.setItem("menu-scroll-position", menu.scrollLeft);
+        }
+    }
+
+    document.querySelectorAll('a[href^="#"]').forEach(anchor => {
+        anchor.addEventListener("click", function (e) {
+            e.preventDefault();
+            var id = this.getAttribute("href").substr(1);
+            if (!window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+                document.querySelector(`[id='${decodeURIComponent(id)}']`).scrollIntoView({
+                    behavior: "smooth"
+                });
+            } else {
+                document.querySelector(`[id='${decodeURIComponent(id)}']`).scrollIntoView();
+            }
+            if (id === "top") {
+                history.replaceState(null, null, " ");
+            } else {
+                history.pushState(null, null, `#${id}`);
+            }
+        });
+    });
+
+</script>
+<script>
+    var mybutton = document.getElementById("top-link");
+    window.onscroll = function () {
+        if (document.body.scrollTop > 800 || document.documentElement.scrollTop > 800) {
+            mybutton.style.visibility = "visible";
+            mybutton.style.opacity = "1";
+        } else {
+            mybutton.style.visibility = "hidden";
+            mybutton.style.opacity = "0";
+        }
+    };
+
+</script>
+<script>
+    document.getElementById("theme-toggle").addEventListener("click", () => {
+        if (document.body.className.includes("dark")) {
+            document.body.classList.remove('dark');
+            localStorage.setItem("pref-theme", 'light');
+        } else {
+            document.body.classList.add('dark');
+            localStorage.setItem("pref-theme", 'dark');
+        }
+    })
+
+</script>
+<script>
+    document.querySelectorAll('pre > code').forEach((codeblock) => {
+        const container = codeblock.parentNode.parentNode;
+
+        const copybutton = document.createElement('button');
+        copybutton.classList.add('copy-code');
+        copybutton.innerHTML = 'copy';
+
+        function copyingDone() {
+            copybutton.innerHTML = 'copied!';
+            setTimeout(() => {
+                copybutton.innerHTML = 'copy';
+            }, 2000);
+        }
+
+        copybutton.addEventListener('click', (cb) => {
+            if ('clipboard' in navigator) {
+                navigator.clipboard.writeText(codeblock.textContent);
+                copyingDone();
+                return;
+            }
+
+            const range = document.createRange();
+            range.selectNodeContents(codeblock);
+            const selection = window.getSelection();
+            selection.removeAllRanges();
+            selection.addRange(range);
+            try {
+                document.execCommand('copy');
+                copyingDone();
+            } catch (e) { };
+            selection.removeRange(range);
+        });
+
+        if (container.classList.contains("highlight")) {
+            container.appendChild(copybutton);
+        } else if (container.parentNode.firstChild == container) {
+            
+        } else if (codeblock.parentNode.parentNode.parentNode.parentNode.parentNode.nodeName == "TABLE") {
+            
+            codeblock.parentNode.parentNode.parentNode.parentNode.parentNode.appendChild(copybutton);
+        } else {
+            
+            codeblock.parentNode.appendChild(copybutton);
+        }
+    });
+</script>
+</body>
+
+</html>

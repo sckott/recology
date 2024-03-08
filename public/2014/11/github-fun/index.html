@@ -1,0 +1,399 @@
+<!DOCTYPE html>
+<html lang="en" dir="auto">
+
+<head><script src="/livereload.js?mindelay=10&amp;v=2&amp;port=1313&amp;path=livereload" data-no-instant defer></script><meta charset="utf-8">
+<meta http-equiv="X-UA-Compatible" content="IE=edge">
+<meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
+<meta name="robots" content="noindex, nofollow">
+<title>Fun with the GitHub API | Recology</title>
+<meta name="keywords" content="R, API, github">
+<meta name="description" content="Recently I&rsquo;ve had fun playing with the GitHub API, and here are some notes to self about this fun having.
+Setup Get/load packages
+install.packages(c(&#39;devtools&#39;,&#39;jsonlite&#39;,&#39;httr&#39;,&#39;yaml&#39;)) library(&#34;devtools&#34;) library(&#34;httr&#34;) library(&#34;yaml&#34;) Define a vector of package names pkgs &lt;- c(&#34;alm&#34;, &#34;bmc&#34;, &#34;bold&#34;, &#34;clifro&#34;, &#34;ecoengine&#34;, &#34;elastic&#34;, &#34;fulltext&#34;, &#34;geonames&#34;, &#34;gistr&#34;, &#34;RNeXML&#34;, &#34;rnoaa&#34;, &#34;rnpn&#34;, &#34;traits&#34;, &#34;rplos&#34;, &#34;rsnps&#34;, &#34;rWBclimate&#34;, &#34;solr&#34;, &#34;spocc&#34;, &#34;taxize&#34;, &#34;togeojson&#34;, &#34;treeBASE&#34;) pkgs &lt;- sort(pkgs) Define functions github_auth &lt;- function(appname = getOption(&#34;gh_appname&#34;), key = getOption(&#34;gh_id&#34;), secret = getOption(&#34;gh_secret&#34;)) { if (is.">
+<meta name="author" content="Scott Chamberlain">
+<link rel="canonical" href="http://localhost:1313/2014/11/github-fun/">
+<link crossorigin="anonymous" href="/assets/css/stylesheet.f4cda22486791d430ef692108ba33a982c3c552eca57e99456bb55aa4bd22568.css" integrity="sha256-9M2iJIZ5HUMO9pIQi6M6mCw8VS7KV&#43;mUVrtVqkvSJWg=" rel="preload stylesheet" as="style">
+<link rel="icon" href="http://localhost:1313/favicon.ico">
+<link rel="icon" type="image/png" sizes="16x16" href="http://localhost:1313/favicon-16x16.png">
+<link rel="icon" type="image/png" sizes="32x32" href="http://localhost:1313/favicon-32x32.png">
+<link rel="apple-touch-icon" href="http://localhost:1313/apple-touch-icon.png">
+<link rel="mask-icon" href="http://localhost:1313/safari-pinned-tab.svg">
+<meta name="theme-color" content="#2e2e33">
+<meta name="msapplication-TileColor" content="#2e2e33">
+<link rel="alternate" hreflang="en" href="http://localhost:1313/2014/11/github-fun/">
+<noscript>
+    <style>
+        #theme-toggle,
+        .top-link {
+            display: none;
+        }
+
+    </style>
+    <style>
+        @media (prefers-color-scheme: dark) {
+            :root {
+                --theme: rgb(29, 30, 32);
+                --entry: rgb(46, 46, 51);
+                --primary: rgb(218, 218, 219);
+                --secondary: rgb(155, 156, 157);
+                --tertiary: rgb(65, 66, 68);
+                --content: rgb(196, 196, 197);
+                --code-block-bg: rgb(46, 46, 51);
+                --code-bg: rgb(55, 56, 62);
+                --border: rgb(51, 51, 51);
+            }
+
+            .list {
+                background: var(--theme);
+            }
+
+            .list:not(.dark)::-webkit-scrollbar-track {
+                background: 0 0;
+            }
+
+            .list:not(.dark)::-webkit-scrollbar-thumb {
+                border-color: var(--theme);
+            }
+        }
+
+    </style>
+</noscript>
+</head>
+
+<body class="" id="top">
+<script>
+    if (localStorage.getItem("pref-theme") === "dark") {
+        document.body.classList.add('dark');
+    } else if (localStorage.getItem("pref-theme") === "light") {
+        document.body.classList.remove('dark')
+    } else if (window.matchMedia('(prefers-color-scheme: dark)').matches) {
+        document.body.classList.add('dark');
+    }
+
+</script>
+
+<header class="header">
+    <nav class="nav">
+        <div class="logo">
+            <a href="http://localhost:1313/" accesskey="h" title="Recology (Alt + H)">Recology</a>
+            <div class="logo-switches">
+                <button id="theme-toggle" accesskey="t" title="(Alt + T)">
+                    <svg id="moon" xmlns="http://www.w3.org/2000/svg" width="24" height="18" viewBox="0 0 24 24"
+                        fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
+                        stroke-linejoin="round">
+                        <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path>
+                    </svg>
+                    <svg id="sun" xmlns="http://www.w3.org/2000/svg" width="24" height="18" viewBox="0 0 24 24"
+                        fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
+                        stroke-linejoin="round">
+                        <circle cx="12" cy="12" r="5"></circle>
+                        <line x1="12" y1="1" x2="12" y2="3"></line>
+                        <line x1="12" y1="21" x2="12" y2="23"></line>
+                        <line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line>
+                        <line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line>
+                        <line x1="1" y1="12" x2="3" y2="12"></line>
+                        <line x1="21" y1="12" x2="23" y2="12"></line>
+                        <line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line>
+                        <line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line>
+                    </svg>
+                </button>
+                <ul class="lang-switch"><li>|</li>
+                </ul>
+            </div>
+        </div>
+        <ul id="menu">
+            <li>
+                <a href="http://localhost:1313/" title="Home">
+                    <span>Home</span>
+                </a>
+            </li>
+            <li>
+                <a href="http://localhost:1313/about" title="About">
+                    <span>About</span>
+                </a>
+            </li>
+            <li>
+                <a href="http://localhost:1313/archives" title="Archive">
+                    <span>Archive</span>
+                </a>
+            </li>
+            <li>
+                <a href="http://localhost:1313/search" title="Search (Alt &#43; /)" accesskey=/>
+                    <span>Search</span>
+                </a>
+            </li>
+            <li>
+                <a href="http://localhost:1313/index.xml" title="RSS">
+                    <span>RSS</span>
+                </a>
+            </li>
+        </ul>
+    </nav>
+</header>
+<main class="main">
+
+<article class="post-single">
+  <header class="post-header">
+    
+    <h1 class="post-title entry-hint-parent">
+      Fun with the GitHub API
+    </h1>
+    <div class="post-meta"><span title='2014-11-26 00:00:00 +0000 UTC'>November 26, 2014</span>&nbsp;·&nbsp;3 min&nbsp;·&nbsp;Scott Chamberlain
+
+</div>
+  </header> 
+  <div class="post-content"><p>Recently I&rsquo;ve had fun playing with the GitHub API, and here are some notes to self about this fun having.</p>
+<h2 id="setup">Setup<a hidden class="anchor" aria-hidden="true" href="#setup">#</a></h2>
+<p>Get/load packages</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-r" data-lang="r"><span style="display:flex;"><span><span style="color:#a6e22e">install.packages</span>(<span style="color:#a6e22e">c</span>(<span style="color:#e6db74">&#39;devtools&#39;</span>,<span style="color:#e6db74">&#39;jsonlite&#39;</span>,<span style="color:#e6db74">&#39;httr&#39;</span>,<span style="color:#e6db74">&#39;yaml&#39;</span>))
+</span></span></code></pre></div><div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-r" data-lang="r"><span style="display:flex;"><span><span style="color:#a6e22e">library</span>(<span style="color:#e6db74">&#34;devtools&#34;</span>)
+</span></span><span style="display:flex;"><span><span style="color:#a6e22e">library</span>(<span style="color:#e6db74">&#34;httr&#34;</span>)
+</span></span><span style="display:flex;"><span><span style="color:#a6e22e">library</span>(<span style="color:#e6db74">&#34;yaml&#34;</span>)
+</span></span></code></pre></div><h2 id="define-a-vector-of-package-names">Define a vector of package names<a hidden class="anchor" aria-hidden="true" href="#define-a-vector-of-package-names">#</a></h2>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-r" data-lang="r"><span style="display:flex;"><span>pkgs <span style="color:#f92672">&lt;-</span> <span style="color:#a6e22e">c</span>(<span style="color:#e6db74">&#34;alm&#34;</span>, <span style="color:#e6db74">&#34;bmc&#34;</span>, <span style="color:#e6db74">&#34;bold&#34;</span>, <span style="color:#e6db74">&#34;clifro&#34;</span>, <span style="color:#e6db74">&#34;ecoengine&#34;</span>,
+</span></span><span style="display:flex;"><span>  <span style="color:#e6db74">&#34;elastic&#34;</span>, <span style="color:#e6db74">&#34;fulltext&#34;</span>, <span style="color:#e6db74">&#34;geonames&#34;</span>, <span style="color:#e6db74">&#34;gistr&#34;</span>,
+</span></span><span style="display:flex;"><span>  <span style="color:#e6db74">&#34;RNeXML&#34;</span>, <span style="color:#e6db74">&#34;rnoaa&#34;</span>, <span style="color:#e6db74">&#34;rnpn&#34;</span>, <span style="color:#e6db74">&#34;traits&#34;</span>, <span style="color:#e6db74">&#34;rplos&#34;</span>, <span style="color:#e6db74">&#34;rsnps&#34;</span>,
+</span></span><span style="display:flex;"><span>  <span style="color:#e6db74">&#34;rWBclimate&#34;</span>, <span style="color:#e6db74">&#34;solr&#34;</span>, <span style="color:#e6db74">&#34;spocc&#34;</span>, <span style="color:#e6db74">&#34;taxize&#34;</span>, <span style="color:#e6db74">&#34;togeojson&#34;</span>, <span style="color:#e6db74">&#34;treeBASE&#34;</span>)
+</span></span><span style="display:flex;"><span>pkgs <span style="color:#f92672">&lt;-</span> <span style="color:#a6e22e">sort</span>(pkgs)
+</span></span></code></pre></div><h2 id="define-functions">Define functions<a hidden class="anchor" aria-hidden="true" href="#define-functions">#</a></h2>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-r" data-lang="r"><span style="display:flex;"><span>github_auth <span style="color:#f92672">&lt;-</span> <span style="color:#66d9ef">function</span>(appname <span style="color:#f92672">=</span> <span style="color:#a6e22e">getOption</span>(<span style="color:#e6db74">&#34;gh_appname&#34;</span>), key <span style="color:#f92672">=</span> <span style="color:#a6e22e">getOption</span>(<span style="color:#e6db74">&#34;gh_id&#34;</span>),
+</span></span><span style="display:flex;"><span>                        secret <span style="color:#f92672">=</span> <span style="color:#a6e22e">getOption</span>(<span style="color:#e6db74">&#34;gh_secret&#34;</span>)) {
+</span></span><span style="display:flex;"><span>  <span style="color:#66d9ef">if</span> (<span style="color:#a6e22e">is.null</span>(<span style="color:#a6e22e">getOption</span>(<span style="color:#e6db74">&#34;gh_token&#34;</span>))) {
+</span></span><span style="display:flex;"><span>    myapp <span style="color:#f92672">&lt;-</span> <span style="color:#a6e22e">oauth_app</span>(appname, key, secret)
+</span></span><span style="display:flex;"><span>    token <span style="color:#f92672">&lt;-</span> <span style="color:#a6e22e">oauth2.0_token</span>(<span style="color:#a6e22e">oauth_endpoints</span>(<span style="color:#e6db74">&#34;github&#34;</span>), myapp)
+</span></span><span style="display:flex;"><span>    <span style="color:#a6e22e">options</span>(gh_token <span style="color:#f92672">=</span> token)
+</span></span><span style="display:flex;"><span>  } <span style="color:#66d9ef">else</span> {
+</span></span><span style="display:flex;"><span>    token <span style="color:#f92672">&lt;-</span> <span style="color:#a6e22e">getOption</span>(<span style="color:#e6db74">&#34;gh_token&#34;</span>)
+</span></span><span style="display:flex;"><span>  }
+</span></span><span style="display:flex;"><span>  <span style="color:#66d9ef">return</span>(token)
+</span></span><span style="display:flex;"><span>}
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>make_url <span style="color:#f92672">&lt;-</span> <span style="color:#66d9ef">function</span>(x, y, z) {
+</span></span><span style="display:flex;"><span>  <span style="color:#a6e22e">sprintf</span>(<span style="color:#e6db74">&#34;https://api.github.com/repos/%s/%s/%s&#34;</span>, x, y, z)
+</span></span><span style="display:flex;"><span>}
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>process_result <span style="color:#f92672">&lt;-</span> <span style="color:#66d9ef">function</span>(x) {
+</span></span><span style="display:flex;"><span>  <span style="color:#a6e22e">stop_for_status</span>(x)
+</span></span><span style="display:flex;"><span>  <span style="color:#66d9ef">if</span> (<span style="color:#f92672">!</span>x<span style="color:#f92672">$</span>headers<span style="color:#f92672">$</span>`content-type` <span style="color:#f92672">==</span> <span style="color:#e6db74">&#34;application/json; charset=utf-8&#34;</span>)
+</span></span><span style="display:flex;"><span>    <span style="color:#a6e22e">stop</span>(<span style="color:#e6db74">&#34;content type mismatch&#34;</span>)
+</span></span><span style="display:flex;"><span>  tmp <span style="color:#f92672">&lt;-</span> <span style="color:#a6e22e">content</span>(x, as <span style="color:#f92672">=</span> <span style="color:#e6db74">&#34;text&#34;</span>)
+</span></span><span style="display:flex;"><span>  jsonlite<span style="color:#f92672">::</span><span style="color:#a6e22e">fromJSON</span>(tmp, flatten <span style="color:#f92672">=</span> <span style="color:#66d9ef">TRUE</span>)
+</span></span><span style="display:flex;"><span>}
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>parse_file <span style="color:#f92672">&lt;-</span> <span style="color:#66d9ef">function</span>(x) {
+</span></span><span style="display:flex;"><span>  tmp <span style="color:#f92672">&lt;-</span> <span style="color:#a6e22e">gsub</span>(<span style="color:#e6db74">&#34;\n\\s+&#34;</span>, <span style="color:#e6db74">&#34;\n&#34;</span>, 
+</span></span><span style="display:flex;"><span>              <span style="color:#a6e22e">paste</span>(<span style="color:#a6e22e">vapply</span>(<span style="color:#a6e22e">strsplit</span>(x, <span style="color:#e6db74">&#34;\n&#34;</span>)[[1]], RCurl<span style="color:#f92672">::</span>base64Decode,
+</span></span><span style="display:flex;"><span>                           <span style="color:#a6e22e">character</span>(<span style="color:#ae81ff">1</span>), USE.NAMES <span style="color:#f92672">=</span> <span style="color:#66d9ef">FALSE</span>), collapse <span style="color:#f92672">=</span> <span style="color:#e6db74">&#34; &#34;</span>))
+</span></span><span style="display:flex;"><span>  lines <span style="color:#f92672">&lt;-</span> <span style="color:#a6e22e">readLines</span>(<span style="color:#a6e22e">textConnection</span>(tmp))
+</span></span><span style="display:flex;"><span>  <span style="color:#a6e22e">vapply</span>(lines, gsub, <span style="color:#a6e22e">character</span>(<span style="color:#ae81ff">1</span>), pattern <span style="color:#f92672">=</span> <span style="color:#e6db74">&#34;\\s&#34;</span>, replacement <span style="color:#f92672">=</span> <span style="color:#e6db74">&#34;&#34;</span>,
+</span></span><span style="display:flex;"><span>         USE.NAMES <span style="color:#f92672">=</span> <span style="color:#66d9ef">FALSE</span>)
+</span></span><span style="display:flex;"><span>}
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>request <span style="color:#f92672">&lt;-</span> <span style="color:#66d9ef">function</span>(owner <span style="color:#f92672">=</span> <span style="color:#e6db74">&#34;ropensci&#34;</span>, repo, file<span style="color:#f92672">=</span><span style="color:#e6db74">&#34;DESCRIPTION&#34;</span>, <span style="color:#66d9ef">...</span>) {
+</span></span><span style="display:flex;"><span>  req <span style="color:#f92672">&lt;-</span> <span style="color:#a6e22e">GET</span>(<span style="color:#a6e22e">make_url</span>(owner, repo, <span style="color:#a6e22e">paste0</span>(<span style="color:#e6db74">&#34;contents/&#34;</span>, file)), 
+</span></span><span style="display:flex;"><span>             config <span style="color:#f92672">=</span> <span style="color:#a6e22e">c</span>(token <span style="color:#f92672">=</span> <span style="color:#a6e22e">github_auth</span>(), <span style="color:#66d9ef">...</span>))
+</span></span><span style="display:flex;"><span>  <span style="color:#66d9ef">if</span>(req<span style="color:#f92672">$</span>status_code <span style="color:#f92672">!=</span> <span style="color:#ae81ff">200</span>) { <span style="color:#66d9ef">NA</span> } <span style="color:#66d9ef">else</span> {
+</span></span><span style="display:flex;"><span>    cts <span style="color:#f92672">&lt;-</span> <span style="color:#a6e22e">process_result</span>(req)<span style="color:#f92672">$</span>content
+</span></span><span style="display:flex;"><span>    <span style="color:#a6e22e">parse_file</span>(cts)
+</span></span><span style="display:flex;"><span>  }
+</span></span><span style="display:flex;"><span>}
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>has_term <span style="color:#f92672">&lt;-</span> <span style="color:#66d9ef">function</span>(what, <span style="color:#66d9ef">...</span>) <span style="color:#a6e22e">any</span>(<span style="color:#a6e22e">grepl</span>(what, <span style="color:#a6e22e">request</span>(<span style="color:#66d9ef">...</span>)))
+</span></span><span style="display:flex;"><span>has_file <span style="color:#f92672">&lt;-</span> <span style="color:#66d9ef">function</span>(what, <span style="color:#66d9ef">...</span>) <span style="color:#66d9ef">if</span>(<span style="color:#a6e22e">all</span>(<span style="color:#a6e22e">is.na</span>(<span style="color:#a6e22e">request</span>(file <span style="color:#f92672">=</span> what, <span style="color:#66d9ef">...</span>)))) <span style="color:#66d9ef">FALSE</span> <span style="color:#66d9ef">else</span> <span style="color:#66d9ef">TRUE</span>
+</span></span></code></pre></div><h2 id="do-stuff">Do stuff<a hidden class="anchor" aria-hidden="true" href="#do-stuff">#</a></h2>
+<p>Does a package depend on a particular package? e.g., look for <code>httr</code> in the <code>DESCRIPTION</code> file (which is the default file name in <code>request()</code> above)</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-r" data-lang="r"><span style="display:flex;"><span><span style="color:#a6e22e">has_term</span>(<span style="color:#e6db74">&#34;httr&#34;</span>, repo<span style="color:#f92672">=</span><span style="color:#e6db74">&#34;taxize&#34;</span>)
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; [1] TRUE</span>
+</span></span><span style="display:flex;"><span><span style="color:#a6e22e">has_term</span>(<span style="color:#e6db74">&#34;maptools&#34;</span>, repo<span style="color:#f92672">=</span><span style="color:#e6db74">&#34;taxize&#34;</span>)
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; [1] FALSE</span>
+</span></span></code></pre></div><p>Do a series of R packages have a file for how to contribute <code>CONTRIBUTING.md</code>?</p>
+<p>Yes</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-r" data-lang="r"><span style="display:flex;"><span><span style="color:#a6e22e">has_file</span>(<span style="color:#e6db74">&#34;CONTRIBUTING.md&#34;</span>, repo<span style="color:#f92672">=</span><span style="color:#e6db74">&#34;taxize&#34;</span>)
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; [1] TRUE</span>
+</span></span></code></pre></div><p>Many packages</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-r" data-lang="r"><span style="display:flex;"><span><span style="color:#a6e22e">vapply</span>(pkgs, <span style="color:#66d9ef">function</span>(x) <span style="color:#a6e22e">has_file</span>(<span style="color:#e6db74">&#34;CONTRIBUTING.md&#34;</span>, repo<span style="color:#f92672">=</span>x), <span style="color:#a6e22e">logical</span>(<span style="color:#ae81ff">1</span>))
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt;        alm        bmc       bold     clifro  ecoengine    elastic </span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt;      FALSE      FALSE      FALSE      FALSE      FALSE      FALSE </span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt;   fulltext   geonames      gistr     RNeXML      rnoaa       rnpn </span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt;       TRUE      FALSE      FALSE       TRUE       TRUE      FALSE </span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt;      rplos      rsnps rWBclimate       solr      spocc     taxize </span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt;      FALSE      FALSE      FALSE      FALSE       TRUE       TRUE </span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt;  togeojson     traits   treeBASE </span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt;      FALSE      FALSE      FALSE</span>
+</span></span></code></pre></div><h2 id="check-rate-limit">Check rate limit<a hidden class="anchor" aria-hidden="true" href="#check-rate-limit">#</a></h2>
+<p>Define function</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-r" data-lang="r"><span style="display:flex;"><span>rate_limit <span style="color:#f92672">&lt;-</span> <span style="color:#66d9ef">function</span>(<span style="color:#66d9ef">...</span>) {
+</span></span><span style="display:flex;"><span>  token <span style="color:#f92672">&lt;-</span> <span style="color:#a6e22e">github_auth</span>()
+</span></span><span style="display:flex;"><span>  req <span style="color:#f92672">&lt;-</span> <span style="color:#a6e22e">GET</span>(<span style="color:#e6db74">&#34;https://api.github.com/rate_limit&#34;</span>, config <span style="color:#f92672">=</span> <span style="color:#a6e22e">c</span>(token <span style="color:#f92672">=</span> token, <span style="color:#66d9ef">...</span>))
+</span></span><span style="display:flex;"><span>  <span style="color:#a6e22e">process_result</span>(req)
+</span></span><span style="display:flex;"><span>}
+</span></span></code></pre></div><p>Check it</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-r" data-lang="r"><span style="display:flex;"><span><span style="color:#a6e22e">rate_limit</span>()
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; $resources</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; $resources$core</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; $resources$core$limit</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; [1] 5000</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; </span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; $resources$core$remaining</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; [1] 4925</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; </span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; $resources$core$reset</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; [1] 1417031016</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; </span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; </span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; $resources$search</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; $resources$search$limit</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; [1] 30</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; </span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; $resources$search$remaining</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; [1] 30</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; </span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; $resources$search$reset</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; [1] 1417028069</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; </span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; </span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; </span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; $rate</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; $rate$limit</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; [1] 5000</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; </span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; $rate$remaining</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; [1] 4925</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; </span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; $rate$reset</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; [1] 1417031016</span>
+</span></span></code></pre></div><p>Convert time to reset to human readable form</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-r" data-lang="r"><span style="display:flex;"><span><span style="color:#a6e22e">as.POSIXct</span>(<span style="color:#a6e22e">rate_limit</span>()<span style="color:#f92672">$</span>rate<span style="color:#f92672">$</span>reset, origin<span style="color:#f92672">=</span><span style="color:#e6db74">&#34;1970-01-01&#34;</span>)
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; [1] &#34;2014-11-26 11:43:36 PST&#34;</span>
+</span></span></code></pre></div>
+
+  </div>
+
+  <footer class="post-footer">
+    <ul class="post-tags">
+      <li><a href="http://localhost:1313/tags/r/">R</a></li>
+      <li><a href="http://localhost:1313/tags/api/">API</a></li>
+      <li><a href="http://localhost:1313/tags/github/">Github</a></li>
+    </ul>
+  </footer>
+</article>
+    </main>
+    
+<footer class="footer">
+    <span>&copy; 2024 <a href="http://localhost:1313/">Recology</a></span>
+    <span>
+        Powered by
+        <a href="https://gohugo.io/" rel="noopener noreferrer" target="_blank">Hugo</a> &
+        <a href="https://github.com/adityatelange/hugo-PaperMod/" rel="noopener" target="_blank">PaperMod</a>
+    </span>
+</footer>
+<a href="#top" aria-label="go to top" title="Go to Top (Alt + G)" class="top-link" id="top-link" accesskey="g">
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 12 6" fill="currentColor">
+        <path d="M12 6H0l6-6z" />
+    </svg>
+</a>
+
+<script>
+    let menu = document.getElementById('menu')
+    if (menu) {
+        menu.scrollLeft = localStorage.getItem("menu-scroll-position");
+        menu.onscroll = function () {
+            localStorage.setItem("menu-scroll-position", menu.scrollLeft);
+        }
+    }
+
+    document.querySelectorAll('a[href^="#"]').forEach(anchor => {
+        anchor.addEventListener("click", function (e) {
+            e.preventDefault();
+            var id = this.getAttribute("href").substr(1);
+            if (!window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+                document.querySelector(`[id='${decodeURIComponent(id)}']`).scrollIntoView({
+                    behavior: "smooth"
+                });
+            } else {
+                document.querySelector(`[id='${decodeURIComponent(id)}']`).scrollIntoView();
+            }
+            if (id === "top") {
+                history.replaceState(null, null, " ");
+            } else {
+                history.pushState(null, null, `#${id}`);
+            }
+        });
+    });
+
+</script>
+<script>
+    var mybutton = document.getElementById("top-link");
+    window.onscroll = function () {
+        if (document.body.scrollTop > 800 || document.documentElement.scrollTop > 800) {
+            mybutton.style.visibility = "visible";
+            mybutton.style.opacity = "1";
+        } else {
+            mybutton.style.visibility = "hidden";
+            mybutton.style.opacity = "0";
+        }
+    };
+
+</script>
+<script>
+    document.getElementById("theme-toggle").addEventListener("click", () => {
+        if (document.body.className.includes("dark")) {
+            document.body.classList.remove('dark');
+            localStorage.setItem("pref-theme", 'light');
+        } else {
+            document.body.classList.add('dark');
+            localStorage.setItem("pref-theme", 'dark');
+        }
+    })
+
+</script>
+<script>
+    document.querySelectorAll('pre > code').forEach((codeblock) => {
+        const container = codeblock.parentNode.parentNode;
+
+        const copybutton = document.createElement('button');
+        copybutton.classList.add('copy-code');
+        copybutton.innerHTML = 'copy';
+
+        function copyingDone() {
+            copybutton.innerHTML = 'copied!';
+            setTimeout(() => {
+                copybutton.innerHTML = 'copy';
+            }, 2000);
+        }
+
+        copybutton.addEventListener('click', (cb) => {
+            if ('clipboard' in navigator) {
+                navigator.clipboard.writeText(codeblock.textContent);
+                copyingDone();
+                return;
+            }
+
+            const range = document.createRange();
+            range.selectNodeContents(codeblock);
+            const selection = window.getSelection();
+            selection.removeAllRanges();
+            selection.addRange(range);
+            try {
+                document.execCommand('copy');
+                copyingDone();
+            } catch (e) { };
+            selection.removeRange(range);
+        });
+
+        if (container.classList.contains("highlight")) {
+            container.appendChild(copybutton);
+        } else if (container.parentNode.firstChild == container) {
+            
+        } else if (codeblock.parentNode.parentNode.parentNode.parentNode.parentNode.nodeName == "TABLE") {
+            
+            codeblock.parentNode.parentNode.parentNode.parentNode.parentNode.appendChild(copybutton);
+        } else {
+            
+            codeblock.parentNode.appendChild(copybutton);
+        }
+    });
+</script>
+</body>
+
+</html>
