@@ -1,0 +1,446 @@
+<!DOCTYPE html>
+<html lang="en" dir="auto">
+
+<head><script src="/livereload.js?mindelay=10&amp;v=2&amp;port=1313&amp;path=livereload" data-no-instant defer></script><meta charset="utf-8">
+<meta http-equiv="X-UA-Compatible" content="IE=edge">
+<meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
+<meta name="robots" content="noindex, nofollow">
+<title>Stashing and playing with raw data locally from the web | Recology</title>
+<meta name="keywords" content="R, ropensci, API, database, couchdb, nosql">
+<meta name="description" content="It is getting easier to get data directly into R from the web. Often R packages that retrieve data from the web return useful R data structures to users like a data.frame. This is a good thing of course to make things user friendly.
+However, what if you want to drill down into the data that&rsquo;s returned from a query to a database in R? What if you want to get that nice data.">
+<meta name="author" content="Scott Chamberlain">
+<link rel="canonical" href="http://localhost:1313/2013/06/couch/">
+<link crossorigin="anonymous" href="/assets/css/stylesheet.f4cda22486791d430ef692108ba33a982c3c552eca57e99456bb55aa4bd22568.css" integrity="sha256-9M2iJIZ5HUMO9pIQi6M6mCw8VS7KV&#43;mUVrtVqkvSJWg=" rel="preload stylesheet" as="style">
+<link rel="icon" href="http://localhost:1313/favicon.ico">
+<link rel="icon" type="image/png" sizes="16x16" href="http://localhost:1313/favicon-16x16.png">
+<link rel="icon" type="image/png" sizes="32x32" href="http://localhost:1313/favicon-32x32.png">
+<link rel="apple-touch-icon" href="http://localhost:1313/apple-touch-icon.png">
+<link rel="mask-icon" href="http://localhost:1313/safari-pinned-tab.svg">
+<meta name="theme-color" content="#2e2e33">
+<meta name="msapplication-TileColor" content="#2e2e33">
+<link rel="alternate" hreflang="en" href="http://localhost:1313/2013/06/couch/">
+<noscript>
+    <style>
+        #theme-toggle,
+        .top-link {
+            display: none;
+        }
+
+    </style>
+    <style>
+        @media (prefers-color-scheme: dark) {
+            :root {
+                --theme: rgb(29, 30, 32);
+                --entry: rgb(46, 46, 51);
+                --primary: rgb(218, 218, 219);
+                --secondary: rgb(155, 156, 157);
+                --tertiary: rgb(65, 66, 68);
+                --content: rgb(196, 196, 197);
+                --code-block-bg: rgb(46, 46, 51);
+                --code-bg: rgb(55, 56, 62);
+                --border: rgb(51, 51, 51);
+            }
+
+            .list {
+                background: var(--theme);
+            }
+
+            .list:not(.dark)::-webkit-scrollbar-track {
+                background: 0 0;
+            }
+
+            .list:not(.dark)::-webkit-scrollbar-thumb {
+                border-color: var(--theme);
+            }
+        }
+
+    </style>
+</noscript>
+</head>
+
+<body class="" id="top">
+<script>
+    if (localStorage.getItem("pref-theme") === "dark") {
+        document.body.classList.add('dark');
+    } else if (localStorage.getItem("pref-theme") === "light") {
+        document.body.classList.remove('dark')
+    } else if (window.matchMedia('(prefers-color-scheme: dark)').matches) {
+        document.body.classList.add('dark');
+    }
+
+</script>
+
+<header class="header">
+    <nav class="nav">
+        <div class="logo">
+            <a href="http://localhost:1313/" accesskey="h" title="Recology (Alt + H)">Recology</a>
+            <div class="logo-switches">
+                <button id="theme-toggle" accesskey="t" title="(Alt + T)">
+                    <svg id="moon" xmlns="http://www.w3.org/2000/svg" width="24" height="18" viewBox="0 0 24 24"
+                        fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
+                        stroke-linejoin="round">
+                        <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path>
+                    </svg>
+                    <svg id="sun" xmlns="http://www.w3.org/2000/svg" width="24" height="18" viewBox="0 0 24 24"
+                        fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
+                        stroke-linejoin="round">
+                        <circle cx="12" cy="12" r="5"></circle>
+                        <line x1="12" y1="1" x2="12" y2="3"></line>
+                        <line x1="12" y1="21" x2="12" y2="23"></line>
+                        <line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line>
+                        <line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line>
+                        <line x1="1" y1="12" x2="3" y2="12"></line>
+                        <line x1="21" y1="12" x2="23" y2="12"></line>
+                        <line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line>
+                        <line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line>
+                    </svg>
+                </button>
+                <ul class="lang-switch"><li>|</li>
+                </ul>
+            </div>
+        </div>
+        <ul id="menu">
+            <li>
+                <a href="http://localhost:1313/" title="Home">
+                    <span>Home</span>
+                </a>
+            </li>
+            <li>
+                <a href="http://localhost:1313/about" title="About">
+                    <span>About</span>
+                </a>
+            </li>
+            <li>
+                <a href="http://localhost:1313/archives" title="Archive">
+                    <span>Archive</span>
+                </a>
+            </li>
+            <li>
+                <a href="http://localhost:1313/search" title="Search (Alt &#43; /)" accesskey=/>
+                    <span>Search</span>
+                </a>
+            </li>
+            <li>
+                <a href="http://localhost:1313/index.xml" title="RSS">
+                    <span>RSS</span>
+                </a>
+            </li>
+        </ul>
+    </nav>
+</header>
+<main class="main">
+
+<article class="post-single">
+  <header class="post-header">
+    
+    <h1 class="post-title entry-hint-parent">
+      Stashing and playing with raw data locally from the web
+    </h1>
+    <div class="post-meta"><span title='2013-06-17 00:00:00 +0000 UTC'>June 17, 2013</span>&nbsp;·&nbsp;7 min&nbsp;·&nbsp;Scott Chamberlain
+
+</div>
+  </header> 
+  <div class="post-content"><p>It is getting easier to get data directly into R from the web. Often R packages that retrieve data from the web return useful R data structures to users like a data.frame. This is a good thing of course to make things user friendly.</p>
+<p>However, what if you want to drill down into the data that&rsquo;s returned from a query to a database in R?  What if you want to get that nice data.frame in R, but you think you may want to look at the raw data later? The raw data from web queries are often JSON or XML data. This type of data, especially JSON, can be easily stored in schemaless so-called NoSQL databases, and queried later.</p>
+<p>A brief aside: What are JSON and XML? This is what JSON looks like (ps if you ever wonder if your JSON is correct, go <a href="http://jsonlint.com/">here</a>):</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-bash" data-lang="bash"><span style="display:flex;"><span><span style="color:#f92672">{</span>
+</span></span><span style="display:flex;"><span>  <span style="color:#e6db74">&#34;name&#34;</span>: <span style="color:#e6db74">&#34;joe&#34;</span>,
+</span></span><span style="display:flex;"><span>  <span style="color:#e6db74">&#34;hobby&#34;</span>: <span style="color:#e6db74">&#34;codemonkey&#34;</span>,
+</span></span><span style="display:flex;"><span>  <span style="color:#e6db74">&#34;lives&#34;</span>: <span style="color:#f92672">[</span>
+</span></span><span style="display:flex;"><span>      <span style="color:#f92672">{</span>
+</span></span><span style="display:flex;"><span>          <span style="color:#e6db74">&#34;city&#34;</span>: <span style="color:#e6db74">&#34;San Jose&#34;</span>,
+</span></span><span style="display:flex;"><span>          <span style="color:#e6db74">&#34;state&#34;</span>: <span style="color:#e6db74">&#34;CA&#34;</span>
+</span></span><span style="display:flex;"><span>      <span style="color:#f92672">}</span>
+</span></span><span style="display:flex;"><span>  <span style="color:#f92672">]</span>
+</span></span><span style="display:flex;"><span><span style="color:#f92672">}</span>
+</span></span></code></pre></div><p>This is what XML looks like:</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-xml" data-lang="xml"><span style="display:flex;"><span><span style="color:#75715e">&lt;?xml version=&#34;1.0&#34; encoding=&#34;UTF-8&#34; ?&gt;</span>
+</span></span><span style="display:flex;"><span>  <span style="color:#f92672">&lt;name&gt;</span>joe<span style="color:#f92672">&lt;/name&gt;</span>
+</span></span><span style="display:flex;"><span>	<span style="color:#f92672">&lt;hobby&gt;</span>codemonkey<span style="color:#f92672">&lt;/hobby&gt;</span>
+</span></span><span style="display:flex;"><span>	<span style="color:#f92672">&lt;lives&gt;</span>
+</span></span><span style="display:flex;"><span>		<span style="color:#f92672">&lt;city&gt;</span>San Jose<span style="color:#f92672">&lt;/city&gt;</span>
+</span></span><span style="display:flex;"><span>		<span style="color:#f92672">&lt;state&gt;</span>CA<span style="color:#f92672">&lt;/state&gt;</span>
+</span></span><span style="display:flex;"><span>	<span style="color:#f92672">&lt;/lives&gt;</span>
+</span></span></code></pre></div><p>But don&rsquo;t worry if it looks complicated - the project I talk about below, sofa, tries to make the interface to JSON and XML easy. Web APIs almost always return either JSON or XML, so this is the raw data.</p>
+<p>So here&rsquo;s the use case I imagine, or workflow:</p>
+<ul>
+<li>Query a database on the web, and choose to write the raw data to a local database.</li>
+<li>Do whatever you want with the output R object - analyze, visualize, etc.</li>
+<li>Now you want to go back and search through some of the raw data. But, that query took an hour. Since you wrote it to a local database, you can search the data.</li>
+<li>If you hadn&rsquo;t written it locally, you would have to make a new web call.</li>
+</ul>
+<p>Note that if you are doing calls to web APIs that get small amounts of data you don&rsquo;t need to worry too much as you can easily just do the call again.</p>
+<p>I&rsquo;ve started an R package to interact with the NoSQL database <a href="http://couchdb.apache.org/">CouchDB</a>. CouchDB is a schemaless database that speaks JSON, so you can store JSON and get back JSON (don&rsquo;t worry XML, we got you covered - we can just wrap the XML in JSON before putting it in CouchDB). What&rsquo;s especially cool is you can interact with CouchDB via <a href="http://docs.couchdb.org/en/latest/api-basics.html">a RESTful API</a>. CouchDB doesn&rsquo;t have full text search built in (though you can build map-reduce <em>Views</em>, basically preset queries on the database), so I added functions (and docs to help) to interact with the <a href="https://github.com/elasticsearch/elasticsearch-river-couchdb/blob/master/README.md">CouchDB River plugin</a> for <a href="http://www.elasticsearch.org/">Elasticsearch</a>, which provides powerful full text search via an API interface. But nevermind the tech details - all this just means you can search on the full text of your stored data.</p>
+<p>There are plenty of databases you can interact with from R, so why CouchDB? For one, it makes a lot of sense to write to a NoSQL database since this blog post is dealing with a use case writing JSON, which isn&rsquo;t a good fit for databases like MySQL, SQLite, PostgreSQL, etc. (<a href="http://wiki.postgresql.org/wiki/What's_new_in_PostgreSQL_9.2#JSON_datatype">though postgres allows you to write JSON</a>). It didn&rsquo;t have to be CouchDB, but at least to me it seems relatively easy to install, you can interact with it via an HTTP API (if you&rsquo;re into that, which I am), and it has a nice web interface (navigate to <a href="http://localhost:5984/_utils/">http://localhost:5984/_utils/</a> after starting <code>couchdb</code>).</p>
+<p>Is this for the casual R user? Probably not. But, I imagine there are R users out there that want some more flexibility when it comes to interacting with web data in R. It is nice and tidy to get back an R data.frame from a web call, but having the raw data at your fingertips could be super powerful. I&rsquo;ll describe using an R package to interact with a web database with <code>sofa</code> baked in, and discuss a bit about the functions within <code>sofa</code>.</p>
+<h3 id="first-start-couchdb-in-your-terminal">First start CouchDB in your terminal<a hidden class="anchor" aria-hidden="true" href="#first-start-couchdb-in-your-terminal">#</a></h3>
+<p>You can do this from anywhere in your directory. See <a href="http://couchdb.apache.org/">here</a> for instructions on how to install CouchDB.</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-bash" data-lang="bash"><span style="display:flex;"><span>couchdb
+</span></span></code></pre></div><h3 id="then-start-elasticsearch-in-your-terminal">Then start elasticsearch in your terminal<a hidden class="anchor" aria-hidden="true" href="#then-start-elasticsearch-in-your-terminal">#</a></h3>
+<p>See <a href="https://github.com/sckott/sofa">here</a> for instructions on how to install Elasticsearch and the River CouchDB plugin.</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-bash" data-lang="bash"><span style="display:flex;"><span>cd /usr/local/elasticsearch
+</span></span><span style="display:flex;"><span>bin/elasticsearch -f
+</span></span></code></pre></div><h3 id="install-sofa">Install sofa<a hidden class="anchor" aria-hidden="true" href="#install-sofa">#</a></h3>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-r" data-lang="r"><span style="display:flex;"><span><span style="color:#75715e"># Uncomment these lines if you don&#39;t have these packages installed</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e"># install.packages(&#39;devtools&#39;) library(devtools) install_github(&#39;sofa&#39;,</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e"># &#39;schamberlain&#39;) install_github(&#39;alm&#39;, &#39;ropensci&#39;, ref=&#39;couch&#39;)</span>
+</span></span><span style="display:flex;"><span><span style="color:#a6e22e">library</span>(sofa)
+</span></span><span style="display:flex;"><span><span style="color:#a6e22e">library</span>(alm)
+</span></span></code></pre></div><h3 id="simultaneously-write-data-to-couchdb-along-with-api-calls-using-the-alm-package-to-get-altmetrics-data-on-plos-papers-ping-to-make-sure-couchdb-is-on">Simultaneously write data to CouchDB along with API calls using the alm package to get altmetrics data on PLoS papers. Ping to make sure CouchDB is on<a hidden class="anchor" aria-hidden="true" href="#simultaneously-write-data-to-couchdb-along-with-api-calls-using-the-alm-package-to-get-altmetrics-data-on-plos-papers-ping-to-make-sure-couchdb-is-on">#</a></h3>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-r" data-lang="r"><span style="display:flex;"><span><span style="color:#a6e22e">sofa_ping</span>()
+</span></span></code></pre></div><div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-r" data-lang="r"><span style="display:flex;"><span>  couchdb   version 
+</span></span><span style="display:flex;"><span><span style="color:#e6db74">&#34;Welcome&#34;</span>   <span style="color:#e6db74">&#34;1.2.1&#34;</span> 
+</span></span></code></pre></div><h3 id="create-a-new-database">Create a new database<a hidden class="anchor" aria-hidden="true" href="#create-a-new-database">#</a></h3>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-r" data-lang="r"><span style="display:flex;"><span><span style="color:#a6e22e">sofa_createdb</span>(dbname <span style="color:#f92672">=</span> <span style="color:#e6db74">&#34;alm_db&#34;</span>)
+</span></span></code></pre></div><div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-r" data-lang="r"><span style="display:flex;"><span>  ok 
+</span></span><span style="display:flex;"><span><span style="color:#66d9ef">TRUE</span> 
+</span></span></code></pre></div><h3 id="write-couchdb-database-name-to-options">Write couchdb database name to options<a hidden class="anchor" aria-hidden="true" href="#write-couchdb-database-name-to-options">#</a></h3>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-r" data-lang="r"><span style="display:flex;"><span><span style="color:#a6e22e">options</span>(couch_db_name <span style="color:#f92672">=</span> <span style="color:#e6db74">&#34;alm_db&#34;</span>)
+</span></span></code></pre></div><h3 id="list-the-databases">List the databases<a hidden class="anchor" aria-hidden="true" href="#list-the-databases">#</a></h3>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-r" data-lang="r"><span style="display:flex;"><span><span style="color:#a6e22e">sofa_listdbs</span>()
+</span></span></code></pre></div><div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-r" data-lang="r"><span style="display:flex;"><span> [1] <span style="color:#e6db74">&#34;_replicator&#34;</span>                <span style="color:#e6db74">&#34;_users&#34;</span>                    
+</span></span><span style="display:flex;"><span> [3] <span style="color:#e6db74">&#34;alm_couchdb&#34;</span>                <span style="color:#e6db74">&#34;alm_db&#34;</span>                    
+</span></span><span style="display:flex;"><span> [5] <span style="color:#e6db74">&#34;dudedb&#34;</span>                     <span style="color:#e6db74">&#34;example&#34;</span>                   
+</span></span><span style="display:flex;"><span> [7] <span style="color:#e6db74">&#34;poop&#34;</span>                       <span style="color:#e6db74">&#34;rplos_db&#34;</span>                  
+</span></span><span style="display:flex;"><span> [9] <span style="color:#e6db74">&#34;shit&#34;</span>                       <span style="color:#e6db74">&#34;shitty&#34;</span>                    
+</span></span><span style="display:flex;"><span>[11] <span style="color:#e6db74">&#34;shitty2&#34;</span>                    <span style="color:#e6db74">&#34;test_suite_db&#34;</span>             
+</span></span><span style="display:flex;"><span>[13] <span style="color:#e6db74">&#34;test_suite_db/with_slashes&#34;</span> <span style="color:#e6db74">&#34;test_suite_reports&#34;</span>        
+</span></span><span style="display:flex;"><span>[15] <span style="color:#e6db74">&#34;testr2couch&#34;</span>                <span style="color:#e6db74">&#34;twitter_db&#34;</span>                
+</span></span></code></pre></div><h3 id="search-for-altmetrics-normally-wo-writing-to-a-database">Search for altmetrics normally, w/o writing to a database<a hidden class="anchor" aria-hidden="true" href="#search-for-altmetrics-normally-wo-writing-to-a-database">#</a></h3>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-r" data-lang="r"><span style="display:flex;"><span><span style="color:#a6e22e">head</span>(<span style="color:#a6e22e">alm</span>(doi <span style="color:#f92672">=</span> <span style="color:#e6db74">&#34;10.1371/journal.pone.0029797&#34;</span>))
+</span></span></code></pre></div><div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-r" data-lang="r"><span style="display:flex;"><span>          .id pdf html shares groups comments likes citations total
+</span></span><span style="display:flex;"><span><span style="color:#ae81ff">1</span>   bloglines  <span style="color:#66d9ef">NA</span>   <span style="color:#66d9ef">NA</span>     <span style="color:#66d9ef">NA</span>     <span style="color:#66d9ef">NA</span>       <span style="color:#66d9ef">NA</span>    <span style="color:#66d9ef">NA</span>         <span style="color:#ae81ff">0</span>     <span style="color:#ae81ff">0</span>
+</span></span><span style="display:flex;"><span><span style="color:#ae81ff">2</span>   citeulike  <span style="color:#66d9ef">NA</span>   <span style="color:#66d9ef">NA</span>      <span style="color:#ae81ff">1</span>     <span style="color:#66d9ef">NA</span>       <span style="color:#66d9ef">NA</span>    <span style="color:#66d9ef">NA</span>        <span style="color:#66d9ef">NA</span>     <span style="color:#ae81ff">1</span>
+</span></span><span style="display:flex;"><span><span style="color:#ae81ff">3</span>    connotea  <span style="color:#66d9ef">NA</span>   <span style="color:#66d9ef">NA</span>     <span style="color:#66d9ef">NA</span>     <span style="color:#66d9ef">NA</span>       <span style="color:#66d9ef">NA</span>    <span style="color:#66d9ef">NA</span>         <span style="color:#ae81ff">0</span>     <span style="color:#ae81ff">0</span>
+</span></span><span style="display:flex;"><span><span style="color:#ae81ff">4</span>    crossref  <span style="color:#66d9ef">NA</span>   <span style="color:#66d9ef">NA</span>     <span style="color:#66d9ef">NA</span>     <span style="color:#66d9ef">NA</span>       <span style="color:#66d9ef">NA</span>    <span style="color:#66d9ef">NA</span>         <span style="color:#ae81ff">6</span>     <span style="color:#ae81ff">6</span>
+</span></span><span style="display:flex;"><span><span style="color:#ae81ff">5</span>      nature  <span style="color:#66d9ef">NA</span>   <span style="color:#66d9ef">NA</span>     <span style="color:#66d9ef">NA</span>     <span style="color:#66d9ef">NA</span>       <span style="color:#66d9ef">NA</span>    <span style="color:#66d9ef">NA</span>         <span style="color:#ae81ff">4</span>     <span style="color:#ae81ff">4</span>
+</span></span><span style="display:flex;"><span><span style="color:#ae81ff">6</span> postgenomic  <span style="color:#66d9ef">NA</span>   <span style="color:#66d9ef">NA</span>     <span style="color:#66d9ef">NA</span>     <span style="color:#66d9ef">NA</span>       <span style="color:#66d9ef">NA</span>    <span style="color:#66d9ef">NA</span>         <span style="color:#ae81ff">0</span>     <span style="color:#ae81ff">0</span>
+</span></span></code></pre></div><h3 id="search-for-altmetrics-normally-while-writing-to-a-database">Search for altmetrics normally, while writing to a database<a hidden class="anchor" aria-hidden="true" href="#search-for-altmetrics-normally-while-writing-to-a-database">#</a></h3>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-r" data-lang="r"><span style="display:flex;"><span><span style="color:#a6e22e">head</span>(<span style="color:#a6e22e">alm</span>(doi <span style="color:#f92672">=</span> <span style="color:#e6db74">&#34;10.1371/journal.pone.0029797&#34;</span>, write2couch <span style="color:#f92672">=</span> <span style="color:#66d9ef">TRUE</span>))
+</span></span></code></pre></div><div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-r" data-lang="r"><span style="display:flex;"><span>          .id pdf html shares groups comments likes citations total
+</span></span><span style="display:flex;"><span><span style="color:#ae81ff">1</span>   bloglines  <span style="color:#66d9ef">NA</span>   <span style="color:#66d9ef">NA</span>     <span style="color:#66d9ef">NA</span>     <span style="color:#66d9ef">NA</span>       <span style="color:#66d9ef">NA</span>    <span style="color:#66d9ef">NA</span>         <span style="color:#ae81ff">0</span>     <span style="color:#ae81ff">0</span>
+</span></span><span style="display:flex;"><span><span style="color:#ae81ff">2</span>   citeulike  <span style="color:#66d9ef">NA</span>   <span style="color:#66d9ef">NA</span>      <span style="color:#ae81ff">1</span>     <span style="color:#66d9ef">NA</span>       <span style="color:#66d9ef">NA</span>    <span style="color:#66d9ef">NA</span>        <span style="color:#66d9ef">NA</span>     <span style="color:#ae81ff">1</span>
+</span></span><span style="display:flex;"><span><span style="color:#ae81ff">3</span>    connotea  <span style="color:#66d9ef">NA</span>   <span style="color:#66d9ef">NA</span>     <span style="color:#66d9ef">NA</span>     <span style="color:#66d9ef">NA</span>       <span style="color:#66d9ef">NA</span>    <span style="color:#66d9ef">NA</span>         <span style="color:#ae81ff">0</span>     <span style="color:#ae81ff">0</span>
+</span></span><span style="display:flex;"><span><span style="color:#ae81ff">4</span>    crossref  <span style="color:#66d9ef">NA</span>   <span style="color:#66d9ef">NA</span>     <span style="color:#66d9ef">NA</span>     <span style="color:#66d9ef">NA</span>       <span style="color:#66d9ef">NA</span>    <span style="color:#66d9ef">NA</span>         <span style="color:#ae81ff">6</span>     <span style="color:#ae81ff">6</span>
+</span></span><span style="display:flex;"><span><span style="color:#ae81ff">5</span>      nature  <span style="color:#66d9ef">NA</span>   <span style="color:#66d9ef">NA</span>     <span style="color:#66d9ef">NA</span>     <span style="color:#66d9ef">NA</span>       <span style="color:#66d9ef">NA</span>    <span style="color:#66d9ef">NA</span>         <span style="color:#ae81ff">4</span>     <span style="color:#ae81ff">4</span>
+</span></span><span style="display:flex;"><span><span style="color:#ae81ff">6</span> postgenomic  <span style="color:#66d9ef">NA</span>   <span style="color:#66d9ef">NA</span>     <span style="color:#66d9ef">NA</span>     <span style="color:#66d9ef">NA</span>       <span style="color:#66d9ef">NA</span>    <span style="color:#66d9ef">NA</span>         <span style="color:#ae81ff">0</span>     <span style="color:#ae81ff">0</span>
+</span></span></code></pre></div><h3 id="make-lots-of-calls-and-write-them-simultaneously">Make lots of calls, and write them simultaneously<a hidden class="anchor" aria-hidden="true" href="#make-lots-of-calls-and-write-them-simultaneously">#</a></h3>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-r" data-lang="r"><span style="display:flex;"><span><span style="color:#75715e"># install_github(&#39;rplos&#39;, &#39;ropensci&#39;)</span>
+</span></span><span style="display:flex;"><span><span style="color:#a6e22e">library</span>(rplos)
+</span></span><span style="display:flex;"><span>dois <span style="color:#f92672">&lt;-</span> <span style="color:#a6e22e">searchplos</span>(terms <span style="color:#f92672">=</span> <span style="color:#e6db74">&#34;evolution&#34;</span>, fields <span style="color:#f92672">=</span> <span style="color:#e6db74">&#34;id&#34;</span>, limit <span style="color:#f92672">=</span> <span style="color:#ae81ff">100</span>)
+</span></span><span style="display:flex;"><span>out <span style="color:#f92672">&lt;-</span> <span style="color:#a6e22e">alm</span>(doi <span style="color:#f92672">=</span> <span style="color:#a6e22e">as.character</span>(dois[, <span style="color:#ae81ff">1</span>]), write2couch <span style="color:#f92672">=</span> <span style="color:#66d9ef">TRUE</span>)
+</span></span><span style="display:flex;"><span><span style="color:#a6e22e">lapply</span>(out[1<span style="color:#f92672">:</span><span style="color:#ae81ff">2</span>], head)
+</span></span></code></pre></div><div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-r" data-lang="r"><span style="display:flex;"><span><span style="color:#f92672">$</span>`01`
+</span></span><span style="display:flex;"><span>          .id pdf html shares groups comments likes citations total
+</span></span><span style="display:flex;"><span><span style="color:#ae81ff">1</span>   bloglines  <span style="color:#66d9ef">NA</span>   <span style="color:#66d9ef">NA</span>     <span style="color:#66d9ef">NA</span>     <span style="color:#66d9ef">NA</span>       <span style="color:#66d9ef">NA</span>    <span style="color:#66d9ef">NA</span>         <span style="color:#ae81ff">0</span>     <span style="color:#ae81ff">0</span>
+</span></span><span style="display:flex;"><span><span style="color:#ae81ff">2</span>   citeulike  <span style="color:#66d9ef">NA</span>   <span style="color:#66d9ef">NA</span>      <span style="color:#ae81ff">0</span>     <span style="color:#66d9ef">NA</span>       <span style="color:#66d9ef">NA</span>    <span style="color:#66d9ef">NA</span>        <span style="color:#66d9ef">NA</span>     <span style="color:#ae81ff">0</span>
+</span></span><span style="display:flex;"><span><span style="color:#ae81ff">3</span>    connotea  <span style="color:#66d9ef">NA</span>   <span style="color:#66d9ef">NA</span>     <span style="color:#66d9ef">NA</span>     <span style="color:#66d9ef">NA</span>       <span style="color:#66d9ef">NA</span>    <span style="color:#66d9ef">NA</span>         <span style="color:#ae81ff">0</span>     <span style="color:#ae81ff">0</span>
+</span></span><span style="display:flex;"><span><span style="color:#ae81ff">4</span>    crossref  <span style="color:#66d9ef">NA</span>   <span style="color:#66d9ef">NA</span>     <span style="color:#66d9ef">NA</span>     <span style="color:#66d9ef">NA</span>       <span style="color:#66d9ef">NA</span>    <span style="color:#66d9ef">NA</span>         <span style="color:#ae81ff">0</span>     <span style="color:#ae81ff">0</span>
+</span></span><span style="display:flex;"><span><span style="color:#ae81ff">5</span>      nature  <span style="color:#66d9ef">NA</span>   <span style="color:#66d9ef">NA</span>     <span style="color:#66d9ef">NA</span>     <span style="color:#66d9ef">NA</span>       <span style="color:#66d9ef">NA</span>    <span style="color:#66d9ef">NA</span>         <span style="color:#ae81ff">0</span>     <span style="color:#ae81ff">0</span>
+</span></span><span style="display:flex;"><span><span style="color:#ae81ff">6</span> postgenomic  <span style="color:#66d9ef">NA</span>   <span style="color:#66d9ef">NA</span>     <span style="color:#66d9ef">NA</span>     <span style="color:#66d9ef">NA</span>       <span style="color:#66d9ef">NA</span>    <span style="color:#66d9ef">NA</span>         <span style="color:#ae81ff">0</span>     <span style="color:#ae81ff">0</span>
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span><span style="color:#f92672">$</span>`02`
+</span></span><span style="display:flex;"><span>          .id pdf html shares groups comments likes citations total
+</span></span><span style="display:flex;"><span><span style="color:#ae81ff">1</span>   bloglines  <span style="color:#66d9ef">NA</span>   <span style="color:#66d9ef">NA</span>     <span style="color:#66d9ef">NA</span>     <span style="color:#66d9ef">NA</span>       <span style="color:#66d9ef">NA</span>    <span style="color:#66d9ef">NA</span>         <span style="color:#ae81ff">0</span>     <span style="color:#ae81ff">0</span>
+</span></span><span style="display:flex;"><span><span style="color:#ae81ff">2</span>   citeulike  <span style="color:#66d9ef">NA</span>   <span style="color:#66d9ef">NA</span>      <span style="color:#ae81ff">1</span>     <span style="color:#66d9ef">NA</span>       <span style="color:#66d9ef">NA</span>    <span style="color:#66d9ef">NA</span>        <span style="color:#66d9ef">NA</span>     <span style="color:#ae81ff">1</span>
+</span></span><span style="display:flex;"><span><span style="color:#ae81ff">3</span>    connotea  <span style="color:#66d9ef">NA</span>   <span style="color:#66d9ef">NA</span>     <span style="color:#66d9ef">NA</span>     <span style="color:#66d9ef">NA</span>       <span style="color:#66d9ef">NA</span>    <span style="color:#66d9ef">NA</span>         <span style="color:#ae81ff">0</span>     <span style="color:#ae81ff">0</span>
+</span></span><span style="display:flex;"><span><span style="color:#ae81ff">4</span>    crossref  <span style="color:#66d9ef">NA</span>   <span style="color:#66d9ef">NA</span>     <span style="color:#66d9ef">NA</span>     <span style="color:#66d9ef">NA</span>       <span style="color:#66d9ef">NA</span>    <span style="color:#66d9ef">NA</span>         <span style="color:#ae81ff">2</span>     <span style="color:#ae81ff">2</span>
+</span></span><span style="display:flex;"><span><span style="color:#ae81ff">5</span>      nature  <span style="color:#66d9ef">NA</span>   <span style="color:#66d9ef">NA</span>     <span style="color:#66d9ef">NA</span>     <span style="color:#66d9ef">NA</span>       <span style="color:#66d9ef">NA</span>    <span style="color:#66d9ef">NA</span>         <span style="color:#ae81ff">0</span>     <span style="color:#ae81ff">0</span>
+</span></span><span style="display:flex;"><span><span style="color:#ae81ff">6</span> postgenomic  <span style="color:#66d9ef">NA</span>   <span style="color:#66d9ef">NA</span>     <span style="color:#66d9ef">NA</span>     <span style="color:#66d9ef">NA</span>       <span style="color:#66d9ef">NA</span>    <span style="color:#66d9ef">NA</span>         <span style="color:#ae81ff">0</span>     <span style="color:#ae81ff">0</span>
+</span></span></code></pre></div><h3 id="writing-data-to-couchdb-does-take-a-bit-longer">Writing data to CouchDB does take a bit longer<a hidden class="anchor" aria-hidden="true" href="#writing-data-to-couchdb-does-take-a-bit-longer">#</a></h3>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-r" data-lang="r"><span style="display:flex;"><span><span style="color:#a6e22e">system.time</span>(<span style="color:#a6e22e">alm</span>(doi <span style="color:#f92672">=</span> <span style="color:#a6e22e">as.character</span>(dois[, <span style="color:#ae81ff">1</span>])[1<span style="color:#f92672">:</span><span style="color:#ae81ff">60</span>], write2couch <span style="color:#f92672">=</span> <span style="color:#66d9ef">FALSE</span>))
+</span></span></code></pre></div><div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-r" data-lang="r"><span style="display:flex;"><span>   user  system elapsed 
+</span></span><span style="display:flex;"><span>  <span style="color:#ae81ff">1.739</span>   <span style="color:#ae81ff">0.016</span>   <span style="color:#ae81ff">4.554</span> 
+</span></span></code></pre></div><div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-r" data-lang="r"><span style="display:flex;"><span><span style="color:#a6e22e">system.time</span>(<span style="color:#a6e22e">alm</span>(doi <span style="color:#f92672">=</span> <span style="color:#a6e22e">as.character</span>(dois[, <span style="color:#ae81ff">1</span>])[1<span style="color:#f92672">:</span><span style="color:#ae81ff">60</span>], write2couch <span style="color:#f92672">=</span> <span style="color:#66d9ef">TRUE</span>))
+</span></span></code></pre></div><div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-r" data-lang="r"><span style="display:flex;"><span>   user  system elapsed 
+</span></span><span style="display:flex;"><span>  <span style="color:#ae81ff">3.579</span>   <span style="color:#ae81ff">0.062</span>   <span style="color:#ae81ff">6.460</span> 
+</span></span></code></pre></div><h3 id="search-using-elasticsearch">Search using elasticsearch<a hidden class="anchor" aria-hidden="true" href="#search-using-elasticsearch">#</a></h3>
+<h4 id="tell-elasticsearch-to-start-indexing-your-database">tell elasticsearch to start indexing your database<a hidden class="anchor" aria-hidden="true" href="#tell-elasticsearch-to-start-indexing-your-database">#</a></h4>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-r" data-lang="r"><span style="display:flex;"><span><span style="color:#a6e22e">elastic_start</span>(dbname <span style="color:#f92672">=</span> <span style="color:#e6db74">&#34;alm_db&#34;</span>)
+</span></span></code></pre></div><div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-r" data-lang="r"><span style="display:flex;"><span><span style="color:#f92672">$</span>ok
+</span></span><span style="display:flex;"><span>[1] <span style="color:#66d9ef">TRUE</span>
+</span></span></code></pre></div><h4 id="search-your-database">Search your database<a hidden class="anchor" aria-hidden="true" href="#search-your-database">#</a></h4>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-r" data-lang="r"><span style="display:flex;"><span>out <span style="color:#f92672">&lt;-</span> <span style="color:#a6e22e">elastic_search</span>(dbname <span style="color:#f92672">=</span> <span style="color:#e6db74">&#34;alm_db&#34;</span>, q <span style="color:#f92672">=</span> <span style="color:#e6db74">&#34;twitter&#34;</span>, parse_ <span style="color:#f92672">=</span> <span style="color:#66d9ef">TRUE</span>)
+</span></span><span style="display:flex;"><span>out<span style="color:#f92672">$</span>hits<span style="color:#f92672">$</span>total
+</span></span></code></pre></div><div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-r" data-lang="r"><span style="display:flex;"><span>[1] <span style="color:#ae81ff">679</span>
+</span></span></code></pre></div><h3 id="using-views">Using views<a hidden class="anchor" aria-hidden="true" href="#using-views">#</a></h3>
+<h4 id="write-a-view---here-letting-key-be-the-default-of-null">Write a view - here letting key be the default of null<a hidden class="anchor" aria-hidden="true" href="#write-a-view---here-letting-key-be-the-default-of-null">#</a></h4>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-r" data-lang="r"><span style="display:flex;"><span><span style="color:#a6e22e">sofa_view_put</span>(dbname <span style="color:#f92672">=</span> <span style="color:#e6db74">&#34;alm_db&#34;</span>, design_name <span style="color:#f92672">=</span> <span style="color:#e6db74">&#34;myview&#34;</span>, value <span style="color:#f92672">=</span> <span style="color:#e6db74">&#34;doc.baseurl&#34;</span>)
+</span></span></code></pre></div><div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-r" data-lang="r"><span style="display:flex;"><span><span style="color:#f92672">$</span>ok
+</span></span><span style="display:flex;"><span>[1] <span style="color:#66d9ef">TRUE</span>
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span><span style="color:#f92672">$</span>id
+</span></span><span style="display:flex;"><span>[1] <span style="color:#e6db74">&#34;_design/myview&#34;</span>
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span><span style="color:#f92672">$</span>rev
+</span></span><span style="display:flex;"><span>[1] <span style="color:#e6db74">&#34;1-e7c17cff1b96e4595c3781da53e16ad8&#34;</span>
+</span></span></code></pre></div><h4 id="get-info-on-your-new-view">Get info on your new view<a hidden class="anchor" aria-hidden="true" href="#get-info-on-your-new-view">#</a></h4>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-r" data-lang="r"><span style="display:flex;"><span><span style="color:#a6e22e">sofa_view_get</span>(dbname <span style="color:#f92672">=</span> <span style="color:#e6db74">&#34;alm_db&#34;</span>, design_name <span style="color:#f92672">=</span> <span style="color:#e6db74">&#34;myview&#34;</span>)
+</span></span></code></pre></div><div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-r" data-lang="r"><span style="display:flex;"><span><span style="color:#f92672">$</span>`_id`
+</span></span><span style="display:flex;"><span>[1] <span style="color:#e6db74">&#34;_design/myview&#34;</span>
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span><span style="color:#f92672">$</span>`_rev`
+</span></span><span style="display:flex;"><span>[1] <span style="color:#e6db74">&#34;1-e7c17cff1b96e4595c3781da53e16ad8&#34;</span>
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span><span style="color:#f92672">$</span>views
+</span></span><span style="display:flex;"><span><span style="color:#f92672">$</span>views<span style="color:#f92672">$</span>foo
+</span></span><span style="display:flex;"><span>                                    map 
+</span></span><span style="display:flex;"><span><span style="color:#e6db74">&#34;function(doc){emit(null,doc.baseurl)}&#34;</span> 
+</span></span></code></pre></div><h4 id="get-data-using-a-view">Get data using a view<a hidden class="anchor" aria-hidden="true" href="#get-data-using-a-view">#</a></h4>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-r" data-lang="r"><span style="display:flex;"><span>out <span style="color:#f92672">&lt;-</span> <span style="color:#a6e22e">sofa_view_search</span>(dbname <span style="color:#f92672">=</span> <span style="color:#e6db74">&#34;alm_db&#34;</span>, design_name <span style="color:#f92672">=</span> <span style="color:#e6db74">&#34;myview&#34;</span>)
+</span></span><span style="display:flex;"><span><span style="color:#a6e22e">length</span>(out<span style="color:#f92672">$</span>rows)  <span style="color:#75715e"># 160 results</span>
+</span></span></code></pre></div><div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-r" data-lang="r"><span style="display:flex;"><span>[1] <span style="color:#ae81ff">161</span>
+</span></span></code></pre></div><div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-r" data-lang="r"><span style="display:flex;"><span><span style="color:#a6e22e">sapply</span>(out<span style="color:#f92672">$</span>rows, <span style="color:#66d9ef">function</span>(x) x<span style="color:#f92672">$</span>value)[1<span style="color:#f92672">:</span><span style="color:#ae81ff">5</span>]  <span style="color:#75715e"># the values, just the API call URLs</span>
+</span></span></code></pre></div><div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-r" data-lang="r"><span style="display:flex;"><span>[1] <span style="color:#e6db74">&#34;http://alm.plos.org/api/v3/articles&#34;</span>
+</span></span><span style="display:flex;"><span>[2] <span style="color:#e6db74">&#34;http://alm.plos.org/api/v3/articles&#34;</span>
+</span></span><span style="display:flex;"><span>[3] <span style="color:#e6db74">&#34;http://alm.plos.org/api/v3/articles&#34;</span>
+</span></span><span style="display:flex;"><span>[4] <span style="color:#e6db74">&#34;http://alm.plos.org/api/v3/articles&#34;</span>
+</span></span><span style="display:flex;"><span>[5] <span style="color:#e6db74">&#34;http://alm.plos.org/api/v3/articles&#34;</span>
+</span></span></code></pre></div><h4 id="delete-the-view">Delete the view<a hidden class="anchor" aria-hidden="true" href="#delete-the-view">#</a></h4>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-r" data-lang="r"><span style="display:flex;"><span><span style="color:#a6e22e">sofa_view_del</span>(dbname <span style="color:#f92672">=</span> <span style="color:#e6db74">&#34;alm_db&#34;</span>, design_name <span style="color:#f92672">=</span> <span style="color:#e6db74">&#34;myview&#34;</span>)
+</span></span></code></pre></div><div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-r" data-lang="r"><span style="display:flex;"><span>[1] <span style="color:#e6db74">&#34;&#34;</span>
+</span></span></code></pre></div><h2 id="what-now">What now?<a hidden class="anchor" aria-hidden="true" href="#what-now">#</a></h2>
+<p>Well, if no one uses this, then probably nothing. Though, if people think this could be useful:</p>
+<ul>
+<li>It would be cool to make easy hooks into any package making web calls to allow users to write data to CouchDB if they choose to, sort of like the example above with rplos.</li>
+<li>Perhaps automate some of the setup for CouchDB for users, making system calls so they don&rsquo;t have to.</li>
+<li>Performance: As shown above, simultaneously writing data to CouchDB takes longer than not doing so - removing this time difference will make writing to couch more palatable.</li>
+</ul>
+<h2 id="what-do-you-think">What do you think?<a hidden class="anchor" aria-hidden="true" href="#what-do-you-think">#</a></h2>
+<p>What is your reaction to this post?  Do you have a need for this sort of tool?  Do you have similar use cases that could be addressed with <code>sofa</code>?</p>
+
+
+  </div>
+
+  <footer class="post-footer">
+    <ul class="post-tags">
+      <li><a href="http://localhost:1313/tags/r/">R</a></li>
+      <li><a href="http://localhost:1313/tags/ropensci/">Ropensci</a></li>
+      <li><a href="http://localhost:1313/tags/api/">API</a></li>
+      <li><a href="http://localhost:1313/tags/database/">Database</a></li>
+      <li><a href="http://localhost:1313/tags/couchdb/">Couchdb</a></li>
+      <li><a href="http://localhost:1313/tags/nosql/">Nosql</a></li>
+    </ul>
+  </footer>
+</article>
+    </main>
+    
+<footer class="footer">
+    <span>&copy; 2024 <a href="http://localhost:1313/">Recology</a></span>
+    <span>
+        Powered by
+        <a href="https://gohugo.io/" rel="noopener noreferrer" target="_blank">Hugo</a> &
+        <a href="https://github.com/adityatelange/hugo-PaperMod/" rel="noopener" target="_blank">PaperMod</a>
+    </span>
+</footer>
+<a href="#top" aria-label="go to top" title="Go to Top (Alt + G)" class="top-link" id="top-link" accesskey="g">
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 12 6" fill="currentColor">
+        <path d="M12 6H0l6-6z" />
+    </svg>
+</a>
+
+<script>
+    let menu = document.getElementById('menu')
+    if (menu) {
+        menu.scrollLeft = localStorage.getItem("menu-scroll-position");
+        menu.onscroll = function () {
+            localStorage.setItem("menu-scroll-position", menu.scrollLeft);
+        }
+    }
+
+    document.querySelectorAll('a[href^="#"]').forEach(anchor => {
+        anchor.addEventListener("click", function (e) {
+            e.preventDefault();
+            var id = this.getAttribute("href").substr(1);
+            if (!window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+                document.querySelector(`[id='${decodeURIComponent(id)}']`).scrollIntoView({
+                    behavior: "smooth"
+                });
+            } else {
+                document.querySelector(`[id='${decodeURIComponent(id)}']`).scrollIntoView();
+            }
+            if (id === "top") {
+                history.replaceState(null, null, " ");
+            } else {
+                history.pushState(null, null, `#${id}`);
+            }
+        });
+    });
+
+</script>
+<script>
+    var mybutton = document.getElementById("top-link");
+    window.onscroll = function () {
+        if (document.body.scrollTop > 800 || document.documentElement.scrollTop > 800) {
+            mybutton.style.visibility = "visible";
+            mybutton.style.opacity = "1";
+        } else {
+            mybutton.style.visibility = "hidden";
+            mybutton.style.opacity = "0";
+        }
+    };
+
+</script>
+<script>
+    document.getElementById("theme-toggle").addEventListener("click", () => {
+        if (document.body.className.includes("dark")) {
+            document.body.classList.remove('dark');
+            localStorage.setItem("pref-theme", 'light');
+        } else {
+            document.body.classList.add('dark');
+            localStorage.setItem("pref-theme", 'dark');
+        }
+    })
+
+</script>
+<script>
+    document.querySelectorAll('pre > code').forEach((codeblock) => {
+        const container = codeblock.parentNode.parentNode;
+
+        const copybutton = document.createElement('button');
+        copybutton.classList.add('copy-code');
+        copybutton.innerHTML = 'copy';
+
+        function copyingDone() {
+            copybutton.innerHTML = 'copied!';
+            setTimeout(() => {
+                copybutton.innerHTML = 'copy';
+            }, 2000);
+        }
+
+        copybutton.addEventListener('click', (cb) => {
+            if ('clipboard' in navigator) {
+                navigator.clipboard.writeText(codeblock.textContent);
+                copyingDone();
+                return;
+            }
+
+            const range = document.createRange();
+            range.selectNodeContents(codeblock);
+            const selection = window.getSelection();
+            selection.removeAllRanges();
+            selection.addRange(range);
+            try {
+                document.execCommand('copy');
+                copyingDone();
+            } catch (e) { };
+            selection.removeRange(range);
+        });
+
+        if (container.classList.contains("highlight")) {
+            container.appendChild(copybutton);
+        } else if (container.parentNode.firstChild == container) {
+            
+        } else if (codeblock.parentNode.parentNode.parentNode.parentNode.parentNode.nodeName == "TABLE") {
+            
+            codeblock.parentNode.parentNode.parentNode.parentNode.parentNode.appendChild(copybutton);
+        } else {
+            
+            codeblock.parentNode.appendChild(copybutton);
+        }
+    });
+</script>
+</body>
+
+</html>

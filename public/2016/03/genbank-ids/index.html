@@ -1,0 +1,351 @@
+<!DOCTYPE html>
+<html lang="en" dir="auto">
+
+<head><script src="/livereload.js?mindelay=10&amp;v=2&amp;port=1313&amp;path=livereload" data-no-instant defer></script><meta charset="utf-8">
+<meta http-equiv="X-UA-Compatible" content="IE=edge">
+<meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
+<meta name="robots" content="noindex, nofollow">
+<title>GenBank IDs API - get, match, swap id types | Recology</title>
+<meta name="keywords" content="API, ruby, sinatra, science">
+<meta name="description" content="GenBank IDs, accession numbers and GI identifiers, are the two types of identifiers for entries in GenBank. (see this page for why there are two types of identifiers). Actually, recent news from NCBI is that GI identifiers will be phased out by September this year, which affects what I&rsquo;ll talk about below.
+There are a lot of sequences in GenBank. Sometimes you have identifiers and you want to check if they exist in GenBank, or want to get one type from another (accession from GI, or vice versa; although GI phase out will make this use case no longer needed), or just get a bunch of identifiers for software testing purposes perhaps.">
+<meta name="author" content="">
+<link rel="canonical" href="http://localhost:1313/2016/03/genbank-ids/">
+<link crossorigin="anonymous" href="/assets/css/stylesheet.f4cda22486791d430ef692108ba33a982c3c552eca57e99456bb55aa4bd22568.css" integrity="sha256-9M2iJIZ5HUMO9pIQi6M6mCw8VS7KV&#43;mUVrtVqkvSJWg=" rel="preload stylesheet" as="style">
+<link rel="icon" href="http://localhost:1313/favicon.ico">
+<link rel="icon" type="image/png" sizes="16x16" href="http://localhost:1313/favicon-16x16.png">
+<link rel="icon" type="image/png" sizes="32x32" href="http://localhost:1313/favicon-32x32.png">
+<link rel="apple-touch-icon" href="http://localhost:1313/apple-touch-icon.png">
+<link rel="mask-icon" href="http://localhost:1313/safari-pinned-tab.svg">
+<meta name="theme-color" content="#2e2e33">
+<meta name="msapplication-TileColor" content="#2e2e33">
+<link rel="alternate" hreflang="en" href="http://localhost:1313/2016/03/genbank-ids/">
+<noscript>
+    <style>
+        #theme-toggle,
+        .top-link {
+            display: none;
+        }
+
+    </style>
+    <style>
+        @media (prefers-color-scheme: dark) {
+            :root {
+                --theme: rgb(29, 30, 32);
+                --entry: rgb(46, 46, 51);
+                --primary: rgb(218, 218, 219);
+                --secondary: rgb(155, 156, 157);
+                --tertiary: rgb(65, 66, 68);
+                --content: rgb(196, 196, 197);
+                --code-block-bg: rgb(46, 46, 51);
+                --code-bg: rgb(55, 56, 62);
+                --border: rgb(51, 51, 51);
+            }
+
+            .list {
+                background: var(--theme);
+            }
+
+            .list:not(.dark)::-webkit-scrollbar-track {
+                background: 0 0;
+            }
+
+            .list:not(.dark)::-webkit-scrollbar-thumb {
+                border-color: var(--theme);
+            }
+        }
+
+    </style>
+</noscript>
+</head>
+
+<body class="" id="top">
+<script>
+    if (localStorage.getItem("pref-theme") === "dark") {
+        document.body.classList.add('dark');
+    } else if (localStorage.getItem("pref-theme") === "light") {
+        document.body.classList.remove('dark')
+    } else if (window.matchMedia('(prefers-color-scheme: dark)').matches) {
+        document.body.classList.add('dark');
+    }
+
+</script>
+
+<header class="header">
+    <nav class="nav">
+        <div class="logo">
+            <a href="http://localhost:1313/" accesskey="h" title="Recology (Alt + H)">Recology</a>
+            <div class="logo-switches">
+                <button id="theme-toggle" accesskey="t" title="(Alt + T)">
+                    <svg id="moon" xmlns="http://www.w3.org/2000/svg" width="24" height="18" viewBox="0 0 24 24"
+                        fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
+                        stroke-linejoin="round">
+                        <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path>
+                    </svg>
+                    <svg id="sun" xmlns="http://www.w3.org/2000/svg" width="24" height="18" viewBox="0 0 24 24"
+                        fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
+                        stroke-linejoin="round">
+                        <circle cx="12" cy="12" r="5"></circle>
+                        <line x1="12" y1="1" x2="12" y2="3"></line>
+                        <line x1="12" y1="21" x2="12" y2="23"></line>
+                        <line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line>
+                        <line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line>
+                        <line x1="1" y1="12" x2="3" y2="12"></line>
+                        <line x1="21" y1="12" x2="23" y2="12"></line>
+                        <line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line>
+                        <line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line>
+                    </svg>
+                </button>
+                <ul class="lang-switch"><li>|</li>
+                </ul>
+            </div>
+        </div>
+        <ul id="menu">
+            <li>
+                <a href="http://localhost:1313/" title="Home">
+                    <span>Home</span>
+                </a>
+            </li>
+            <li>
+                <a href="http://localhost:1313/about" title="About">
+                    <span>About</span>
+                </a>
+            </li>
+            <li>
+                <a href="http://localhost:1313/archives" title="Archive">
+                    <span>Archive</span>
+                </a>
+            </li>
+            <li>
+                <a href="http://localhost:1313/search" title="Search (Alt &#43; /)" accesskey=/>
+                    <span>Search</span>
+                </a>
+            </li>
+            <li>
+                <a href="http://localhost:1313/index.xml" title="RSS">
+                    <span>RSS</span>
+                </a>
+            </li>
+        </ul>
+    </nav>
+</header>
+<main class="main">
+
+<article class="post-single">
+  <header class="post-header">
+    
+    <h1 class="post-title entry-hint-parent">
+      GenBank IDs API - get, match, swap id types
+    </h1>
+    <div class="post-meta"><span title='2016-03-29 00:00:00 +0000 UTC'>March 29, 2016</span>&nbsp;·&nbsp;3 min
+
+</div>
+  </header> 
+  <div class="post-content"><p>GenBank IDs, accession numbers and GI identifiers, are the two types of identifiers for entries in GenBank. (see <a href="https://www.ncbi.nlm.nih.gov/Sitemap/sequenceIDs.html">this page</a> for why there are two types of identifiers). Actually, <a href="https://www.ncbi.nlm.nih.gov/news/03-02-2016-phase-out-of-GI-numbers/">recent news</a> from NCBI is that GI identifiers will be phased out by September this year, which affects what I&rsquo;ll talk about below.</p>
+<p>There are a lot of sequences in GenBank. Sometimes you have identifiers and you want to check if they exist in GenBank, or want to get one type from another (accession from GI, or vice versa; although GI phase out will make this use case no longer needed), or just get a bunch of identifiers for software testing purposes perhaps.</p>
+<p>Currently, the ENTREZ web services aren&rsquo;t super performant or easy to use for the above use cases. Thus, I&rsquo;ve built out a RESTful API for these use cases, called <a href="https://github.com/sckott/gbids">gbids</a>.</p>
+<p><code>gbids</code> on GitHub: <a href="https://github.com/sckott/gbids">sckott/gbids</a></p>
+<p>Here&rsquo;s the tech stack:</p>
+<ul>
+<li>API: Ruby/Sinatra</li>
+<li>Storage: MySQL</li>
+<li>Caching: Redis
+<ul>
+<li>each key cached for 3 hours</li>
+</ul>
+</li>
+<li>Server: Caddy
+<ul>
+<li>https</li>
+</ul>
+</li>
+<li>Authentication: none</li>
+</ul>
+<p>Will soon have a cron job update when new dump is available every Sunday, but for now we&rsquo;re about a month behind the current dump of identifiers. If usage of the API picks up, I&rsquo;ll know it&rsquo;s worth maintaining and make sure data is up to date.</p>
+<p>The base url is <a href="https://gbids.xyz">https://gbids.xyz</a></p>
+<p>Here&rsquo;s a rundown of the API routes:</p>
+<ul>
+<li><code>/</code> re-routes to <code>/heartbeat</code></li>
+<li><code>/heartbeat</code> - list routes</li>
+<li><code>/acc</code> - <code>GET</code> - list accession ids</li>
+<li><code>/acc/:id,:id,...</code> - <code>GET</code> - submit many accession numbers, get back boolean (match or no match)</li>
+<li><code>/acc</code> - <code>POST</code></li>
+<li><code>/gi</code> - <code>GET</code> - list gi numbers</li>
+<li><code>/gi/:id,:id,...</code> - <code>GET</code> - submit many gi numbers, get back boolean (match or no match)</li>
+<li><code>/gi</code> - <code>POST</code></li>
+<li><code>/acc2gi/:id,:id,...</code> - <code>GET</code> - get gi numbers from accession numbers</li>
+<li><code>/acc2gi</code> - <code>POST</code></li>
+<li><code>/gi2acc/:id,:id,...</code> - <code>GET</code> - get accession numbers from gi numbers</li>
+<li><code>/gi2acc</code> - <code>POST</code></li>
+</ul>
+<p>Of course after GI identifiers are phased out, all <code>gi</code> routes will be removed.</p>
+<p>The API docs are at <a href="https://recology.info/gbidsdocs">recology.info/gbidsdocs</a> - let me know if you have any feedback on those.</p>
+<p>I also have a status page up at <a href="https://recology.info/gbidsstatus/">recology.info/gbidsstatus</a> - it&rsquo;s not automated, I have to update the status manually, but I do update that page whenever I&rsquo;m doing maintenance and the API will be down, or if it goes down due to any other reason.</p>
+<h2 id="examples">examples<a hidden class="anchor" aria-hidden="true" href="#examples">#</a></h2>
+<p>Request to list accession identifiers, limit to 5</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-bash" data-lang="bash"><span style="display:flex;"><span>curl <span style="color:#e6db74">&#39;https://gbids.xyz/acc?limit=5&#39;</span> | jq .
+</span></span><span style="display:flex;"><span><span style="color:#f92672">{</span>
+</span></span><span style="display:flex;"><span>  <span style="color:#e6db74">&#34;matched&#34;</span>: 692006925,
+</span></span><span style="display:flex;"><span>  <span style="color:#e6db74">&#34;returned&#34;</span>: 5,
+</span></span><span style="display:flex;"><span>  <span style="color:#e6db74">&#34;data&#34;</span>: <span style="color:#f92672">[</span>
+</span></span><span style="display:flex;"><span>    <span style="color:#e6db74">&#34;A00002&#34;</span>,
+</span></span><span style="display:flex;"><span>    <span style="color:#e6db74">&#34;A00003&#34;</span>,
+</span></span><span style="display:flex;"><span>    <span style="color:#e6db74">&#34;X17276&#34;</span>,
+</span></span><span style="display:flex;"><span>    <span style="color:#e6db74">&#34;X60065&#34;</span>,
+</span></span><span style="display:flex;"><span>    <span style="color:#e6db74">&#34;CAA42669&#34;</span>
+</span></span><span style="display:flex;"><span>  <span style="color:#f92672">]</span>,
+</span></span><span style="display:flex;"><span>  <span style="color:#e6db74">&#34;error&#34;</span>: null
+</span></span><span style="display:flex;"><span><span style="color:#f92672">}</span>
+</span></span></code></pre></div><p>Request to match accession identifiers, some exist, while some do not</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-bash" data-lang="bash"><span style="display:flex;"><span>curl <span style="color:#e6db74">&#39;https://gbids.xyz/acc/AACY024124486,AACY024124483,asdfd,asdf,AACY024124476&#39;</span> | jq .
+</span></span><span style="display:flex;"><span><span style="color:#f92672">{</span>
+</span></span><span style="display:flex;"><span>  <span style="color:#e6db74">&#34;matched&#34;</span>: 3,
+</span></span><span style="display:flex;"><span>  <span style="color:#e6db74">&#34;returned&#34;</span>: 5,
+</span></span><span style="display:flex;"><span>  <span style="color:#e6db74">&#34;data&#34;</span>: <span style="color:#f92672">{</span>
+</span></span><span style="display:flex;"><span>    <span style="color:#e6db74">&#34;AACY024124486&#34;</span>: true,
+</span></span><span style="display:flex;"><span>    <span style="color:#e6db74">&#34;AACY024124483&#34;</span>: true,
+</span></span><span style="display:flex;"><span>    <span style="color:#e6db74">&#34;asdfd&#34;</span>: false,
+</span></span><span style="display:flex;"><span>    <span style="color:#e6db74">&#34;asdf&#34;</span>: false,
+</span></span><span style="display:flex;"><span>    <span style="color:#e6db74">&#34;AACY024124476&#34;</span>: true
+</span></span><span style="display:flex;"><span>  <span style="color:#f92672">}</span>,
+</span></span><span style="display:flex;"><span>  <span style="color:#e6db74">&#34;error&#34;</span>: null
+</span></span><span style="display:flex;"><span><span style="color:#f92672">}</span>
+</span></span></code></pre></div><h2 id="to-do">to do<a hidden class="anchor" aria-hidden="true" href="#to-do">#</a></h2>
+<p>I think it&rsquo;d probably be worth adding routes for getting accession from taxonomy id and vice versa since that&rsquo;s something that is currently not very easy. We could use the dumped accession2taxid data from <a href="ftp://ftp.ncbi.nih.gov/pub/taxonomy/accession2taxid/">ftp://ftp.ncbi.nih.gov/pub/taxonomy/accession2taxid/</a></p>
+<h2 id="feedback">feedback!<a hidden class="anchor" aria-hidden="true" href="#feedback">#</a></h2>
+<p>If you think this could be potentially useful, do try it out and send any feedback. I watch logs from the API, so I&rsquo;m hoping for an increase in usage so I know people find it useful.</p>
+<p>Since servers aren&rsquo;t free, costs add up, and if I don&rsquo;t see usage pick up I&rsquo;ll discontinue the service at some point. So do use it!</p>
+<p>And if anyone can offer free servers, I&rsquo;d gladly take advantage of that. I&rsquo;ve applied for AWS research grant, but won&rsquo;t hear back for a few months.</p>
+
+
+  </div>
+
+  <footer class="post-footer">
+    <ul class="post-tags">
+      <li><a href="http://localhost:1313/tags/api/">API</a></li>
+      <li><a href="http://localhost:1313/tags/ruby/">Ruby</a></li>
+      <li><a href="http://localhost:1313/tags/sinatra/">Sinatra</a></li>
+      <li><a href="http://localhost:1313/tags/science/">Science</a></li>
+    </ul>
+  </footer>
+</article>
+    </main>
+    
+<footer class="footer">
+    <span>&copy; 2024 <a href="http://localhost:1313/">Recology</a></span>
+    <span>
+        Powered by
+        <a href="https://gohugo.io/" rel="noopener noreferrer" target="_blank">Hugo</a> &
+        <a href="https://github.com/adityatelange/hugo-PaperMod/" rel="noopener" target="_blank">PaperMod</a>
+    </span>
+</footer>
+<a href="#top" aria-label="go to top" title="Go to Top (Alt + G)" class="top-link" id="top-link" accesskey="g">
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 12 6" fill="currentColor">
+        <path d="M12 6H0l6-6z" />
+    </svg>
+</a>
+
+<script>
+    let menu = document.getElementById('menu')
+    if (menu) {
+        menu.scrollLeft = localStorage.getItem("menu-scroll-position");
+        menu.onscroll = function () {
+            localStorage.setItem("menu-scroll-position", menu.scrollLeft);
+        }
+    }
+
+    document.querySelectorAll('a[href^="#"]').forEach(anchor => {
+        anchor.addEventListener("click", function (e) {
+            e.preventDefault();
+            var id = this.getAttribute("href").substr(1);
+            if (!window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+                document.querySelector(`[id='${decodeURIComponent(id)}']`).scrollIntoView({
+                    behavior: "smooth"
+                });
+            } else {
+                document.querySelector(`[id='${decodeURIComponent(id)}']`).scrollIntoView();
+            }
+            if (id === "top") {
+                history.replaceState(null, null, " ");
+            } else {
+                history.pushState(null, null, `#${id}`);
+            }
+        });
+    });
+
+</script>
+<script>
+    var mybutton = document.getElementById("top-link");
+    window.onscroll = function () {
+        if (document.body.scrollTop > 800 || document.documentElement.scrollTop > 800) {
+            mybutton.style.visibility = "visible";
+            mybutton.style.opacity = "1";
+        } else {
+            mybutton.style.visibility = "hidden";
+            mybutton.style.opacity = "0";
+        }
+    };
+
+</script>
+<script>
+    document.getElementById("theme-toggle").addEventListener("click", () => {
+        if (document.body.className.includes("dark")) {
+            document.body.classList.remove('dark');
+            localStorage.setItem("pref-theme", 'light');
+        } else {
+            document.body.classList.add('dark');
+            localStorage.setItem("pref-theme", 'dark');
+        }
+    })
+
+</script>
+<script>
+    document.querySelectorAll('pre > code').forEach((codeblock) => {
+        const container = codeblock.parentNode.parentNode;
+
+        const copybutton = document.createElement('button');
+        copybutton.classList.add('copy-code');
+        copybutton.innerHTML = 'copy';
+
+        function copyingDone() {
+            copybutton.innerHTML = 'copied!';
+            setTimeout(() => {
+                copybutton.innerHTML = 'copy';
+            }, 2000);
+        }
+
+        copybutton.addEventListener('click', (cb) => {
+            if ('clipboard' in navigator) {
+                navigator.clipboard.writeText(codeblock.textContent);
+                copyingDone();
+                return;
+            }
+
+            const range = document.createRange();
+            range.selectNodeContents(codeblock);
+            const selection = window.getSelection();
+            selection.removeAllRanges();
+            selection.addRange(range);
+            try {
+                document.execCommand('copy');
+                copyingDone();
+            } catch (e) { };
+            selection.removeRange(range);
+        });
+
+        if (container.classList.contains("highlight")) {
+            container.appendChild(copybutton);
+        } else if (container.parentNode.firstChild == container) {
+            
+        } else if (codeblock.parentNode.parentNode.parentNode.parentNode.parentNode.nodeName == "TABLE") {
+            
+            codeblock.parentNode.parentNode.parentNode.parentNode.parentNode.appendChild(copybutton);
+        } else {
+            
+            codeblock.parentNode.appendChild(copybutton);
+        }
+    });
+</script>
+</body>
+
+</html>
