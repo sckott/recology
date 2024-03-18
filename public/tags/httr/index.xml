@@ -16,6 +16,178 @@
       <description>request is DSL for http requests for R, and is inspired by the CLI tool httpie. It&amp;rsquo;s built on httr.
 The following were driving principles for this package:
 The web is increasingly a JSON world, so we assume applications/json by default, but give back other types if not The workflow follows logically, or at least should, from, hey, I got this url, to i need to add some options, to execute request - and functions support piping so that you can execute functions in this order Whenever possible, we transform output to data.</description>
+      <content:encoded><![CDATA[<p><code>request</code> is DSL for http requests for R, and is inspired by the CLI tool <a href="https://github.com/jakubroztocil/httpie">httpie</a>. It&rsquo;s built on <code>httr</code>.</p>
+<p>The following were driving principles for this package:</p>
+<ul>
+<li>The web is increasingly a JSON world, so we assume <code>applications/json</code> by default, but give back other types if not</li>
+<li>The workflow follows logically, or at least should, from, <em>hey, I got this url</em>, to <em>i need to add some options</em>, to <em>execute request</em> - and functions support piping so that you can execute functions in this order</li>
+<li>Whenever possible, we transform output to data.frame&rsquo;s - facilitating downstream manipulation via <code>dplyr</code>, etc.</li>
+<li>We do <code>GET</code> requests by default. Specify a different type if you don&rsquo;t want <code>GET</code>. Given <code>GET</code> by default, this client is optimized for consumption of data, rather than creating new things on servers</li>
+<li>You can use non-standard evaluation to easily pass in query parameters without worrying about <code>&amp;</code>&rsquo;s, URL escaping, etc. (see <code>api_query()</code>)</li>
+<li>Same for body params (see <code>api_body()</code>)</li>
+</ul>
+<p>The following is a brief demo of some of the package functionality:</p>
+<h2 id="install">Install</h2>
+<p>From CRAN</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-r" data-lang="r"><span style="display:flex;"><span><span style="color:#a6e22e">install.packages</span>(<span style="color:#e6db74">&#34;request&#34;</span>)
+</span></span></code></pre></div><p>Or from GitHub</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-r" data-lang="r"><span style="display:flex;"><span>devtools<span style="color:#f92672">::</span><span style="color:#a6e22e">install_github</span>(<span style="color:#e6db74">&#34;sckott/request&#34;</span>)
+</span></span></code></pre></div><div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-r" data-lang="r"><span style="display:flex;"><span><span style="color:#a6e22e">library</span>(<span style="color:#e6db74">&#34;request&#34;</span>)
+</span></span></code></pre></div><h2 id="execute-on-last-pipe">Execute on last pipe</h2>
+<p>When using pipes (<code>%&gt;%</code>) in <code>request</code>, we autodetect last piped command, and execute <code>http()</code> if it&rsquo;s the last. If not the last, the output gets passed to the next command, and so on. This feature (and <code>magrittr</code>) were done by Stefan Milton Bache.</p>
+<p>This feature is really nice because a) it&rsquo;s one less thing you need to do, and b) you only need to care about the request itself.</p>
+<p>You can escape auto-execution if you use the function <code>peep()</code>, which prints out a summary of the request you&rsquo;ve created, but does not execute an HTTP request.</p>
+<h2 id="http-requests">HTTP Requests</h2>
+<p>A high level function <code>http()</code> wraps a lower level <code>R6</code> object <code>RequestIterator</code>, which holds a series of variables and functions to execute <code>GET</code> and <code>POST</code> requests, and will hold other HTTP verbs as well. In addition, it can hold state, which will allow us to do paging internally for you (see below). You have direct access to the <code>R6</code> object if you call <code>http_client()</code> instead of <code>http()</code>.</p>
+<h2 id="nse-and-se">NSE and SE</h2>
+<p>Most if not all functions in <code>request</code> support non-standard evaluation (NSE) as well as standard evaluation (SE). If a function supports both, there&rsquo;s a version without an underscore for NSE, while a version with an underscore is for SE. For example, here, we make a HTTP request by passing a base URL, then a series of paths that get combined together. First the NSE version</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-r" data-lang="r"><span style="display:flex;"><span><span style="color:#a6e22e">api</span>(<span style="color:#e6db74">&#39;https://api.github.com/&#39;</span>) <span style="color:#f92672">%&gt;%</span>
+</span></span><span style="display:flex;"><span>  <span style="color:#a6e22e">api_path</span>(repos, ropensci, rgbif, issues)
+</span></span></code></pre></div><p>Then the SE version</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-r" data-lang="r"><span style="display:flex;"><span><span style="color:#a6e22e">api</span>(<span style="color:#e6db74">&#39;https://api.github.com/&#39;</span>) <span style="color:#f92672">%&gt;%</span>
+</span></span><span style="display:flex;"><span>  <span style="color:#a6e22e">api_path_</span>(<span style="color:#e6db74">&#39;repos&#39;</span>, <span style="color:#e6db74">&#39;ropensci&#39;</span>, <span style="color:#e6db74">&#39;rgbif&#39;</span>, <span style="color:#e6db74">&#39;issues&#39;</span>)
+</span></span></code></pre></div><h2 id="building-api-routes">Building API routes</h2>
+<p>The first thing you&rsquo;ll want to do is lay out the base URL for your request. The function <code>api()</code> is your friend.</p>
+<p><code>api()</code> works with full or partial URLs:</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-r" data-lang="r"><span style="display:flex;"><span><span style="color:#a6e22e">api</span>(<span style="color:#e6db74">&#39;https://api.github.com/&#39;</span>)
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; URL: https://api.github.com/</span>
+</span></span><span style="display:flex;"><span><span style="color:#a6e22e">api</span>(<span style="color:#e6db74">&#39;https://api.gbif.org/v1&#39;</span>)
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; URL: https://api.gbif.org/v1</span>
+</span></span><span style="display:flex;"><span><span style="color:#a6e22e">api</span>(<span style="color:#e6db74">&#39;api.gbif.org/v1&#39;</span>)
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; URL: api.gbif.org/v1</span>
+</span></span></code></pre></div><p>And works with ports, full or partial</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-r" data-lang="r"><span style="display:flex;"><span><span style="color:#a6e22e">api</span>(<span style="color:#e6db74">&#39;http://localhost:9200&#39;</span>)
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; URL: http://localhost:9200</span>
+</span></span><span style="display:flex;"><span><span style="color:#a6e22e">api</span>(<span style="color:#e6db74">&#39;localhost:9200&#39;</span>)
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; URL: http://localhost:9200</span>
+</span></span><span style="display:flex;"><span><span style="color:#a6e22e">api</span>(<span style="color:#e6db74">&#39;:9200&#39;</span>)
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; URL: http://localhost:9200</span>
+</span></span><span style="display:flex;"><span><span style="color:#a6e22e">api</span>(<span style="color:#e6db74">&#39;9200&#39;</span>)
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; URL: http://localhost:9200</span>
+</span></span><span style="display:flex;"><span><span style="color:#a6e22e">api</span>(<span style="color:#e6db74">&#39;9200/stuff&#39;</span>)
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; URL: http://localhost:9200/stuff</span>
+</span></span></code></pre></div><h2 id="make-http-requests">Make HTTP requests</h2>
+<p>The above examples with <code>api()</code> are not passed through a pipe, so only define a URL, but don&rsquo;t do an HTTP request. To make an HTTP request, you can either pipe a url or partial url to e.g., <code>api()</code>, or call <code>http()</code> at the end of a string of function calls:</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-r" data-lang="r"><span style="display:flex;"><span><span style="color:#e6db74">&#39;https://api.github.com/&#39;</span> <span style="color:#f92672">%&gt;%</span> <span style="color:#a6e22e">api</span>()
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; $current_user_url</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; [1] &#34;https://api.github.com/user&#34;</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt;</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; $current_user_authorizations_html_url</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; [1] &#34;https://github.com/settings/connections/applications{/client_id}&#34;</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt;</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; $authorizations_url</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; [1] &#34;https://api.github.com/authorizations&#34;</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt;</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; $code_search_url</span>
+</span></span><span style="display:flex;"><span><span style="color:#66d9ef">...</span>
+</span></span></code></pre></div><p>Or</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-r" data-lang="r"><span style="display:flex;"><span><span style="color:#a6e22e">api</span>(<span style="color:#e6db74">&#39;https://api.github.com/&#39;</span>) <span style="color:#f92672">%&gt;%</span> <span style="color:#a6e22e">http</span>()
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; $current_user_url</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; [1] &#34;https://api.github.com/user&#34;</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt;</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; $current_user_authorizations_html_url</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; [1] &#34;https://github.com/settings/connections/applications{/client_id}&#34;</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt;</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; $authorizations_url</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; [1] &#34;https://api.github.com/authorizations&#34;</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt;</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; $code_search_url</span>
+</span></span><span style="display:flex;"><span><span style="color:#66d9ef">...</span>
+</span></span></code></pre></div><p><code>http()</code> is called at the end of a chain of piped commands, so no need to invoke it. However, you can if you like.</p>
+<h2 id="templating">Templating</h2>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-r" data-lang="r"><span style="display:flex;"><span>repo_info <span style="color:#f92672">&lt;-</span> <span style="color:#a6e22e">list</span>(username <span style="color:#f92672">=</span> <span style="color:#e6db74">&#39;craigcitro&#39;</span>, repo <span style="color:#f92672">=</span> <span style="color:#e6db74">&#39;r-travis&#39;</span>)
+</span></span><span style="display:flex;"><span><span style="color:#a6e22e">api</span>(<span style="color:#e6db74">&#39;https://api.github.com/&#39;</span>) <span style="color:#f92672">%&gt;%</span>
+</span></span><span style="display:flex;"><span>  <span style="color:#a6e22e">api_template</span>(template <span style="color:#f92672">=</span> <span style="color:#e6db74">&#39;repos/{{username}}/{{repo}}/issues&#39;</span>, data <span style="color:#f92672">=</span> repo_info)
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; [[1]]</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; [[1]]$url</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; [1] &#34;https://api.github.com/repos/craigcitro/r-travis/issues/164&#34;</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt;</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; [[1]]$labels_url</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; [1] &#34;https://api.github.com/repos/craigcitro/r-travis/issues/164/labels{/name}&#34;</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt;</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; [[1]]$comments_url</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; [1] &#34;https://api.github.com/repos/craigcitro/r-travis/issues/164/comments&#34;</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; ...</span>
+</span></span></code></pre></div><h2 id="set-paths">Set paths</h2>
+<p><code>api_path()</code> adds paths to the base URL</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-r" data-lang="r"><span style="display:flex;"><span><span style="color:#a6e22e">api</span>(<span style="color:#e6db74">&#39;https://api.github.com/&#39;</span>) <span style="color:#f92672">%&gt;%</span>
+</span></span><span style="display:flex;"><span>  <span style="color:#a6e22e">api_path</span>(repos, ropensci, rgbif, issues) <span style="color:#f92672">%&gt;%</span>
+</span></span><span style="display:flex;"><span>  peep
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; &lt;http request&gt;</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt;   url: https://api.github.com/</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt;   paths: repos/ropensci/rgbif/issues</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt;   query:</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt;   body:</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt;   paging:</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt;   headers:</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt;   rate limit:</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt;   retry (n/delay (s)): /</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt;   error handler:</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt;   config:</span>
+</span></span></code></pre></div><h2 id="query">Query</h2>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-r" data-lang="r"><span style="display:flex;"><span><span style="color:#a6e22e">api</span>(<span style="color:#e6db74">&#34;https://api.plos.org/search&#34;</span>) <span style="color:#f92672">%&gt;%</span>
+</span></span><span style="display:flex;"><span>  <span style="color:#a6e22e">api_query</span>(q <span style="color:#f92672">=</span> ecology, wt <span style="color:#f92672">=</span> json, fl <span style="color:#f92672">=</span> journal) <span style="color:#f92672">%&gt;%</span>
+</span></span><span style="display:flex;"><span>  peep
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; &lt;http request&gt;</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt;   url: https://api.plos.org/search</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt;   paths:</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt;   query: q=ecology, wt=json, fl=journal</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt;   body:</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt;   paging:</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt;   headers:</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt;   rate limit:</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt;   retry (n/delay (s)): /</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt;   error handler:</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt;   config:</span>
+</span></span></code></pre></div><h2 id="headers">Headers</h2>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-r" data-lang="r"><span style="display:flex;"><span><span style="color:#a6e22e">api</span>(<span style="color:#e6db74">&#39;https://httpbin.org/headers&#39;</span>) <span style="color:#f92672">%&gt;%</span>
+</span></span><span style="display:flex;"><span>  <span style="color:#a6e22e">api_headers</span>(`X-FARGO-SEASON` <span style="color:#f92672">=</span> <span style="color:#ae81ff">3</span>, `X-NARCOS-SEASON` <span style="color:#f92672">=</span> <span style="color:#ae81ff">5</span>) <span style="color:#f92672">%&gt;%</span>
+</span></span><span style="display:flex;"><span>  peep
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; &lt;http request&gt;</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt;   url: https://httpbin.org/headers</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt;   paths:</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt;   query:</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt;   body:</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt;   paging:</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt;   headers:</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt;     X-FARGO-SEASON: 3</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt;     X-NARCOS-SEASON: 5</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt;   rate limit:</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt;   retry (n/delay (s)): /</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt;   error handler:</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt;   config:</span>
+</span></span></code></pre></div><h2 id="curl-configuration">curl configuration</h2>
+<p><code>httr</code> is exported in <code>request</code>, so you can use <code>httr</code> functions like <code>verbose()</code> to get verbose curl output</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-r" data-lang="r"><span style="display:flex;"><span><span style="color:#a6e22e">api</span>(<span style="color:#e6db74">&#39;https://httpbin.org/headers&#39;</span>) <span style="color:#f92672">%&gt;%</span>
+</span></span><span style="display:flex;"><span>  <span style="color:#a6e22e">api_config</span>(<span style="color:#a6e22e">verbose</span>())
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; -&gt; GET /headers HTTP/1.1</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; -&gt; Host: httpbin.org</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; -&gt; User-Agent: curl/7.43.0 curl/0.9.4 httr/1.0.0 request/0.1.0</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; -&gt; Accept-Encoding: gzip, deflate</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; -&gt; Accept: application/json, text/xml, application/xml, */*</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; -&gt;</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; &lt;- HTTP/1.1 200 OK</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; &lt;- Server: nginx</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; &lt;- Date: Sun, 03 Jan 2016 16:56:29 GMT</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; &lt;- Content-Type: application/json</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; &lt;- Content-Length: 227</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; &lt;- Connection: keep-alive</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; &lt;- Access-Control-Allow-Origin: *</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; &lt;- Access-Control-Allow-Credentials: true</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; &lt;-</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; $headers</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; $headers$Accept</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; [1] &#34;application/json, text/xml, application/xml, */*&#34;</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; ...</span>
+</span></span></code></pre></div><h2 id="coming-soon">Coming soon</h2>
+<p>There&rsquo;s a number of interesting features that should be coming soon to <code>request</code>.</p>
+<ul>
+<li>Paging - a paging helper will make it easy to do paing, and will attempt to handle any parameters used for paging. Some user input will be required, like what parameter names are, and how many records you want returned  <a href="https://github.com/sckott/request/issues/2">sckott/request#2</a></li>
+<li>Retry - a retry helper will make it easy to retry http requests on any failure, and execute a user defined function on failure <a href="https://github.com/sckott/request/issues/6">sckott/request#6</a></li>
+<li>Rate limit - a rate limit helper will add info to a set of many requests - still in early design stages <a href="https://github.com/sckott/request/issues/5">sckott/request#5</a></li>
+<li>Caching - a caching helper - may use in the background the in development <a href="https://github.com/ropensci/vcr">vcr R client</a> when on CRAN or perhaps <a href="https://github.com/richfitz/storr">storr</a>  <a href="https://github.com/sckott/request/issues/4">sckott/request#4</a></li>
+</ul>
+]]></content:encoded>
     </item>
     <item>
       <title>the new way - httsnap</title>
@@ -24,6 +196,188 @@ The web is increasingly a JSON world, so we assume applications/json by default,
       <guid>http://localhost:1313/2015/04/the-new-way/</guid>
       <description>Inspired by httpie, a Python command line client as a sort of drop in replacement for curl, I am playing around with something similar-ish in R, at least in spirit. I started a little R pkg called httsnap with the following ideas:
 The web is increasingly a JSON world, so set content-type and accept headers to applications/json by default The workflow follows logically, or at least should, from, hey, I got this url, to i need to add some options, to execute request Whenever possible, transform output to data.</description>
+      <content:encoded><![CDATA[<p>Inspired by <code>httpie</code>, a Python command line client as a sort of drop in replacement for <code>curl</code>, I am playing around with something similar-ish in R, at least in spirit. I started a little R pkg called <code>httsnap</code> with the following ideas:</p>
+<ul>
+<li>The web is increasingly a JSON world, so set <code>content-type</code> and <code>accept</code> headers to <code>applications/json</code> by default</li>
+<li>The workflow follows logically, or at least should, from, <em>hey, I got this url</em>, to <em>i need to add some options</em>, to <em>execute request</em></li>
+<li>Whenever possible, transform output to data.frame&rsquo;s - facilitating downstream manipulation via <code>dplyr</code>, etc.</li>
+<li>Do <code>GET</code> requests by default. Specify a different type if you don&rsquo;t want <code>GET</code>. Some functionality does GET by default, though in some cases you need to specify GET</li>
+<li>You can use non-standard evaluation to easily pass in query parameters without worrying about <code>&amp;</code>&rsquo;s, URL escaping, etc. (see <code>Query()</code>)</li>
+<li>Same for body params (see <code>Body()</code>)</li>
+</ul>
+<h2 id="install">Install</h2>
+<p>Install and load <code>httsnap</code></p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-r" data-lang="r"><span style="display:flex;"><span>devtools<span style="color:#f92672">::</span><span style="color:#a6e22e">install_github</span>(<span style="color:#e6db74">&#34;sckott/httsnap&#34;</span>)
+</span></span></code></pre></div><div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-r" data-lang="r"><span style="display:flex;"><span><span style="color:#a6e22e">library</span>(<span style="color:#e6db74">&#34;httsnap&#34;</span>)
+</span></span><span style="display:flex;"><span><span style="color:#a6e22e">library</span>(<span style="color:#e6db74">&#34;dplyr&#34;</span>)
+</span></span></code></pre></div><h2 id="functions-so-far">Functions so far</h2>
+<ul>
+<li><code>Get</code> - GET request</li>
+<li><code>Query</code> - add query parameters</li>
+<li><code>Authenticate</code> - add authentication details</li>
+<li><code>Progress</code> - add progress bar</li>
+<li><code>Timeout</code> - add a timeout</li>
+<li><code>User_agent</code> - add a user agent</li>
+<li><code>Verbose</code> - give verbose output</li>
+<li><code>Body</code> - add a body</li>
+<li><code>h</code> - add headers by key-value pair</li>
+</ul>
+<p>These are named to avoid conflict with <code>httr</code></p>
+<h2 id="intro">Intro</h2>
+<p>A simple <code>GET</code> request</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-r" data-lang="r"><span style="display:flex;"><span><span style="color:#e6db74">&#34;https://httpbin.org/get&#34;</span> <span style="color:#f92672">%&gt;%</span>
+</span></span><span style="display:flex;"><span>  <span style="color:#a6e22e">Get</span>()
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; $args</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; named list()</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; </span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; $headers</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; $headers$Accept</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; [1] &#34;application/json, text/xml, application/xml, */*&#34;</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; </span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; $headers$`Accept-Encoding`</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; [1] &#34;gzip&#34;</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; </span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; $headers$Host</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; [1] &#34;httpbin.org&#34;</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; </span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; $headers$`User-Agent`</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; [1] &#34;curl/7.37.1 Rcurl/1.95.4.1 httr/0.6.1 httsnap/0.0.2.99&#34;</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; </span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; </span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; $origin</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; [1] &#34;24.21.209.71&#34;</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; </span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; $url</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; [1] &#34;https://httpbin.org/get&#34;</span>
+</span></span></code></pre></div><p>You&rsquo;ll notice that <code>Get()</code> doesn&rsquo;t just get the response, but also checks for whether it was a good response (the HTTP status code), and extracts the data.</p>
+<p>Or you can just pass the URL into the function itself</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-r" data-lang="r"><span style="display:flex;"><span><span style="color:#a6e22e">Get</span>(<span style="color:#e6db74">&#34;https://httpbin.org/get&#34;</span>)
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; $args</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; named list()</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; </span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; $headers</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; $headers$Accept</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; [1] &#34;application/json, text/xml, application/xml, */*&#34;</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; </span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; $headers$`Accept-Encoding`</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; [1] &#34;gzip&#34;</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; </span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; $headers$Host</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; [1] &#34;httpbin.org&#34;</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; </span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; $headers$`User-Agent`</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; [1] &#34;curl/7.37.1 Rcurl/1.95.4.1 httr/0.6.1 httsnap/0.0.2.99&#34;</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; </span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; </span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; $origin</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; [1] &#34;24.21.209.71&#34;</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; </span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; $url</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; [1] &#34;https://httpbin.org/get&#34;</span>
+</span></span></code></pre></div><p>You can buid up options by calling functions via pipes, and see what the options look like</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-r" data-lang="r"><span style="display:flex;"><span><span style="color:#e6db74">&#34;https://httpbin.org/get&#34;</span> <span style="color:#f92672">%&gt;%</span>
+</span></span><span style="display:flex;"><span>  <span style="color:#a6e22e">Progress</span>() <span style="color:#f92672">%&gt;%</span>
+</span></span><span style="display:flex;"><span>  <span style="color:#a6e22e">Verbose</span>()
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; &lt;http request&gt; </span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt;   url: https://httpbin.org/get</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt;   config: </span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; Config: </span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; List of 4</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt;  $ noprogress      :FALSE</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt;  $ progressfunction:function (...)  </span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt;  $ debugfunction   :function (...)  </span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt;  $ verbose         :TRUE</span>
+</span></span></code></pre></div><p>Then execute the GET request when you&rsquo;re ready</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-r" data-lang="r"><span style="display:flex;"><span><span style="color:#e6db74">&#34;https://httpbin.org/get&#34;</span> <span style="color:#f92672">%&gt;%</span>
+</span></span><span style="display:flex;"><span>  <span style="color:#a6e22e">Progress</span>() <span style="color:#f92672">%&gt;%</span>
+</span></span><span style="display:flex;"><span>  <span style="color:#a6e22e">Verbose</span>() <span style="color:#f92672">%&gt;%</span>
+</span></span><span style="display:flex;"><span>  <span style="color:#a6e22e">Get</span>()
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; $args</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; named list()</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; </span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; $headers</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; $headers$Accept</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; [1] &#34;application/json, text/xml, application/xml, */*&#34;</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; </span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; $headers$`Accept-Encoding`</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; [1] &#34;gzip&#34;</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; </span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; $headers$Host</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; [1] &#34;httpbin.org&#34;</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; </span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; $headers$`User-Agent`</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; [1] &#34;curl/7.37.1 Rcurl/1.95.4.1 httr/0.6.1 httsnap/0.0.2.99&#34;</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; </span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; </span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; $origin</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; [1] &#34;24.21.209.71&#34;</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; </span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; $url</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; [1] &#34;https://httpbin.org/get&#34;</span>
+</span></span></code></pre></div><h2 id="example-1">Example 1</h2>
+<p>Get scholarly article metadata from the Crossref API</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-r" data-lang="r"><span style="display:flex;"><span><span style="color:#e6db74">&#34;https://api.crossref.org/works&#34;</span> <span style="color:#f92672">%&gt;%</span>
+</span></span><span style="display:flex;"><span>  <span style="color:#a6e22e">Query</span>(query <span style="color:#f92672">=</span> <span style="color:#e6db74">&#34;ecology&#34;</span>) <span style="color:#f92672">%&gt;%</span> 
+</span></span><span style="display:flex;"><span>  .$message <span style="color:#f92672">%&gt;%</span> 
+</span></span><span style="display:flex;"><span>  .$items <span style="color:#f92672">%&gt;%</span> 
+</span></span><span style="display:flex;"><span>  <span style="color:#a6e22e">select</span>(DOI, title, publisher)
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt;                            DOI                title</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; 1          10.4996/fireecology         Fire Ecology</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; 2              10.5402/ecology         ISRN Ecology</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; 3                 10.1155/8641         ISRN Ecology</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; 4      10.1111/(issn)1526-100x  Restoration Ecology</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; 5        10.1007/248.1432-184x    Microbial Ecology</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; 6      10.1007/10144.1438-390x   Population Ecology</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; 7      10.1007/10452.1573-5125      Aquatic Ecology</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; 8      10.1007/10682.1573-8477 Evolutionary Ecology</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; 9      10.1007/10745.1572-9915        Human Ecology</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; 10     10.1007/10980.1572-9761    Landscape Ecology</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; 11     10.1007/11258.1573-5052        Plant Ecology</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; 12     10.1007/12080.1874-1746  Theoretical Ecology</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; 13     10.1111/(issn)1442-9993      Austral Ecology</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; 14     10.1111/(issn)1439-0485       Marine Ecology</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; 15     10.1111/(issn)1365-2435   Functional Ecology</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; 16     10.1111/(issn)1365-294x    Molecular Ecology</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; 17     10.1111/(issn)1461-0248      Ecology Letters</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; 18   10.1002/9780470979365.ch7  Behavioural Ecology</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; 19 10.1111/fec.2007.21.issue-5                     </span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; 20     10.1111/rec.0.0.issue-0                     </span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt;                            publisher</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; 1       Association for Fire Ecology</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; 2     Hindawi Publishing Corporation</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; 3     Hindawi Publishing Corporation</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; 4                    Wiley-Blackwell</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; 5  Springer Science + Business Media</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; 6  Springer Science + Business Media</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; 7  Springer Science + Business Media</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; 8  Springer Science + Business Media</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; 9  Springer Science + Business Media</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; 10 Springer Science + Business Media</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; 11 Springer Science + Business Media</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; 12 Springer Science + Business Media</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; 13                   Wiley-Blackwell</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; 14                   Wiley-Blackwell</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; 15                   Wiley-Blackwell</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; 16                   Wiley-Blackwell</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; 17                   Wiley-Blackwell</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; 18                   Wiley-Blackwell</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; 19                   Wiley-Blackwell</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; 20                   Wiley-Blackwell</span>
+</span></span></code></pre></div><h2 id="example-2">Example 2</h2>
+<p>Get Public Library of Science article metadata via their API, make a histogram of number of tweets for each article</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-r" data-lang="r"><span style="display:flex;"><span><span style="color:#e6db74">&#34;https://api.plos.org/search&#34;</span> <span style="color:#f92672">%&gt;%</span>
+</span></span><span style="display:flex;"><span>  <span style="color:#a6e22e">Query</span>(q <span style="color:#f92672">=</span> <span style="color:#e6db74">&#34;*:*&#34;</span>, wt <span style="color:#f92672">=</span> <span style="color:#e6db74">&#34;json&#34;</span>, rows <span style="color:#f92672">=</span> <span style="color:#ae81ff">100</span>, 
+</span></span><span style="display:flex;"><span>        fl <span style="color:#f92672">=</span> <span style="color:#e6db74">&#34;id,journal,alm_twitterCount&#34;</span>,  
+</span></span><span style="display:flex;"><span>        fq <span style="color:#f92672">=</span> <span style="color:#e6db74">&#39;alm_twitterCount:[100 TO 10000]&#39;</span>) <span style="color:#f92672">%&gt;%</span> 
+</span></span><span style="display:flex;"><span>  .$response <span style="color:#f92672">%&gt;%</span> 
+</span></span><span style="display:flex;"><span>  .$docs <span style="color:#f92672">%&gt;%</span> 
+</span></span><span style="display:flex;"><span>  .$alm_twitterCount <span style="color:#f92672">%&gt;%</span> 
+</span></span><span style="display:flex;"><span>  <span style="color:#a6e22e">hist</span>()
+</span></span></code></pre></div><p><img loading="lazy" src="/public/img/2015-04-29-the-new-way/unnamed-chunk-9-1.png" alt="image"  />
+</p>
+<h2 id="notes">Notes</h2>
+<p>Okay, so this isn&rsquo;t drastically different from what <code>httr</code> already does, but its early days.</p>
+]]></content:encoded>
     </item>
     <item>
       <title>Dealing with multi handle errors</title>
@@ -32,6 +386,46 @@ The web is increasingly a JSON world, so set content-type and accept headers to 
       <guid>http://localhost:1313/2014/12/multi-handle/</guid>
       <description>At rOpenSci we occasssionally hear from our users that they run into an error like:
 Error in function (type, msg, asError = TRUE) : easy handled already used in multi handle This error occurs in the httr package that we use to do http requests to sources of data on the web. It happens when e.g., you make a lot of requests to a resource, then it gets interrupted somehow - then you make another call, and you get the error above.</description>
+      <content:encoded><![CDATA[<p>At rOpenSci we occasssionally hear from our users that they run into an error like:</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-r" data-lang="r"><span style="display:flex;"><span>Error <span style="color:#66d9ef">in</span> <span style="color:#66d9ef">function</span> (type, msg, asError <span style="color:#f92672">=</span> <span style="color:#66d9ef">TRUE</span>)  <span style="color:#f92672">:</span> 
+</span></span><span style="display:flex;"><span>  easy handled already used <span style="color:#66d9ef">in</span> multi handle
+</span></span></code></pre></div><p>This error occurs in the <code>httr</code> package that we use to do http requests to sources of data on the web. It happens when e.g., you make a lot of requests to a resource, then it gets interrupted somehow - then you make another call, and you get the error above. Let&rsquo;s try it with the an version of <code>httr</code> (<code>v0.5</code>):</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-r" data-lang="r"><span style="display:flex;"><span><span style="color:#a6e22e">library</span>(<span style="color:#e6db74">&#34;httr&#34;</span>)
+</span></span><span style="display:flex;"><span><span style="color:#75715e"># run, then esc to cause multi handle error</span>
+</span></span><span style="display:flex;"><span><span style="color:#a6e22e">replicate</span>(<span style="color:#ae81ff">50</span>, <span style="color:#a6e22e">GET</span>(<span style="color:#e6db74">&#34;http://google.com/&#34;</span>))
+</span></span><span style="display:flex;"><span><span style="color:#75715e"># then retry single call, which trows multi handle error</span>
+</span></span><span style="display:flex;"><span><span style="color:#a6e22e">GET</span>(<span style="color:#e6db74">&#34;http://google.com/&#34;</span>)
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; Error in function (type, msg, asError = TRUE)  : </span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt;   easy handled already used in multi handle</span>
+</span></span></code></pre></div><p>There are any number of reasons why your session may get interrupted, including an internet outage, the web service you are requesesting data from times out, etc.  There hasn&rsquo;t been a straight-forward way to handle this, until recently.</p>
+<p>In <code>httr</code> version <code>0.6</code>, there are two new functions <code>handle_find()</code> and <code>handle_reset()</code> to help deal with this error.</p>
+<p>First, install newest httr from Github</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-r" data-lang="r"><span style="display:flex;"><span><span style="color:#a6e22e">install.packages</span>(<span style="color:#e6db74">&#34;devtools&#34;</span>)
+</span></span><span style="display:flex;"><span>devtools<span style="color:#f92672">::</span><span style="color:#a6e22e">install_github</span>(<span style="color:#e6db74">&#34;hadley/httr&#34;</span>)
+</span></span></code></pre></div><div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-r" data-lang="r"><span style="display:flex;"><span><span style="color:#a6e22e">library</span>(<span style="color:#e6db74">&#34;httr&#34;</span>)
+</span></span></code></pre></div><p>Make a bunch of requests to google, interrupting part way through</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-r" data-lang="r"><span style="display:flex;"><span><span style="color:#a6e22e">replicate</span>(<span style="color:#ae81ff">50</span>, <span style="color:#a6e22e">HEAD</span>(<span style="color:#e6db74">&#34;http://google.com/&#34;</span>))
+</span></span></code></pre></div><p>Then retry single call, which trows multi handle error</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-r" data-lang="r"><span style="display:flex;"><span><span style="color:#a6e22e">HEAD</span>(<span style="color:#e6db74">&#34;http://google.com/&#34;</span>)
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; Error in function (type, msg, asError = TRUE)  : </span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt;   easy handled already used in multi handle</span>
+</span></span></code></pre></div><p>Find handle</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-r" data-lang="r"><span style="display:flex;"><span><span style="color:#a6e22e">handle_find</span>(<span style="color:#e6db74">&#34;http://google.com/&#34;</span>)
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; Host: http://google.com/ &lt;0x10f3d1600&gt;</span>
+</span></span></code></pre></div><p>Reset handle</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-r" data-lang="r"><span style="display:flex;"><span><span style="color:#a6e22e">handle_reset</span>(<span style="color:#e6db74">&#34;http://google.com/&#34;</span>)
+</span></span></code></pre></div><p>Try call again, this time it should work</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-r" data-lang="r"><span style="display:flex;"><span><span style="color:#a6e22e">HEAD</span>(<span style="color:#e6db74">&#34;http://google.com/&#34;</span>)
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; Response [http://www.google.com/]</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt;   Date: 2014-12-08 13:37</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt;   Status: 200</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt;   Content-Type: text/html; charset=ISO-8859-1</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; &lt;EMPTY BODY&gt;</span>
+</span></span></code></pre></div><h2 id="usage-in-ropensci-packages">Usage in ropensci packages</h2>
+<p>We have more work to do yet to integrate this into our packages. It&rsquo;s great you can reset a handle as above, but to reset the handle you need to search for the URL used in the request, which our users would have to dig into the code for the function they are using. That is easy-ish to do, but perhaps not everyone knows they can get to the code easily.  So, we may try seting a parameter in functions that would let reset the handle to clear this error.</p>
+<h2 id="note">Note</h2>
+<p>Note that Hadley is planning on eliminating <code>RCurl</code> dependency (<a href="https://github.com/hadley/httr/issues/172)">https://github.com/hadley/httr/issues/172)</a>, so there may be a different solution in the future.</p>
+]]></content:encoded>
     </item>
   </channel>
 </rss>

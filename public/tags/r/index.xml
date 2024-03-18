@@ -16,6 +16,162 @@
       <description>I wrote the other day about overcoming an issue with Shiny.
 Another issue I ran into concurrently was about file inputs. The issue was that file inputs (i.e., shiny::fileInput) was difficult to clear. That is, after a user uploads a file, it was easy to get some of the various parts cleared/cleaned up, but not others:
 (Not Easy) The UI components of fileInput (the text of the file name, the loading display) (Not Easy) The data behind the fileInput handler (Easy) Displaying some feedback in the UI after handling file input Load libraries</description>
+      <content:encoded><![CDATA[<p>I <a href="/2024/03/shiny-events/">wrote the other day</a> about overcoming an issue with <a href="https://shiny.posit.co/">Shiny</a>.</p>
+<p>Another issue I ran into concurrently was about file inputs. The issue was that file inputs (i.e., <code>shiny::fileInput</code>) was difficult to clear. That is, after a user uploads a file, it was easy to get some of the various parts cleared/cleaned up, but not others:</p>
+<ul>
+<li>(Not Easy) The UI components of <code>fileInput</code> (the text of the file name, the loading display)</li>
+<li>(Not Easy) The data behind the <code>fileInput</code> handler</li>
+<li>(Easy) Displaying some feedback in the UI after handling file input</li>
+</ul>
+<p>Load libraries</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-r" data-lang="r"><span style="display:flex;"><span><span style="color:#a6e22e">library</span>(shiny)
+</span></span><span style="display:flex;"><span><span style="color:#a6e22e">library</span>(shinyjs)
+</span></span><span style="display:flex;"><span><span style="color:#a6e22e">library</span>(bslib)
+</span></span><span style="display:flex;"><span><span style="color:#a6e22e">library</span>(DT)
+</span></span><span style="display:flex;"><span><span style="color:#a6e22e">library</span>(vroom)
+</span></span></code></pre></div><p>A helper function to handle reactive inputs</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-r" data-lang="r"><span style="display:flex;"><span>reactiveInput <span style="color:#f92672">&lt;-</span> <span style="color:#66d9ef">function</span>(rval, path) {
+</span></span><span style="display:flex;"><span>  <span style="color:#66d9ef">if</span> (<span style="color:#a6e22e">is.null</span>(rval)) {
+</span></span><span style="display:flex;"><span>    <span style="color:#66d9ef">return</span>(<span style="color:#66d9ef">NULL</span>)
+</span></span><span style="display:flex;"><span>  } <span style="color:#66d9ef">else</span> <span style="color:#66d9ef">if</span> (rval <span style="color:#f92672">==</span> <span style="color:#e6db74">&#39;loaded&#39;</span>) {
+</span></span><span style="display:flex;"><span>    <span style="color:#66d9ef">return</span>(path)
+</span></span><span style="display:flex;"><span>  } <span style="color:#66d9ef">else</span> <span style="color:#66d9ef">if</span> (rval <span style="color:#f92672">==</span> <span style="color:#e6db74">&#39;reset&#39;</span>) {
+</span></span><span style="display:flex;"><span>    <span style="color:#66d9ef">return</span>(<span style="color:#66d9ef">NULL</span>)
+</span></span><span style="display:flex;"><span>  }
+</span></span><span style="display:flex;"><span>}
+</span></span></code></pre></div><p>A <code>bslib</code> ui component</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-r" data-lang="r"><span style="display:flex;"><span>ui <span style="color:#f92672">&lt;-</span> <span style="color:#a6e22e">page_sidebar</span>(
+</span></span><span style="display:flex;"><span>  title <span style="color:#f92672">=</span> <span style="color:#e6db74">&#34;My dashboard&#34;</span>,
+</span></span><span style="display:flex;"><span>  sidebar <span style="color:#f92672">=</span> <span style="color:#a6e22e">list</span>(
+</span></span><span style="display:flex;"><span>    <span style="color:#a6e22e">actionButton</span>(<span style="color:#e6db74">&#34;submit&#34;</span>, <span style="color:#e6db74">&#34;Submit&#34;</span>),
+</span></span><span style="display:flex;"><span>    <span style="color:#a6e22e">actionButton</span>(<span style="color:#e6db74">&#34;reset&#34;</span>, <span style="color:#e6db74">&#34;Reset&#34;</span>)
+</span></span><span style="display:flex;"><span>  ),
+</span></span><span style="display:flex;"><span>  <span style="color:#a6e22e">fileInput</span>(inputId <span style="color:#f92672">=</span> <span style="color:#e6db74">&#34;afile&#34;</span>, <span style="color:#e6db74">&#34;Upload file&#34;</span>, accept <span style="color:#f92672">=</span> <span style="color:#e6db74">&#34;.csv&#34;</span>),
+</span></span><span style="display:flex;"><span>  DT<span style="color:#f92672">::</span><span style="color:#a6e22e">DTOutput</span>(<span style="color:#e6db74">&#34;result&#34;</span>),
+</span></span><span style="display:flex;"><span>  shinyjs<span style="color:#f92672">::</span><span style="color:#a6e22e">useShinyjs</span>()
+</span></span><span style="display:flex;"><span>)
+</span></span></code></pre></div><p>Here&rsquo;s the server part that was giving me trouble.</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-r" data-lang="r"><span style="display:flex;"><span>server <span style="color:#f92672">&lt;-</span> <span style="color:#66d9ef">function</span>(input, output) {
+</span></span><span style="display:flex;"><span>  <span style="color:#a6e22e">observeEvent</span>(input<span style="color:#f92672">$</span>submit, {
+</span></span><span style="display:flex;"><span>    output<span style="color:#f92672">$</span>result <span style="color:#f92672">&lt;-</span> DT<span style="color:#f92672">::</span><span style="color:#a6e22e">renderDataTable</span>({
+</span></span><span style="display:flex;"><span>      dat <span style="color:#f92672">&lt;-</span> vroom<span style="color:#f92672">::</span><span style="color:#a6e22e">vroom</span>(
+</span></span><span style="display:flex;"><span>        <span style="color:#a6e22e">isolate</span>(input<span style="color:#f92672">$</span>afile<span style="color:#f92672">$</span>datapath)
+</span></span><span style="display:flex;"><span>      )
+</span></span><span style="display:flex;"><span>      DT<span style="color:#f92672">::</span><span style="color:#a6e22e">datatable</span>(dat)
+</span></span><span style="display:flex;"><span>    })
+</span></span><span style="display:flex;"><span>  })
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>  <span style="color:#a6e22e">observeEvent</span>(input<span style="color:#f92672">$</span>reset, {
+</span></span><span style="display:flex;"><span>    shinyjs<span style="color:#f92672">::</span><span style="color:#a6e22e">reset</span>(<span style="color:#e6db74">&#34;afile&#34;</span>)
+</span></span><span style="display:flex;"><span>    output<span style="color:#f92672">$</span>result <span style="color:#f92672">&lt;-</span> <span style="color:#a6e22e">renderText</span>({})
+</span></span><span style="display:flex;"><span>  })
+</span></span><span style="display:flex;"><span>}
+</span></span></code></pre></div><p>With <code>shinyjs::reset</code> we can reset the UI components of the file input handler, and with <code>renderText</code> with an empty input we can reset the UI feedback. However, the data backing the file input handler is not reset. This led to problems in the UI where you could keep pressing submit after clicking the Reset button because the data for the last uploaded file was still there, whereas the user should get an error that they need to upload a file before clicking Submit.</p>
+<p>To be able to completey reset data behind the file input handler I found out about a solution using reactive values via stackoverflow. Basically, the change involves handling file input data through a reactive value and keeping track of the state of the file input loader.</p>
+<p>Here&rsquo;s the entire app that doesn&rsquo;t work</p>
+<details>
+  <summary>Click to expand</summary>
+  <div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-r" data-lang="r"><span style="display:flex;"><span><span style="color:#a6e22e">library</span>(shiny)
+</span></span><span style="display:flex;"><span><span style="color:#a6e22e">library</span>(shinyjs)
+</span></span><span style="display:flex;"><span><span style="color:#a6e22e">library</span>(bslib)
+</span></span><span style="display:flex;"><span><span style="color:#a6e22e">library</span>(DT)
+</span></span><span style="display:flex;"><span><span style="color:#a6e22e">library</span>(vroom)
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>ui <span style="color:#f92672">&lt;-</span> <span style="color:#a6e22e">page_sidebar</span>(
+</span></span><span style="display:flex;"><span>  title <span style="color:#f92672">=</span> <span style="color:#e6db74">&#34;My dashboard&#34;</span>,
+</span></span><span style="display:flex;"><span>  sidebar <span style="color:#f92672">=</span> <span style="color:#a6e22e">list</span>(
+</span></span><span style="display:flex;"><span>    <span style="color:#a6e22e">actionButton</span>(<span style="color:#e6db74">&#34;submit&#34;</span>, <span style="color:#e6db74">&#34;Submit&#34;</span>),
+</span></span><span style="display:flex;"><span>    <span style="color:#a6e22e">actionButton</span>(<span style="color:#e6db74">&#34;reset&#34;</span>, <span style="color:#e6db74">&#34;Reset&#34;</span>)
+</span></span><span style="display:flex;"><span>  ),
+</span></span><span style="display:flex;"><span>  <span style="color:#a6e22e">fileInput</span>(inputId <span style="color:#f92672">=</span> <span style="color:#e6db74">&#34;afile&#34;</span>, <span style="color:#e6db74">&#34;Upload file&#34;</span>, accept <span style="color:#f92672">=</span> <span style="color:#e6db74">&#34;.csv&#34;</span>),
+</span></span><span style="display:flex;"><span>  DT<span style="color:#f92672">::</span><span style="color:#a6e22e">DTOutput</span>(<span style="color:#e6db74">&#34;result&#34;</span>),
+</span></span><span style="display:flex;"><span>  shinyjs<span style="color:#f92672">::</span><span style="color:#a6e22e">useShinyjs</span>()
+</span></span><span style="display:flex;"><span>)
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>server <span style="color:#f92672">&lt;-</span> <span style="color:#66d9ef">function</span>(input, output) {
+</span></span><span style="display:flex;"><span>  <span style="color:#a6e22e">observeEvent</span>(input<span style="color:#f92672">$</span>submit, {
+</span></span><span style="display:flex;"><span>    output<span style="color:#f92672">$</span>result <span style="color:#f92672">&lt;-</span> DT<span style="color:#f92672">::</span><span style="color:#a6e22e">renderDataTable</span>({
+</span></span><span style="display:flex;"><span>      dat <span style="color:#f92672">&lt;-</span> vroom<span style="color:#f92672">::</span><span style="color:#a6e22e">vroom</span>(
+</span></span><span style="display:flex;"><span>        <span style="color:#a6e22e">isolate</span>(input<span style="color:#f92672">$</span>afile<span style="color:#f92672">$</span>datapath)
+</span></span><span style="display:flex;"><span>      )
+</span></span><span style="display:flex;"><span>      DT<span style="color:#f92672">::</span><span style="color:#a6e22e">datatable</span>(dat)
+</span></span><span style="display:flex;"><span>    })
+</span></span><span style="display:flex;"><span>  })
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>  <span style="color:#a6e22e">observeEvent</span>(input<span style="color:#f92672">$</span>reset, {
+</span></span><span style="display:flex;"><span>    shinyjs<span style="color:#f92672">::</span><span style="color:#a6e22e">reset</span>(<span style="color:#e6db74">&#34;afile&#34;</span>)
+</span></span><span style="display:flex;"><span>    output<span style="color:#f92672">$</span>result <span style="color:#f92672">&lt;-</span> <span style="color:#a6e22e">renderText</span>({})
+</span></span><span style="display:flex;"><span>  })
+</span></span><span style="display:flex;"><span>}
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span><span style="color:#a6e22e">shinyApp</span>(ui, server)
+</span></span></code></pre></div>
+</details>
+
+<br />
+
+<p>And here&rsquo;s the entire app that does work</p>
+<details>
+  <summary>Click to expand</summary>
+  <div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-r" data-lang="r"><span style="display:flex;"><span><span style="color:#a6e22e">library</span>(shiny)
+</span></span><span style="display:flex;"><span><span style="color:#a6e22e">library</span>(shinyjs)
+</span></span><span style="display:flex;"><span><span style="color:#a6e22e">library</span>(bslib)
+</span></span><span style="display:flex;"><span><span style="color:#a6e22e">library</span>(DT)
+</span></span><span style="display:flex;"><span><span style="color:#a6e22e">library</span>(vroom)
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>reactiveInput <span style="color:#f92672">&lt;-</span> <span style="color:#66d9ef">function</span>(rval, path) {
+</span></span><span style="display:flex;"><span>  <span style="color:#66d9ef">if</span> (<span style="color:#a6e22e">is.null</span>(rval)) {
+</span></span><span style="display:flex;"><span>    <span style="color:#66d9ef">return</span>(<span style="color:#66d9ef">NULL</span>)
+</span></span><span style="display:flex;"><span>  } <span style="color:#66d9ef">else</span> <span style="color:#66d9ef">if</span> (rval <span style="color:#f92672">==</span> <span style="color:#e6db74">&#39;loaded&#39;</span>) {
+</span></span><span style="display:flex;"><span>    <span style="color:#66d9ef">return</span>(path)
+</span></span><span style="display:flex;"><span>  } <span style="color:#66d9ef">else</span> <span style="color:#66d9ef">if</span> (rval <span style="color:#f92672">==</span> <span style="color:#e6db74">&#39;reset&#39;</span>) {
+</span></span><span style="display:flex;"><span>    <span style="color:#66d9ef">return</span>(<span style="color:#66d9ef">NULL</span>)
+</span></span><span style="display:flex;"><span>  }
+</span></span><span style="display:flex;"><span>}
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>ui <span style="color:#f92672">&lt;-</span> <span style="color:#a6e22e">page_sidebar</span>(
+</span></span><span style="display:flex;"><span>  title <span style="color:#f92672">=</span> <span style="color:#e6db74">&#34;My dashboard&#34;</span>,
+</span></span><span style="display:flex;"><span>  sidebar <span style="color:#f92672">=</span> <span style="color:#a6e22e">list</span>(
+</span></span><span style="display:flex;"><span>    <span style="color:#a6e22e">actionButton</span>(<span style="color:#e6db74">&#34;submit&#34;</span>, <span style="color:#e6db74">&#34;Submit&#34;</span>),
+</span></span><span style="display:flex;"><span>    <span style="color:#a6e22e">actionButton</span>(<span style="color:#e6db74">&#34;reset&#34;</span>, <span style="color:#e6db74">&#34;Reset&#34;</span>)
+</span></span><span style="display:flex;"><span>  ),
+</span></span><span style="display:flex;"><span>  <span style="color:#a6e22e">fileInput</span>(inputId <span style="color:#f92672">=</span> <span style="color:#e6db74">&#34;afile&#34;</span>, <span style="color:#e6db74">&#34;Upload file&#34;</span>, accept <span style="color:#f92672">=</span> <span style="color:#e6db74">&#34;.csv&#34;</span>),
+</span></span><span style="display:flex;"><span>  DT<span style="color:#f92672">::</span><span style="color:#a6e22e">DTOutput</span>(<span style="color:#e6db74">&#34;result&#34;</span>),
+</span></span><span style="display:flex;"><span>  shinyjs<span style="color:#f92672">::</span><span style="color:#a6e22e">useShinyjs</span>()
+</span></span><span style="display:flex;"><span>)
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>server <span style="color:#f92672">&lt;-</span> <span style="color:#66d9ef">function</span>(input, output) {
+</span></span><span style="display:flex;"><span>  rv_file <span style="color:#f92672">&lt;-</span> <span style="color:#a6e22e">reactiveValues</span>(file_state <span style="color:#f92672">=</span> <span style="color:#66d9ef">NULL</span>)
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>  thefile <span style="color:#f92672">&lt;-</span> <span style="color:#a6e22e">reactive</span>({
+</span></span><span style="display:flex;"><span>    <span style="color:#a6e22e">reactiveInput</span>(rv_file<span style="color:#f92672">$</span>file_state, input<span style="color:#f92672">$</span>afile<span style="color:#f92672">$</span>datapath)
+</span></span><span style="display:flex;"><span>  })
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>  <span style="color:#a6e22e">observeEvent</span>(input<span style="color:#f92672">$</span>afile, {
+</span></span><span style="display:flex;"><span>    rv_file<span style="color:#f92672">$</span>file_state <span style="color:#f92672">&lt;-</span> <span style="color:#e6db74">&#39;loaded&#39;</span>
+</span></span><span style="display:flex;"><span>  })
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>  <span style="color:#a6e22e">observeEvent</span>(input<span style="color:#f92672">$</span>submit, {
+</span></span><span style="display:flex;"><span>    output<span style="color:#f92672">$</span>result <span style="color:#f92672">&lt;-</span> DT<span style="color:#f92672">::</span><span style="color:#a6e22e">renderDataTable</span>({
+</span></span><span style="display:flex;"><span>      dat <span style="color:#f92672">&lt;-</span> vroom<span style="color:#f92672">::</span><span style="color:#a6e22e">vroom</span>(
+</span></span><span style="display:flex;"><span>        <span style="color:#a6e22e">isolate</span>(<span style="color:#a6e22e">thefile</span>())
+</span></span><span style="display:flex;"><span>      )
+</span></span><span style="display:flex;"><span>      DT<span style="color:#f92672">::</span><span style="color:#a6e22e">datatable</span>(dat)
+</span></span><span style="display:flex;"><span>    })
+</span></span><span style="display:flex;"><span>  })
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>  <span style="color:#a6e22e">observeEvent</span>(input<span style="color:#f92672">$</span>reset, {
+</span></span><span style="display:flex;"><span>    shinyjs<span style="color:#f92672">::</span><span style="color:#a6e22e">reset</span>(<span style="color:#e6db74">&#34;afile&#34;</span>)
+</span></span><span style="display:flex;"><span>    rv_file<span style="color:#f92672">$</span>file_state <span style="color:#f92672">&lt;-</span> <span style="color:#e6db74">&#39;reset&#39;</span>
+</span></span><span style="display:flex;"><span>    output<span style="color:#f92672">$</span>result <span style="color:#f92672">&lt;-</span> <span style="color:#a6e22e">renderText</span>({})
+</span></span><span style="display:flex;"><span>  })
+</span></span><span style="display:flex;"><span>}
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span><span style="color:#a6e22e">shinyApp</span>(ui, server)
+</span></span></code></pre></div>
+</details>
+
+]]></content:encoded>
     </item>
     <item>
       <title>Shiny button weirdness</title>
@@ -27,6 +183,137 @@ Load libraries
 library(shiny) library(bslib) library(crul) Helper function, returned a random UUID from an httpbin server
 httpbin_uuid &amp;lt;- function(...) { con &amp;lt;- crul::HttpClient$new(&amp;#34;https://hb.opencpu.org&amp;#34;) res &amp;lt;- con$get(&amp;#34;uuid&amp;#34;) jsonlite::fromJSON(res$parse(&amp;#34;UTF-8&amp;#34;))$uuid } A bslib ui component
 ui &amp;lt;- page_sidebar( title = &amp;#34;My dashboard&amp;#34;, sidebar = list( actionButton(&amp;#34;submit&amp;#34;, &amp;#34;Submit&amp;#34;), actionButton(&amp;#34;reset&amp;#34;, &amp;#34;Reset&amp;#34;) ), textInput(inputId = &amp;#34;name&amp;#34;, &amp;#34;Your name&amp;#34;), textOutput(&amp;#34;uuid&amp;#34;) ) Here&amp;rsquo;s the server part that was giving me trouble.</description>
+      <content:encoded><![CDATA[<p>I&rsquo;ve been working on <a href="https://shiny.posit.co/">Shiny</a> app at work for the past few months. One of the many frustrating things about Shiny lately has been around buttons. Well, it wasn&rsquo;t really about buttons, but that&rsquo;s where it started.</p>
+<p>Load libraries</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-r" data-lang="r"><span style="display:flex;"><span><span style="color:#a6e22e">library</span>(shiny)
+</span></span><span style="display:flex;"><span><span style="color:#a6e22e">library</span>(bslib)
+</span></span><span style="display:flex;"><span><span style="color:#a6e22e">library</span>(crul)
+</span></span></code></pre></div><p>Helper function, returned a random UUID from an httpbin server</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-r" data-lang="r"><span style="display:flex;"><span>httpbin_uuid <span style="color:#f92672">&lt;-</span> <span style="color:#66d9ef">function</span>(<span style="color:#66d9ef">...</span>) {
+</span></span><span style="display:flex;"><span>  con <span style="color:#f92672">&lt;-</span> crul<span style="color:#f92672">::</span>HttpClient<span style="color:#f92672">$</span><span style="color:#a6e22e">new</span>(<span style="color:#e6db74">&#34;https://hb.opencpu.org&#34;</span>)
+</span></span><span style="display:flex;"><span>  res <span style="color:#f92672">&lt;-</span> con<span style="color:#f92672">$</span><span style="color:#a6e22e">get</span>(<span style="color:#e6db74">&#34;uuid&#34;</span>)
+</span></span><span style="display:flex;"><span>  jsonlite<span style="color:#f92672">::</span><span style="color:#a6e22e">fromJSON</span>(res<span style="color:#f92672">$</span><span style="color:#a6e22e">parse</span>(<span style="color:#e6db74">&#34;UTF-8&#34;</span>))<span style="color:#f92672">$</span>uuid
+</span></span><span style="display:flex;"><span>}
+</span></span></code></pre></div><p>A bslib ui component</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-r" data-lang="r"><span style="display:flex;"><span>ui <span style="color:#f92672">&lt;-</span> <span style="color:#a6e22e">page_sidebar</span>(
+</span></span><span style="display:flex;"><span>  title <span style="color:#f92672">=</span> <span style="color:#e6db74">&#34;My dashboard&#34;</span>,
+</span></span><span style="display:flex;"><span>  sidebar <span style="color:#f92672">=</span> <span style="color:#a6e22e">list</span>(
+</span></span><span style="display:flex;"><span>    <span style="color:#a6e22e">actionButton</span>(<span style="color:#e6db74">&#34;submit&#34;</span>, <span style="color:#e6db74">&#34;Submit&#34;</span>),
+</span></span><span style="display:flex;"><span>    <span style="color:#a6e22e">actionButton</span>(<span style="color:#e6db74">&#34;reset&#34;</span>, <span style="color:#e6db74">&#34;Reset&#34;</span>)
+</span></span><span style="display:flex;"><span>  ),
+</span></span><span style="display:flex;"><span>  <span style="color:#a6e22e">textInput</span>(inputId <span style="color:#f92672">=</span> <span style="color:#e6db74">&#34;name&#34;</span>, <span style="color:#e6db74">&#34;Your name&#34;</span>),
+</span></span><span style="display:flex;"><span>  <span style="color:#a6e22e">textOutput</span>(<span style="color:#e6db74">&#34;uuid&#34;</span>)
+</span></span><span style="display:flex;"><span>)
+</span></span></code></pre></div><p>Here&rsquo;s the server part that was giving me trouble. As I said this was an inherited repo, and the server side handling for many buttons was done with <code>eventReactive</code> as below. Using <code>eventReactive</code> meant that button clicks only sometimes triggered the server side code.</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-r" data-lang="r"><span style="display:flex;"><span>server <span style="color:#f92672">&lt;-</span> <span style="color:#66d9ef">function</span>(input, output, session) {
+</span></span><span style="display:flex;"><span>  tmp <span style="color:#f92672">&lt;-</span> <span style="color:#a6e22e">eventReactive</span>(input<span style="color:#f92672">$</span>submit, {
+</span></span><span style="display:flex;"><span>    <span style="color:#a6e22e">httpbin_uuid</span>(input<span style="color:#f92672">$</span>name)
+</span></span><span style="display:flex;"><span>  })
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>  output<span style="color:#f92672">$</span>uuid <span style="color:#f92672">&lt;-</span> <span style="color:#a6e22e">renderText</span>({ <span style="color:#a6e22e">tmp</span>() })
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>  <span style="color:#a6e22e">observeEvent</span>(input<span style="color:#f92672">$</span>reset, {
+</span></span><span style="display:flex;"><span>    <span style="color:#a6e22e">updateTextInput</span>(session, <span style="color:#e6db74">&#34;name&#34;</span>, <span style="color:#e6db74">&#34;Your name&#34;</span>, <span style="color:#e6db74">&#34;&#34;</span>)
+</span></span><span style="display:flex;"><span>    output<span style="color:#f92672">$</span>uuid <span style="color:#f92672">&lt;-</span> <span style="color:#a6e22e">renderText</span>({})
+</span></span><span style="display:flex;"><span>  })
+</span></span><span style="display:flex;"><span>}
+</span></span></code></pre></div><p>Eventually I landed upon switching from <code>eventReactive</code> to <code>observeEvent</code> for a variety of reasons. And tried something like this:</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-r" data-lang="r"><span style="display:flex;"><span>  <span style="color:#a6e22e">observeEvent</span>(input<span style="color:#f92672">$</span>submit, {
+</span></span><span style="display:flex;"><span>    output<span style="color:#f92672">$</span>uuid <span style="color:#f92672">&lt;-</span> <span style="color:#a6e22e">renderText</span>({
+</span></span><span style="display:flex;"><span>      <span style="color:#a6e22e">httpbin_uuid</span>(input<span style="color:#f92672">$</span>name)
+</span></span><span style="display:flex;"><span>    })
+</span></span><span style="display:flex;"><span>  })
+</span></span></code></pre></div><p>However, keen eyes will notice that this still doesn&rsquo;t work. The final missing piece was the function <code>isolate</code>. Without <code>isolate</code> the <code>observeEvent</code> handler was being triggered on changes other than just a button click.</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-r" data-lang="r"><span style="display:flex;"><span>  <span style="color:#a6e22e">observeEvent</span>(input<span style="color:#f92672">$</span>submit, {
+</span></span><span style="display:flex;"><span>    output<span style="color:#f92672">$</span>uuid <span style="color:#f92672">&lt;-</span> <span style="color:#a6e22e">renderText</span>({
+</span></span><span style="display:flex;"><span>      <span style="color:#a6e22e">isolate</span>(
+</span></span><span style="display:flex;"><span>      	<span style="color:#a6e22e">httpbin_uuid</span>(input<span style="color:#f92672">$</span>name)
+</span></span><span style="display:flex;"><span>      )
+</span></span><span style="display:flex;"><span>    })
+</span></span><span style="display:flex;"><span>  })
+</span></span></code></pre></div><p>Here&rsquo;s the entire app with <code>eventReactive</code> that didn&rsquo;t work:</p>
+<details>
+  <summary>Click to expand</summary>
+  <div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-r" data-lang="r"><span style="display:flex;"><span><span style="color:#a6e22e">library</span>(shiny)
+</span></span><span style="display:flex;"><span><span style="color:#a6e22e">library</span>(bslib)
+</span></span><span style="display:flex;"><span><span style="color:#a6e22e">library</span>(crul)
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>httpbin_uuid <span style="color:#f92672">&lt;-</span> <span style="color:#66d9ef">function</span>(<span style="color:#66d9ef">...</span>) {
+</span></span><span style="display:flex;"><span>  con <span style="color:#f92672">&lt;-</span> crul<span style="color:#f92672">::</span>HttpClient<span style="color:#f92672">$</span><span style="color:#a6e22e">new</span>(<span style="color:#e6db74">&#34;https://hb.opencpu.org&#34;</span>)
+</span></span><span style="display:flex;"><span>  res <span style="color:#f92672">&lt;-</span> con<span style="color:#f92672">$</span><span style="color:#a6e22e">get</span>(<span style="color:#e6db74">&#34;uuid&#34;</span>)
+</span></span><span style="display:flex;"><span>  jsonlite<span style="color:#f92672">::</span><span style="color:#a6e22e">fromJSON</span>(res<span style="color:#f92672">$</span><span style="color:#a6e22e">parse</span>(<span style="color:#e6db74">&#34;UTF-8&#34;</span>))<span style="color:#f92672">$</span>uuid
+</span></span><span style="display:flex;"><span>}
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>ui <span style="color:#f92672">&lt;-</span> <span style="color:#a6e22e">page_sidebar</span>(
+</span></span><span style="display:flex;"><span>  title <span style="color:#f92672">=</span> <span style="color:#e6db74">&#34;My dashboard&#34;</span>,
+</span></span><span style="display:flex;"><span>  sidebar <span style="color:#f92672">=</span> <span style="color:#a6e22e">list</span>(
+</span></span><span style="display:flex;"><span>    <span style="color:#a6e22e">actionButton</span>(<span style="color:#e6db74">&#34;submit&#34;</span>, <span style="color:#e6db74">&#34;Submit&#34;</span>),
+</span></span><span style="display:flex;"><span>    <span style="color:#a6e22e">actionButton</span>(<span style="color:#e6db74">&#34;reset&#34;</span>, <span style="color:#e6db74">&#34;Reset&#34;</span>)
+</span></span><span style="display:flex;"><span>  ),
+</span></span><span style="display:flex;"><span>  <span style="color:#a6e22e">textInput</span>(inputId <span style="color:#f92672">=</span> <span style="color:#e6db74">&#34;name&#34;</span>, <span style="color:#e6db74">&#34;Your name&#34;</span>),
+</span></span><span style="display:flex;"><span>  <span style="color:#a6e22e">textOutput</span>(<span style="color:#e6db74">&#34;uuid&#34;</span>)
+</span></span><span style="display:flex;"><span>)
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>server <span style="color:#f92672">&lt;-</span> <span style="color:#66d9ef">function</span>(input, output, session) {
+</span></span><span style="display:flex;"><span>  tmp <span style="color:#f92672">&lt;-</span> <span style="color:#a6e22e">eventReactive</span>(input<span style="color:#f92672">$</span>submit, {
+</span></span><span style="display:flex;"><span>    <span style="color:#a6e22e">httpbin_uuid</span>(input<span style="color:#f92672">$</span>name)
+</span></span><span style="display:flex;"><span>  })
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>  output<span style="color:#f92672">$</span>uuid <span style="color:#f92672">&lt;-</span> <span style="color:#a6e22e">renderText</span>({ <span style="color:#a6e22e">tmp</span>() })
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>  <span style="color:#a6e22e">observeEvent</span>(input<span style="color:#f92672">$</span>reset, {
+</span></span><span style="display:flex;"><span>    <span style="color:#a6e22e">updateTextInput</span>(session, <span style="color:#e6db74">&#34;name&#34;</span>, <span style="color:#e6db74">&#34;Your name&#34;</span>, <span style="color:#e6db74">&#34;&#34;</span>)
+</span></span><span style="display:flex;"><span>    output<span style="color:#f92672">$</span>uuid <span style="color:#f92672">&lt;-</span> <span style="color:#a6e22e">renderText</span>({})
+</span></span><span style="display:flex;"><span>  })
+</span></span><span style="display:flex;"><span>}
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span><span style="color:#a6e22e">shinyApp</span>(ui, server)
+</span></span></code></pre></div>
+</details>
+
+<br />
+
+<p>And here&rsquo;s the entire app with <code>obseveEvent</code> and <code>isolate</code> that worked:</p>
+<details>
+  <summary>Click to expand</summary>
+  <div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-r" data-lang="r"><span style="display:flex;"><span><span style="color:#a6e22e">library</span>(shiny)
+</span></span><span style="display:flex;"><span><span style="color:#a6e22e">library</span>(bslib)
+</span></span><span style="display:flex;"><span><span style="color:#a6e22e">library</span>(crul)
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>httpbin_uuid <span style="color:#f92672">&lt;-</span> <span style="color:#66d9ef">function</span>(<span style="color:#66d9ef">...</span>) {
+</span></span><span style="display:flex;"><span>  con <span style="color:#f92672">&lt;-</span> crul<span style="color:#f92672">::</span>HttpClient<span style="color:#f92672">$</span><span style="color:#a6e22e">new</span>(<span style="color:#e6db74">&#34;https://hb.opencpu.org&#34;</span>)
+</span></span><span style="display:flex;"><span>  res <span style="color:#f92672">&lt;-</span> con<span style="color:#f92672">$</span><span style="color:#a6e22e">get</span>(<span style="color:#e6db74">&#34;uuid&#34;</span>)
+</span></span><span style="display:flex;"><span>  jsonlite<span style="color:#f92672">::</span><span style="color:#a6e22e">fromJSON</span>(res<span style="color:#f92672">$</span><span style="color:#a6e22e">parse</span>(<span style="color:#e6db74">&#34;UTF-8&#34;</span>))<span style="color:#f92672">$</span>uuid
+</span></span><span style="display:flex;"><span>}
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>ui <span style="color:#f92672">&lt;-</span> <span style="color:#a6e22e">page_sidebar</span>(
+</span></span><span style="display:flex;"><span>  title <span style="color:#f92672">=</span> <span style="color:#e6db74">&#34;My dashboard&#34;</span>,
+</span></span><span style="display:flex;"><span>  sidebar <span style="color:#f92672">=</span> <span style="color:#a6e22e">list</span>(
+</span></span><span style="display:flex;"><span>    <span style="color:#a6e22e">actionButton</span>(<span style="color:#e6db74">&#34;submit&#34;</span>, <span style="color:#e6db74">&#34;Submit&#34;</span>),
+</span></span><span style="display:flex;"><span>    <span style="color:#a6e22e">actionButton</span>(<span style="color:#e6db74">&#34;reset&#34;</span>, <span style="color:#e6db74">&#34;Reset&#34;</span>)
+</span></span><span style="display:flex;"><span>  ),
+</span></span><span style="display:flex;"><span>  <span style="color:#a6e22e">textInput</span>(inputId <span style="color:#f92672">=</span> <span style="color:#e6db74">&#34;name&#34;</span>, <span style="color:#e6db74">&#34;Your name&#34;</span>),
+</span></span><span style="display:flex;"><span>  <span style="color:#a6e22e">textOutput</span>(<span style="color:#e6db74">&#34;uuid&#34;</span>)
+</span></span><span style="display:flex;"><span>)
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>server <span style="color:#f92672">&lt;-</span> <span style="color:#66d9ef">function</span>(input, output, session) {
+</span></span><span style="display:flex;"><span>  <span style="color:#a6e22e">observeEvent</span>(input<span style="color:#f92672">$</span>submit, {
+</span></span><span style="display:flex;"><span>    output<span style="color:#f92672">$</span>uuid <span style="color:#f92672">&lt;-</span> <span style="color:#a6e22e">renderText</span>({
+</span></span><span style="display:flex;"><span>      <span style="color:#a6e22e">isolate</span>(<span style="color:#a6e22e">httpbin_uuid</span>(input<span style="color:#f92672">$</span>name))
+</span></span><span style="display:flex;"><span>    })
+</span></span><span style="display:flex;"><span>  })
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>  <span style="color:#a6e22e">observeEvent</span>(input<span style="color:#f92672">$</span>reset, {
+</span></span><span style="display:flex;"><span>    <span style="color:#a6e22e">updateTextInput</span>(session, <span style="color:#e6db74">&#34;name&#34;</span>, <span style="color:#e6db74">&#34;Your name&#34;</span>, <span style="color:#e6db74">&#34;&#34;</span>)
+</span></span><span style="display:flex;"><span>    output<span style="color:#f92672">$</span>uuid <span style="color:#f92672">&lt;-</span> <span style="color:#a6e22e">renderText</span>({})
+</span></span><span style="display:flex;"><span>  })
+</span></span><span style="display:flex;"><span>}
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span><span style="color:#a6e22e">shinyApp</span>(ui, server)
+</span></span></code></pre></div>
+</details>
+
+]]></content:encoded>
     </item>
     <item>
       <title>Working at Fred Hutchinson Cancer Center</title>
@@ -35,6 +322,11 @@ ui &amp;lt;- page_sidebar( title = &amp;#34;My dashboard&amp;#34;, sidebar = lis
       <guid>http://localhost:1313/2023/10/fred-hutch/</guid>
       <description>Soooo, my last job at Deck was amazing. I loved it. I was doing data engineer stuff there, mostly maintaining infrastructure for data pipelines. Everyone was great and the mission was amazing: helping Democrats win. Yet the company was shut down about a month ago, sending me on another job search, the 3rd since early/mid 2021.
 I&amp;rsquo;m super thrilled to have landed a job (Software and Reproducibility Software Developer) at the Fred Hutch Data Science Lab (DASL), headed up by Jeff Leek, working with Sean Kross, Amy Paguirigan, and Monica Gerber, among many other amazing folks.</description>
+      <content:encoded><![CDATA[<p>Soooo, my last job at <a href="https://welcome.deck.tools/">Deck</a> was amazing. I loved it. I was doing data engineer stuff there, mostly maintaining infrastructure for data pipelines. Everyone was great and the mission was amazing: helping Democrats win. Yet the company was shut down about a month ago, sending me on another job search, the 3rd since early/mid 2021.</p>
+<p>I&rsquo;m super thrilled to have landed a job (Software and Reproducibility Software Developer) at the <a href="https://hutchdatascience.org/">Fred Hutch Data Science Lab (DASL)</a>, headed up by <a href="https://jtleek.com/">Jeff Leek</a>, working with <a href="https://seankross.com/">Sean Kross</a>, <a href="https://amypag.com/">Amy Paguirigan</a>, and <a href="https://www.monicagerber.com/">Monica Gerber</a>, among many other amazing folks.</p>
+<p>I&rsquo;m excited to help support the DASL mission to help cancer patients, care providers and researchers.</p>
+<p>In addition, I get to do a bunch (maybe all?) of software work as opensource, mostly in R and Python. After two jobs where opensource wasn&rsquo;t really part of the job, it&rsquo;s such a treat to get back to doing opensource work. Perhaps it will mostly be conversing with Fred Hutch people, but the goal is to make tools that will help far beyond Fred Hutch.</p>
+]]></content:encoded>
     </item>
     <item>
       <title>CRAN Checks API and Badges</title>
@@ -43,6 +335,29 @@ I&amp;rsquo;m super thrilled to have landed a job (Software and Reproducibility 
       <guid>http://localhost:1313/2022/06/cran-checks-badges/</guid>
       <description>TL;DR In 6 months (end of November 2022) the CRAN Checks API https://cranchecks.info/ will be gone You can still get badges at https://badges.cranchecks.info You can use the new badges like: [![cran checks](https://badges.cranchecks.info/worst/dplyr.svg)](https://cran.r-project.org/web/checks/check_results_dplyr.html) Find more details at https://github.com/sckott/cchecksbadges
 Sunsetting the CRAN Checks API If you contribute an R package to CRAN, you may use badges from the CRAN checks API at https://cranchecks.info/. The CRAN Checks API has been operating since about September 2017 (I think).</description>
+      <content:encoded><![CDATA[<h2 id="tldr">TL;DR</h2>
+<ol>
+<li>In 6 months (end of November 2022) the CRAN Checks API <a href="https://cranchecks.info/">https://cranchecks.info/</a> will be gone</li>
+<li>You can still get badges at <a href="https://badges.cranchecks.info">https://badges.cranchecks.info</a></li>
+<li>You can use the new badges like:</li>
+</ol>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-markdown" data-lang="markdown"><span style="display:flex;"><span>[<span style="color:#f92672">![cran checks</span>](<span style="color:#a6e22e">https://badges.cranchecks.info/worst/dplyr.svg</span>)](https://cran.r-project.org/web/checks/check_results_dplyr.html)
+</span></span></code></pre></div><p>Find more details at <a href="https://github.com/sckott/cchecksbadges">https://github.com/sckott/cchecksbadges</a></p>
+<h2 id="sunsetting-the-cran-checks-api">Sunsetting the CRAN Checks API</h2>
+<p>If you contribute an R package to <a href="https://cloud.r-project.org/">CRAN</a>, you may use badges from the CRAN checks API at <a href="https://cranchecks.info/">https://cranchecks.info/</a>. The CRAN Checks API has been operating <a href="https://recology.info/2017/09/cranchecks-api/">since about September 2017</a> (I think).</p>
+<p>The API has a number of routes, but really people only use the badges.</p>
+<p>Given this usage pattern, and not wanting to pay for a server anymore, I&rsquo;ve decided to make the badges available on a static endpoint that doesn&rsquo;t cost me anything. There are costs of course - but they&rsquo;re on Github and Netlify (thanks y&rsquo;all!).</p>
+<h2 id="the-new-static-site-version">The new static site version</h2>
+<p>The static site is created using GitHub Actions.</p>
+<p>For a static site you need to create files for any route you want to support - so the code for the static site creates 19 routes x No. of CRAN packages = approx. 360,000 svg files.</p>
+<p>The badges will be updated once a day - the same schedule as the API.</p>
+<p>I had to use Netlify because Github pages (as far as I know) doesn&rsquo;t provide ssl certs for custom domains and my domain host doesn&rsquo;t provide free Lets Encrypt certs - whereas Netlify does.</p>
+<p>Some example routes you can look at</p>
+<p><a href="https://badges.cranchecks.info/summary/taxize.svg">https://badges.cranchecks.info/summary/taxize.svg</a>
+<a href="https://badges.cranchecks.info/worst/dplyr.svg">https://badges.cranchecks.info/worst/dplyr.svg</a>
+<a href="https://badges.cranchecks.info/flavor/r-devel-linux-x86_64-fedora-clang/DT.svg">https://badges.cranchecks.info/flavor/r-devel-linux-x86_64-fedora-clang/DT.svg</a></p>
+<p>If you find any issues with the badges at <a href="https://badges.cranchecks.info">https://badges.cranchecks.info</a> <a href="https://github.com/sckott/cchecksbadges/issues">open an issue</a>.</p>
+]]></content:encoded>
     </item>
     <item>
       <title>Mocking HTTP redirects</title>
@@ -50,6 +365,87 @@ Sunsetting the CRAN Checks API If you contribute an R package to CRAN, you may u
       <pubDate>Sat, 27 Nov 2021 00:00:00 +0000</pubDate>
       <guid>http://localhost:1313/2021/11/mocking-redirects/</guid>
       <description>You&amp;rsquo;ve experienced an HTTP redirect (or URL redirect, or URL forwarding) even if you haven&amp;rsquo;t noticed. We all use browsers (I assume, since you are reading this), either on a phone or laptop/desktop computer. Browsers don&amp;rsquo;t show all the HTTP requests going on in the background, some of which are redirects. Redirection is used for various reasons, including to prevent broken links when web pages are moved, for privacy protection, to allow multiple domains to refer to a single web page, and more.</description>
+      <content:encoded><![CDATA[<p>You&rsquo;ve experienced an <a href="https://en.wikipedia.org/wiki/URL_redirection">HTTP redirect</a> (or URL redirect, or URL forwarding) even if you haven&rsquo;t noticed. We all use browsers (I assume, since you are reading this), either on a phone or laptop/desktop computer. Browsers don&rsquo;t show all the HTTP requests going on in the background, some of which are redirects. Redirection is used for various reasons, including to prevent broken links when web pages are moved, for privacy protection, to allow multiple domains to refer to a single web page, and more.</p>
+<p>The easiest way to know if you hit a redirect is to look at the <a href="https://en.wikipedia.org/wiki/List_of_HTTP_status_codes">HTTP status code</a>. Status codes in the 3xx series are mostly about URL redirection. The most common you will see are 301 (moved permanently), 302 (moved temporarily), and 303 (see other URI; usually in a &ldquo;Location&rdquo; response header).</p>
+<p>When making HTTP requests in R, redirects are generally handled automatically by the three HTTP clients (<a href="https://jeroen.cran.dev/curl/">curl</a>, <a href="https://github.com/ropensci/crul">crul</a>, <a href="https://github.com/r-lib/httr">httr</a>). That is, if a 300 series code is detected, all three clients will go to the next URI and so on until there are no more redirects. Automatically following redirects may not be default behavior elsewhere (e.g., <code>crul</code> command line tool doesn&rsquo;t follow redirects by default), so beware.</p>
+<p>HTTP redirects become more tricky when we have to mock them in unit tests or other similar situations. I&rsquo;ll cover the various tools for doing this in R.</p>
+<h2 id="redirects">Redirects</h2>
+<p>First, I&rsquo;ll show how redirects work with three major HTTP clients:</p>
+<p><a href="https://jeroen.cran.dev/curl/">curl</a></p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-r" data-lang="r"><span style="display:flex;"><span><span style="color:#a6e22e">library</span>(curl)
+</span></span><span style="display:flex;"><span>h <span style="color:#f92672">&lt;-</span> curl<span style="color:#f92672">::</span><span style="color:#a6e22e">new_handle</span>()
+</span></span><span style="display:flex;"><span><span style="color:#a6e22e">handle_setopt</span>(h, followlocation<span style="color:#f92672">=</span><span style="color:#ae81ff">0L</span>)
+</span></span><span style="display:flex;"><span>out <span style="color:#f92672">&lt;-</span> <span style="color:#a6e22e">curl_fetch_memory</span>(<span style="color:#e6db74">&#34;https://hb.opencpu.org/redirect/3&#34;</span>, handle <span style="color:#f92672">=</span> h)
+</span></span><span style="display:flex;"><span>curl<span style="color:#f92672">::</span><span style="color:#a6e22e">parse_headers</span>(out<span style="color:#f92672">$</span>headers, multiple <span style="color:#f92672">=</span> <span style="color:#66d9ef">TRUE</span>)
+</span></span></code></pre></div><p><a href="https://github.com/ropensci/crul">crul</a></p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-r" data-lang="r"><span style="display:flex;"><span><span style="color:#a6e22e">library</span>(crul)
+</span></span><span style="display:flex;"><span>con <span style="color:#f92672">&lt;-</span> HttpClient<span style="color:#f92672">$</span><span style="color:#a6e22e">new</span>(<span style="color:#e6db74">&#34;https://hb.opencpu.org/redirect/3&#34;</span>)
+</span></span><span style="display:flex;"><span>res <span style="color:#f92672">&lt;-</span> con<span style="color:#f92672">$</span><span style="color:#a6e22e">get</span>()
+</span></span><span style="display:flex;"><span><span style="color:#a6e22e">length</span>(res<span style="color:#f92672">$</span>response_headers_all)
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; [1] 4</span>
+</span></span></code></pre></div><p><a href="https://github.com/r-lib/httr">httr</a></p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-r" data-lang="r"><span style="display:flex;"><span><span style="color:#a6e22e">library</span>(httr)
+</span></span><span style="display:flex;"><span>z <span style="color:#f92672">&lt;-</span> <span style="color:#a6e22e">GET</span>(<span style="color:#e6db74">&#34;https://hb.opencpu.org/redirect/3&#34;</span>)
+</span></span><span style="display:flex;"><span><span style="color:#a6e22e">length</span>(z<span style="color:#f92672">$</span>all_headers)
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; [1] 4</span>
+</span></span></code></pre></div><h2 id="mocking-redirects">Mocking redirects</h2>
+<p>If you want to mock HTTP redirects, you can do so with the <a href="https://github.com/ropensci/webmockr">webmockr</a> package. Why would you want to mock redirects?</p>
+<p>Here&rsquo;s one use case: Say you have a library/package interacting with a web resource that you interact with. You want to add some unit tests for a route that responds with one or more redirects. You&rsquo;d prefer not to perform real HTTP requests against the remote service for one reason or another (e.g., extreme rate limiting); and some would say it&rsquo;s best not to test with real HTTP requests b/c you want to test the functionality of the package, NOT the remote server with which it interacts.</p>
+<p>In the following, we re-create what happens in real HTTP requests - but just status codes and the <code>location</code> response header.</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-r" data-lang="r"><span style="display:flex;"><span><span style="color:#a6e22e">library</span>(webmockr)
+</span></span><span style="display:flex;"><span><span style="color:#a6e22e">library</span>(crul)
+</span></span><span style="display:flex;"><span>webmockr<span style="color:#f92672">::</span><span style="color:#a6e22e">enable</span>()
+</span></span></code></pre></div><p>Make a single stub with each redirect response with <code>to_return()</code></p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-r" data-lang="r"><span style="display:flex;"><span><span style="color:#a6e22e">stub_request</span>(<span style="color:#e6db74">&#34;get&#34;</span>, <span style="color:#e6db74">&#34;https://hb.opencpu.org/redirect/3&#34;</span>) <span style="color:#f92672">%&gt;%</span>
+</span></span><span style="display:flex;"><span>  <span style="color:#a6e22e">to_return</span>(status <span style="color:#f92672">=</span> <span style="color:#ae81ff">302</span>, headers <span style="color:#f92672">=</span> <span style="color:#a6e22e">list</span>(location <span style="color:#f92672">=</span> <span style="color:#e6db74">&#34;/relative-redirect/2&#34;</span>)) <span style="color:#f92672">%&gt;%</span>
+</span></span><span style="display:flex;"><span>  <span style="color:#a6e22e">to_return</span>(status <span style="color:#f92672">=</span> <span style="color:#ae81ff">302</span>, headers <span style="color:#f92672">=</span> <span style="color:#a6e22e">list</span>(location <span style="color:#f92672">=</span> <span style="color:#e6db74">&#34;/relative-redirect/1&#34;</span>)) <span style="color:#f92672">%&gt;%</span>
+</span></span><span style="display:flex;"><span>  <span style="color:#a6e22e">to_return</span>(status <span style="color:#f92672">=</span> <span style="color:#ae81ff">302</span>, headers <span style="color:#f92672">=</span> <span style="color:#a6e22e">list</span>(location <span style="color:#f92672">=</span> <span style="color:#e6db74">&#34;/get&#34;</span>)) <span style="color:#f92672">%&gt;%</span>
+</span></span><span style="display:flex;"><span>  <span style="color:#a6e22e">to_return</span>(status <span style="color:#f92672">=</span> <span style="color:#ae81ff">200</span>, headers <span style="color:#f92672">=</span> <span style="color:#a6e22e">list</span>(location <span style="color:#f92672">=</span> <span style="color:#e6db74">&#34;hooray, all done!&#34;</span>))
+</span></span></code></pre></div><p>Then make four different requests to <code>https://hb.opencpu.org/redirect/3</code>:</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-r" data-lang="r"><span style="display:flex;"><span>con <span style="color:#f92672">&lt;-</span> crul<span style="color:#f92672">::</span>HttpClient<span style="color:#f92672">$</span><span style="color:#a6e22e">new</span>(url <span style="color:#f92672">=</span> <span style="color:#e6db74">&#34;https://hb.opencpu.org&#34;</span>)
+</span></span><span style="display:flex;"><span>con<span style="color:#f92672">$</span><span style="color:#a6e22e">get</span>(<span style="color:#e6db74">&#34;redirect/3&#34;</span>)<span style="color:#f92672">$</span>response_headers
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; $location</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; [1] &#34;/relative-redirect/2&#34;</span>
+</span></span><span style="display:flex;"><span>con<span style="color:#f92672">$</span><span style="color:#a6e22e">get</span>(<span style="color:#e6db74">&#34;redirect/3&#34;</span>)<span style="color:#f92672">$</span>response_headers
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; $location</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; [1] &#34;/relative-redirect/1&#34;</span>
+</span></span><span style="display:flex;"><span>con<span style="color:#f92672">$</span><span style="color:#a6e22e">get</span>(<span style="color:#e6db74">&#34;redirect/3&#34;</span>)<span style="color:#f92672">$</span>response_headers
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; $location</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; [1] &#34;/get&#34;</span>
+</span></span><span style="display:flex;"><span>con<span style="color:#f92672">$</span><span style="color:#a6e22e">get</span>(<span style="color:#e6db74">&#34;redirect/3&#34;</span>)<span style="color:#f92672">$</span>response_headers
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; $location</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; [1] &#34;hooray, all done!&#34;</span>
+</span></span></code></pre></div><p>This isn&rsquo;t ideal because it doesn&rsquo;t reflect how the real HTTP request equivalent happens.</p>
+<p>Alernatively, you could set it up like this, with four separate stubs:</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-r" data-lang="r"><span style="display:flex;"><span><span style="color:#a6e22e">stub_request</span>(<span style="color:#e6db74">&#34;get&#34;</span>, <span style="color:#e6db74">&#34;https://hb.opencpu.org/redirect/3&#34;</span>) <span style="color:#f92672">%&gt;%</span>
+</span></span><span style="display:flex;"><span>  <span style="color:#a6e22e">to_return</span>(status <span style="color:#f92672">=</span> <span style="color:#ae81ff">302</span>, headers <span style="color:#f92672">=</span> <span style="color:#a6e22e">list</span>(location <span style="color:#f92672">=</span> <span style="color:#e6db74">&#34;/relative-redirect/2&#34;</span>))
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span><span style="color:#a6e22e">stub_request</span>(<span style="color:#e6db74">&#34;get&#34;</span>, <span style="color:#e6db74">&#34;https://hb.opencpu.org/relative-redirect/2&#34;</span>) <span style="color:#f92672">%&gt;%</span>
+</span></span><span style="display:flex;"><span>  <span style="color:#a6e22e">to_return</span>(status <span style="color:#f92672">=</span> <span style="color:#ae81ff">302</span>, headers <span style="color:#f92672">=</span> <span style="color:#a6e22e">list</span>(location <span style="color:#f92672">=</span> <span style="color:#e6db74">&#34;/relative-redirect/1&#34;</span>))
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span><span style="color:#a6e22e">stub_request</span>(<span style="color:#e6db74">&#34;get&#34;</span>, <span style="color:#e6db74">&#34;https://hb.opencpu.org/relative-redirect/1&#34;</span>) <span style="color:#f92672">%&gt;%</span>
+</span></span><span style="display:flex;"><span>  <span style="color:#a6e22e">to_return</span>(status <span style="color:#f92672">=</span> <span style="color:#ae81ff">302</span>, headers <span style="color:#f92672">=</span> <span style="color:#a6e22e">list</span>(location <span style="color:#f92672">=</span> <span style="color:#e6db74">&#34;/get&#34;</span>))
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span><span style="color:#a6e22e">stub_request</span>(<span style="color:#e6db74">&#34;get&#34;</span>, <span style="color:#e6db74">&#34;https://hb.opencpu.org/get&#34;</span>) <span style="color:#f92672">%&gt;%</span>
+</span></span><span style="display:flex;"><span>  <span style="color:#a6e22e">to_return</span>(status <span style="color:#f92672">=</span> <span style="color:#ae81ff">200</span>, headers <span style="color:#f92672">=</span> <span style="color:#a6e22e">list</span>(location <span style="color:#f92672">=</span> <span style="color:#e6db74">&#34;hooray, all done!&#34;</span>))
+</span></span></code></pre></div><p>Then make each request in turn to each successive URL:</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-r" data-lang="r"><span style="display:flex;"><span>con <span style="color:#f92672">&lt;-</span> crul<span style="color:#f92672">::</span>HttpClient<span style="color:#f92672">$</span><span style="color:#a6e22e">new</span>(url <span style="color:#f92672">=</span> <span style="color:#e6db74">&#34;https://hb.opencpu.org&#34;</span>)
+</span></span><span style="display:flex;"><span>con<span style="color:#f92672">$</span><span style="color:#a6e22e">get</span>(<span style="color:#e6db74">&#34;redirect/3&#34;</span>)<span style="color:#f92672">$</span>response_headers
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; $location</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; [1] &#34;/relative-redirect/2&#34;</span>
+</span></span><span style="display:flex;"><span>con<span style="color:#f92672">$</span><span style="color:#a6e22e">get</span>(<span style="color:#e6db74">&#34;relative-redirect/2&#34;</span>)<span style="color:#f92672">$</span>response_headers
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; $location</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; [1] &#34;/relative-redirect/1&#34;</span>
+</span></span><span style="display:flex;"><span>con<span style="color:#f92672">$</span><span style="color:#a6e22e">get</span>(<span style="color:#e6db74">&#34;relative-redirect/1&#34;</span>)<span style="color:#f92672">$</span>response_headers
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; $location</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; [1] &#34;/get&#34;</span>
+</span></span><span style="display:flex;"><span>con<span style="color:#f92672">$</span><span style="color:#a6e22e">get</span>(<span style="color:#e6db74">&#34;get&#34;</span>)<span style="color:#f92672">$</span>response_headers
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; $location</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; [1] &#34;hooray, all done!&#34;</span>
+</span></span></code></pre></div><h2 id="faking-real-redirects">Faking real redirects</h2>
+<p><a href="https://github.com/ropensci/vcr">vcr</a> is built on top of webmockr, but instead of returning stubbed responses and not allowing real HTTP requests, vcr stores real HTTP request/response and uses them on all subsequent matching HTTP requests.</p>
+<p>I wrote this back in March 2021 - and was waiting to figure out how to deal with redirects in <a href="https://github.com/ropensci/vcr">vcr</a> before finishing this post - see <a href="https://github.com/ropensci/vcr/issues/220">vcr issue #220</a>. I still have and may never get to that issue. If you are interested, please do stop by vcr and make a pull request to get it fixed. The major issue is that vcr stores only the first HTTP response in a redirect chain, rather than the last HTTP response - as I would expect.</p>
+]]></content:encoded>
     </item>
     <item>
       <title>API client design: how to deal with lots of parameters?</title>
@@ -59,6 +455,69 @@ Sunsetting the CRAN Checks API If you contribute an R package to CRAN, you may u
       <description>In February this year I wroute about how many parameters functions should have, looking at some other languages, with a detailed look at R. On a related topic &amp;hellip;
 As I work on many R packages that are API clients for various web services, I began wondering: What is the best way to deal with API routes that have a lot of parameters?
 The general programming wisdom I&amp;rsquo;ve seen is that a function should have no more than 3-4 parameters (e.</description>
+      <content:encoded><![CDATA[<p>In February this year I wroute about <a href="https://recology.info/2020/02/how-many-parameters/">how many parameters functions should have</a>, looking at some other languages, with a detailed look at R. On a related topic &hellip;</p>
+<p>As I work on many R packages that are API clients for various web services, I began wondering: What is the best way to deal with API routes that have a lot of parameters?</p>
+<p>The general programming wisdom I&rsquo;ve seen is that a function should have no more than 3-4 parameters (e.g., <a href="https://stackoverflow.com/questions/174968/how-many-parameters-are-too-many">this long SO thread</a>, or <a href="https://softwareengineering.stackexchange.com/questions/331803/techniques-for-minimising-number-of-function-arguments">this one</a>). So should one do anything different from a normal function when that function is connecting to a web API route with a lot of parameters? I&rsquo;ve not found very much spilled ink on this exact topic, but I&rsquo;ll discuss what I have found.</p>
+<h2 id="use-cases">Use cases?</h2>
+<p>A Software Engineering StackExchange thread <a href="https://softwareengineering.stackexchange.com/questions/196895/how-to-handle-many-arguments-in-an-api-wrapper">How to handle many arguments in an API wrapper?</a> had a couple ideas. One idea is to consider use cases, and then make separate functions covering those use cases. This might work, but I haven&rsquo;t explored it thoroughly for a real API route yet. Pondering on it though I doubt this would work since you&rsquo;d have to pre-emptively think about all the different scenarios users might dream up, which seems like a fools errand.</p>
+<h2 id="builder-pattern">Builder pattern</h2>
+<p>Another concept brought up in the thread mentioned above was the <a href="https://en.wikipedia.org/wiki/Builder_pattern">Builder pattern</a>. It&rsquo;s hard for me to understand the idea in abstract - <a href="https://medium.com/kkempin/builder-design-pattern-in-ruby-dfa2d557ff1b">here&rsquo;s a nicer discussion of this in Ruby</a>.</p>
+<p>This is a good concept to know about, but I don&rsquo;t think is appropriate for the issue at hand, of how to handle many API parameters.</p>
+<h2 id="named-parameter-map">Named parameter map</h2>
+<p>Another idea in that thread was to use a named parameter map. In R this would look something like this (imagine a lot more parameters though):</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-r" data-lang="r"><span style="display:flex;"><span>foo <span style="color:#f92672">&lt;-</span> <span style="color:#66d9ef">function</span>(args) {
+</span></span><span style="display:flex;"><span>  <span style="color:#a6e22e">get</span>(<span style="color:#e6db74">&#34;/some-api-route&#34;</span>, args)
+</span></span><span style="display:flex;"><span>}
+</span></span><span style="display:flex;"><span>api_args <span style="color:#f92672">&lt;-</span> <span style="color:#a6e22e">list</span>(query <span style="color:#f92672">=</span> <span style="color:#e6db74">&#34;*:*&#34;</span>, limit <span style="color:#f92672">=</span> <span style="color:#ae81ff">10</span>)
+</span></span><span style="display:flex;"><span>my_args <span style="color:#f92672">&lt;-</span> <span style="color:#a6e22e">modifyList</span>(api_args, <span style="color:#a6e22e">list</span>(query <span style="color:#f92672">=</span> <span style="color:#e6db74">&#34;bears&#34;</span>, limit <span style="color:#f92672">=</span> <span style="color:#ae81ff">300</span>))
+</span></span><span style="display:flex;"><span><span style="color:#a6e22e">foo</span>(my_args)
+</span></span></code></pre></div><p>That is, the above would replace this:</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-r" data-lang="r"><span style="display:flex;"><span>foo <span style="color:#f92672">&lt;-</span> <span style="color:#66d9ef">function</span>(query <span style="color:#f92672">=</span> <span style="color:#e6db74">&#34;*:*&#34;</span>, limit <span style="color:#f92672">=</span> <span style="color:#ae81ff">10</span>) {
+</span></span><span style="display:flex;"><span>  <span style="color:#a6e22e">get</span>(<span style="color:#e6db74">&#34;/some-api-route&#34;</span>, <span style="color:#a6e22e">list</span>(query <span style="color:#f92672">=</span> query, limit <span style="color:#f92672">=</span> limit))
+</span></span><span style="display:flex;"><span>}
+</span></span><span style="display:flex;"><span><span style="color:#a6e22e">foo</span>(query <span style="color:#f92672">=</span> <span style="color:#e6db74">&#34;*:*&#34;</span>, limit <span style="color:#f92672">=</span> <span style="color:#ae81ff">10</span>)
+</span></span></code></pre></div><p>So in the first code block the function no longer has a lot of parameters in it. The drawback of this in R (and I&rsquo;m sure is similar in other languages) is that users lose the autocomplete helpers that most modern IDE&rsquo;s and text editors have - helping users type less and quickly get a tip on what each parameter is intended to do and importantly (if the developer has documented the function well) what types the parameters expects and what (if any) options there are to pass to the parameter.</p>
+<p>Of course a user can &ldquo;just&rdquo; read the docs to figure out what each parameter expects, but it sure can save a lot of time if the help is right there in the tooltips of the IDE/text editor. In addition, in R there&rsquo;s automated checking that parameters in functions are also documented, which is nice for making sure parameters and docs don&rsquo;t get out of sync. You&rsquo;d lose this by using a parameter map - though you could document the parameter map - and perhaps wire together some custom code to make sure the parameters in the parameter map are all handled by the function. This does seem like a lot of fuss though compared to simply having the parameters in the function itself.</p>
+<p>This approach probably becomes more attractive if a client has many functions that take the same parameters - in which a named parameter map could handle the parameters and any logic behind checking those parameters.</p>
+<h2 id="include-no-parameters-in-the-function">Include no parameters in the function</h2>
+<p>In other words: Pass all parameters on to the API w/o including any of them in the function - i.e., let the API handle any problems in parameters.</p>
+<p>Another approach I&rsquo;ve not seen written about but that I&rsquo;ve seen in code is having a rather lite wrapper around an API and letting the API itself sort out any problems due to user inputs.</p>
+<p>An example is the <a href="https://gh.r-lib.org/">gh R package</a>, a client for the GitHub API. For query parameters you can pass in named parameters through the ellipsis <code>...</code>, all of which are passed as query parameters. The gh package does no checking of these parameters (that I know of); simply passes them to the GitHub API. The GitHub API happens to apparently ignore invalid (silently drop) parameters and invalid valuses of parameters (here, &ldquo;stuff&rdquo; is an invalid value for the <code>page</code> parameter).</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-r" data-lang="r"><span style="display:flex;"><span>x <span style="color:#f92672">&lt;-</span> <span style="color:#a6e22e">gh</span>(<span style="color:#e6db74">&#34;GET /users/{username}/repos&#34;</span>, username <span style="color:#f92672">=</span> <span style="color:#e6db74">&#34;gaborcsardi&#34;</span>, page <span style="color:#f92672">=</span> <span style="color:#e6db74">&#34;stuff&#34;</span>)
+</span></span><span style="display:flex;"><span><span style="color:#a6e22e">length</span>(x)
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; 30</span>
+</span></span></code></pre></div><p>I don&rsquo;t hate this solution, but I don&rsquo;t love it either. This approach is highly dependent on a well designed API that fails gracefully, with informative error messages and with correct status codes, etc. I would say  most APIs are not as nice as GitHub&rsquo;s, at least in the scientific API space in which I work.</p>
+<p>One plus side of this approach is the R package gh only has one parameter (<code>...</code>) to handle all query parameters, so you do solve the too many query parameters problem.</p>
+<p>Another upside to this approach is you do not have to keep up with any changes in parameters on each API route - for example, an API route could drop one parameter, and add another, and the R client wouldn&rsquo;t have to change anything (assuming the change in parameters wasn&rsquo;t associated with a change that breaks code in the client).</p>
+<p>A major downside of this approach is that the user often has to mount a time-consuming expedition to figure out what parameters are accepted. Some API clients may document them, and some will simply direct users to the web APIs docs. I think this part alone makes this solution (include no parameters in the function) not a good one since the user experience can be so bad if the documentation is not good. And all developers know its much easier for their docs to get out of date than their code.</p>
+<h2 id="include-some-parameters-in-the-function">Include some parameters in the function</h2>
+<p>Another approach is to define some query parameters in the function, and handle all others via R&rsquo;s ellipsis (<code>...</code>) - or similar in other languages. I&rsquo;ve seen this relatively often and have used it myself. It&rsquo;s often used when there&rsquo;s a clear smaller set of important parameters - those can be put in the function as named parameters. And then there&rsquo;s a long tail of other parameters that the maintainer thinks are not likely to be used very often. Those can be looked up by the user in the API docs for whatever API the client interacts with.</p>
+<p>An example of this is the rOpenSci package <a href="https://docs.ropensci.org/rtweet/">rtweet</a> - a client for the Twitter API. In the <a href="https://docs.ropensci.org/rtweet/reference/search_tweets.html#arguments">search_tweets() function</a> there are a half dozen or so named parameters in the function, but then the ellipsis handles all other parameters.</p>
+<p>The drawback to this approach is that no two APIs behave the same way. In the case of Twitter they silently ignore/drop parameters they do not support (same as the GitHub API, see above). For example:</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-r" data-lang="r"><span style="display:flex;"><span><span style="color:#a6e22e">library</span>(rtweet)
+</span></span><span style="display:flex;"><span><span style="color:#a6e22e">search_tweets</span>(<span style="color:#e6db74">&#34;hillaryclinton&#34;</span>, n <span style="color:#f92672">=</span> <span style="color:#ae81ff">3</span>, foo <span style="color:#f92672">=</span> <span style="color:#e6db74">&#34;bar&#34;</span>)
+</span></span></code></pre></div><p>Works just fine even though <code>foo</code> is absolutely not a parameter supported by the Twitter API. They must ignore parameters they don&rsquo;t support. This is same behavior as the GitHub API we saw above.</p>
+<p>In the case of Twitter and GitHub one might want to raise errors on unsupported parameters client side in rtweet to avoid any use confusion of parameters being silently dropped.</p>
+<h2 id="grouping-similar-parameters-together">Grouping similar parameters together</h2>
+<p>Many threads (e.g., <a href="https://softwareengineering.stackexchange.com/a/352676/329940">this one</a>) suggest that similar parameters could be grouped together to reduce the number of parameters passed to a function. For example, if a function has the parameters <code>latitude</code> and <code>longitude</code> you could group those into a single parameter called e.g., <code>coordinates</code>.</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-r" data-lang="r"><span style="display:flex;"><span><span style="color:#75715e"># Original function, each parameter separate</span>
+</span></span><span style="display:flex;"><span>foo <span style="color:#f92672">&lt;-</span> <span style="color:#66d9ef">function</span>(latitude, longitude) {
+</span></span><span style="display:flex;"><span>    <span style="color:#75715e"># do something with latitude/longitude</span>
+</span></span><span style="display:flex;"><span>    latitude
+</span></span><span style="display:flex;"><span>    longitude
+</span></span><span style="display:flex;"><span>}
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e"># Modified function, grouping the two parameters into one</span>
+</span></span><span style="display:flex;"><span>foo <span style="color:#f92672">&lt;-</span> <span style="color:#66d9ef">function</span>(coordinates) {
+</span></span><span style="display:flex;"><span>    <span style="color:#75715e"># do something with latitude/longitude</span>
+</span></span><span style="display:flex;"><span>    coordinates<span style="color:#f92672">$</span>latitude
+</span></span><span style="display:flex;"><span>    coordinates<span style="color:#f92672">$</span>longitude
+</span></span><span style="display:flex;"><span>}
+</span></span></code></pre></div><p>Though I&rsquo;ve not tried this approach myself, it might be a good compromise between a function not handling any parameters (i.e., just passing all to the web API unhandled) and handling every parameter individually.</p>
+<h2 id="closing-thoughts">Closing thoughts</h2>
+<p>The benefit of documenting API query parameters in a client package is that you can tell the user what each parameters expects in language they can understand. That is, if you simply direct users to the docs for the web API with which the client interacts, the API docs could be not very good and/or specify types expected that the user may not understand. In addition, there may be edge cases or similar with some parameters that are not documented in the API docs but that you can document in the client docs for each parameter.</p>
+<p>I would say the vast majority of web API clients I use that do succeed in having very few parameters also have docs in which it&rsquo;s a nightmare trying to figure out what parameters each method accepts. That is, the pursuit of very few parameters at least is correlated with a very poor user experience  - in my experience.</p>
+]]></content:encoded>
     </item>
     <item>
       <title>stories behind archived packages</title>
@@ -68,6 +527,159 @@ The general programming wisdom I&amp;rsquo;ve seen is that a function should hav
       <description>Update on 2021-02-09: I&amp;rsquo;ve archived 8 more packages. Post below updated
 Code is often arranged in packages for any given language. Packages are often cataloged in a package registry of some kind: NPM for node, crates.io for Rust, etc. For R, that registry is either CRAN or Bioconductor (for the most part).
 CRAN has the concept of an archived package. That is, the namespace for a package (foo) is still in the registry (and can not be used again), but the package is archived - no longer gets updated and checks I think are no longer performed.</description>
+      <content:encoded><![CDATA[<blockquote>
+<p>Update on 2021-02-09: I&rsquo;ve archived 8 more packages. Post below updated</p>
+</blockquote>
+<!-- raw HTML omitted -->
+<p>Code is often arranged in packages for any given language. Packages
+are often cataloged in a package registry of some kind: NPM for
+node, crates.io for Rust, etc. For R, that registry is either
+<a href="https://cran.r-project.org/">CRAN</a> or <a href="https://bioconductor.org/">Bioconductor</a>
+(for the most part).</p>
+<p>CRAN has the concept of an archived package. That is, the namespace
+for a package (<code>foo</code>) is still in the registry (and can not be used again),
+but the package is archived - no longer gets updated and checks
+I think are no longer performed.</p>
+<p>We rarely hear the stories behind how software gets laid to rest. What are
+the most common reasons for software to be abandoned?</p>
+<h2 id="my-cran-archived-packages">My CRAN archived packages</h2>
+<p>First, my archived CRAN packages:</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-r" data-lang="r"><span style="display:flex;"><span><span style="color:#a6e22e">library</span>(pkgsearch)
+</span></span><span style="display:flex;"><span><span style="color:#a6e22e">library</span>(dplyr)
+</span></span><span style="display:flex;"><span><span style="color:#a6e22e">library</span>(data.table)
+</span></span><span style="display:flex;"><span><span style="color:#a6e22e">library</span>(tibble)
+</span></span><span style="display:flex;"><span>x <span style="color:#f92672">=</span> <span style="color:#a6e22e">cran_events</span>(releases <span style="color:#f92672">=</span> <span style="color:#66d9ef">FALSE</span>, archivals <span style="color:#f92672">=</span> <span style="color:#66d9ef">TRUE</span>, limit <span style="color:#f92672">=</span> <span style="color:#ae81ff">4000L</span>)
+</span></span><span style="display:flex;"><span>res <span style="color:#f92672">=</span> <span style="color:#a6e22e">lapply</span>(x, <span style="color:#66d9ef">function</span>(w)
+</span></span><span style="display:flex;"><span>  <span style="color:#a6e22e">tibble</span>(pkg<span style="color:#f92672">=</span>w<span style="color:#f92672">$</span>name, maintainer<span style="color:#f92672">=</span>w<span style="color:#f92672">$</span>package<span style="color:#f92672">$</span>Maintainer))
+</span></span><span style="display:flex;"><span>df <span style="color:#f92672">=</span> <span style="color:#a6e22e">rbindlist</span>(res, use.names <span style="color:#f92672">=</span> <span style="color:#66d9ef">TRUE</span>, fill <span style="color:#f92672">=</span> <span style="color:#66d9ef">TRUE</span>)
+</span></span><span style="display:flex;"><span>df <span style="color:#f92672">=</span> <span style="color:#a6e22e">as_tibble</span>(df)
+</span></span><span style="display:flex;"><span>scott <span style="color:#f92672">&lt;-</span> <span style="color:#a6e22e">filter</span>(df, <span style="color:#a6e22e">grepl</span>(<span style="color:#e6db74">&#34;chamberlain&#34;</span>, maintainer, ignore.case <span style="color:#f92672">=</span> <span style="color:#66d9ef">TRUE</span>)) <span style="color:#f92672">%&gt;%</span>
+</span></span><span style="display:flex;"><span>  <span style="color:#a6e22e">select</span>(pkg) <span style="color:#f92672">%&gt;%</span> 
+</span></span><span style="display:flex;"><span>  <span style="color:#a6e22e">data.frame</span>()
+</span></span><span style="display:flex;"><span>scott
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt;            pkg</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; 1      originr</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; 2       geoaxe</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; 3         lawn</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; 4     pleiades</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; 5       geoops</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; 6          rif</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; 7     rbraries</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; 8        ccafs</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; 9     rjsonapi</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; 10       rdpla</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; 11 seaaroundus</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; 12    crevents</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; 13      etseed</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; 14      rtimes</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; 15   rsunlight</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; 16        nneo</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; 17     binomen</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; 18        solr</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; 19      enigma</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; 20         alm</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; 21    ropensnp</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; 22      govdat</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; 23  spoccutils</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; 24     rgauges</span>
+</span></span></code></pre></div><p>I have 24 archived packages on CRAN.</p>
+<h2 id="stories">Stories</h2>
+<p>The following are brief stories of why each package was archived on CRAN.</p>
+<ul>
+<li><strong>spoccutils</strong>: was a package of utility functions that didn&rsquo;t quite fit within the scope of another package <a href="https://github.com/ropensci/spocc">spocc</a>. It was renamed to <a href="https://github.com/ropensci/mapr">mapr</a>. I suppose I could have asked CRAN to change the name, hmmm</li>
+<li><strong><a href="https://github.com/ropensci-archive/rgauges">rgauges</a></strong>: was a client for the <a href="https://get.gaug.es/">Gaug.es</a> website analytics API - we started the package to gather data on visitors to the rOpenSci website. Eventually we stopped using Gaug.es and then it didn&rsquo;t make sense to maintain the package, so it was archived.</li>
+<li><strong><a href="https://github.com/ropensci-archive/alm">alm</a></strong>: was a client for a generic article-level metrics web service framework called Lagotto. In the early days of rOpenSci we were quite engaged with the community of folks working on article-level metrics. If I remember correctly, Lagotto usage slowed down and wasn&rsquo;t used much so I gave up on maintaining <code>alm</code></li>
+<li><strong>ropensnp</strong>: was a client for the service <a href="https://opensnp.org/">OpenSNP</a>. There were other sources of SNP data that I thought would be nice to access all from one package; so a new package (<a href="https://github.com/ropensci/rsnps">rsnps</a>) was created and incorporated functions for OpenSNP and <code>ropensnp</code> was archived.</li>
+<li><strong>solr</strong>: was a package client for the <a href="https://lucene.apache.org/solr/">Apache Solr</a> database. At some point it got a major overhual and I decided to change the package name to <a href="https://github.com/ropensci/solrium">solrium</a>.</li>
+<li><strong><a href="https://github.com/ropensci/binomen">binomen</a></strong>: aim of the package was functions for creating taxonomic classes/objects and functions for manipulating taxonomic data, sort of like dplyr. Evolution of ideas in <code>binomen</code> gave way to a new package <a href="https://github.com/ropensci/taxa">taxa</a>, now maintained by <a href="https://github.com/zachary-foster">Zach Foster</a>.</li>
+<li><strong><a href="https://github.com/ropensci-archive/nneo">nneo</a></strong>: was a client for APIs for <a href="https://data.neonscience.org/data-api/">NEON</a> data. At some point I stumbled upon someone else from NEON making essentially the same package, so I archived mine.</li>
+<li><strong><a href="https://github.com/ropensci-archive/etseed">etseed</a></strong>: was a package for interacting with the distributed key-value store <a href="https://etcd.io/">etcd</a>. I was on a kick at the time of making R packages for databases, and saw a missing package I thought. After getting familiar with etcd, I realized I would probably never use it myself, and further, it probably didn&rsquo;t make sense to interact with etcd from R anyway.</li>
+<li><strong><a href="https://github.com/ropensci-archive/crevents">crevents</a></strong>: <a href="https://www.crossref.org/">Crossref</a> mints DOIs for scholarly articles (among other works). A neat service they started was collecting and making searchable the &ldquo;events&rdquo; on DOIs - that is, the links pointing to DOIs, e.g., from Twitter, etc. The service at some point became very unreliable (was often down), so the package was archived.</li>
+<li><strong><a href="https://github.com/ropensci-archive/seaaroundus">seaaroundus</a></strong>: <a href="https://www.seaaroundus.org/">Seaaroundus</a> maintains fisheries and fisheries-related data. I was helping maintain an R package for the API, but it was a difficult one to maintain, and most users simply sent emails requesting dumps of data anyway - so the package was archived.</li>
+<li><strong><a href="https://github.com/ropensci-archive/rdpla">rdpla</a></strong>: The <a href="https://dp.la/">Digital Public Library of America</a> is a very cool organization that is similar to Crossref in a way, in that they centralize metadata about &ldquo;things&rdquo;; metadata on museum collections for DPLA and scholarly works for Crossref. I figured many researchers would enjoy being able to easily get metadata from DPLA for research on museum collections. In the end not many people used the package.</li>
+<li><strong><a href="https://github.com/ropensci-archive/rjsonapi">rjsonapi</a></strong>: <a href="https://jsonapi.org/">JSON:API</a> is a cool idea - a sort of specification for building APIs in JSON. REST APIs are incredibly variable - this is an attempto standardize it a bit. I thought perhaps JSON:API would be adopted widely and that an R client would be useful for consuming JSON:API services - however, I&rsquo;ve seen only very few APIs using JSON:API.</li>
+<li><strong><a href="https://github.com/ropensci-archive/originr">originr</a></strong>: The idea with <code>originr</code> originally was to centralize in one package tools for biologists to get data on &ldquo;nativity&rdquo; of species in their studies: are species X and Y native to A, B, and C countries. I was lucky to get a collaborator (<a href="https://github.com/ibartomeus">Ignasi Bartomeus</a>) to help on that package. The package simply was not used much at all, and the data sources used were very flaky, making for a buggy user experience.</li>
+<li><strong><a href="https://github.com/ropensci-archive/geoaxe">geoaxe</a></strong>: This package always had a very narrow scope. It was created to solve a problem in two widely used packages: <a href="https://github.com/ropensci/rgbif">rgbif</a> and <a href="https://github.com/ropensci/spocc">spocc</a>. In both of those packages we needed to take user input of a Well-known text (WKT) string representing a polygon in which the user wanted to search for something in a remote data source. And with that WKT we would chop up the polygon into smaller polygons to be submitted in multiple (spatial) requests instead of one very large (spatial) request. I didn&rsquo;t want to depend on the heavy <code>rgdal</code> depenency, so I cooked up <code>geoaxe</code> that only used <code>sp</code> and <code>rgeos</code>. <code>geoaxe</code> lasted for many years, but there&rsquo;s better tools out there now, so it was archived.</li>
+<li><strong><a href="https://github.com/ropensci-archive/lawn">lawn</a></strong>: This package started out when I was trying to see what we could do in spatial R packages, specifically around GeoJSON. Jeroen had recently created the <a href="https://github.com/jeroen/v8">V8</a> package so you could leverage bundled Javascript libraries in R. <a href="https://turfjs.org/">turf.js</a> was a neat project for Javascript for spatial analysis and built in a modular, approachable manner - I thought. So collaborator <a href="https://github.com/jhollist">Jeff Hollister</a> and I wrapped turf.js in R. It was not used that much - and especially not used much after the rise of sf and related &ldquo;tidy&rdquo; spatial packages, leading to archival.</li>
+<li><strong><a href="https://github.com/sckott/geoops">geoops</a></strong>: This package was a follow on from <code>lawn</code>, in exploring more GeoJSON focused work. I wanted to learn how to make an R package mostly out of C++, with just a thin layer of R on top. Like <code>lawn</code>, <code>geoops</code> was not used much at all as far as I could tell, maybe partly because it focused only on GeoJSON - but this was also during the rise of <code>sf</code> and friends. I moved it to my own personal account just as a little C++ in R playground in case I want to brush up on that.</li>
+<li><strong><a href="https://github.com/ropensci-archive/pleiades">pleiades</a></strong>: I don&rsquo;t remember how or why this package started. It was a client for Pleiades (<a href="https://pleiades.stoa.org/home">https://pleiades.stoa.org/home</a>), a database of historical geographic information about the ancient world. It was used very, very little as far as I could tell - so was archived.</li>
+<li><strong><a href="https://github.com/ropensci-archive/rif">rif</a></strong>: This package was started after a some exploration of what R work we (rOpenSci) could do in the neuroscience field. It was a client for the Neuroscience Information Framework (<a href="https://neuinfo.org/">https://neuinfo.org/</a>), a database of neuroscience information. Another package not used - so was archived.</li>
+<li><strong><a href="https://github.com/ropensci-archive/rbraries">rbraries</a></strong>: This package started because I thought rOpenSci would make use of the metadata around R package downloads/etc. that <a href="https://libraries.io/">https://libraries.io/</a> collected. We never ended up using the data - and no one seemed to use the package - so was archived.</li>
+<li><strong><a href="https://github.com/ropensci-archive/ccafs">ccafs</a></strong>: A client for Climate Change, Agriculture, and Food Security (CCAFS) General Circulation Models (GCM) data (<a href="https://www.ccafs-climate.org/">https://www.ccafs-climate.org/</a>). All I could find for motivation for this package was an email with someone where they shared a few links to different sources of climate data - then apparently this package was born shortly thereafter. It wasn&rsquo;t used much at all - so was archived.</li>
+</ul>
+<p>The following four packages were all R clients for sources of government open data - see the organization <a href="https://github.com/ropengov">rOpenGov</a> for R packages on government data.</p>
+<ul>
+<li><strong>govdat</strong>: was split into two packages (<code>rsunlight</code> and <code>rtimes</code>) and <code>govdat</code> was archived</li>
+<li><strong><a href="https://github.com/rOpenGov/rsunlight">rsunlight</a></strong>: was a client for many APIs of the organization <a href="https://sunlightfoundation.com/api/">Sunlight Labs</a> - part of the reason for archiving this package was the disintegration of Sunlight Labs, which made the previously sensible organization of many APIs into one R package not sensible anymore. Also, government data was considered out of scope for our work at rOpenSci.</li>
+<li><strong><a href="https://github.com/rOpenGov/rtimes">rtimes</a></strong>: was a client for a number of the government data APIs from the New York Times. One reason for abandoning this package was that NYT almost never responded to questions/feedback on their APIs. Another reason was the aforementioned focus of rOpenSci.</li>
+<li><strong><a href="https://github.com/rOpenGov/enigma">enigma</a></strong>: was a client for the Enigma API - the company I think was first focused on making open government data easier to access - as well as data on companies. I didn&rsquo;t really use the package at all though, and there wasn&rsquo;t much usage of the package, so archived it.</li>
+</ul>
+<p>As a summary of the lists above, a list of the major reasons each package was archived:</p>
+<ul>
+<li>Not used
+<ul>
+<li>rjsonapi</li>
+<li>rdpla</li>
+<li>etseed</li>
+<li>enigma</li>
+<li>rgauges</li>
+<li>rtimes</li>
+<li>originr</li>
+<li>geaoxe</li>
+<li>pleiades</li>
+<li>rif</li>
+<li>rbraries</li>
+<li>ccafs</li>
+</ul>
+</li>
+<li>The fall of the GeoJSON-verse <sup id="fnref:1"><a href="#fn:1" class="footnote-ref" role="doc-noteref">1</a></sup>
+<ul>
+<li>lawn</li>
+<li>geoops</li>
+</ul>
+</li>
+<li>Bad/retired service
+<ul>
+<li>rtimes</li>
+<li>seaaroundus</li>
+<li>crevents</li>
+<li>alm</li>
+</ul>
+</li>
+<li>Name change
+<ul>
+<li>solr</li>
+<li>ropensnp</li>
+<li>spoccutils</li>
+</ul>
+</li>
+<li>Evolution to new package
+<ul>
+<li>binomen</li>
+<li>govdat</li>
+</ul>
+</li>
+<li>Duplicated work
+<ul>
+<li>nneo</li>
+</ul>
+</li>
+<li>Out of scope
+<ul>
+<li>rsunlight</li>
+</ul>
+</li>
+</ul>
+<p>Footnotes:</p>
+<div class="footnotes" role="doc-endnotes">
+<hr>
+<ol>
+<li id="fn:1">
+<p>although, <code>geojsonsf</code> is very successful so I think my projects were just crap I guess :)&#160;<a href="#fnref:1" class="footnote-backref" role="doc-backlink">&#x21a9;&#xfe0e;</a></p>
+</li>
+</ol>
+</div>
+]]></content:encoded>
     </item>
     <item>
       <title>taxizedb: an update</title>
@@ -76,6 +688,78 @@ CRAN has the concept of an archived package. That is, the namespace for a packag
       <guid>http://localhost:1313/2020/08/taxizedb-update/</guid>
       <description>taxizedb arose from pain in using taxize when dealing with large amounts of data in a single request or doing a lot of requests of any data size. taxize works with remote data sources on the web, so there&amp;rsquo;s a number of issues that can slow the response down: internet speed, server response speed (was a response already cached or not; or do they even use caching), etc.
 The idea with taxizedb was to allow users to do the same things as taxize allows, but much faster by accessing the entire database for a data source on their own computer.</description>
+      <content:encoded><![CDATA[<p><a href="https://github.com/ropensci/taxizedb">taxizedb</a> arose from pain in using <a href="https://github.com/ropensci/taxize">taxize</a> when dealing with large amounts of data in a single request or doing a lot of requests of any data size. <a href="https://github.com/ropensci/taxize">taxize</a> works with remote data sources on the web, so there&rsquo;s a number of issues that can slow the response down: internet speed, server response speed (was a response already cached or not; or do they even use caching), etc.</p>
+<p>The idea with <a href="https://github.com/ropensci/taxizedb">taxizedb</a> was to allow users to do the same things as taxize allows, but much faster by accessing the entire database for a data source on their own computer. The previous versions of taxizedb used a variety of different databases (MySQL/MariaDB, PostgreSQL, SQLite), so the technical barrier to entry was pretty high. In the newest version just released, we&rsquo;ve drastically simplified the database situation, among other things.</p>
+<p><a href="https://github.com/ropensci/taxadb">taxadb</a> was developed as an alternative approach to taxizedb and should also be considered when dealing with taxonomic names. It takes a different approach for the data, with tabular files hosted on GitHub releases, but is similar in that after downloading the data is put into a SQL database, SQLite by default (with other options for databases). taxadb user facing functions are different from those in taxizedb, and largely don&rsquo;t overlap.</p>
+<p>taxizedb quick links:</p>
+<ul>
+<li><a href="https://github.com/ropensci/taxizedb">taxizedb repo</a></li>
+<li><a href="https://cloud.r-project.org/web/packages/taxizedb/">taxizedb on cran</a></li>
+<li><a href="https://ropensci.github.io/taxizedb/">taxizedb docs</a></li>
+</ul>
+<p>Install the latest version, if you don&rsquo;t get <code>v0.2.0</code> with</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-r" data-lang="r"><span style="display:flex;"><span><span style="color:#a6e22e">install.packages</span>(<span style="color:#e6db74">&#34;taxizedb&#34;</span>)
+</span></span></code></pre></div><p>then use</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-r" data-lang="r"><span style="display:flex;"><span><span style="color:#a6e22e">install.packages</span>(<span style="color:#e6db74">&#34;taxizedb&#34;</span>, repos <span style="color:#f92672">=</span> <span style="color:#e6db74">&#34;https://dev.ropensci.org&#34;</span>)
+</span></span></code></pre></div><p>Load the package</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-r" data-lang="r"><span style="display:flex;"><span><span style="color:#a6e22e">library</span>(taxizedb)
+</span></span></code></pre></div><!-- raw HTML omitted -->
+<h2 id="all-sqlite">All SQLite!</h2>
+<p>SQLite is shipped in nearly every device these days, so taxizedb now uses only SQLite for the database backend for each data source. Every person that installs taxizedb should have SQLite already installed. In addition, there&rsquo;s no usernames/passwords/ports to setup with. How we&rsquo;ve accomplished this is partly through automation:</p>
+<ul>
+<li>NCBI: SQLite built within R from tabular files</li>
+<li>ITIS: they provide a SQLite dump</li>
+<li>Plantlist: is no longer updated; we build a SQLite manually from csv files</li>
+<li>COL: a SQLite is built once a day via GitHub Actions</li>
+<li>GBIF: a SQLite is built once a day via GitHub Actions</li>
+<li>Wikidata: SQLite built within R from a tabular file</li>
+<li>World Flora Online: SQLite built within R from a tabular file</li>
+</ul>
+<p>Some of the databases have indices to speed up queries, making them a bit larger relative to no indices, but these days most people likely are willing to use up a little more disk space on their computer to have faster queries.</p>
+<!-- raw HTML omitted -->
+<h2 id="new-data-sources">New data sources</h2>
+<p>Three new data sources were added:</p>
+<ul>
+<li><a href="https://www.ncbi.nlm.nih.gov/taxonomy">NCBI taxonomy</a> - all of this work was done by <a href="https://github.com/arendsee">Zebulun Arendsee</a></li>
+<li><a href="https://www.worldfloraonline.org/">World Flora Online</a> - the replacement for The Plant List</li>
+<li><a href="https://zenodo.org/record/1213477">Wikidata</a> - the table <code>wikidata-taxon-info</code>, extracted taxon objects from Wikidata, last updated April 2018, on Zenodo</li>
+</ul>
+<!-- raw HTML omitted -->
+<h2 id="new-functions-taxize-equivalents">New functions: taxize equivalents</h2>
+<p>Three new high level functions matching those in taxize were added: <code>children</code>, <code>classification</code>, <code>downstream</code>. The taxize version of those functions are still good for smaller requests, but with larger requests, its probably best to use taxizedb. The most common problem where taxize becomes frustrating is with <code>downstream</code> where a user wants all species within a high taxonomic rank like phylum. The original work for these functions was done by <a href="https://github.com/arendsee">Zebulun Arendsee</a>.</p>
+<p>Here&rsquo;s a comparison of taxize vs. taxizedb with <code>downstream</code> - getting all species within the genus <em>Bombus</em> (bumble bees)</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-r" data-lang="r"><span style="display:flex;"><span>id_tx <span style="color:#f92672">&lt;-</span> taxize<span style="color:#f92672">::</span><span style="color:#a6e22e">get_tsn</span>(<span style="color:#e6db74">&#34;Bombus&#34;</span>)
+</span></span><span style="display:flex;"><span><span style="color:#a6e22e">system.time</span>(taxize<span style="color:#f92672">::</span><span style="color:#a6e22e">downstream</span>(id_tx, db <span style="color:#f92672">=</span> <span style="color:#e6db74">&#34;itis&#34;</span>, downto <span style="color:#f92672">=</span> <span style="color:#e6db74">&#34;species&#34;</span>))
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt;    user  system elapsed </span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt;   2.144   0.130  20.533</span>
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>id_txdb <span style="color:#f92672">&lt;-</span> taxizedb<span style="color:#f92672">::</span><span style="color:#a6e22e">name2taxid</span>(<span style="color:#e6db74">&#39;Bombus&#39;</span>, db <span style="color:#f92672">=</span> <span style="color:#e6db74">&#34;itis&#34;</span>)
+</span></span><span style="display:flex;"><span><span style="color:#a6e22e">system.time</span>(taxizedb<span style="color:#f92672">::</span><span style="color:#a6e22e">downstream</span>(id_txdb, db <span style="color:#f92672">=</span> <span style="color:#e6db74">&#34;itis&#34;</span>, downto <span style="color:#f92672">=</span> <span style="color:#e6db74">&#34;species&#34;</span>))
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt;    user  system elapsed </span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt;   0.132   0.051   0.186</span>
+</span></span></code></pre></div><!-- raw HTML omitted -->
+<p>In addition, three new &ldquo;mapping&rdquo; functions were added that are similar to those in taxize, but with different names: <code>name2taxid</code> (scientific or common name to taxonomy ID); <code>taxid2name</code> (taxonomy ID to scientific name); <code>taxid2rank</code> (taxonomy ID to rank).</p>
+<p>We saw <code>name2taxid</code> above. Below we get the taxonomic ID for COL, ITIS and GBIF for <em>Bombus</em></p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-r" data-lang="r"><span style="display:flex;"><span><span style="color:#a6e22e">name2taxid</span>(<span style="color:#e6db74">&#39;Bombus&#39;</span>, db <span style="color:#f92672">=</span> <span style="color:#e6db74">&#34;col&#34;</span>)
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; [1] &#34;3993765&#34;</span>
+</span></span><span style="display:flex;"><span><span style="color:#a6e22e">name2taxid</span>(<span style="color:#e6db74">&#39;Bombus&#39;</span>, db <span style="color:#f92672">=</span> <span style="color:#e6db74">&#34;itis&#34;</span>)
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; [1] &#34;154397&#34;</span>
+</span></span><span style="display:flex;"><span><span style="color:#a6e22e">name2taxid</span>(<span style="color:#e6db74">&#39;Bombus&#39;</span>, db <span style="color:#f92672">=</span> <span style="color:#e6db74">&#34;gbif&#34;</span>)
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; [1] &#34;1340278&#34;</span>
+</span></span></code></pre></div><p>Get the scientific name from a taxonomic ID</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-r" data-lang="r"><span style="display:flex;"><span><span style="color:#a6e22e">taxid2name</span>(<span style="color:#ae81ff">3993765</span>, db <span style="color:#f92672">=</span> <span style="color:#e6db74">&#34;col&#34;</span>)
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; [1] &#34;Bombus&#34;</span>
+</span></span><span style="display:flex;"><span><span style="color:#a6e22e">taxid2rank</span>(<span style="color:#ae81ff">3993765</span>, db <span style="color:#f92672">=</span> <span style="color:#e6db74">&#34;col&#34;</span>)
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; [1] &#34;genus&#34;</span>
+</span></span></code></pre></div><p>These functions are quite fast too:</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-r" data-lang="r"><span style="display:flex;"><span>x <span style="color:#f92672">&lt;-</span> taxize<span style="color:#f92672">::</span><span style="color:#a6e22e">names_list</span>(rank <span style="color:#f92672">=</span> <span style="color:#e6db74">&#34;species&#34;</span>, size <span style="color:#f92672">=</span> <span style="color:#ae81ff">10000L</span>)
+</span></span><span style="display:flex;"><span><span style="color:#a6e22e">system.time</span>(<span style="color:#a6e22e">name2taxid</span>(x, db <span style="color:#f92672">=</span> <span style="color:#e6db74">&#34;gbif&#34;</span>, out_type <span style="color:#f92672">=</span> <span style="color:#e6db74">&#34;summary&#34;</span>))
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt;    user  system elapsed </span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt;   0.096   0.206   1.053</span>
+</span></span></code></pre></div><!-- raw HTML omitted -->
+<h2 id="thoughts">Thoughts?</h2>
+<p>Get in touch if you have any feedback at <a href="https://github.com/ropensci/taxizedb/issues">https://github.com/ropensci/taxizedb/issues</a></p>
+]]></content:encoded>
     </item>
     <item>
       <title>how many parameters?</title>
@@ -85,6 +769,153 @@ The idea with taxizedb was to allow users to do the same things as taxize allows
       <description>Functions can have no parameters, or have a lot of parameters, or somewhere in between. How many parameters is too many? Does it even matter how many parameters there are in a function?
 There&amp;rsquo;s AFAIK no &amp;ldquo;correct&amp;rdquo; answer to this question. And surely the &amp;ldquo;best practice&amp;rdquo; varies among programming languages. What do folks say about this and what should we be doing in R?
 From other languages Many of the blog posts and SO posts on this topic cite the book Clean Code by &amp;ldquo;Uncle Bob&amp;rdquo;.</description>
+      <content:encoded><![CDATA[<p>Functions can have no parameters, or have a lot of parameters, or somewhere
+in between. How many parameters is too many? Does it even matter how many
+parameters there are in a function?</p>
+<p>There&rsquo;s AFAIK no &ldquo;correct&rdquo; answer to this question. And surely the &ldquo;best
+practice&rdquo; varies among programming languages. What do folks say about
+this and what should we be doing in R?</p>
+<h2 id="from-other-languages">From other languages</h2>
+<p>Many of the blog posts and SO posts on this topic cite the book
+<a href="https://www.goodreads.com/book/show/3735293-clean-code">Clean Code</a> by &ldquo;Uncle Bob&rdquo;. I&rsquo;ve not read the book, but
+it sounds worth a read.</p>
+<p><a href="https://hackernoon.com/object-oriented-tricks-3-death-by-arguments-d070ac86d996">Some of the arguments go like</a>: <em>too many arguments can</em> &hellip;</p>
+<ul>
+<li>makes it easier to pass arguments in the wrong order</li>
+<li>reduce code readability</li>
+<li>make it harder to test a function; it’s difficult/time consuming to
+test all various combinations of arguments work together</li>
+</ul>
+<p>An <a href="https://www.exakat.io/how-many-parameters-is-too-many/">analysis was done</a> in 2018 of php open source projects, and they
+found that the most common number of parameters was 5; functions with 10
+parameters or more were found in &lt;20% of projects.</p>
+<p>On the other side, <a href="https://stackoverflow.com/a/175087/1091766">some</a> argue that
+you shouldn&rsquo;t worry so much about the correct
+number of parameters, but rather make sure that all the parameters make sense,
+and are documented and tested.</p>
+<p>To the extreme, a number of people <a href="https://stackoverflow.com/a/175035/1091766">quote the Clean Code book</a>:</p>
+<blockquote>
+<p>The ideal number of arguments for a function is zero</p>
+</blockquote>
+<p>Some general threads on this topic:</p>
+<ul>
+<li><a href="https://softwareengineering.stackexchange.com/questions/145055/are-there-guidelines-on-how-many-parameters-a-function-should-accept">Software engineering Stackexchange</a></li>
+<li><a href="https://stackoverflow.com/questions/174968/how-many-parameters-are-too-many">Stackoverflow</a></li>
+</ul>
+<h2 id="data">Data</h2>
+<p>Data for this post, created below, is in the github repo <a href="https://github.com/sckott/howmanyparams">sckott/howmanyparams</a>.</p>
+<h2 id="what-about-r">What about R?</h2>
+<p>What do the data show in the R language? Just like the blog post on php above,
+let&rsquo;s have a look at a lot of R packages to get a general data informed
+consensus on how many parameters are used per function.</p>
+<p>It&rsquo;s incredibly likely that there is a better way to do what I&rsquo;ve done
+below; but this is my hacky way of getting to the data.</p>
+<p>What I&rsquo;ve done in words:</p>
+<ul>
+<li>Get a list of all available package names on CRAN</li>
+<li>Install about half of them (didn&rsquo;t do all cause it takes time and
+I don&rsquo;t think I need all 15K packages to get a good answer)</li>
+<li>List the exported functions in each package</li>
+<li>Count the arguments (parameters) per function in each package</li>
+<li>Visualize the results</li>
+</ul>
+<p>I ended up using 82489 functions across 4777 packages</p>
+<p>Load packages</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-r" data-lang="r"><span style="display:flex;"><span><span style="color:#a6e22e">library</span>(plyr)
+</span></span><span style="display:flex;"><span><span style="color:#a6e22e">library</span>(dplyr)
+</span></span><span style="display:flex;"><span><span style="color:#a6e22e">library</span>(tibble)
+</span></span><span style="display:flex;"><span><span style="color:#a6e22e">library</span>(ggplot2)
+</span></span></code></pre></div><p>Use a different path from my actual R library location to not pollute
+my current setup, and put binaries into a temporary directory
+so they are cleaned up on exiting R.</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-r" data-lang="r"><span style="display:flex;"><span>path <span style="color:#f92672">&lt;-</span> <span style="color:#e6db74">&#34;/some/path&#34;</span>
+</span></span><span style="display:flex;"><span>binaries <span style="color:#f92672">&lt;-</span> <span style="color:#a6e22e">file.path</span>(<span style="color:#a6e22e">tempdir</span>(), <span style="color:#e6db74">&#34;binaries&#34;</span>)
+</span></span><span style="display:flex;"><span><span style="color:#a6e22e">dir.create</span>(path)
+</span></span><span style="display:flex;"><span><span style="color:#a6e22e">dir.create</span>(binaries)
+</span></span><span style="display:flex;"><span><span style="color:#a6e22e">.libPaths</span>(path)
+</span></span><span style="display:flex;"><span><span style="color:#a6e22e">.libPaths</span>() <span style="color:#75715e"># check that the path was set</span>
+</span></span></code></pre></div><p>Function <code>do_one()</code> to run on each package:</p>
+<ul>
+<li>try to load the package</li>
+<li>if not found install it</li>
+<li>get a vector of the exported functions in the package</li>
+<li>count how many arguments each function has, make a data.frame</li>
+<li>unload the package namespace</li>
+</ul>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-r" data-lang="r"><span style="display:flex;"><span>do_one <span style="color:#f92672">&lt;-</span> <span style="color:#66d9ef">function</span>(pkg) {
+</span></span><span style="display:flex;"><span>  <span style="color:#66d9ef">if</span> (<span style="color:#f92672">!</span><span style="color:#a6e22e">requireNamespace</span>(pkg))
+</span></span><span style="display:flex;"><span>    <span style="color:#a6e22e">install.packages</span>(pkg, quiet<span style="color:#f92672">=</span><span style="color:#66d9ef">TRUE</span>, verbose<span style="color:#f92672">=</span><span style="color:#66d9ef">FALSE</span>, destdir <span style="color:#f92672">=</span> binaries)
+</span></span><span style="display:flex;"><span>  <span style="color:#a6e22e">on.exit</span>(<span style="color:#a6e22e">unloadNamespace</span>(pkg))
+</span></span><span style="display:flex;"><span>  funs <span style="color:#f92672">&lt;-</span> <span style="color:#a6e22e">paste0</span>(pkg, <span style="color:#e6db74">&#34;::&#34;</span>, <span style="color:#a6e22e">getNamespaceExports</span>(pkg))
+</span></span><span style="display:flex;"><span>  <span style="color:#a6e22e">enframe</span>(<span style="color:#a6e22e">vapply</span>(funs, <span style="color:#66d9ef">function</span>(w) {
+</span></span><span style="display:flex;"><span>    tt <span style="color:#f92672">&lt;-</span> <span style="color:#a6e22e">tryCatch</span>(<span style="color:#a6e22e">parse</span>(text <span style="color:#f92672">=</span> w), error <span style="color:#f92672">=</span> <span style="color:#66d9ef">function</span>(e) e)
+</span></span><span style="display:flex;"><span>    <span style="color:#66d9ef">if</span> (<span style="color:#f92672">!</span><span style="color:#a6e22e">inherits</span>(tt, <span style="color:#e6db74">&#34;error&#34;</span>)) <span style="color:#a6e22e">length</span>(<span style="color:#a6e22e">suppressWarnings</span>(<span style="color:#a6e22e">formals</span>(<span style="color:#a6e22e">eval</span>(tt)))) <span style="color:#66d9ef">else</span> <span style="color:#ae81ff">0</span>
+</span></span><span style="display:flex;"><span>  }, <span style="color:#a6e22e">numeric</span>(<span style="color:#ae81ff">1</span>)))
+</span></span><span style="display:flex;"><span>}
+</span></span><span style="display:flex;"><span>do_one_safe <span style="color:#f92672">&lt;-</span> <span style="color:#a6e22e">failwith</span>(<span style="color:#a6e22e">tibble</span>(), do_one)
+</span></span></code></pre></div><p>Get a list of packages. First time running through I used <code>available.packages()</code> which
+gets you all available packages. After installing packages though, I used
+<code>installed.packages()</code> to get the list of packages I already installed.</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-r" data-lang="r"><span style="display:flex;"><span><span style="color:#75715e"># pkg_names &lt;- unname(available.packages()[,&#34;Package&#34;])</span>
+</span></span><span style="display:flex;"><span>pkg_names <span style="color:#f92672">&lt;-</span> <span style="color:#a6e22e">unname</span>(<span style="color:#a6e22e">installed.packages</span>()[,<span style="color:#e6db74">&#34;Package&#34;</span>])
+</span></span></code></pre></div><p>Run each package through the <code>do_one()</code> function. This had to be stopped and
+re-started a few times. This failed for quite a few packages - I wasn&rsquo;t trying to get every single package, just a large set of packages to get an idea of what packages do on average.</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-r" data-lang="r"><span style="display:flex;"><span>tbls <span style="color:#f92672">&lt;-</span> stats<span style="color:#f92672">::</span><span style="color:#a6e22e">setNames</span>(<span style="color:#a6e22e">lapply</span>(pkg_names, do_one_safe), pkg_names)
+</span></span></code></pre></div><p>Combine list of data.frame&rsquo;s into one data.frame</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-r" data-lang="r"><span style="display:flex;"><span>df <span style="color:#f92672">&lt;-</span> dplyr<span style="color:#f92672">::</span><span style="color:#a6e22e">bind_rows</span>(tbls, .id <span style="color:#f92672">=</span> <span style="color:#e6db74">&#34;pkg&#34;</span>)
+</span></span><span style="display:flex;"><span>readr<span style="color:#f92672">::</span><span style="color:#a6e22e">write_csv</span>(df, <span style="color:#e6db74">&#34;params_per_fxn.csv&#34;</span>)
+</span></span></code></pre></div><blockquote>
+<p>note: you can get this data at <a href="https://github.com/sckott/howmanyparams#how-many-parameters">sckott/howmanyparams</a></p>
+</blockquote>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-r" data-lang="r"><span style="display:flex;"><span>df <span style="color:#f92672">&lt;-</span> readr<span style="color:#f92672">::</span><span style="color:#a6e22e">read_csv</span>(<span style="color:#e6db74">&#34;~/params_per_fxn.csv&#34;</span>)
+</span></span></code></pre></div><p>Visualize</p>
+<p><strong>All functions across all packages</strong></p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-r" data-lang="r"><span style="display:flex;"><span><span style="color:#a6e22e">ggplot</span>(df, <span style="color:#a6e22e">aes</span>(x <span style="color:#f92672">=</span> value)) <span style="color:#f92672">+</span>
+</span></span><span style="display:flex;"><span>  <span style="color:#a6e22e">geom_histogram</span>(bins <span style="color:#f92672">=</span> <span style="color:#ae81ff">30</span>) <span style="color:#f92672">+</span>
+</span></span><span style="display:flex;"><span>  <span style="color:#a6e22e">scale_x_continuous</span>(limits <span style="color:#f92672">=</span> <span style="color:#a6e22e">c</span>(<span style="color:#ae81ff">0</span>, <span style="color:#ae81ff">30</span>)) <span style="color:#f92672">+</span>
+</span></span><span style="display:flex;"><span>  <span style="color:#a6e22e">theme_grey</span>(base_size <span style="color:#f92672">=</span> <span style="color:#ae81ff">15</span>)
+</span></span></code></pre></div><p><img loading="lazy" src="/2020-02-10-how-many-parameters/unnamed-chunk-5-1.png" alt="plot of chunk unnamed-chunk-5"  />
+</p>
+<p>The mean number of arguments per function across all packages was 4.4,
+and the most common value was 3. The maximum number of arguments was
+209, and there were 5306 functions
+(or 6.4%) with zero
+parameters.</p>
+<p><strong>Mean params across functions for each pkg</strong></p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-r" data-lang="r"><span style="display:flex;"><span>df_means <span style="color:#f92672">&lt;-</span> <span style="color:#a6e22e">group_by</span>(df, pkg) <span style="color:#f92672">%&gt;%</span> 
+</span></span><span style="display:flex;"><span>  <span style="color:#a6e22e">summarise</span>(mean_params <span style="color:#f92672">=</span> <span style="color:#a6e22e">mean</span>(value, na.rm<span style="color:#f92672">=</span><span style="color:#66d9ef">TRUE</span>)) <span style="color:#f92672">%&gt;%</span> 
+</span></span><span style="display:flex;"><span>  <span style="color:#a6e22e">ungroup</span>()
+</span></span><span style="display:flex;"><span><span style="color:#75715e"># arrange(df_means, desc(mean_params))</span>
+</span></span><span style="display:flex;"><span><span style="color:#a6e22e">ggplot</span>(df_means, <span style="color:#a6e22e">aes</span>(x <span style="color:#f92672">=</span> mean_params)) <span style="color:#f92672">+</span>
+</span></span><span style="display:flex;"><span>  <span style="color:#a6e22e">geom_histogram</span>(bins <span style="color:#f92672">=</span> <span style="color:#ae81ff">50</span>) <span style="color:#f92672">+</span>
+</span></span><span style="display:flex;"><span>  <span style="color:#a6e22e">scale_x_continuous</span>(limits <span style="color:#f92672">=</span> <span style="color:#a6e22e">c</span>(<span style="color:#ae81ff">0</span>, <span style="color:#ae81ff">30</span>)) <span style="color:#f92672">+</span>
+</span></span><span style="display:flex;"><span>  <span style="color:#a6e22e">theme_grey</span>(base_size <span style="color:#f92672">=</span> <span style="color:#ae81ff">15</span>)
+</span></span></code></pre></div><p><img loading="lazy" src="/2020-02-10-how-many-parameters/unnamed-chunk-6-1.png" alt="plot of chunk unnamed-chunk-6"  />
+</p>
+<p>Taking the mean within each package first pulls the number of arguments to the right some,
+with a mean of 5 arguments, and the most common value at 4.</p>
+<h2 id="thoughts">Thoughts</h2>
+<p>In terms of getting around the too many arguments thing, there&rsquo;s talk of
+using global variables, which seems like generally a bad idea; unless perhaps
+they are environment variables that are meant to be set by the user in
+non-interactive environments, etc.</p>
+<p>Other solutions are to use <code>...</code> in R, or similarly <code>**kwargs</code> or <code>*args</code> in Python (<a href="https://pythontips.com/2013/08/04/args-and-kwargs-in-python-explained/">ref.</a>), or
+the newly added <code>...</code> in Ruby (<a href="https://eregon.me/blog/2019/11/10/the-delegation-challenge-of-ruby27.html">ref</a>). With this approach you could have very few parameters
+defined in the function, and then internally within the function handle any parameter
+filtering, etc. The downside of this in R is that you don&rsquo;t get the automated
+checks making sure all function arguments are documented, and there&rsquo;s no documented
+arguments that don&rsquo;t exist in the function.</p>
+<p>I&rsquo;m not suggesting a solution is needed though; there&rsquo;s probably no right answer, but rather lots of opinions.</p>
+<p>Having said that, the average R function does use about 4 arguments, so if you
+keep your functions to around 4 arguments you&rsquo;ll be approaching the sort of
+consensus of a large number of R developers.</p>
+<p>Last, I should admit that some of the functions in my packages have quite a lot
+of parameters - which was sort of the motivation for this post - that is, to explore
+what most functions do. For example, <code>brranching::phylomatic</code> has 13 parameters,
+three functions in the <code>crevents</code> package have 24 parameters &hellip; and I wonder
+about these types of functions. Should I refactor? Or is it good enough to make
+sure these functions are thoroughly documented and tested?</p>
+]]></content:encoded>
     </item>
     <item>
       <title>finding truffles</title>
@@ -93,6 +924,133 @@ From other languages Many of the blog posts and SO posts on this topic cite the 
       <guid>http://localhost:1313/2020/01/test-truffles/</guid>
       <description>The bad thing about making software is that you can sometimes make it easier for someone to shoot themselves in the foot. The good thing about software is that you can make more software to help them not shoot a foot off.
 The R package vcr, an R port of the Ruby library of the same name, records and plays back HTTP requests. Some HTTP requests can have secrets (e.g., passwords, API keys, etc.</description>
+      <content:encoded><![CDATA[<p>The bad thing about making software is that you can sometimes make it easier
+for someone to shoot themselves in the foot. The good thing about software
+is that you can make more software to help them not shoot a foot off.</p>
+<p>The R package <a href="https://github.com/ropensci/vcr">vcr</a>, an R port of the <a href="https://github.com/vcr/vcr">Ruby library</a> of the same name,
+records and plays back HTTP requests. Some HTTP requests can have secrets (e.g.,
+passwords, API keys, etc.) in their requests and/or responses. These secrets
+can then accidentally end up on the Internet, where bad people may find them.
+These secrets are sometimes called &ldquo;truffles&rdquo;.</p>
+<p>There&rsquo;s a suite of tools out there for finding these truffles (e.g.,
+<a href="https://github.com/dxa4481/truffleHog">truffleHog</a>, <a href="https://github.com/awslabs/git-secrets">gitsecrets</a>) that use tools like regex and entropy.</p>
+<p>Despite there being existing tools, users tend to use things that are
+built in the language(s) they know; that are easy to incorporate into
+their existing workflows. Towards this end, I&rsquo;ve been working on a new
+R package <a href="https://github.com/ropenscilabs/trufflesniffer">trufflesniffer</a>.</p>
+<p>trufflesniffer doesn&rsquo;t do any fancy entropy stuff, and doesn&rsquo;t try to
+find secrets without any informed knowledge. Rather, the user supplies
+the secrets that they want to look for and trufflesniffer looks for
+them. In the future I&rsquo;d look to see if it can be used without
+any user inputs.</p>
+<p>terminology:</p>
+<ul>
+<li>sniff: search for a secret</li>
+</ul>
+<p>links:</p>
+<ul>
+<li>src: <a href="https://github.com/ropenscilabs/trufflesniffer">https://github.com/ropenscilabs/trufflesniffer</a></li>
+<li>docs: <a href="https://docs.ropensci.org/trufflesniffer">https://docs.ropensci.org/trufflesniffer</a></li>
+</ul>
+<h2 id="install">Install</h2>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-r" data-lang="r"><span style="display:flex;"><span>remotes<span style="color:#f92672">::</span><span style="color:#a6e22e">install_github</span>(<span style="color:#e6db74">&#34;ropenscilabs/trufflesniffer&#34;</span>)
+</span></span></code></pre></div><div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-r" data-lang="r"><span style="display:flex;"><span><span style="color:#a6e22e">library</span>(trufflesniffer)
+</span></span></code></pre></div><h2 id="directory">directory</h2>
+<p>You can &ldquo;sniff&rdquo; a file directory or a package: <code>sniff_one()</code></p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-r" data-lang="r"><span style="display:flex;"><span><span style="color:#75715e"># crete a directory</span>
+</span></span><span style="display:flex;"><span><span style="color:#a6e22e">Sys.setenv</span>(A_KEY <span style="color:#f92672">=</span> <span style="color:#e6db74">&#34;a8d#d%d7g7g4012a4s2&#34;</span>)
+</span></span><span style="display:flex;"><span>path <span style="color:#f92672">&lt;-</span> <span style="color:#a6e22e">file.path</span>(<span style="color:#a6e22e">tempdir</span>(), <span style="color:#e6db74">&#34;foobar&#34;</span>)
+</span></span><span style="display:flex;"><span><span style="color:#a6e22e">dir.create</span>(path)
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e"># no matches</span>
+</span></span><span style="display:flex;"><span><span style="color:#a6e22e">sniff_one</span>(path, <span style="color:#a6e22e">Sys.getenv</span>(<span style="color:#e6db74">&#34;A_KEY&#34;</span>))
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; named list()</span>
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e"># add files with the secret</span>
+</span></span><span style="display:flex;"><span><span style="color:#a6e22e">cat</span>(<span style="color:#a6e22e">paste0</span>(<span style="color:#e6db74">&#34;foo\nbar\nhello\nworld\n&#34;</span>, 
+</span></span><span style="display:flex;"><span>    <span style="color:#a6e22e">Sys.getenv</span>(<span style="color:#e6db74">&#34;A_KEY&#34;</span>), <span style="color:#e6db74">&#34;\n&#34;</span>), file <span style="color:#f92672">=</span> <span style="color:#a6e22e">file.path</span>(path, <span style="color:#e6db74">&#34;stuff.R&#34;</span>))
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e"># matches! prints the line number where the key was found</span>
+</span></span><span style="display:flex;"><span><span style="color:#a6e22e">sniff_one</span>(path, <span style="color:#a6e22e">Sys.getenv</span>(<span style="color:#e6db74">&#34;A_KEY&#34;</span>))
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; $stuff.R</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; [1] 5</span>
+</span></span></code></pre></div><h2 id="package">package</h2>
+<p>sniff through a whole package</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-r" data-lang="r"><span style="display:flex;"><span>foo <span style="color:#f92672">&lt;-</span> <span style="color:#66d9ef">function</span>(key <span style="color:#f92672">=</span> <span style="color:#66d9ef">NULL</span>) {
+</span></span><span style="display:flex;"><span>  <span style="color:#66d9ef">if</span> (<span style="color:#a6e22e">is.null</span>(key)) key <span style="color:#f92672">&lt;-</span> <span style="color:#e6db74">&#34;mysecretkey&#34;</span>
+</span></span><span style="display:flex;"><span>}
+</span></span><span style="display:flex;"><span><span style="color:#a6e22e">package.skeleton</span>(name <span style="color:#f92672">=</span> <span style="color:#e6db74">&#34;mypkg&#34;</span>, list <span style="color:#f92672">=</span> <span style="color:#e6db74">&#34;foo&#34;</span>, path <span style="color:#f92672">=</span> <span style="color:#a6e22e">tempdir</span>())
+</span></span><span style="display:flex;"><span>pkgpath <span style="color:#f92672">&lt;-</span> <span style="color:#a6e22e">file.path</span>(<span style="color:#a6e22e">tempdir</span>(), <span style="color:#e6db74">&#34;mypkg&#34;</span>)
+</span></span><span style="display:flex;"><span><span style="color:#a6e22e">list.files</span>(pkgpath, recursive<span style="color:#f92672">=</span><span style="color:#66d9ef">TRUE</span>)
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; [1] &#34;DESCRIPTION&#34;          &#34;man/foo.Rd&#34;           &#34;man/mypkg-package.Rd&#34;</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; [4] &#34;NAMESPACE&#34;            &#34;R/foo.R&#34;              &#34;Read-and-delete-me&#34;</span>
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e"># check the package</span>
+</span></span><span style="display:flex;"><span><span style="color:#a6e22e">sniff_secrets_pkg</span>(dir <span style="color:#f92672">=</span> pkgpath, secrets <span style="color:#f92672">=</span> <span style="color:#a6e22e">c</span>(<span style="color:#e6db74">&#34;mysecretkey&#34;</span>))
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; $mysecretkey</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; $mysecretkey$foo.R</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; [1] 3</span>
+</span></span></code></pre></div><h2 id="fixtures">fixtures</h2>
+<p>sniff specifically in a package&rsquo;s test fixtures.</p>
+<p>Create a package</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-r" data-lang="r"><span style="display:flex;"><span>foo <span style="color:#f92672">&lt;-</span> <span style="color:#66d9ef">function</span>(key <span style="color:#f92672">=</span> <span style="color:#66d9ef">NULL</span>) {
+</span></span><span style="display:flex;"><span>  <span style="color:#66d9ef">if</span> (<span style="color:#a6e22e">is.null</span>(key)) key <span style="color:#f92672">&lt;-</span> <span style="color:#e6db74">&#34;a2s323223asd423adsf4&#34;</span>
+</span></span><span style="display:flex;"><span>}
+</span></span><span style="display:flex;"><span><span style="color:#a6e22e">package.skeleton</span>(<span style="color:#e6db74">&#34;herpkg&#34;</span>, list <span style="color:#f92672">=</span> <span style="color:#e6db74">&#34;foo&#34;</span>, path <span style="color:#f92672">=</span> <span style="color:#a6e22e">tempdir</span>())
+</span></span><span style="display:flex;"><span>pkgpath <span style="color:#f92672">&lt;-</span> <span style="color:#a6e22e">file.path</span>(<span style="color:#a6e22e">tempdir</span>(), <span style="color:#e6db74">&#34;herpkg&#34;</span>)
+</span></span><span style="display:flex;"><span><span style="color:#a6e22e">dir.create</span>(<span style="color:#a6e22e">file.path</span>(pkgpath, <span style="color:#e6db74">&#34;tests/testthat&#34;</span>), recursive <span style="color:#f92672">=</span> <span style="color:#66d9ef">TRUE</span>)
+</span></span><span style="display:flex;"><span><span style="color:#a6e22e">dir.create</span>(<span style="color:#a6e22e">file.path</span>(pkgpath, <span style="color:#e6db74">&#34;tests/fixtures&#34;</span>), recursive <span style="color:#f92672">=</span> <span style="color:#66d9ef">TRUE</span>)
+</span></span><span style="display:flex;"><span><span style="color:#a6e22e">cat</span>(<span style="color:#e6db74">&#34;library(vcr)
+</span></span></span><span style="display:flex;"><span><span style="color:#e6db74">vcr::vcr_configure(&#39;../fixtures&#39;, 
+</span></span></span><span style="display:flex;"><span><span style="color:#e6db74">  filter_sensitive_data = list(&#39;&lt;&lt;mytoken&gt;&gt;&#39; = Sys.getenv(&#39;MY_KEY&#39;))
+</span></span></span><span style="display:flex;"><span><span style="color:#e6db74">)\n&#34;</span>, file <span style="color:#f92672">=</span> <span style="color:#a6e22e">file.path</span>(pkgpath, <span style="color:#e6db74">&#34;tests/testthat/helper-herpkg.R&#34;</span>))
+</span></span><span style="display:flex;"><span><span style="color:#a6e22e">cat</span>(<span style="color:#e6db74">&#34;a2s323223asd423adsf4\n&#34;</span>, 
+</span></span><span style="display:flex;"><span>  file <span style="color:#f92672">=</span> <span style="color:#a6e22e">file.path</span>(pkgpath, <span style="color:#e6db74">&#34;tests/fixtures/foo.yml&#34;</span>))
+</span></span><span style="display:flex;"><span><span style="color:#75715e"># check that you have a pkg at herpkg</span>
+</span></span><span style="display:flex;"><span><span style="color:#a6e22e">list.files</span>(pkgpath)
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; [1] &#34;DESCRIPTION&#34;        &#34;man&#34;                &#34;NAMESPACE&#34;         </span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; [4] &#34;R&#34;                  &#34;Read-and-delete-me&#34; &#34;tests&#34;</span>
+</span></span><span style="display:flex;"><span><span style="color:#a6e22e">list.files</span>(<span style="color:#a6e22e">file.path</span>(pkgpath, <span style="color:#e6db74">&#34;tests/testthat&#34;</span>))
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; [1] &#34;helper-herpkg.R&#34;</span>
+</span></span><span style="display:flex;"><span><span style="color:#a6e22e">cat</span>(<span style="color:#a6e22e">readLines</span>(<span style="color:#a6e22e">file.path</span>(pkgpath, <span style="color:#e6db74">&#34;tests/testthat/helper-herpkg.R&#34;</span>)),
+</span></span><span style="display:flex;"><span>  sep <span style="color:#f92672">=</span> <span style="color:#e6db74">&#34;\n&#34;</span>)
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; library(vcr)</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; vcr::vcr_configure(&#39;../fixtures&#39;, </span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt;   filter_sensitive_data = list(&#39;&lt;&lt;mytoken&gt;&gt;&#39; = Sys.getenv(&#39;MY_KEY&#39;))</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; )</span>
+</span></span><span style="display:flex;"><span><span style="color:#a6e22e">list.files</span>(<span style="color:#a6e22e">file.path</span>(pkgpath, <span style="color:#e6db74">&#34;tests/fixtures&#34;</span>))
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; [1] &#34;foo.yml&#34;</span>
+</span></span><span style="display:flex;"><span><span style="color:#a6e22e">readLines</span>(<span style="color:#a6e22e">file.path</span>(pkgpath, <span style="color:#e6db74">&#34;tests/fixtures/foo.yml&#34;</span>))
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; [1] &#34;a2s323223asd423adsf4&#34;</span>
+</span></span></code></pre></div><p>Check the package</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-r" data-lang="r"><span style="display:flex;"><span><span style="color:#a6e22e">Sys.setenv</span>(<span style="color:#e6db74">&#39;MY_KEY&#39;</span> <span style="color:#f92672">=</span> <span style="color:#e6db74">&#39;a2s323223asd423adsf4&#39;</span>)
+</span></span><span style="display:flex;"><span><span style="color:#a6e22e">sniff_secrets_fixtures</span>(pkgpath)
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; $MY_KEY</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; $MY_KEY$foo.yml</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; [1] 1</span>
+</span></span></code></pre></div><h2 id="sniffer">sniffer</h2>
+<p>The function <code>sniffer()</code> wraps the function <code>sniff_secrets_fixtures()</code> and
+pretty prints to optimize non-interactive use. Run from within R or from the
+command line non-interactively.</p>
+<p>Example where a secret is found:</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-r" data-lang="r"><span style="display:flex;"><span><span style="color:#a6e22e">sniffer</span>(pkgpath)
+</span></span></code></pre></div><p><img loading="lazy" src="/2020-01-30-test-truffles/found.png" alt="found"  />
+</p>
+<p>Example where a secret is not found:</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-r" data-lang="r"><span style="display:flex;"><span><span style="color:#a6e22e">Sys.unsetenv</span>(<span style="color:#e6db74">&#39;MY_KEY&#39;</span>)
+</span></span><span style="display:flex;"><span><span style="color:#a6e22e">sniffer</span>(pkgpath)
+</span></span></code></pre></div><p><img loading="lazy" src="/2020-01-30-test-truffles/notfound.png" alt="found"  />
+</p>
+<h2 id="to-do">To do</h2>
+<p>There&rsquo;s more to do. trufflesniffer hasn&rsquo;t been tested thoroughly yet; I&rsquo;ll do
+more testing to make the experience better. In addition, it&rsquo;d probably be
+best to integrate this into the R vcr package so that the user doesn&rsquo;t have to
+take an extra step to make sure they aren&rsquo;t going to put any secrets on
+the web.</p>
+<hr>
+<!-- raw HTML omitted -->
+<p>ack: trufflesniffer uses R packages <a href="https://github.com/r-lib/cli">cli</a> and <a href="https://github.com/r-lib/crayon">crayon</a></p>
+]]></content:encoded>
     </item>
   </channel>
 </rss>

@@ -15,6 +15,163 @@
       <guid>http://localhost:1313/2013/01/tnrs-use-case/</guid>
       <description>taxize use case: Resolving species names when you have a lot of them Species names can be a pain in the ass, especially if you are an ecologist. We ecologists aren&amp;rsquo;t trained in taxonomy, yet we often end up with huge species lists. Of course we want to correct any spelling errors in the names, and get the newest names for our species, resolve any synonyms, etc.
 We are building tools into our R package taxize, that will let you check your species names to make sure they are correct.</description>
+      <content:encoded><![CDATA[<h3 id="__taxize-use-case-resolving-species-names-when-you-have-a-lot-of-them__"><strong>taxize use case: Resolving species names when you have a lot of them</strong></h3>
+<p>Species names can be a pain in the ass, especially if you are an ecologist. We ecologists aren&rsquo;t trained in taxonomy, yet we often end up with huge species lists.  Of course we want to correct any spelling errors in the names, and get the newest names for our species, resolve any synonyms, etc.</p>
+<p>We are building tools into our R package <a href="http://ropensci.github.com/taxize_/"><code>taxize</code></a>, that will let you check your species names to make sure they are correct.</p>
+<p>An important use case is when you have a lot of species. Someone wrote to us recently, saying that they had thousands of species, and they wanted to know how to check their species names efficiently in R.</p>
+<p>Below is an example of how to do this.</p>
+<h4 id="install-taxize">Install taxize</h4>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-r" data-lang="r"><span style="display:flex;"><span><span style="color:#75715e"># install_github(&#39;taxize_&#39;, &#39;ropensci&#39;) # install the GitHub version, not</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e"># the CRAN version, uncomment if you don&#39;t have it installed</span>
+</span></span><span style="display:flex;"><span><span style="color:#a6e22e">library</span>(taxize)
+</span></span></code></pre></div><h4 id="get-some-species-in-this-case-all-species-in-the-scrophulariaceae-family-from-theplantlistorg">Get some species, in this case all species in the Scrophulariaceae family from theplantlist.org</h4>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-r" data-lang="r"><span style="display:flex;"><span><span style="color:#a6e22e">tpl_get</span>(dir_ <span style="color:#f92672">=</span> <span style="color:#e6db74">&#34;~/foo2&#34;</span>, family <span style="color:#f92672">=</span> <span style="color:#e6db74">&#34;Scrophulariaceae&#34;</span>)
+</span></span></code></pre></div><div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-r" data-lang="r"><span style="display:flex;"><span><span style="color:#75715e">## Reading and writing csv files to ~/foo2...</span>
+</span></span></code></pre></div><div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-r" data-lang="r"><span style="display:flex;"><span>dat <span style="color:#f92672">&lt;-</span> <span style="color:#a6e22e">read.csv</span>(<span style="color:#e6db74">&#34;~/foo2/Scrophulariaceae.csv&#34;</span>)
+</span></span></code></pre></div><h4 id="lets-grab-the-species-and-concatenate-to-genus_species">Lets grab the species and concatenate to genus_species</h4>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-r" data-lang="r"><span style="display:flex;"><span>species <span style="color:#f92672">&lt;-</span> <span style="color:#a6e22e">as.character</span>(<span style="color:#a6e22e">ddply</span>(dat[, <span style="color:#a6e22e">c</span>(<span style="color:#e6db74">&#34;Genus&#34;</span>, <span style="color:#e6db74">&#34;Species&#34;</span>)], .(), transform, 
+</span></span><span style="display:flex;"><span>    gen_sp <span style="color:#f92672">=</span> <span style="color:#a6e22e">as.factor</span>(<span style="color:#a6e22e">paste</span>(Genus, Species, sep <span style="color:#f92672">=</span> <span style="color:#e6db74">&#34; &#34;</span>)))[, <span style="color:#ae81ff">4</span>])
+</span></span></code></pre></div><h4 id="its-better-to-do-many-smaller-calls-to-a-web-api-instead-of-few-big-ones-to-be-nice-to-the-database-maintainers">It&rsquo;s better to do many smaller calls to a web API instead of few big ones to be nice to the database maintainers.</h4>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-r" data-lang="r"><span style="display:flex;"><span><span style="color:#75715e">## Define function to split up your species list into useable chuncks</span>
+</span></span><span style="display:flex;"><span>slice <span style="color:#f92672">&lt;-</span> <span style="color:#66d9ef">function</span>(input, by <span style="color:#f92672">=</span> <span style="color:#ae81ff">2</span>) {
+</span></span><span style="display:flex;"><span>    starts <span style="color:#f92672">&lt;-</span> <span style="color:#a6e22e">seq</span>(<span style="color:#ae81ff">1</span>, <span style="color:#a6e22e">length</span>(input), by)
+</span></span><span style="display:flex;"><span>    tt <span style="color:#f92672">&lt;-</span> <span style="color:#a6e22e">lapply</span>(starts, <span style="color:#66d9ef">function</span>(y) input[y<span style="color:#f92672">:</span>(y <span style="color:#f92672">+</span> (by <span style="color:#f92672">-</span> <span style="color:#ae81ff">1</span>))])
+</span></span><span style="display:flex;"><span>    <span style="color:#a6e22e">llply</span>(tt, <span style="color:#66d9ef">function</span>(x) x[<span style="color:#f92672">!</span><span style="color:#a6e22e">is.na</span>(x)])
+</span></span><span style="display:flex;"><span>}
+</span></span><span style="display:flex;"><span>species_split <span style="color:#f92672">&lt;-</span> <span style="color:#a6e22e">slice</span>(species, by <span style="color:#f92672">=</span> <span style="color:#ae81ff">100</span>)
+</span></span></code></pre></div><h4 id="query-for-your-large-species-list-with-pauses-between-calls-with-3-seconds-in-between-calls-to-not-hit-the-web-service-too-hard-using-post-method-here-instead-of-get---required-when-you-have-a-lot-of-species">Query for your large species list with pauses between calls, with 3 seconds in between calls to not hit the web service too hard. Using POST method here instead of GET - required when you have a lot of species.</h4>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-r" data-lang="r"><span style="display:flex;"><span>tnrs_safe <span style="color:#f92672">&lt;-</span> <span style="color:#a6e22e">failwith</span>(<span style="color:#66d9ef">NULL</span>, tnrs)  <span style="color:#75715e"># in case some calls fail, will continue</span>
+</span></span><span style="display:flex;"><span>out <span style="color:#f92672">&lt;-</span> <span style="color:#a6e22e">llply</span>(species_split, <span style="color:#66d9ef">function</span>(x) <span style="color:#a6e22e">tnrs_safe</span>(x, getpost <span style="color:#f92672">=</span> <span style="color:#e6db74">&#34;POST&#34;</span>, sleep <span style="color:#f92672">=</span> <span style="color:#ae81ff">3</span>))
+</span></span></code></pre></div><div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-r" data-lang="r"><span style="display:flex;"><span>Calling http<span style="color:#f92672">://</span>taxosaurus.org<span style="color:#f92672">/</span>retrieve<span style="color:#f92672">/</span><span style="color:#ae81ff">90</span>fcd9ae425ad7c6103b06dd9fd78ae2
+</span></span><span style="display:flex;"><span>Calling http<span style="color:#f92672">://</span>taxosaurus.org<span style="color:#f92672">/</span>retrieve<span style="color:#f92672">/</span><span style="color:#ae81ff">223</span>f73b83fcddcb8b6187966963660a8
+</span></span><span style="display:flex;"><span>Calling http<span style="color:#f92672">://</span>taxosaurus.org<span style="color:#f92672">/</span>retrieve<span style="color:#f92672">/</span><span style="color:#ae81ff">72</span>bacdbb8938316e321d4c709c8cdd09
+</span></span><span style="display:flex;"><span>Calling http<span style="color:#f92672">://</span>taxosaurus.org<span style="color:#f92672">/</span>retrieve<span style="color:#f92672">/</span><span style="color:#ae81ff">979</span>ce9cc4dec376710f61de162e1294e
+</span></span><span style="display:flex;"><span>Calling http<span style="color:#f92672">://</span>taxosaurus.org<span style="color:#f92672">/</span>retrieve<span style="color:#f92672">/</span><span style="color:#ae81ff">03</span>a39a124561fec2fdfc0f483d9fb607
+</span></span><span style="display:flex;"><span>Calling http<span style="color:#f92672">://</span>taxosaurus.org<span style="color:#f92672">/</span>retrieve<span style="color:#f92672">/</span>d4bf4e5a1403f45a1be1ca3dd87785d7
+</span></span><span style="display:flex;"><span>Calling http<span style="color:#f92672">://</span>taxosaurus.org<span style="color:#f92672">/</span>retrieve<span style="color:#f92672">/</span>a9a9bdde6fda7e325d80120e27ccb480
+</span></span><span style="display:flex;"><span>Calling http<span style="color:#f92672">://</span>taxosaurus.org<span style="color:#f92672">/</span>retrieve<span style="color:#f92672">/</span><span style="color:#ae81ff">215</span>ccdcf2b00362278bf19d1942e1395
+</span></span><span style="display:flex;"><span>Calling http<span style="color:#f92672">://</span>taxosaurus.org<span style="color:#f92672">/</span>retrieve<span style="color:#f92672">/</span><span style="color:#ae81ff">9</span>d43c0b99b4dfb5ea1b435adab17b980
+</span></span><span style="display:flex;"><span>Calling http<span style="color:#f92672">://</span>taxosaurus.org<span style="color:#f92672">/</span>retrieve<span style="color:#f92672">/</span><span style="color:#ae81ff">42e166</span>f8e43f1fb349e36459cd5938b3
+</span></span><span style="display:flex;"><span>Calling http<span style="color:#f92672">://</span>taxosaurus.org<span style="color:#f92672">/</span>retrieve<span style="color:#f92672">/</span><span style="color:#ae81ff">2</span>c42e4b5227c5464f9bfeeafcdf0651d
+</span></span></code></pre></div><div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-r" data-lang="r"><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e"># Looks like we got some data back for each element of our species list</span>
+</span></span><span style="display:flex;"><span><span style="color:#a6e22e">lapply</span>(out, head)[1<span style="color:#f92672">:</span><span style="color:#ae81ff">2</span>]  <span style="color:#75715e"># just look at the first two</span>
+</span></span></code></pre></div><div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-r" data-lang="r"><span style="display:flex;"><span>[[1]]
+</span></span><span style="display:flex;"><span>                 submittedName                 acceptedName    sourceId
+</span></span><span style="display:flex;"><span><span style="color:#ae81ff">1</span>        Aptosimum welwitschii                              iPlant_TNRS
+</span></span><span style="display:flex;"><span><span style="color:#ae81ff">2</span>        Anticharis ebracteata        Anticharis ebracteata iPlant_TNRS
+</span></span><span style="display:flex;"><span><span style="color:#ae81ff">3</span>            Aptosimum lineare            Aptosimum lineare iPlant_TNRS
+</span></span><span style="display:flex;"><span><span style="color:#ae81ff">4</span>     Antherothamnus pearsonii     Antherothamnus pearsonii iPlant_TNRS
+</span></span><span style="display:flex;"><span><span style="color:#ae81ff">5</span> Barthlottia madagascariensis Barthlottia madagascariensis iPlant_TNRS
+</span></span><span style="display:flex;"><span><span style="color:#ae81ff">6</span>         Agathelpis mucronata                              iPlant_TNRS
+</span></span><span style="display:flex;"><span>  score                  matchedName     annotations
+</span></span><span style="display:flex;"><span><span style="color:#ae81ff">1</span>     <span style="color:#ae81ff">1</span>        Aptosimum welwitschii                
+</span></span><span style="display:flex;"><span><span style="color:#ae81ff">2</span>     <span style="color:#ae81ff">1</span>        Anticharis ebracteata          Schinz
+</span></span><span style="display:flex;"><span><span style="color:#ae81ff">3</span>     <span style="color:#ae81ff">1</span>            Aptosimum lineare Marloth <span style="color:#f92672">&amp;</span> Engl.
+</span></span><span style="display:flex;"><span><span style="color:#ae81ff">4</span>     <span style="color:#ae81ff">1</span>     Antherothamnus pearsonii        N.E. Br.
+</span></span><span style="display:flex;"><span><span style="color:#ae81ff">5</span>     <span style="color:#ae81ff">1</span> Barthlottia madagascariensis      Eb. Fisch.
+</span></span><span style="display:flex;"><span><span style="color:#ae81ff">6</span>     <span style="color:#ae81ff">1</span>         Agathelpis mucronata                
+</span></span><span style="display:flex;"><span>                                    uri
+</span></span><span style="display:flex;"><span><span style="color:#ae81ff">1</span>                                      
+</span></span><span style="display:flex;"><span><span style="color:#ae81ff">2</span> http<span style="color:#f92672">://</span>www.tropicos.org<span style="color:#f92672">/</span>Name<span style="color:#f92672">/</span><span style="color:#ae81ff">29202501</span>
+</span></span><span style="display:flex;"><span><span style="color:#ae81ff">3</span> http<span style="color:#f92672">://</span>www.tropicos.org<span style="color:#f92672">/</span>Name<span style="color:#f92672">/</span><span style="color:#ae81ff">29202525</span>
+</span></span><span style="display:flex;"><span><span style="color:#ae81ff">4</span> http<span style="color:#f92672">://</span>www.tropicos.org<span style="color:#f92672">/</span>Name<span style="color:#f92672">/</span><span style="color:#ae81ff">29202728</span>
+</span></span><span style="display:flex;"><span><span style="color:#ae81ff">5</span> http<span style="color:#f92672">://</span>www.tropicos.org<span style="color:#f92672">/</span>Name<span style="color:#f92672">/</span><span style="color:#ae81ff">50089700</span>
+</span></span><span style="display:flex;"><span><span style="color:#ae81ff">6</span>                                      
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>[[2]]
+</span></span><span style="display:flex;"><span>                     submittedName           acceptedName    sourceId
+</span></span><span style="display:flex;"><span><span style="color:#ae81ff">1</span> Buddleja pichinchensis x bullata Buddleja pichinchensis iPlant_TNRS
+</span></span><span style="display:flex;"><span><span style="color:#ae81ff">2</span>                 Buddleja soratae       Buddleja soratae iPlant_TNRS
+</span></span><span style="display:flex;"><span><span style="color:#ae81ff">3</span>              Buddleja euryphylla    Buddleja euryphylla iPlant_TNRS
+</span></span><span style="display:flex;"><span><span style="color:#ae81ff">4</span>                  Buddleja incana        Buddleja incana iPlant_TNRS
+</span></span><span style="display:flex;"><span><span style="color:#ae81ff">5</span>                  Buddleja incana                 Incana        NCBI
+</span></span><span style="display:flex;"><span><span style="color:#ae81ff">6</span>                    Buddleja nana Buddleja brachystachya iPlant_TNRS
+</span></span><span style="display:flex;"><span>  score            matchedName        annotations
+</span></span><span style="display:flex;"><span><span style="color:#ae81ff">1</span>   <span style="color:#ae81ff">0.9</span> Buddleja pichinchensis              Kunth
+</span></span><span style="display:flex;"><span><span style="color:#ae81ff">2</span>   <span style="color:#ae81ff">1.0</span>       Buddleja soratae           Kraenzl.
+</span></span><span style="display:flex;"><span><span style="color:#ae81ff">3</span>   <span style="color:#ae81ff">1.0</span>    Buddleja euryphylla Standl. <span style="color:#f92672">&amp;</span> Steyerm.
+</span></span><span style="display:flex;"><span><span style="color:#ae81ff">4</span>   <span style="color:#ae81ff">1.0</span>        Buddleja incana        Ruiz <span style="color:#f92672">&amp;</span> Pav.
+</span></span><span style="display:flex;"><span><span style="color:#ae81ff">5</span>   <span style="color:#ae81ff">1.0</span>        Buddleja incana               none
+</span></span><span style="display:flex;"><span><span style="color:#ae81ff">6</span>   <span style="color:#ae81ff">1.0</span>          Buddleja nana              Diels
+</span></span><span style="display:flex;"><span>                                          uri
+</span></span><span style="display:flex;"><span><span style="color:#ae81ff">1</span>       http<span style="color:#f92672">://</span>www.tropicos.org<span style="color:#f92672">/</span>Name<span style="color:#f92672">/</span><span style="color:#ae81ff">19000333</span>
+</span></span><span style="display:flex;"><span><span style="color:#ae81ff">2</span>       http<span style="color:#f92672">://</span>www.tropicos.org<span style="color:#f92672">/</span>Name<span style="color:#f92672">/</span><span style="color:#ae81ff">19001018</span>
+</span></span><span style="display:flex;"><span><span style="color:#ae81ff">3</span>       http<span style="color:#f92672">://</span>www.tropicos.org<span style="color:#f92672">/</span>Name<span style="color:#f92672">/</span><span style="color:#ae81ff">19000790</span>
+</span></span><span style="display:flex;"><span><span style="color:#ae81ff">4</span>       http<span style="color:#f92672">://</span>www.tropicos.org<span style="color:#f92672">/</span>Name<span style="color:#f92672">/</span><span style="color:#ae81ff">19000596</span>
+</span></span><span style="display:flex;"><span><span style="color:#ae81ff">5</span> http<span style="color:#f92672">://</span>www.ncbi.nlm.nih.gov<span style="color:#f92672">/</span>taxonomy<span style="color:#f92672">/</span><span style="color:#ae81ff">405077</span>
+</span></span><span style="display:flex;"><span><span style="color:#ae81ff">6</span>       http<span style="color:#f92672">://</span>www.tropicos.org<span style="color:#f92672">/</span>Name<span style="color:#f92672">/</span><span style="color:#ae81ff">19001133</span>
+</span></span></code></pre></div><div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-r" data-lang="r"><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e"># Now we can put them back together as so into one data.frame if you like</span>
+</span></span><span style="display:flex;"><span>outdf <span style="color:#f92672">&lt;-</span> <span style="color:#a6e22e">ldply</span>(out)
+</span></span><span style="display:flex;"><span><span style="color:#a6e22e">head</span>(outdf)
+</span></span></code></pre></div><div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-r" data-lang="r"><span style="display:flex;"><span>                 submittedName                 acceptedName    sourceId
+</span></span><span style="display:flex;"><span><span style="color:#ae81ff">1</span>        Aptosimum welwitschii                              iPlant_TNRS
+</span></span><span style="display:flex;"><span><span style="color:#ae81ff">2</span>        Anticharis ebracteata        Anticharis ebracteata iPlant_TNRS
+</span></span><span style="display:flex;"><span><span style="color:#ae81ff">3</span>            Aptosimum lineare            Aptosimum lineare iPlant_TNRS
+</span></span><span style="display:flex;"><span><span style="color:#ae81ff">4</span>     Antherothamnus pearsonii     Antherothamnus pearsonii iPlant_TNRS
+</span></span><span style="display:flex;"><span><span style="color:#ae81ff">5</span> Barthlottia madagascariensis Barthlottia madagascariensis iPlant_TNRS
+</span></span><span style="display:flex;"><span><span style="color:#ae81ff">6</span>         Agathelpis mucronata                              iPlant_TNRS
+</span></span><span style="display:flex;"><span>  score                  matchedName     annotations
+</span></span><span style="display:flex;"><span><span style="color:#ae81ff">1</span>     <span style="color:#ae81ff">1</span>        Aptosimum welwitschii                
+</span></span><span style="display:flex;"><span><span style="color:#ae81ff">2</span>     <span style="color:#ae81ff">1</span>        Anticharis ebracteata          Schinz
+</span></span><span style="display:flex;"><span><span style="color:#ae81ff">3</span>     <span style="color:#ae81ff">1</span>            Aptosimum lineare Marloth <span style="color:#f92672">&amp;</span> Engl.
+</span></span><span style="display:flex;"><span><span style="color:#ae81ff">4</span>     <span style="color:#ae81ff">1</span>     Antherothamnus pearsonii        N.E. Br.
+</span></span><span style="display:flex;"><span><span style="color:#ae81ff">5</span>     <span style="color:#ae81ff">1</span> Barthlottia madagascariensis      Eb. Fisch.
+</span></span><span style="display:flex;"><span><span style="color:#ae81ff">6</span>     <span style="color:#ae81ff">1</span>         Agathelpis mucronata                
+</span></span><span style="display:flex;"><span>                                    uri
+</span></span><span style="display:flex;"><span><span style="color:#ae81ff">1</span>                                      
+</span></span><span style="display:flex;"><span><span style="color:#ae81ff">2</span> http<span style="color:#f92672">://</span>www.tropicos.org<span style="color:#f92672">/</span>Name<span style="color:#f92672">/</span><span style="color:#ae81ff">29202501</span>
+</span></span><span style="display:flex;"><span><span style="color:#ae81ff">3</span> http<span style="color:#f92672">://</span>www.tropicos.org<span style="color:#f92672">/</span>Name<span style="color:#f92672">/</span><span style="color:#ae81ff">29202525</span>
+</span></span><span style="display:flex;"><span><span style="color:#ae81ff">4</span> http<span style="color:#f92672">://</span>www.tropicos.org<span style="color:#f92672">/</span>Name<span style="color:#f92672">/</span><span style="color:#ae81ff">29202728</span>
+</span></span><span style="display:flex;"><span><span style="color:#ae81ff">5</span> http<span style="color:#f92672">://</span>www.tropicos.org<span style="color:#f92672">/</span>Name<span style="color:#f92672">/</span><span style="color:#ae81ff">50089700</span>
+</span></span><span style="display:flex;"><span><span style="color:#ae81ff">6</span>
+</span></span></code></pre></div><p>Note that there are multiple names for some species because data sources have different names for the same species (resulting in more than one row in the data.frame &lsquo;outdf&rsquo; for a species). We are leaving this up to the user to decide which to use. For example, for the species <em>Buddleja montana</em> there are two names for in the output</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-r" data-lang="r"><span style="display:flex;"><span>data <span style="color:#f92672">&lt;-</span> <span style="color:#a6e22e">ddply</span>(outdf, .(submittedName), summarize, <span style="color:#a6e22e">length</span>(submittedName))
+</span></span><span style="display:flex;"><span>outdf[outdf<span style="color:#f92672">$</span>submittedName <span style="color:#f92672">%in%</span> <span style="color:#a6e22e">as.character</span>(data[data<span style="color:#f92672">$</span><span style="color:#66d9ef">..1</span> <span style="color:#f92672">&gt;</span> <span style="color:#ae81ff">1</span>, ][6, <span style="color:#e6db74">&#34;submittedName&#34;</span>]), 
+</span></span><span style="display:flex;"><span>    ]
+</span></span></code></pre></div><div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-r" data-lang="r"><span style="display:flex;"><span>       submittedName     acceptedName    sourceId score      matchedName
+</span></span><span style="display:flex;"><span><span style="color:#ae81ff">123</span> Buddleja montana Buddleja montana iPlant_TNRS     <span style="color:#ae81ff">1</span> Buddleja montana
+</span></span><span style="display:flex;"><span><span style="color:#ae81ff">124</span> Buddleja montana          Montana        NCBI     <span style="color:#ae81ff">1</span> Buddleja montana
+</span></span><span style="display:flex;"><span>         annotations                                         uri
+</span></span><span style="display:flex;"><span><span style="color:#ae81ff">123</span> Britton ex Rusby       http<span style="color:#f92672">://</span>www.tropicos.org<span style="color:#f92672">/</span>Name<span style="color:#f92672">/</span><span style="color:#ae81ff">19000601</span>
+</span></span><span style="display:flex;"><span><span style="color:#ae81ff">124</span>             none http<span style="color:#f92672">://</span>www.ncbi.nlm.nih.gov<span style="color:#f92672">/</span>taxonomy<span style="color:#f92672">/</span><span style="color:#ae81ff">441235</span>
+</span></span></code></pre></div><p>The source iPlant matched the name, but NCBI actually gave back a genus of cricket (follow the link under the column uri for <em>Montana</em>). If you look at the page for <em>Buddleja</em> on NCBI <a href="http://www.ncbi.nlm.nih.gov/Taxonomy/Browser/wwwtax.cgi?id=26473">here</a> there is no <em>Buddleja montana</em> at all.</p>
+<p>Another thing we could do is look at the score that is returned. Let&rsquo;s look at those that are less than 1 (i.e., )</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-r" data-lang="r"><span style="display:flex;"><span>outdf[outdf<span style="color:#f92672">$</span>score <span style="color:#f92672">&lt;</span> <span style="color:#ae81ff">1</span>, ]
+</span></span></code></pre></div><div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-r" data-lang="r"><span style="display:flex;"><span>                        submittedName           acceptedName    sourceId
+</span></span><span style="display:flex;"><span><span style="color:#ae81ff">94</span>   Buddleja pichinchensis x bullata Buddleja pichinchensis iPlant_TNRS
+</span></span><span style="display:flex;"><span><span style="color:#ae81ff">340</span>                Diascia ellaphieae                        iPlant_TNRS
+</span></span><span style="display:flex;"><span><span style="color:#ae81ff">495</span>              Eremophila decipiens                        iPlant_TNRS
+</span></span><span style="display:flex;"><span><span style="color:#ae81ff">500</span>            Eremophila grandiflora             Eremophila iPlant_TNRS
+</span></span><span style="display:flex;"><span><span style="color:#ae81ff">808</span>           Jamesbrittneia hilliard                        iPlant_TNRS
+</span></span><span style="display:flex;"><span><span style="color:#ae81ff">1051</span>                 Verbascum patris              Verbascum iPlant_TNRS
+</span></span><span style="display:flex;"><span><span style="color:#ae81ff">1081</span>             Verbascum barnadesii              Verbascum iPlant_TNRS
+</span></span><span style="display:flex;"><span><span style="color:#ae81ff">1097</span>              Verbascum calycosum              Verbascum iPlant_TNRS
+</span></span><span style="display:flex;"><span>     score            matchedName annotations
+</span></span><span style="display:flex;"><span><span style="color:#ae81ff">94</span>    <span style="color:#ae81ff">0.90</span> Buddleja pichinchensis       Kunth
+</span></span><span style="display:flex;"><span><span style="color:#ae81ff">340</span>   <span style="color:#ae81ff">0.98</span>      Diascia ellaphiae            
+</span></span><span style="display:flex;"><span><span style="color:#ae81ff">495</span>   <span style="color:#ae81ff">0.98</span>  Eremophila decipiense            
+</span></span><span style="display:flex;"><span><span style="color:#ae81ff">500</span>   <span style="color:#ae81ff">0.50</span>             Eremophila      R. Br.
+</span></span><span style="display:flex;"><span><span style="color:#ae81ff">808</span>   <span style="color:#ae81ff">0.50</span>         Jamesbrittenia            
+</span></span><span style="display:flex;"><span><span style="color:#ae81ff">1051</span>  <span style="color:#ae81ff">0.50</span>              Verbascum          L.
+</span></span><span style="display:flex;"><span><span style="color:#ae81ff">1081</span>  <span style="color:#ae81ff">0.50</span>              Verbascum          L.
+</span></span><span style="display:flex;"><span><span style="color:#ae81ff">1097</span>  <span style="color:#ae81ff">0.50</span>              Verbascum          L.
+</span></span><span style="display:flex;"><span>                                       uri
+</span></span><span style="display:flex;"><span><span style="color:#ae81ff">94</span>   http<span style="color:#f92672">://</span>www.tropicos.org<span style="color:#f92672">/</span>Name<span style="color:#f92672">/</span><span style="color:#ae81ff">19000333</span>
+</span></span><span style="display:flex;"><span><span style="color:#ae81ff">340</span>                                       
+</span></span><span style="display:flex;"><span><span style="color:#ae81ff">495</span>                                       
+</span></span><span style="display:flex;"><span><span style="color:#ae81ff">500</span>  http<span style="color:#f92672">://</span>www.tropicos.org<span style="color:#f92672">/</span>Name<span style="color:#f92672">/</span><span style="color:#ae81ff">40004761</span>
+</span></span><span style="display:flex;"><span><span style="color:#ae81ff">808</span>                                       
+</span></span><span style="display:flex;"><span><span style="color:#ae81ff">1051</span> http<span style="color:#f92672">://</span>www.tropicos.org<span style="color:#f92672">/</span>Name<span style="color:#f92672">/</span><span style="color:#ae81ff">40023766</span>
+</span></span><span style="display:flex;"><span><span style="color:#ae81ff">1081</span> http<span style="color:#f92672">://</span>www.tropicos.org<span style="color:#f92672">/</span>Name<span style="color:#f92672">/</span><span style="color:#ae81ff">40023766</span>
+</span></span><span style="display:flex;"><span><span style="color:#ae81ff">1097</span> http<span style="color:#f92672">://</span>www.tropicos.org<span style="color:#f92672">/</span>Name<span style="color:#f92672">/</span><span style="color:#ae81ff">40023766</span>
+</span></span></code></pre></div><p>As we got this speies list from <a href="http://www.theplantlist.org/">theplantlist.org</a>, there aren&rsquo;t that many mistakes, but if it was my species list you know there would be many :)</p>
+<p>That&rsquo;s it.  Try it out and let us know if you have any questions at <a href="mailto:info@ropensci.org">info@ropensci.org</a>, or <a href="https://github.com/ropensci/taxize_/issues">ask questions/report problems at GitHub</a>.</p>
+<hr>
+<p>Get the .Rmd file used to create this post <a href="https://github.com/sckott/sckott.github.com/tree/master/2013-01-25-tnrs-use-case.Rmd">at my github account</a> - or <a href="https://github.com/sckott/sckott.github.com/tree/master/_posts/2013-01-25-tnrs-use-case.md">.md file</a>.</p>
+<p>Written in <a href="http://daringfireball.net/projects/markdown/">Markdown</a>, with help from <a href="http://yihui.name/knitr/">knitr</a>.</p>
+]]></content:encoded>
     </item>
     <item>
       <title>Hitting the Global Names Resolver API</title>
@@ -22,6 +179,68 @@ We are building tools into our R package taxize, that will let you check your sp
       <pubDate>Fri, 20 Jul 2012 00:00:00 +0000</pubDate>
       <guid>http://localhost:1313/2012/07/global-names-resolver/</guid>
       <description>Example of using the Global Names Resolver API to check species names There are a number of options for resolution of taxonomic names. The Taxonomic Name Resolution Service (TNRS) comes to mind. There is a new service for taxonomic name resoultion called the Global Names Resolver. They describe the service thusly &amp;ldquo;Resolve lists of scientific names against known sources. This service parses incoming names, executes exact or fuzzy matching as required, and displays a confidence score for each match along with its identifier.</description>
+      <content:encoded><![CDATA[<h2 id="example-of-using-the-global-names-resolver-api-to-check-species-names">Example of using the Global Names Resolver API to check species names</h2>
+<p>There are a number of options for resolution of taxonomic names. The <a href="http://tnrs.iplantcollaborative.org/">Taxonomic Name Resolution Service (TNRS)</a> comes to mind. There is a new service for taxonomic name resoultion called the <a href="http://resolver.globalnames.org/">Global Names Resolver</a>. They describe the service thusly &ldquo;<em>Resolve lists of scientific names against known sources. This service parses incoming names, executes exact or fuzzy matching as required, and displays a confidence score for each match along with its identifier.</em>&rdquo;.</p>
+<h2 id="load-required-packages">Load required packages</h2>
+<h3 id="just-uncomment-the-code-to-use">Just uncomment the code to use.</h3>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-r" data-lang="r"><span style="display:flex;"><span><span style="color:#75715e"># If you don&#39;t have them already</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e"># install.packages(c(&#39;RJSONIO&#39;,&#39;plyr&#39;,&#39;devtools&#39;)) require(devtools)</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e"># install_github(&#39;taxize_&#39;,&#39;ropensci&#39;)</span>
+</span></span><span style="display:flex;"><span><span style="color:#a6e22e">library</span>(RJSONIO)
+</span></span><span style="display:flex;"><span><span style="color:#a6e22e">library</span>(plyr)
+</span></span><span style="display:flex;"><span><span style="color:#a6e22e">library</span>(taxize)
+</span></span></code></pre></div><h2 id="get-the-data-sources-available">Get the data sources available</h2>
+<h3 id="get-just-ids-and-names-of-sources-in-a-dataframe">Get just id&rsquo;s and names of sources in a data.frame</h3>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-r" data-lang="r"><span style="display:flex;"><span><span style="color:#a6e22e">tail</span>(<span style="color:#a6e22e">gnr_datasources</span>(todf <span style="color:#f92672">=</span> T))
+</span></span></code></pre></div><div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-r" data-lang="r"><span style="display:flex;"><span><span style="color:#75715e">##     id                                title</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">## 82 164                            BioLib.cz</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">## 83 165 Tropicos - Missouri Botanical Garden</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">## 84 166                                nlbif</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">## 85 167                                 IPNI</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">## 86 168              Index to Organism Names</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">## 87 169                        uBio NameBank</span>
+</span></span></code></pre></div><hr>
+<h3 id="give-me-the-id-for-eol-encyclopedia-of-life">Give me the id for EOL (Encyclopedia of Life)</h3>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-r" data-lang="r"><span style="display:flex;"><span>out <span style="color:#f92672">&lt;-</span> <span style="color:#a6e22e">gnr_datasources</span>(todf <span style="color:#f92672">=</span> T)
+</span></span><span style="display:flex;"><span>out[out<span style="color:#f92672">$</span>title <span style="color:#f92672">==</span> <span style="color:#e6db74">&#34;EOL&#34;</span>, <span style="color:#e6db74">&#34;id&#34;</span>]
+</span></span></code></pre></div><div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-r" data-lang="r"><span style="display:flex;"><span><span style="color:#75715e">## [1] 12</span>
+</span></span></code></pre></div><hr>
+<h3 id="fuzzy-search-for-sources-with-the-word-zoo">Fuzzy search for sources with the word &ldquo;zoo&rdquo;</h3>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-r" data-lang="r"><span style="display:flex;"><span>out <span style="color:#f92672">&lt;-</span> <span style="color:#a6e22e">gnr_datasources</span>(todf <span style="color:#f92672">=</span> T)
+</span></span><span style="display:flex;"><span>outdf <span style="color:#f92672">&lt;-</span> out<span style="color:#a6e22e">[agrep</span>(<span style="color:#e6db74">&#34;zoo&#34;</span>, out<span style="color:#f92672">$</span>title, ignore.case <span style="color:#f92672">=</span> T), ]
+</span></span><span style="display:flex;"><span>outdf[1<span style="color:#f92672">:</span><span style="color:#ae81ff">2</span>, ]
+</span></span></code></pre></div><div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-r" data-lang="r"><span style="display:flex;"><span><span style="color:#75715e">##     id             title</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">## 20 100 Mushroom Observer</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">## 25 105           ZooKeys</span>
+</span></span></code></pre></div><h2 id="resolve-some-names">Resolve some names</h2>
+<h3 id="search-for-_helianthus-annuus_-and-_homo-sapiens_-return-a-dataframe">Search for <em>Helianthus annuus</em> and <em>Homo sapiens</em>, return a data.frame</h3>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-r" data-lang="r"><span style="display:flex;"><span><span style="color:#a6e22e">gnr</span>(names <span style="color:#f92672">=</span> <span style="color:#a6e22e">c</span>(<span style="color:#e6db74">&#34;Helianthus annuus&#34;</span>, <span style="color:#e6db74">&#34;Homo sapiens&#34;</span>), returndf <span style="color:#f92672">=</span> <span style="color:#66d9ef">TRUE</span>)[1<span style="color:#f92672">:</span><span style="color:#ae81ff">2</span>, ]
+</span></span></code></pre></div><div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-r" data-lang="r"><span style="display:flex;"><span><span style="color:#75715e">##   data_source_id    submitted_name       name_string score    title</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">## 1              4 Helianthus annuus Helianthus annuus 0.988     NCBI</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">## 3             10 Helianthus annuus Helianthus annuus 0.988 Freebase</span>
+</span></span></code></pre></div><hr>
+<h3 id="search-for-the-same-species-with-only-using-data-source-12-ie-eol">Search for the same species, with only using data source 12 (i.e., EOL)</h3>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-r" data-lang="r"><span style="display:flex;"><span><span style="color:#a6e22e">gnr</span>(names <span style="color:#f92672">=</span> <span style="color:#a6e22e">c</span>(<span style="color:#e6db74">&#34;Helianthus annuus&#34;</span>, <span style="color:#e6db74">&#34;Homo sapiens&#34;</span>), data_source_ids <span style="color:#f92672">=</span> <span style="color:#e6db74">&#34;12&#34;</span>, 
+</span></span><span style="display:flex;"><span>    returndf <span style="color:#f92672">=</span> <span style="color:#66d9ef">TRUE</span>)
+</span></span></code></pre></div><div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-r" data-lang="r"><span style="display:flex;"><span><span style="color:#75715e">##   data_source_id    submitted_name       name_string score title</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">## 1             12 Helianthus annuus Helianthus annuus 0.988   EOL</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">## 2             12      Homo sapiens      Homo sapiens 0.988   EOL</span>
+</span></span></code></pre></div><h3 id="thats-it-have-fun-and-put-bugscommentsetc-herehttpsgithubcomropenscitaxize_issues">That&rsquo;s it. Have fun! And put bugs/comments/etc. <a href="https://github.com/ropensci/taxize_/issues">here</a>.</h3>
+<p>Written in <a href="http://daringfireball.net/projects/markdown/">Markdown</a>, with help from <a href="http://yihui.name/knitr/">knitr</a>, and nice knitr highlighting/etc. in in <a href="http://rstudio.org/">RStudio</a>.</p>
+<h3 id="i-prepared-the-markdown-for-this-post-by">I prepared the markdown for this post by:</h3>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-r" data-lang="r"><span style="display:flex;"><span>KnitPost <span style="color:#f92672">&lt;-</span> <span style="color:#66d9ef">function</span>(input, base.url <span style="color:#f92672">=</span> <span style="color:#e6db74">&#34;/&#34;</span>) {
+</span></span><span style="display:flex;"><span>    <span style="color:#a6e22e">require</span>(knitr)
+</span></span><span style="display:flex;"><span>    opts_knit<span style="color:#f92672">$</span><span style="color:#a6e22e">set</span>(base.url <span style="color:#f92672">=</span> base.url)
+</span></span><span style="display:flex;"><span>    fig.path <span style="color:#f92672">&lt;-</span> <span style="color:#a6e22e">paste0</span>(<span style="color:#e6db74">&#34;img/&#34;</span>, <span style="color:#a6e22e">sub</span>(<span style="color:#e6db74">&#34;.Rmd$&#34;</span>, <span style="color:#e6db74">&#34;&#34;</span>, <span style="color:#a6e22e">basename</span>(input)), <span style="color:#e6db74">&#34;/&#34;</span>)
+</span></span><span style="display:flex;"><span>    opts_chunk<span style="color:#f92672">$</span><span style="color:#a6e22e">set</span>(fig.path <span style="color:#f92672">=</span> fig.path)
+</span></span><span style="display:flex;"><span>    opts_chunk<span style="color:#f92672">$</span><span style="color:#a6e22e">set</span>(fig.cap <span style="color:#f92672">=</span> <span style="color:#e6db74">&#34;center&#34;</span>)
+</span></span><span style="display:flex;"><span>    <span style="color:#a6e22e">render_jekyll</span>()
+</span></span><span style="display:flex;"><span>    <span style="color:#a6e22e">knit</span>(input, envir <span style="color:#f92672">=</span> <span style="color:#a6e22e">parent.frame</span>())
+</span></span><span style="display:flex;"><span>}
+</span></span><span style="display:flex;"><span><span style="color:#a6e22e">setwd</span>(<span style="color:#e6db74">&#34;/path/to/_posts&#34;</span>)
+</span></span><span style="display:flex;"><span><span style="color:#a6e22e">KnitPost</span>(<span style="color:#e6db74">&#34;/path/to/postfile.Rmd&#34;</span>)
+</span></span></code></pre></div><p>from <a href="http://jfisher-usgs.github.com/r/2012/07/03/knitr-jekyll/">jfisher</a>.</p>
+]]></content:encoded>
     </item>
   </channel>
 </rss>

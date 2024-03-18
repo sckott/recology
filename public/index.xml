@@ -16,6 +16,162 @@
       <description>I wrote the other day about overcoming an issue with Shiny.
 Another issue I ran into concurrently was about file inputs. The issue was that file inputs (i.e., shiny::fileInput) was difficult to clear. That is, after a user uploads a file, it was easy to get some of the various parts cleared/cleaned up, but not others:
 (Not Easy) The UI components of fileInput (the text of the file name, the loading display) (Not Easy) The data behind the fileInput handler (Easy) Displaying some feedback in the UI after handling file input Load libraries</description>
+      <content:encoded><![CDATA[<p>I <a href="/2024/03/shiny-events/">wrote the other day</a> about overcoming an issue with <a href="https://shiny.posit.co/">Shiny</a>.</p>
+<p>Another issue I ran into concurrently was about file inputs. The issue was that file inputs (i.e., <code>shiny::fileInput</code>) was difficult to clear. That is, after a user uploads a file, it was easy to get some of the various parts cleared/cleaned up, but not others:</p>
+<ul>
+<li>(Not Easy) The UI components of <code>fileInput</code> (the text of the file name, the loading display)</li>
+<li>(Not Easy) The data behind the <code>fileInput</code> handler</li>
+<li>(Easy) Displaying some feedback in the UI after handling file input</li>
+</ul>
+<p>Load libraries</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-r" data-lang="r"><span style="display:flex;"><span><span style="color:#a6e22e">library</span>(shiny)
+</span></span><span style="display:flex;"><span><span style="color:#a6e22e">library</span>(shinyjs)
+</span></span><span style="display:flex;"><span><span style="color:#a6e22e">library</span>(bslib)
+</span></span><span style="display:flex;"><span><span style="color:#a6e22e">library</span>(DT)
+</span></span><span style="display:flex;"><span><span style="color:#a6e22e">library</span>(vroom)
+</span></span></code></pre></div><p>A helper function to handle reactive inputs</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-r" data-lang="r"><span style="display:flex;"><span>reactiveInput <span style="color:#f92672">&lt;-</span> <span style="color:#66d9ef">function</span>(rval, path) {
+</span></span><span style="display:flex;"><span>  <span style="color:#66d9ef">if</span> (<span style="color:#a6e22e">is.null</span>(rval)) {
+</span></span><span style="display:flex;"><span>    <span style="color:#66d9ef">return</span>(<span style="color:#66d9ef">NULL</span>)
+</span></span><span style="display:flex;"><span>  } <span style="color:#66d9ef">else</span> <span style="color:#66d9ef">if</span> (rval <span style="color:#f92672">==</span> <span style="color:#e6db74">&#39;loaded&#39;</span>) {
+</span></span><span style="display:flex;"><span>    <span style="color:#66d9ef">return</span>(path)
+</span></span><span style="display:flex;"><span>  } <span style="color:#66d9ef">else</span> <span style="color:#66d9ef">if</span> (rval <span style="color:#f92672">==</span> <span style="color:#e6db74">&#39;reset&#39;</span>) {
+</span></span><span style="display:flex;"><span>    <span style="color:#66d9ef">return</span>(<span style="color:#66d9ef">NULL</span>)
+</span></span><span style="display:flex;"><span>  }
+</span></span><span style="display:flex;"><span>}
+</span></span></code></pre></div><p>A <code>bslib</code> ui component</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-r" data-lang="r"><span style="display:flex;"><span>ui <span style="color:#f92672">&lt;-</span> <span style="color:#a6e22e">page_sidebar</span>(
+</span></span><span style="display:flex;"><span>  title <span style="color:#f92672">=</span> <span style="color:#e6db74">&#34;My dashboard&#34;</span>,
+</span></span><span style="display:flex;"><span>  sidebar <span style="color:#f92672">=</span> <span style="color:#a6e22e">list</span>(
+</span></span><span style="display:flex;"><span>    <span style="color:#a6e22e">actionButton</span>(<span style="color:#e6db74">&#34;submit&#34;</span>, <span style="color:#e6db74">&#34;Submit&#34;</span>),
+</span></span><span style="display:flex;"><span>    <span style="color:#a6e22e">actionButton</span>(<span style="color:#e6db74">&#34;reset&#34;</span>, <span style="color:#e6db74">&#34;Reset&#34;</span>)
+</span></span><span style="display:flex;"><span>  ),
+</span></span><span style="display:flex;"><span>  <span style="color:#a6e22e">fileInput</span>(inputId <span style="color:#f92672">=</span> <span style="color:#e6db74">&#34;afile&#34;</span>, <span style="color:#e6db74">&#34;Upload file&#34;</span>, accept <span style="color:#f92672">=</span> <span style="color:#e6db74">&#34;.csv&#34;</span>),
+</span></span><span style="display:flex;"><span>  DT<span style="color:#f92672">::</span><span style="color:#a6e22e">DTOutput</span>(<span style="color:#e6db74">&#34;result&#34;</span>),
+</span></span><span style="display:flex;"><span>  shinyjs<span style="color:#f92672">::</span><span style="color:#a6e22e">useShinyjs</span>()
+</span></span><span style="display:flex;"><span>)
+</span></span></code></pre></div><p>Here&rsquo;s the server part that was giving me trouble.</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-r" data-lang="r"><span style="display:flex;"><span>server <span style="color:#f92672">&lt;-</span> <span style="color:#66d9ef">function</span>(input, output) {
+</span></span><span style="display:flex;"><span>  <span style="color:#a6e22e">observeEvent</span>(input<span style="color:#f92672">$</span>submit, {
+</span></span><span style="display:flex;"><span>    output<span style="color:#f92672">$</span>result <span style="color:#f92672">&lt;-</span> DT<span style="color:#f92672">::</span><span style="color:#a6e22e">renderDataTable</span>({
+</span></span><span style="display:flex;"><span>      dat <span style="color:#f92672">&lt;-</span> vroom<span style="color:#f92672">::</span><span style="color:#a6e22e">vroom</span>(
+</span></span><span style="display:flex;"><span>        <span style="color:#a6e22e">isolate</span>(input<span style="color:#f92672">$</span>afile<span style="color:#f92672">$</span>datapath)
+</span></span><span style="display:flex;"><span>      )
+</span></span><span style="display:flex;"><span>      DT<span style="color:#f92672">::</span><span style="color:#a6e22e">datatable</span>(dat)
+</span></span><span style="display:flex;"><span>    })
+</span></span><span style="display:flex;"><span>  })
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>  <span style="color:#a6e22e">observeEvent</span>(input<span style="color:#f92672">$</span>reset, {
+</span></span><span style="display:flex;"><span>    shinyjs<span style="color:#f92672">::</span><span style="color:#a6e22e">reset</span>(<span style="color:#e6db74">&#34;afile&#34;</span>)
+</span></span><span style="display:flex;"><span>    output<span style="color:#f92672">$</span>result <span style="color:#f92672">&lt;-</span> <span style="color:#a6e22e">renderText</span>({})
+</span></span><span style="display:flex;"><span>  })
+</span></span><span style="display:flex;"><span>}
+</span></span></code></pre></div><p>With <code>shinyjs::reset</code> we can reset the UI components of the file input handler, and with <code>renderText</code> with an empty input we can reset the UI feedback. However, the data backing the file input handler is not reset. This led to problems in the UI where you could keep pressing submit after clicking the Reset button because the data for the last uploaded file was still there, whereas the user should get an error that they need to upload a file before clicking Submit.</p>
+<p>To be able to completey reset data behind the file input handler I found out about a solution using reactive values via stackoverflow. Basically, the change involves handling file input data through a reactive value and keeping track of the state of the file input loader.</p>
+<p>Here&rsquo;s the entire app that doesn&rsquo;t work</p>
+<details>
+  <summary>Click to expand</summary>
+  <div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-r" data-lang="r"><span style="display:flex;"><span><span style="color:#a6e22e">library</span>(shiny)
+</span></span><span style="display:flex;"><span><span style="color:#a6e22e">library</span>(shinyjs)
+</span></span><span style="display:flex;"><span><span style="color:#a6e22e">library</span>(bslib)
+</span></span><span style="display:flex;"><span><span style="color:#a6e22e">library</span>(DT)
+</span></span><span style="display:flex;"><span><span style="color:#a6e22e">library</span>(vroom)
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>ui <span style="color:#f92672">&lt;-</span> <span style="color:#a6e22e">page_sidebar</span>(
+</span></span><span style="display:flex;"><span>  title <span style="color:#f92672">=</span> <span style="color:#e6db74">&#34;My dashboard&#34;</span>,
+</span></span><span style="display:flex;"><span>  sidebar <span style="color:#f92672">=</span> <span style="color:#a6e22e">list</span>(
+</span></span><span style="display:flex;"><span>    <span style="color:#a6e22e">actionButton</span>(<span style="color:#e6db74">&#34;submit&#34;</span>, <span style="color:#e6db74">&#34;Submit&#34;</span>),
+</span></span><span style="display:flex;"><span>    <span style="color:#a6e22e">actionButton</span>(<span style="color:#e6db74">&#34;reset&#34;</span>, <span style="color:#e6db74">&#34;Reset&#34;</span>)
+</span></span><span style="display:flex;"><span>  ),
+</span></span><span style="display:flex;"><span>  <span style="color:#a6e22e">fileInput</span>(inputId <span style="color:#f92672">=</span> <span style="color:#e6db74">&#34;afile&#34;</span>, <span style="color:#e6db74">&#34;Upload file&#34;</span>, accept <span style="color:#f92672">=</span> <span style="color:#e6db74">&#34;.csv&#34;</span>),
+</span></span><span style="display:flex;"><span>  DT<span style="color:#f92672">::</span><span style="color:#a6e22e">DTOutput</span>(<span style="color:#e6db74">&#34;result&#34;</span>),
+</span></span><span style="display:flex;"><span>  shinyjs<span style="color:#f92672">::</span><span style="color:#a6e22e">useShinyjs</span>()
+</span></span><span style="display:flex;"><span>)
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>server <span style="color:#f92672">&lt;-</span> <span style="color:#66d9ef">function</span>(input, output) {
+</span></span><span style="display:flex;"><span>  <span style="color:#a6e22e">observeEvent</span>(input<span style="color:#f92672">$</span>submit, {
+</span></span><span style="display:flex;"><span>    output<span style="color:#f92672">$</span>result <span style="color:#f92672">&lt;-</span> DT<span style="color:#f92672">::</span><span style="color:#a6e22e">renderDataTable</span>({
+</span></span><span style="display:flex;"><span>      dat <span style="color:#f92672">&lt;-</span> vroom<span style="color:#f92672">::</span><span style="color:#a6e22e">vroom</span>(
+</span></span><span style="display:flex;"><span>        <span style="color:#a6e22e">isolate</span>(input<span style="color:#f92672">$</span>afile<span style="color:#f92672">$</span>datapath)
+</span></span><span style="display:flex;"><span>      )
+</span></span><span style="display:flex;"><span>      DT<span style="color:#f92672">::</span><span style="color:#a6e22e">datatable</span>(dat)
+</span></span><span style="display:flex;"><span>    })
+</span></span><span style="display:flex;"><span>  })
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>  <span style="color:#a6e22e">observeEvent</span>(input<span style="color:#f92672">$</span>reset, {
+</span></span><span style="display:flex;"><span>    shinyjs<span style="color:#f92672">::</span><span style="color:#a6e22e">reset</span>(<span style="color:#e6db74">&#34;afile&#34;</span>)
+</span></span><span style="display:flex;"><span>    output<span style="color:#f92672">$</span>result <span style="color:#f92672">&lt;-</span> <span style="color:#a6e22e">renderText</span>({})
+</span></span><span style="display:flex;"><span>  })
+</span></span><span style="display:flex;"><span>}
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span><span style="color:#a6e22e">shinyApp</span>(ui, server)
+</span></span></code></pre></div>
+</details>
+
+<br />
+
+<p>And here&rsquo;s the entire app that does work</p>
+<details>
+  <summary>Click to expand</summary>
+  <div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-r" data-lang="r"><span style="display:flex;"><span><span style="color:#a6e22e">library</span>(shiny)
+</span></span><span style="display:flex;"><span><span style="color:#a6e22e">library</span>(shinyjs)
+</span></span><span style="display:flex;"><span><span style="color:#a6e22e">library</span>(bslib)
+</span></span><span style="display:flex;"><span><span style="color:#a6e22e">library</span>(DT)
+</span></span><span style="display:flex;"><span><span style="color:#a6e22e">library</span>(vroom)
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>reactiveInput <span style="color:#f92672">&lt;-</span> <span style="color:#66d9ef">function</span>(rval, path) {
+</span></span><span style="display:flex;"><span>  <span style="color:#66d9ef">if</span> (<span style="color:#a6e22e">is.null</span>(rval)) {
+</span></span><span style="display:flex;"><span>    <span style="color:#66d9ef">return</span>(<span style="color:#66d9ef">NULL</span>)
+</span></span><span style="display:flex;"><span>  } <span style="color:#66d9ef">else</span> <span style="color:#66d9ef">if</span> (rval <span style="color:#f92672">==</span> <span style="color:#e6db74">&#39;loaded&#39;</span>) {
+</span></span><span style="display:flex;"><span>    <span style="color:#66d9ef">return</span>(path)
+</span></span><span style="display:flex;"><span>  } <span style="color:#66d9ef">else</span> <span style="color:#66d9ef">if</span> (rval <span style="color:#f92672">==</span> <span style="color:#e6db74">&#39;reset&#39;</span>) {
+</span></span><span style="display:flex;"><span>    <span style="color:#66d9ef">return</span>(<span style="color:#66d9ef">NULL</span>)
+</span></span><span style="display:flex;"><span>  }
+</span></span><span style="display:flex;"><span>}
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>ui <span style="color:#f92672">&lt;-</span> <span style="color:#a6e22e">page_sidebar</span>(
+</span></span><span style="display:flex;"><span>  title <span style="color:#f92672">=</span> <span style="color:#e6db74">&#34;My dashboard&#34;</span>,
+</span></span><span style="display:flex;"><span>  sidebar <span style="color:#f92672">=</span> <span style="color:#a6e22e">list</span>(
+</span></span><span style="display:flex;"><span>    <span style="color:#a6e22e">actionButton</span>(<span style="color:#e6db74">&#34;submit&#34;</span>, <span style="color:#e6db74">&#34;Submit&#34;</span>),
+</span></span><span style="display:flex;"><span>    <span style="color:#a6e22e">actionButton</span>(<span style="color:#e6db74">&#34;reset&#34;</span>, <span style="color:#e6db74">&#34;Reset&#34;</span>)
+</span></span><span style="display:flex;"><span>  ),
+</span></span><span style="display:flex;"><span>  <span style="color:#a6e22e">fileInput</span>(inputId <span style="color:#f92672">=</span> <span style="color:#e6db74">&#34;afile&#34;</span>, <span style="color:#e6db74">&#34;Upload file&#34;</span>, accept <span style="color:#f92672">=</span> <span style="color:#e6db74">&#34;.csv&#34;</span>),
+</span></span><span style="display:flex;"><span>  DT<span style="color:#f92672">::</span><span style="color:#a6e22e">DTOutput</span>(<span style="color:#e6db74">&#34;result&#34;</span>),
+</span></span><span style="display:flex;"><span>  shinyjs<span style="color:#f92672">::</span><span style="color:#a6e22e">useShinyjs</span>()
+</span></span><span style="display:flex;"><span>)
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>server <span style="color:#f92672">&lt;-</span> <span style="color:#66d9ef">function</span>(input, output) {
+</span></span><span style="display:flex;"><span>  rv_file <span style="color:#f92672">&lt;-</span> <span style="color:#a6e22e">reactiveValues</span>(file_state <span style="color:#f92672">=</span> <span style="color:#66d9ef">NULL</span>)
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>  thefile <span style="color:#f92672">&lt;-</span> <span style="color:#a6e22e">reactive</span>({
+</span></span><span style="display:flex;"><span>    <span style="color:#a6e22e">reactiveInput</span>(rv_file<span style="color:#f92672">$</span>file_state, input<span style="color:#f92672">$</span>afile<span style="color:#f92672">$</span>datapath)
+</span></span><span style="display:flex;"><span>  })
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>  <span style="color:#a6e22e">observeEvent</span>(input<span style="color:#f92672">$</span>afile, {
+</span></span><span style="display:flex;"><span>    rv_file<span style="color:#f92672">$</span>file_state <span style="color:#f92672">&lt;-</span> <span style="color:#e6db74">&#39;loaded&#39;</span>
+</span></span><span style="display:flex;"><span>  })
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>  <span style="color:#a6e22e">observeEvent</span>(input<span style="color:#f92672">$</span>submit, {
+</span></span><span style="display:flex;"><span>    output<span style="color:#f92672">$</span>result <span style="color:#f92672">&lt;-</span> DT<span style="color:#f92672">::</span><span style="color:#a6e22e">renderDataTable</span>({
+</span></span><span style="display:flex;"><span>      dat <span style="color:#f92672">&lt;-</span> vroom<span style="color:#f92672">::</span><span style="color:#a6e22e">vroom</span>(
+</span></span><span style="display:flex;"><span>        <span style="color:#a6e22e">isolate</span>(<span style="color:#a6e22e">thefile</span>())
+</span></span><span style="display:flex;"><span>      )
+</span></span><span style="display:flex;"><span>      DT<span style="color:#f92672">::</span><span style="color:#a6e22e">datatable</span>(dat)
+</span></span><span style="display:flex;"><span>    })
+</span></span><span style="display:flex;"><span>  })
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>  <span style="color:#a6e22e">observeEvent</span>(input<span style="color:#f92672">$</span>reset, {
+</span></span><span style="display:flex;"><span>    shinyjs<span style="color:#f92672">::</span><span style="color:#a6e22e">reset</span>(<span style="color:#e6db74">&#34;afile&#34;</span>)
+</span></span><span style="display:flex;"><span>    rv_file<span style="color:#f92672">$</span>file_state <span style="color:#f92672">&lt;-</span> <span style="color:#e6db74">&#39;reset&#39;</span>
+</span></span><span style="display:flex;"><span>    output<span style="color:#f92672">$</span>result <span style="color:#f92672">&lt;-</span> <span style="color:#a6e22e">renderText</span>({})
+</span></span><span style="display:flex;"><span>  })
+</span></span><span style="display:flex;"><span>}
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span><span style="color:#a6e22e">shinyApp</span>(ui, server)
+</span></span></code></pre></div>
+</details>
+
+]]></content:encoded>
     </item>
     <item>
       <title>Shiny button weirdness</title>
@@ -27,6 +183,137 @@ Load libraries
 library(shiny) library(bslib) library(crul) Helper function, returned a random UUID from an httpbin server
 httpbin_uuid &amp;lt;- function(...) { con &amp;lt;- crul::HttpClient$new(&amp;#34;https://hb.opencpu.org&amp;#34;) res &amp;lt;- con$get(&amp;#34;uuid&amp;#34;) jsonlite::fromJSON(res$parse(&amp;#34;UTF-8&amp;#34;))$uuid } A bslib ui component
 ui &amp;lt;- page_sidebar( title = &amp;#34;My dashboard&amp;#34;, sidebar = list( actionButton(&amp;#34;submit&amp;#34;, &amp;#34;Submit&amp;#34;), actionButton(&amp;#34;reset&amp;#34;, &amp;#34;Reset&amp;#34;) ), textInput(inputId = &amp;#34;name&amp;#34;, &amp;#34;Your name&amp;#34;), textOutput(&amp;#34;uuid&amp;#34;) ) Here&amp;rsquo;s the server part that was giving me trouble.</description>
+      <content:encoded><![CDATA[<p>I&rsquo;ve been working on <a href="https://shiny.posit.co/">Shiny</a> app at work for the past few months. One of the many frustrating things about Shiny lately has been around buttons. Well, it wasn&rsquo;t really about buttons, but that&rsquo;s where it started.</p>
+<p>Load libraries</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-r" data-lang="r"><span style="display:flex;"><span><span style="color:#a6e22e">library</span>(shiny)
+</span></span><span style="display:flex;"><span><span style="color:#a6e22e">library</span>(bslib)
+</span></span><span style="display:flex;"><span><span style="color:#a6e22e">library</span>(crul)
+</span></span></code></pre></div><p>Helper function, returned a random UUID from an httpbin server</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-r" data-lang="r"><span style="display:flex;"><span>httpbin_uuid <span style="color:#f92672">&lt;-</span> <span style="color:#66d9ef">function</span>(<span style="color:#66d9ef">...</span>) {
+</span></span><span style="display:flex;"><span>  con <span style="color:#f92672">&lt;-</span> crul<span style="color:#f92672">::</span>HttpClient<span style="color:#f92672">$</span><span style="color:#a6e22e">new</span>(<span style="color:#e6db74">&#34;https://hb.opencpu.org&#34;</span>)
+</span></span><span style="display:flex;"><span>  res <span style="color:#f92672">&lt;-</span> con<span style="color:#f92672">$</span><span style="color:#a6e22e">get</span>(<span style="color:#e6db74">&#34;uuid&#34;</span>)
+</span></span><span style="display:flex;"><span>  jsonlite<span style="color:#f92672">::</span><span style="color:#a6e22e">fromJSON</span>(res<span style="color:#f92672">$</span><span style="color:#a6e22e">parse</span>(<span style="color:#e6db74">&#34;UTF-8&#34;</span>))<span style="color:#f92672">$</span>uuid
+</span></span><span style="display:flex;"><span>}
+</span></span></code></pre></div><p>A bslib ui component</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-r" data-lang="r"><span style="display:flex;"><span>ui <span style="color:#f92672">&lt;-</span> <span style="color:#a6e22e">page_sidebar</span>(
+</span></span><span style="display:flex;"><span>  title <span style="color:#f92672">=</span> <span style="color:#e6db74">&#34;My dashboard&#34;</span>,
+</span></span><span style="display:flex;"><span>  sidebar <span style="color:#f92672">=</span> <span style="color:#a6e22e">list</span>(
+</span></span><span style="display:flex;"><span>    <span style="color:#a6e22e">actionButton</span>(<span style="color:#e6db74">&#34;submit&#34;</span>, <span style="color:#e6db74">&#34;Submit&#34;</span>),
+</span></span><span style="display:flex;"><span>    <span style="color:#a6e22e">actionButton</span>(<span style="color:#e6db74">&#34;reset&#34;</span>, <span style="color:#e6db74">&#34;Reset&#34;</span>)
+</span></span><span style="display:flex;"><span>  ),
+</span></span><span style="display:flex;"><span>  <span style="color:#a6e22e">textInput</span>(inputId <span style="color:#f92672">=</span> <span style="color:#e6db74">&#34;name&#34;</span>, <span style="color:#e6db74">&#34;Your name&#34;</span>),
+</span></span><span style="display:flex;"><span>  <span style="color:#a6e22e">textOutput</span>(<span style="color:#e6db74">&#34;uuid&#34;</span>)
+</span></span><span style="display:flex;"><span>)
+</span></span></code></pre></div><p>Here&rsquo;s the server part that was giving me trouble. As I said this was an inherited repo, and the server side handling for many buttons was done with <code>eventReactive</code> as below. Using <code>eventReactive</code> meant that button clicks only sometimes triggered the server side code.</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-r" data-lang="r"><span style="display:flex;"><span>server <span style="color:#f92672">&lt;-</span> <span style="color:#66d9ef">function</span>(input, output, session) {
+</span></span><span style="display:flex;"><span>  tmp <span style="color:#f92672">&lt;-</span> <span style="color:#a6e22e">eventReactive</span>(input<span style="color:#f92672">$</span>submit, {
+</span></span><span style="display:flex;"><span>    <span style="color:#a6e22e">httpbin_uuid</span>(input<span style="color:#f92672">$</span>name)
+</span></span><span style="display:flex;"><span>  })
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>  output<span style="color:#f92672">$</span>uuid <span style="color:#f92672">&lt;-</span> <span style="color:#a6e22e">renderText</span>({ <span style="color:#a6e22e">tmp</span>() })
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>  <span style="color:#a6e22e">observeEvent</span>(input<span style="color:#f92672">$</span>reset, {
+</span></span><span style="display:flex;"><span>    <span style="color:#a6e22e">updateTextInput</span>(session, <span style="color:#e6db74">&#34;name&#34;</span>, <span style="color:#e6db74">&#34;Your name&#34;</span>, <span style="color:#e6db74">&#34;&#34;</span>)
+</span></span><span style="display:flex;"><span>    output<span style="color:#f92672">$</span>uuid <span style="color:#f92672">&lt;-</span> <span style="color:#a6e22e">renderText</span>({})
+</span></span><span style="display:flex;"><span>  })
+</span></span><span style="display:flex;"><span>}
+</span></span></code></pre></div><p>Eventually I landed upon switching from <code>eventReactive</code> to <code>observeEvent</code> for a variety of reasons. And tried something like this:</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-r" data-lang="r"><span style="display:flex;"><span>  <span style="color:#a6e22e">observeEvent</span>(input<span style="color:#f92672">$</span>submit, {
+</span></span><span style="display:flex;"><span>    output<span style="color:#f92672">$</span>uuid <span style="color:#f92672">&lt;-</span> <span style="color:#a6e22e">renderText</span>({
+</span></span><span style="display:flex;"><span>      <span style="color:#a6e22e">httpbin_uuid</span>(input<span style="color:#f92672">$</span>name)
+</span></span><span style="display:flex;"><span>    })
+</span></span><span style="display:flex;"><span>  })
+</span></span></code></pre></div><p>However, keen eyes will notice that this still doesn&rsquo;t work. The final missing piece was the function <code>isolate</code>. Without <code>isolate</code> the <code>observeEvent</code> handler was being triggered on changes other than just a button click.</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-r" data-lang="r"><span style="display:flex;"><span>  <span style="color:#a6e22e">observeEvent</span>(input<span style="color:#f92672">$</span>submit, {
+</span></span><span style="display:flex;"><span>    output<span style="color:#f92672">$</span>uuid <span style="color:#f92672">&lt;-</span> <span style="color:#a6e22e">renderText</span>({
+</span></span><span style="display:flex;"><span>      <span style="color:#a6e22e">isolate</span>(
+</span></span><span style="display:flex;"><span>      	<span style="color:#a6e22e">httpbin_uuid</span>(input<span style="color:#f92672">$</span>name)
+</span></span><span style="display:flex;"><span>      )
+</span></span><span style="display:flex;"><span>    })
+</span></span><span style="display:flex;"><span>  })
+</span></span></code></pre></div><p>Here&rsquo;s the entire app with <code>eventReactive</code> that didn&rsquo;t work:</p>
+<details>
+  <summary>Click to expand</summary>
+  <div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-r" data-lang="r"><span style="display:flex;"><span><span style="color:#a6e22e">library</span>(shiny)
+</span></span><span style="display:flex;"><span><span style="color:#a6e22e">library</span>(bslib)
+</span></span><span style="display:flex;"><span><span style="color:#a6e22e">library</span>(crul)
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>httpbin_uuid <span style="color:#f92672">&lt;-</span> <span style="color:#66d9ef">function</span>(<span style="color:#66d9ef">...</span>) {
+</span></span><span style="display:flex;"><span>  con <span style="color:#f92672">&lt;-</span> crul<span style="color:#f92672">::</span>HttpClient<span style="color:#f92672">$</span><span style="color:#a6e22e">new</span>(<span style="color:#e6db74">&#34;https://hb.opencpu.org&#34;</span>)
+</span></span><span style="display:flex;"><span>  res <span style="color:#f92672">&lt;-</span> con<span style="color:#f92672">$</span><span style="color:#a6e22e">get</span>(<span style="color:#e6db74">&#34;uuid&#34;</span>)
+</span></span><span style="display:flex;"><span>  jsonlite<span style="color:#f92672">::</span><span style="color:#a6e22e">fromJSON</span>(res<span style="color:#f92672">$</span><span style="color:#a6e22e">parse</span>(<span style="color:#e6db74">&#34;UTF-8&#34;</span>))<span style="color:#f92672">$</span>uuid
+</span></span><span style="display:flex;"><span>}
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>ui <span style="color:#f92672">&lt;-</span> <span style="color:#a6e22e">page_sidebar</span>(
+</span></span><span style="display:flex;"><span>  title <span style="color:#f92672">=</span> <span style="color:#e6db74">&#34;My dashboard&#34;</span>,
+</span></span><span style="display:flex;"><span>  sidebar <span style="color:#f92672">=</span> <span style="color:#a6e22e">list</span>(
+</span></span><span style="display:flex;"><span>    <span style="color:#a6e22e">actionButton</span>(<span style="color:#e6db74">&#34;submit&#34;</span>, <span style="color:#e6db74">&#34;Submit&#34;</span>),
+</span></span><span style="display:flex;"><span>    <span style="color:#a6e22e">actionButton</span>(<span style="color:#e6db74">&#34;reset&#34;</span>, <span style="color:#e6db74">&#34;Reset&#34;</span>)
+</span></span><span style="display:flex;"><span>  ),
+</span></span><span style="display:flex;"><span>  <span style="color:#a6e22e">textInput</span>(inputId <span style="color:#f92672">=</span> <span style="color:#e6db74">&#34;name&#34;</span>, <span style="color:#e6db74">&#34;Your name&#34;</span>),
+</span></span><span style="display:flex;"><span>  <span style="color:#a6e22e">textOutput</span>(<span style="color:#e6db74">&#34;uuid&#34;</span>)
+</span></span><span style="display:flex;"><span>)
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>server <span style="color:#f92672">&lt;-</span> <span style="color:#66d9ef">function</span>(input, output, session) {
+</span></span><span style="display:flex;"><span>  tmp <span style="color:#f92672">&lt;-</span> <span style="color:#a6e22e">eventReactive</span>(input<span style="color:#f92672">$</span>submit, {
+</span></span><span style="display:flex;"><span>    <span style="color:#a6e22e">httpbin_uuid</span>(input<span style="color:#f92672">$</span>name)
+</span></span><span style="display:flex;"><span>  })
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>  output<span style="color:#f92672">$</span>uuid <span style="color:#f92672">&lt;-</span> <span style="color:#a6e22e">renderText</span>({ <span style="color:#a6e22e">tmp</span>() })
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>  <span style="color:#a6e22e">observeEvent</span>(input<span style="color:#f92672">$</span>reset, {
+</span></span><span style="display:flex;"><span>    <span style="color:#a6e22e">updateTextInput</span>(session, <span style="color:#e6db74">&#34;name&#34;</span>, <span style="color:#e6db74">&#34;Your name&#34;</span>, <span style="color:#e6db74">&#34;&#34;</span>)
+</span></span><span style="display:flex;"><span>    output<span style="color:#f92672">$</span>uuid <span style="color:#f92672">&lt;-</span> <span style="color:#a6e22e">renderText</span>({})
+</span></span><span style="display:flex;"><span>  })
+</span></span><span style="display:flex;"><span>}
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span><span style="color:#a6e22e">shinyApp</span>(ui, server)
+</span></span></code></pre></div>
+</details>
+
+<br />
+
+<p>And here&rsquo;s the entire app with <code>obseveEvent</code> and <code>isolate</code> that worked:</p>
+<details>
+  <summary>Click to expand</summary>
+  <div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-r" data-lang="r"><span style="display:flex;"><span><span style="color:#a6e22e">library</span>(shiny)
+</span></span><span style="display:flex;"><span><span style="color:#a6e22e">library</span>(bslib)
+</span></span><span style="display:flex;"><span><span style="color:#a6e22e">library</span>(crul)
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>httpbin_uuid <span style="color:#f92672">&lt;-</span> <span style="color:#66d9ef">function</span>(<span style="color:#66d9ef">...</span>) {
+</span></span><span style="display:flex;"><span>  con <span style="color:#f92672">&lt;-</span> crul<span style="color:#f92672">::</span>HttpClient<span style="color:#f92672">$</span><span style="color:#a6e22e">new</span>(<span style="color:#e6db74">&#34;https://hb.opencpu.org&#34;</span>)
+</span></span><span style="display:flex;"><span>  res <span style="color:#f92672">&lt;-</span> con<span style="color:#f92672">$</span><span style="color:#a6e22e">get</span>(<span style="color:#e6db74">&#34;uuid&#34;</span>)
+</span></span><span style="display:flex;"><span>  jsonlite<span style="color:#f92672">::</span><span style="color:#a6e22e">fromJSON</span>(res<span style="color:#f92672">$</span><span style="color:#a6e22e">parse</span>(<span style="color:#e6db74">&#34;UTF-8&#34;</span>))<span style="color:#f92672">$</span>uuid
+</span></span><span style="display:flex;"><span>}
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>ui <span style="color:#f92672">&lt;-</span> <span style="color:#a6e22e">page_sidebar</span>(
+</span></span><span style="display:flex;"><span>  title <span style="color:#f92672">=</span> <span style="color:#e6db74">&#34;My dashboard&#34;</span>,
+</span></span><span style="display:flex;"><span>  sidebar <span style="color:#f92672">=</span> <span style="color:#a6e22e">list</span>(
+</span></span><span style="display:flex;"><span>    <span style="color:#a6e22e">actionButton</span>(<span style="color:#e6db74">&#34;submit&#34;</span>, <span style="color:#e6db74">&#34;Submit&#34;</span>),
+</span></span><span style="display:flex;"><span>    <span style="color:#a6e22e">actionButton</span>(<span style="color:#e6db74">&#34;reset&#34;</span>, <span style="color:#e6db74">&#34;Reset&#34;</span>)
+</span></span><span style="display:flex;"><span>  ),
+</span></span><span style="display:flex;"><span>  <span style="color:#a6e22e">textInput</span>(inputId <span style="color:#f92672">=</span> <span style="color:#e6db74">&#34;name&#34;</span>, <span style="color:#e6db74">&#34;Your name&#34;</span>),
+</span></span><span style="display:flex;"><span>  <span style="color:#a6e22e">textOutput</span>(<span style="color:#e6db74">&#34;uuid&#34;</span>)
+</span></span><span style="display:flex;"><span>)
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>server <span style="color:#f92672">&lt;-</span> <span style="color:#66d9ef">function</span>(input, output, session) {
+</span></span><span style="display:flex;"><span>  <span style="color:#a6e22e">observeEvent</span>(input<span style="color:#f92672">$</span>submit, {
+</span></span><span style="display:flex;"><span>    output<span style="color:#f92672">$</span>uuid <span style="color:#f92672">&lt;-</span> <span style="color:#a6e22e">renderText</span>({
+</span></span><span style="display:flex;"><span>      <span style="color:#a6e22e">isolate</span>(<span style="color:#a6e22e">httpbin_uuid</span>(input<span style="color:#f92672">$</span>name))
+</span></span><span style="display:flex;"><span>    })
+</span></span><span style="display:flex;"><span>  })
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>  <span style="color:#a6e22e">observeEvent</span>(input<span style="color:#f92672">$</span>reset, {
+</span></span><span style="display:flex;"><span>    <span style="color:#a6e22e">updateTextInput</span>(session, <span style="color:#e6db74">&#34;name&#34;</span>, <span style="color:#e6db74">&#34;Your name&#34;</span>, <span style="color:#e6db74">&#34;&#34;</span>)
+</span></span><span style="display:flex;"><span>    output<span style="color:#f92672">$</span>uuid <span style="color:#f92672">&lt;-</span> <span style="color:#a6e22e">renderText</span>({})
+</span></span><span style="display:flex;"><span>  })
+</span></span><span style="display:flex;"><span>}
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span><span style="color:#a6e22e">shinyApp</span>(ui, server)
+</span></span></code></pre></div>
+</details>
+
+]]></content:encoded>
     </item>
     <item>
       <title>Avoiding the word footgun(s)</title>
@@ -34,6 +321,27 @@ ui &amp;lt;- page_sidebar( title = &amp;#34;My dashboard&amp;#34;, sidebar = lis
       <pubDate>Sun, 03 Mar 2024 00:00:00 +0000</pubDate>
       <guid>http://localhost:1313/2024/03/foot-guns/</guid>
       <description>I recently opened an issue in a repository for a package I&amp;rsquo;m working on to think about potential footguns and how to avoid them. That word &amp;ldquo;footguns&amp;rdquo; got me thinking; does using phrases/metaphors for a certain topic in a way lend credibility to it? For example, we use a lot of sports metaphors in the US, especially baseball (swing for the fences, anything related to bases, curveballs, heavy hitter, etc.), and that says something about the place of baseball in our culture.</description>
+      <content:encoded><![CDATA[<p>I recently opened an issue in a repository for a package I&rsquo;m working on to think about potential <a href="https://en.wiktionary.org/wiki/footgun">footguns</a> and how to avoid them. That word &ldquo;footguns&rdquo; got me thinking; does using phrases/metaphors for a certain topic in a way lend credibility to it? For example, we use a lot of sports metaphors in the US, especially baseball (swing for the fences, anything related to bases, curveballs, heavy hitter, etc.), and that says something about the place of baseball in our culture.</p>
+<p>So with that I asked on mastodon for ideas:</p>
+<blockquote>
+<p>Any replacement for the “foot guns” saying for code?</p>
+</blockquote>
+<p>The ideas were:</p>
+<ul>
+<li>self-sabotage</li>
+<li>own-goal</li>
+<li>power tools can injure</li>
+<li>hoisted by their own petard</li>
+<li>fire hazard</li>
+<li>segfault</li>
+<li>tripwire</li>
+<li>landmine</li>
+<li>stumbling block</li>
+</ul>
+<p>The person that suggested own-goal also linked to <a href="https://english.stackexchange.com/questions/199247/is-there-a-word-analogous-to-shooting-yourself-in-the-foot">this question</a> on English Language &amp; Usage stack exchange with some additional ideas, none of which I particularly liked so am not including here.</p>
+<p>Of the ideas above I liked <strong>stumbling block</strong> the most, and was ready to use that moving forward, but then realized/remembered that that phrase is also sort of the translation for the word <a href="https://en.wikipedia.org/wiki/Stolperstein">Stolperstein</a>, physical concrete cubes as memorials for victims of Nazism. I don&rsquo;t think it makes sense to use stumbling blocks then.</p>
+<p>After all that, I&rsquo;m not sure what to use moving forward. :shrug:</p>
+]]></content:encoded>
     </item>
     <item>
       <title>Weird thoughts</title>
@@ -42,6 +350,23 @@ ui &amp;lt;- page_sidebar( title = &amp;#34;My dashboard&amp;#34;, sidebar = lis
       <guid>http://localhost:1313/2023/10/weird-thoughts/</guid>
       <description>My parents just found this email they had printed out from me from May 19, 2006, when I was 26. I chatted about some family stuff, then had this rambling string of weird thoughts below. I thought others might appreciate a good cringe - or cringy laugh - at my expense. It&amp;rsquo;s especially funny because I&amp;rsquo;m most def an atheist. I don&amp;rsquo;t know, those Tucson sunsets really are transformative.
 … Actually, some deep thoughts:</description>
+      <content:encoded><![CDATA[<p>My parents just found this email they had printed out from me from May 19, 2006, when I was 26. I chatted about some family stuff, then had this rambling string of weird thoughts below. I thought others might appreciate a good cringe - or cringy laugh - at my expense. It&rsquo;s especially funny because I&rsquo;m most def an atheist. I don&rsquo;t know, those Tucson sunsets really are transformative.</p>
+<blockquote>
+<p>… Actually, some deep thoughts:</p>
+</blockquote>
+<blockquote>
+<p>So, what is it about a sunset that makes you feel so good? Is it that the sun is
+what provides us food ultimately, and we are grateful for its good day&rsquo;s work
+once again. Or is it that we know that the day is over and we have
+survived it once again. Perhaps we think that it is god looking down on us and sendins us
+off to lay our heads down at the pillow again. But, what if a sunset allows us
+to get in touch with some more spiritual side of ourselves for a small period
+of time; for the sun setting marks the division between day and night, light
+and dark, and signifies maybe the division between our physical and spiritual
+bodies, such that its a moment to connect with that spiritual side for a moment
+before returning to the physical. Anyway&hellip;blah blah blah</p>
+</blockquote>
+]]></content:encoded>
     </item>
     <item>
       <title>Job searching notes</title>
@@ -50,6 +375,38 @@ ui &amp;lt;- page_sidebar( title = &amp;#34;My dashboard&amp;#34;, sidebar = lis
       <guid>http://localhost:1313/2023/10/job-searching/</guid>
       <description>notes to self for next job hunt (some of which may be generally useful):
 don&amp;rsquo;t apply to general tech companies anymore for many reasons. heard back from very very few but that may be b/c I don&amp;rsquo;t know many people at general tech companies never been able to get through interviews; they&amp;rsquo;re presumably looking for computer science grads (not me) most of their missions are probably not stuff I&amp;rsquo;d be happy about at the end of the day.</description>
+      <content:encoded><![CDATA[<p>notes to self for next job hunt (some of which may be generally useful):</p>
+<ul>
+<li>don&rsquo;t apply to general tech companies anymore for many reasons.
+<ol>
+<li>heard back from very very few but that may be b/c I don&rsquo;t know many people at general tech companies</li>
+<li>never been able to get through interviews; they&rsquo;re presumably looking for computer science grads (not me)</li>
+<li>most of their missions are probably not stuff I&rsquo;d be happy about at the end of the day. despite missions of doing xyz, it&rsquo;s probably really about $$</li>
+</ol>
+</li>
+<li>don&rsquo;t apply to pharma companies any more. there&rsquo;s lots of good software jobs in that sector, but i&rsquo;ve struck out 3 times, and so that&rsquo;s a clear pattern my background/whatever isn&rsquo;t something they want</li>
+<li>next time only apply where I have a connection that can refer me or dig around for a referral. it&rsquo;s super easy to apply for jobs, especially if you don&rsquo;t write a cover letter; however, the less time I spend surely the less likely I am to hear back</li>
+<li>make sure (and I&rsquo;ll probably fail to do it again this time, ugh) to write down what questions I was asked, how I answered, and how to improve on that answer. then study and reference those questions and answers for the next interview</li>
+<li>its good to have multiple offers at the same time, but then deciding is harder - &amp; I don&rsquo;t love to negotiating - so maybe don&rsquo;t worry about multiple offers at the same time next time around</li>
+<li>I have relatively low expectations in any interview b/c I don&rsquo;t do technical interviews well - I also try to seek out orgs that do not have crazy technical interview processes - eg., Roche had a whiteboard technical interview that I totally bombed, but was unsurprising in hindsight since the interviewer was an ex-Googler. I&rsquo;m more of a thinker than a quick responder, making it hard to do well in very fast paced (for me) tech interviews. Though I know i have been a good software engineer where I&rsquo;ve worked, so these fast paced tech interviews are probably selecting for a certain kind of brain function I guess?</li>
+<li>seek out orgs with interview processes that have take home assignments - or at least timed coding tests on something like hackerrank - instead of live whiteboard/zoom tech inteviews
+<ul>
+<li>my last job Deck had a take home test</li>
+<li><a href="https://www.axiomdatascience.com/">Axiom DS</a> has a take home test approach</li>
+<li><a href="https://adhoc.team/">AdHoc</a> uses a take home test approach</li>
+<li>Invitae had a hackerrank test, not a take home but better than live coding test</li>
+</ul>
+</li>
+<li>cover letters? I still don&rsquo;t know whether these are worth doing or not. the advice seems to be mixed. they sure take a lot of time, so I hope they&rsquo;re not necessary for most hiring managers; given my bullet above about spending more time on fewer applications, I could find time for a cover letter on every application if ther&rsquo;s not that many</li>
+</ul>
+<p>some data about this last job search:</p>
+<ul>
+<li>48: orgs that took time to say No</li>
+<li>51: orgs that didn&rsquo;t respond</li>
+<li>10: orgs that interviewed me (including recruiter only)</li>
+<li>1: thanks hutch!</li>
+</ul>
+]]></content:encoded>
     </item>
     <item>
       <title>Working at Fred Hutchinson Cancer Center</title>
@@ -58,6 +415,11 @@ don&amp;rsquo;t apply to general tech companies anymore for many reasons. heard 
       <guid>http://localhost:1313/2023/10/fred-hutch/</guid>
       <description>Soooo, my last job at Deck was amazing. I loved it. I was doing data engineer stuff there, mostly maintaining infrastructure for data pipelines. Everyone was great and the mission was amazing: helping Democrats win. Yet the company was shut down about a month ago, sending me on another job search, the 3rd since early/mid 2021.
 I&amp;rsquo;m super thrilled to have landed a job (Software and Reproducibility Software Developer) at the Fred Hutch Data Science Lab (DASL), headed up by Jeff Leek, working with Sean Kross, Amy Paguirigan, and Monica Gerber, among many other amazing folks.</description>
+      <content:encoded><![CDATA[<p>Soooo, my last job at <a href="https://welcome.deck.tools/">Deck</a> was amazing. I loved it. I was doing data engineer stuff there, mostly maintaining infrastructure for data pipelines. Everyone was great and the mission was amazing: helping Democrats win. Yet the company was shut down about a month ago, sending me on another job search, the 3rd since early/mid 2021.</p>
+<p>I&rsquo;m super thrilled to have landed a job (Software and Reproducibility Software Developer) at the <a href="https://hutchdatascience.org/">Fred Hutch Data Science Lab (DASL)</a>, headed up by <a href="https://jtleek.com/">Jeff Leek</a>, working with <a href="https://seankross.com/">Sean Kross</a>, <a href="https://amypag.com/">Amy Paguirigan</a>, and <a href="https://www.monicagerber.com/">Monica Gerber</a>, among many other amazing folks.</p>
+<p>I&rsquo;m excited to help support the DASL mission to help cancer patients, care providers and researchers.</p>
+<p>In addition, I get to do a bunch (maybe all?) of software work as opensource, mostly in R and Python. After two jobs where opensource wasn&rsquo;t really part of the job, it&rsquo;s such a treat to get back to doing opensource work. Perhaps it will mostly be conversing with Fred Hutch people, but the goal is to make tools that will help far beyond Fred Hutch.</p>
+]]></content:encoded>
     </item>
     <item>
       <title>Python, ast, and redbaron</title>
@@ -67,6 +429,133 @@ I&amp;rsquo;m super thrilled to have landed a job (Software and Reproducibility 
       <description>I recently had a use case at work where I wanted to check that file paths given in a Python script actually existed. These paths were in various GitHub repositories, so all I had to do was pull out the paths and check if they exist on GitHub.
 There were a few catches though.
 First, I couldn&amp;rsquo;t simply get any string out of each Python script - they needed to be strings specficied by a specific function parameter, and match a regex (e.</description>
+      <content:encoded><![CDATA[<p>I recently had a use case at work where I wanted to check that file paths given in a Python script actually existed. These paths were in various GitHub repositories, so all I had to do was pull out the paths and check if they exist on GitHub.</p>
+<p>There were a few catches though.</p>
+<p>First, I couldn&rsquo;t simply get any string out of each Python script - they needed to be strings specficied by a specific function parameter, and match a regex (e.g., start with &lsquo;abc&rsquo;).</p>
+<p>Second, the script paths lack the GitHub repository root name. This name was part of the function name - so I needed to get access to the function that the path was specified within, and then parse the function name to get the repository name.</p>
+<p>The obvious solution I thought was the <a href="https://docs.python.org/3/library/ast.html">ast</a> library.</p>
+<h2 id="ast-library">ast library</h2>
+<p>I started by using <code>ast</code>. The <code>ast.NodeVisitor</code> class seemed like it would do the trick.</p>
+<p>An example script (&ldquo;my_script.py&rdquo;):</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-python" data-lang="python"><span style="display:flex;"><span><span style="color:#66d9ef">def</span> <span style="color:#a6e22e">hello</span>(path, stuff<span style="color:#f92672">=</span><span style="color:#66d9ef">None</span>):
+</span></span><span style="display:flex;"><span>    <span style="color:#66d9ef">return</span> path
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span><span style="color:#66d9ef">if</span> __name__ <span style="color:#f92672">==</span> <span style="color:#e6db74">&#34;__main__&#34;</span>:
+</span></span><span style="display:flex;"><span>    print(hello(path<span style="color:#f92672">=</span><span style="color:#e6db74">&#34;hello/world.py&#34;</span>, stuff<span style="color:#f92672">=</span><span style="color:#e6db74">&#34;hello mars&#34;</span>))
+</span></span></code></pre></div><div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-python" data-lang="python"><span style="display:flex;"><span><span style="color:#f92672">import</span> ast
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span><span style="color:#66d9ef">class</span> <span style="color:#a6e22e">CollectStrings</span>(ast<span style="color:#f92672">.</span>NodeVisitor):
+</span></span><span style="display:flex;"><span>    <span style="color:#66d9ef">def</span> <span style="color:#a6e22e">visit_Module</span>(self, node):
+</span></span><span style="display:flex;"><span>        self<span style="color:#f92672">.</span>out <span style="color:#f92672">=</span> set()
+</span></span><span style="display:flex;"><span>        self<span style="color:#f92672">.</span>generic_visit(node)
+</span></span><span style="display:flex;"><span>        <span style="color:#66d9ef">return</span> list(filter(<span style="color:#66d9ef">lambda</span> w: w<span style="color:#f92672">.</span>startswith(<span style="color:#e6db74">&#34;hello&#34;</span>) <span style="color:#f92672">and</span> w<span style="color:#f92672">.</span>endswith(<span style="color:#e6db74">&#34;.py&#34;</span>), self<span style="color:#f92672">.</span>out))
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>    <span style="color:#66d9ef">def</span> <span style="color:#a6e22e">visit_Str</span>(self, node):
+</span></span><span style="display:flex;"><span>        self<span style="color:#f92672">.</span>out<span style="color:#f92672">.</span>add(node<span style="color:#f92672">.</span>s)
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>file <span style="color:#f92672">=</span> <span style="color:#e6db74">&#34;my_script.py&#34;</span>
+</span></span><span style="display:flex;"><span><span style="color:#66d9ef">with</span> open(file, <span style="color:#e6db74">&#34;r&#34;</span>) <span style="color:#66d9ef">as</span> f:
+</span></span><span style="display:flex;"><span>    body <span style="color:#f92672">=</span> ast<span style="color:#f92672">.</span>parse(f<span style="color:#f92672">.</span>read())
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>coll <span style="color:#f92672">=</span> CollectStrings()
+</span></span><span style="display:flex;"><span>coll<span style="color:#f92672">.</span>visit(body)
+</span></span><span style="display:flex;"><span><span style="color:#75715e">## [&#39;hello/world.py&#39;]</span>
+</span></span></code></pre></div><p>That worked great at fetching paths - only because all the paths I was looking for started with the same text and all have the same file extension.</p>
+<p>HOWEVER - I also needed the function name that the <code>path</code> argument was called from. I tried to make this work with <code>ast.NodeVisitor</code> but couldn&rsquo;t get it to work.</p>
+<p>I eventually got frustrated enough and figured there must be some libraries that build on top of <code>ast</code> that make it easier to work with ast&rsquo;s in Python.</p>
+<h2 id="redbaron">redbaron</h2>
+<p>Enter <a href="https://github.com/PyCQA/redbaron">redbaron</a>. I found this library pretty quickly upon searching for a library building on top of <code>ast</code>.</p>
+<p>Another example script (&ldquo;their_script.py&rdquo;):</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-python" data-lang="python"><span style="display:flex;"><span><span style="color:#66d9ef">def</span> <span style="color:#a6e22e">hello</span>(path, stuff<span style="color:#f92672">=</span><span style="color:#66d9ef">None</span>):
+</span></span><span style="display:flex;"><span>    <span style="color:#66d9ef">return</span> path
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span><span style="color:#66d9ef">def</span> <span style="color:#a6e22e">goodbye</span>(path, stuff<span style="color:#f92672">=</span><span style="color:#66d9ef">None</span>):
+</span></span><span style="display:flex;"><span>    <span style="color:#66d9ef">return</span> path
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span><span style="color:#66d9ef">def</span> <span style="color:#a6e22e">world</span>():
+</span></span><span style="display:flex;"><span>    path_str <span style="color:#f92672">=</span> hello(path<span style="color:#f92672">=</span><span style="color:#e6db74">&#34;src/world.py&#34;</span>, stuff<span style="color:#f92672">=</span><span style="color:#e6db74">&#34;hello mars&#34;</span>)
+</span></span><span style="display:flex;"><span>    other_path_str <span style="color:#f92672">=</span> goodbye(path<span style="color:#f92672">=</span><span style="color:#e6db74">&#34;src/world.py&#34;</span>, stuff<span style="color:#f92672">=</span><span style="color:#e6db74">&#34;hello saturn&#34;</span>)
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>    <span style="color:#66d9ef">return</span> path_str, other_path_str
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span><span style="color:#66d9ef">if</span> __name__ <span style="color:#f92672">==</span> <span style="color:#e6db74">&#34;__main__&#34;</span>:
+</span></span><span style="display:flex;"><span>    print(world())
+</span></span></code></pre></div><div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-python" data-lang="python"><span style="display:flex;"><span><span style="color:#f92672">import</span> re
+</span></span><span style="display:flex;"><span><span style="color:#f92672">from</span> redbaron <span style="color:#f92672">import</span> RedBaron
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>file <span style="color:#f92672">=</span> <span style="color:#e6db74">&#34;their_script.py&#34;</span>
+</span></span><span style="display:flex;"><span><span style="color:#66d9ef">with</span> open(file, <span style="color:#e6db74">&#34;r&#34;</span>) <span style="color:#66d9ef">as</span> src:
+</span></span><span style="display:flex;"><span>  red <span style="color:#f92672">=</span> RedBaron(src<span style="color:#f92672">.</span>read())
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>red
+</span></span><span style="display:flex;"><span><span style="color:#75715e">## 0   def hello(path, stuff=None):</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">##         return path</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">##     </span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">##     </span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">##     </span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">## 1   def goodbye(path, stuff=None):</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">##         return path</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">##     </span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">##     </span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">##     </span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">## 2   def world():</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">##         path_str = hello(path=&#34;src/world.py&#34;, stuff=&#34;hello mars&#34;)</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">##         other_path_str = goodbye(path=&#34;src/world.py&#34;, stuff=&#34;hello saturn&#34;)</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">##     </span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">##         return path_str, other_path_str</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">##     </span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">##     </span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">##     </span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">## 3   if __name__ == &#34;__main__&#34;:</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">##         print(world())</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">## </span>
+</span></span></code></pre></div><p>Even just the resulting object you get from parsing something is useful:</p>
+<p>And with <code>.help()</code> you get a very detailed map of the structure of the thing you&rsquo;re trying to navigate (only printing first 20 lines):</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-python" data-lang="python"><span style="display:flex;"><span>red<span style="color:#f92672">.</span>help()
+</span></span><span style="display:flex;"><span><span style="color:#75715e">## 0 -----------------------------------------------------</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">## DefNode()</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">##   # identifiers: def, def_, defnode, funcdef, funcdef_</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">##   # default test value: name</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">##   async=False</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">##   name=&#39;hello&#39;</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">##   return_annotation -&gt;</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">##     None</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">##   decorators -&gt;</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">##   arguments -&gt;</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">##     * DefArgumentNode()</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">##         # identifiers: def_argument, def_argument_, defargument, defargumentnode</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">##         target -&gt;</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">##           NameNode() ...</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">##         annotation -&gt;</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">##           None</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">##         value -&gt;</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">##           None</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">##     * DefArgumentNode()</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">##         # identifiers: def_argument, def_argument_, defargument, defargumentnode</span>
+</span></span><span style="display:flex;"><span><span style="color:#f92672">...</span>
+</span></span></code></pre></div><p>Looking at the result from <code>red.help()</code> I can then use <code>.find_all()</code> to find certain nodes in the ast.</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-python" data-lang="python"><span style="display:flex;"><span>nodes <span style="color:#f92672">=</span> red<span style="color:#f92672">.</span>find_all(<span style="color:#e6db74">&#34;AtomtrailersNode&#34;</span>)
+</span></span><span style="display:flex;"><span>nodes <span style="color:#f92672">=</span> list(filter(<span style="color:#66d9ef">lambda</span> w: <span style="color:#e6db74">&#34;hello&#34;</span> <span style="color:#f92672">in</span> w<span style="color:#f92672">.</span>dumps(), nodes))
+</span></span><span style="display:flex;"><span>nodes
+</span></span><span style="display:flex;"><span><span style="color:#75715e">## [hello(path=&#34;src/world.py&#34;, stuff=&#34;hello mars&#34;), goodbye(path=&#34;src/world.py&#34;, stuff=&#34;hello saturn&#34;)]</span>
+</span></span></code></pre></div><p>Then I can write some okay code to extract out the function name, and ugly code to get the string supplied to the <code>path</code> parameter. Then f-string those together to get the path I&rsquo;m after.</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-python" data-lang="python"><span style="display:flex;"><span>paths <span style="color:#f92672">=</span> []
+</span></span><span style="display:flex;"><span><span style="color:#66d9ef">for</span> node <span style="color:#f92672">in</span> nodes:
+</span></span><span style="display:flex;"><span>    fxn_name <span style="color:#f92672">=</span> node<span style="color:#f92672">.</span>name<span style="color:#f92672">.</span>value
+</span></span><span style="display:flex;"><span>    command <span style="color:#f92672">=</span> re<span style="color:#f92672">.</span>search(<span style="color:#e6db74">&#34;src/.*</span><span style="color:#ae81ff">\\</span><span style="color:#e6db74">.py&#34;</span>, node<span style="color:#f92672">.</span>dumps())<span style="color:#f92672">.</span>group()
+</span></span><span style="display:flex;"><span>    paths<span style="color:#f92672">.</span>append(<span style="color:#e6db74">f</span><span style="color:#e6db74">&#34;</span><span style="color:#e6db74">{</span>fxn_name<span style="color:#e6db74">}</span><span style="color:#e6db74">/</span><span style="color:#e6db74">{</span>command<span style="color:#e6db74">}</span><span style="color:#e6db74">&#34;</span>)
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span><span style="color:#66d9ef">for</span> path <span style="color:#f92672">in</span> paths:
+</span></span><span style="display:flex;"><span>    print(path)
+</span></span><span style="display:flex;"><span><span style="color:#75715e">## hello/src/world.py</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">## goodbye/src/world.py</span>
+</span></span></code></pre></div><p>Not super proud of this but gets the job done for my use case - and when you&rsquo;re not making open source for others, you don&rsquo;t need to worry about other use cases :)</p>
+<p>I&rsquo;ll definitely try to learn how to properly extract stuff using <code>redbaron</code> - but it got me to answer much faster than the <code>ast</code> library.</p>
+]]></content:encoded>
     </item>
     <item>
       <title>CRAN Checks API and Badges</title>
@@ -75,6 +564,29 @@ First, I couldn&amp;rsquo;t simply get any string out of each Python script - th
       <guid>http://localhost:1313/2022/06/cran-checks-badges/</guid>
       <description>TL;DR In 6 months (end of November 2022) the CRAN Checks API https://cranchecks.info/ will be gone You can still get badges at https://badges.cranchecks.info You can use the new badges like: [![cran checks](https://badges.cranchecks.info/worst/dplyr.svg)](https://cran.r-project.org/web/checks/check_results_dplyr.html) Find more details at https://github.com/sckott/cchecksbadges
 Sunsetting the CRAN Checks API If you contribute an R package to CRAN, you may use badges from the CRAN checks API at https://cranchecks.info/. The CRAN Checks API has been operating since about September 2017 (I think).</description>
+      <content:encoded><![CDATA[<h2 id="tldr">TL;DR</h2>
+<ol>
+<li>In 6 months (end of November 2022) the CRAN Checks API <a href="https://cranchecks.info/">https://cranchecks.info/</a> will be gone</li>
+<li>You can still get badges at <a href="https://badges.cranchecks.info">https://badges.cranchecks.info</a></li>
+<li>You can use the new badges like:</li>
+</ol>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-markdown" data-lang="markdown"><span style="display:flex;"><span>[<span style="color:#f92672">![cran checks</span>](<span style="color:#a6e22e">https://badges.cranchecks.info/worst/dplyr.svg</span>)](https://cran.r-project.org/web/checks/check_results_dplyr.html)
+</span></span></code></pre></div><p>Find more details at <a href="https://github.com/sckott/cchecksbadges">https://github.com/sckott/cchecksbadges</a></p>
+<h2 id="sunsetting-the-cran-checks-api">Sunsetting the CRAN Checks API</h2>
+<p>If you contribute an R package to <a href="https://cloud.r-project.org/">CRAN</a>, you may use badges from the CRAN checks API at <a href="https://cranchecks.info/">https://cranchecks.info/</a>. The CRAN Checks API has been operating <a href="https://recology.info/2017/09/cranchecks-api/">since about September 2017</a> (I think).</p>
+<p>The API has a number of routes, but really people only use the badges.</p>
+<p>Given this usage pattern, and not wanting to pay for a server anymore, I&rsquo;ve decided to make the badges available on a static endpoint that doesn&rsquo;t cost me anything. There are costs of course - but they&rsquo;re on Github and Netlify (thanks y&rsquo;all!).</p>
+<h2 id="the-new-static-site-version">The new static site version</h2>
+<p>The static site is created using GitHub Actions.</p>
+<p>For a static site you need to create files for any route you want to support - so the code for the static site creates 19 routes x No. of CRAN packages = approx. 360,000 svg files.</p>
+<p>The badges will be updated once a day - the same schedule as the API.</p>
+<p>I had to use Netlify because Github pages (as far as I know) doesn&rsquo;t provide ssl certs for custom domains and my domain host doesn&rsquo;t provide free Lets Encrypt certs - whereas Netlify does.</p>
+<p>Some example routes you can look at</p>
+<p><a href="https://badges.cranchecks.info/summary/taxize.svg">https://badges.cranchecks.info/summary/taxize.svg</a>
+<a href="https://badges.cranchecks.info/worst/dplyr.svg">https://badges.cranchecks.info/worst/dplyr.svg</a>
+<a href="https://badges.cranchecks.info/flavor/r-devel-linux-x86_64-fedora-clang/DT.svg">https://badges.cranchecks.info/flavor/r-devel-linux-x86_64-fedora-clang/DT.svg</a></p>
+<p>If you find any issues with the badges at <a href="https://badges.cranchecks.info">https://badges.cranchecks.info</a> <a href="https://github.com/sckott/cchecksbadges/issues">open an issue</a>.</p>
+]]></content:encoded>
     </item>
     <item>
       <title>List comprehension vs. filter vs. key lookup</title>
@@ -83,6 +595,70 @@ Sunsetting the CRAN Checks API If you contribute an R package to CRAN, you may u
       <guid>http://localhost:1313/2022/04/lookup-vs-filter/</guid>
       <description>I was working on a work task last week, and needed to filter out one instance of a class from a list of class instances. No matter how you do this speed doesn&amp;rsquo;t matter too much if you&amp;rsquo;re doing this operation once or a few times.
 However, I this operation needs to be done about 100K times each time the script runs - so speed definitely does matter in this case.</description>
+      <content:encoded><![CDATA[<p>I was working on a work task last week, and needed to filter out one instance of a class from a list of class instances. No matter how you do this speed doesn&rsquo;t matter too much if you&rsquo;re doing this operation once or a few times.</p>
+<p>However, I this operation needs to be done about 100K times each time the script runs - so speed definitely does matter in this case.</p>
+<p>First, I naively started off with using <code>filter()</code>. When that lead to waiting more than ten minutes, I read that list comprehensions are faster.</p>
+<p>Second, I tried list comprehensions. Also waited more then ten minutes and gave up again.</p>
+<p>Last, I thought perhaps it would work to make a dictionary where the keys are the things I need to filter on and the values the class instances. This was the answer! Super fast.</p>
+<p>Now some examples of what I&rsquo;m talking about.</p>
+<p>Make a class called <code>Stuff</code>.</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-python" data-lang="python"><span style="display:flex;"><span><span style="color:#66d9ef">class</span> <span style="color:#a6e22e">Stuff</span>:
+</span></span><span style="display:flex;"><span>  <span style="color:#66d9ef">def</span> __init__(self, letter):
+</span></span><span style="display:flex;"><span>    self<span style="color:#f92672">.</span>letter <span style="color:#f92672">=</span> letter
+</span></span><span style="display:flex;"><span>    super(Stuff, self)<span style="color:#f92672">.</span>__init__()
+</span></span><span style="display:flex;"><span>  <span style="color:#66d9ef">def</span> __repr__(self):
+</span></span><span style="display:flex;"><span>        <span style="color:#66d9ef">return</span> <span style="color:#e6db74">&#34;&lt;</span><span style="color:#e6db74">{}</span><span style="color:#e6db74"> (</span><span style="color:#e6db74">{}</span><span style="color:#e6db74">)&gt;&#34;</span><span style="color:#f92672">.</span>format(self<span style="color:#f92672">.</span>__class__<span style="color:#f92672">.</span>__name__, self<span style="color:#f92672">.</span>letter)
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>x <span style="color:#f92672">=</span> Stuff(<span style="color:#e6db74">&#39;s&#39;</span>)
+</span></span><span style="display:flex;"><span>x
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; &lt;Stuff (s)&gt;</span>
+</span></span><span style="display:flex;"><span>x<span style="color:#f92672">.</span>letter
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; &#39;s&#39;</span>
+</span></span></code></pre></div><p>Make a list of instances of the class <code>Stuff</code></p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-python" data-lang="python"><span style="display:flex;"><span><span style="color:#f92672">import</span> string
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>lst <span style="color:#f92672">=</span> []
+</span></span><span style="display:flex;"><span><span style="color:#66d9ef">for</span> x <span style="color:#f92672">in</span> string<span style="color:#f92672">.</span>ascii_lowercase:
+</span></span><span style="display:flex;"><span>    lst<span style="color:#f92672">.</span>append(Stuff(x))
+</span></span><span style="display:flex;"><span>lst
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; [&lt;Stuff (a)&gt;, &lt;Stuff (b)&gt;, &lt;Stuff (c)&gt;, &lt;Stuff (d)&gt;, &lt;Stuff (e)&gt;, &lt;Stuff (f)&gt;, &lt;Stuff (g)&gt;, &lt;Stuff (h)&gt;, &lt;Stuff (i)&gt;, &lt;Stuff (j)&gt;, &lt;Stuff (k)&gt;, &lt;Stuff (l)&gt;, &lt;Stuff (m)&gt;, &lt;Stuff (n)&gt;, &lt;Stuff (o)&gt;, &lt;Stuff (p)&gt;, &lt;Stuff (q)&gt;, &lt;Stuff (r)&gt;, &lt;Stuff (s)&gt;, &lt;Stuff (t)&gt;, &lt;Stuff (u)&gt;, &lt;Stuff (v)&gt;, &lt;Stuff (w)&gt;, &lt;Stuff (x)&gt;, &lt;Stuff (y)&gt;, &lt;Stuff (z)&gt;]</span>
+</span></span><span style="display:flex;"><span>len(lst)
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; 26</span>
+</span></span></code></pre></div><p>List comprehension: This is how I did the list comprehension method. Filter the list <code>lst</code> where some attibute matched some value.</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-python" data-lang="python"><span style="display:flex;"><span>[x <span style="color:#66d9ef">for</span> x <span style="color:#f92672">in</span> lst <span style="color:#66d9ef">if</span> x<span style="color:#f92672">.</span>letter <span style="color:#f92672">==</span> <span style="color:#e6db74">&#39;f&#39;</span>]
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; [&lt;Stuff (f)&gt;]</span>
+</span></span></code></pre></div><p>Filter: This is how I did the filter method. Filter the list <code>lst</code> where some attibute matched some value.</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-python" data-lang="python"><span style="display:flex;"><span>list(filter(<span style="color:#66d9ef">lambda</span> x: x<span style="color:#f92672">.</span>letter <span style="color:#f92672">==</span> <span style="color:#e6db74">&#39;f&#39;</span>, lst))
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; [&lt;Stuff (f)&gt;]</span>
+</span></span></code></pre></div><p>And here&rsquo;s the dictionary approach. Here, I first make a dictionary via <code>dict(zip())</code> where the keys are some attribute of each instance. You can lookup by key.</p>
+<p>A major difference/drawback of this approach is that it only works if there&rsquo;s only one match per key because dictionaries don&rsquo;t allow duplicate keys.</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-python" data-lang="python"><span style="display:flex;"><span>lst_map <span style="color:#f92672">=</span> dict(zip([w<span style="color:#f92672">.</span>letter <span style="color:#66d9ef">for</span> w <span style="color:#f92672">in</span> lst], lst))
+</span></span><span style="display:flex;"><span>lst_map[<span style="color:#e6db74">&#39;f&#39;</span>]
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; &lt;Stuff (f)&gt;</span>
+</span></span></code></pre></div><p>And better yet, use <code>.get()</code> so you don&rsquo;t run into a <code>KeyError</code> when the key doesn&rsquo;t exist</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-python" data-lang="python"><span style="display:flex;"><span>lst_map<span style="color:#f92672">.</span>get(<span style="color:#e6db74">&#39;f&#39;</span>)
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; &lt;Stuff (f)&gt;</span>
+</span></span><span style="display:flex;"><span>lst_map<span style="color:#f92672">.</span>get(<span style="color:#e6db74">&#39;5&#39;</span>)
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; (returns None)</span>
+</span></span></code></pre></div><p>What about the timings:</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-python" data-lang="python"><span style="display:flex;"><span><span style="color:#f92672">from</span> timeit <span style="color:#f92672">import</span> timeit
+</span></span><span style="display:flex;"><span>n <span style="color:#f92672">=</span> <span style="color:#ae81ff">100000</span>
+</span></span><span style="display:flex;"><span>time_list_comp <span style="color:#f92672">=</span> timeit(<span style="color:#e6db74">&#34;[x for x in lst if x.letter == &#39;f&#39;]&#34;</span>, number<span style="color:#f92672">=</span>n, globals<span style="color:#f92672">=</span>globals())
+</span></span><span style="display:flex;"><span>time_filter <span style="color:#f92672">=</span> timeit(<span style="color:#e6db74">&#34;list(filter(lambda x: x.letter == &#39;f&#39;, lst))&#34;</span>, number<span style="color:#f92672">=</span>n, globals<span style="color:#f92672">=</span>globals())
+</span></span><span style="display:flex;"><span>time_dict <span style="color:#f92672">=</span> timeit(<span style="color:#e6db74">&#34;lst_map[&#39;f&#39;]&#34;</span>, number<span style="color:#f92672">=</span>n, globals<span style="color:#f92672">=</span>globals())
+</span></span><span style="display:flex;"><span>time_dict_get <span style="color:#f92672">=</span> timeit(<span style="color:#e6db74">&#34;lst_map.get(&#39;f&#39;)&#34;</span>, number<span style="color:#f92672">=</span>n, globals<span style="color:#f92672">=</span>globals())
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>round(time_list_comp, <span style="color:#ae81ff">3</span>)
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; 0.088</span>
+</span></span><span style="display:flex;"><span>round(time_filter, <span style="color:#ae81ff">3</span>)
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; 0.134</span>
+</span></span><span style="display:flex;"><span>round(time_dict, <span style="color:#ae81ff">3</span>)
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; 0.002</span>
+</span></span><span style="display:flex;"><span>round(time_dict_get, <span style="color:#ae81ff">3</span>)
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; 0.003</span>
+</span></span></code></pre></div><p>For bracketed lookup, the list comprehension is <strong>39</strong> times slower, and the filter is <strong>59</strong> times slower.</p>
+<p>For the <code>get()</code> lookup, the list comprehension is <strong>26</strong> times slower, and the filter is <strong>39</strong> times slower.</p>
+]]></content:encoded>
     </item>
     <item>
       <title>Notes on Python</title>
@@ -93,6 +669,44 @@ However, I this operation needs to be done about 100K times each time the script
 I have been using Python for many years, but not seriously or getting paid either. I&amp;rsquo;ve learned alot in the first 6 months.
 Some Python things learned:
 Functions and methods I used to think functions and methods were the same thing. But during the last 6 months I learned that functions and methods are not the same.</description>
+      <content:encoded><![CDATA[<p>It&rsquo;s been interesting switching jobs with respect to programming languages. I used to write 95% R - now I write 95% Python.</p>
+<p>I have been using Python for many years, but not seriously or getting paid either. I&rsquo;ve learned alot in the first 6 months.</p>
+<p>Some Python things learned:</p>
+<h2 id="functions-and-methods">Functions and methods</h2>
+<p>I used to think functions and methods were the same thing. But during the last 6 months I learned that functions and methods are not the same. Well, they&rsquo;re not that different. A function outside a class is just called a <a href="https://docs.python.org/3/glossary.html#term-function">function</a> while a function inside a class is called a <a href="https://docs.python.org/3/glossary.html#term-method">method</a>.  They could be exactly the same and do the same thing, but one is outside a class and the other inside a class.</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-python" data-lang="python"><span style="display:flex;"><span><span style="color:#66d9ef">class</span> <span style="color:#a6e22e">Stuff</span>(object):
+</span></span><span style="display:flex;"><span>  <span style="color:#66d9ef">def</span> <span style="color:#a6e22e">things</span>():
+</span></span><span style="display:flex;"><span>    <span style="color:#66d9ef">return</span> <span style="color:#ae81ff">5</span>
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span><span style="color:#66d9ef">def</span> <span style="color:#a6e22e">things</span>():
+</span></span><span style="display:flex;"><span>    <span style="color:#66d9ef">return</span> <span style="color:#ae81ff">5</span>
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>Stuff<span style="color:#f92672">.</span>things()
+</span></span><span style="display:flex;"><span><span style="color:#75715e"># 5</span>
+</span></span><span style="display:flex;"><span>things()
+</span></span><span style="display:flex;"><span><span style="color:#75715e"># 5</span>
+</span></span></code></pre></div><h2 id="sort-and-sorted">.sort and sorted</h2>
+<p><code>.sort</code> called on an object changes the object in place and <code>sorted()</code> creates a new object.</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-python" data-lang="python"><span style="display:flex;"><span>x <span style="color:#f92672">=</span> [<span style="color:#ae81ff">4</span>,<span style="color:#ae81ff">1</span>,<span style="color:#ae81ff">7</span>,<span style="color:#ae81ff">2</span>,<span style="color:#ae81ff">6</span>,<span style="color:#ae81ff">5</span>,<span style="color:#ae81ff">3</span>]
+</span></span><span style="display:flex;"><span>z <span style="color:#f92672">=</span> x<span style="color:#f92672">.</span>sort()
+</span></span><span style="display:flex;"><span><span style="color:#75715e"># nothing returned, z = None</span>
+</span></span><span style="display:flex;"><span>sorted(x)
+</span></span><span style="display:flex;"><span><span style="color:#75715e"># [1, 2, 3, 4, 5, 6, 7]</span>
+</span></span></code></pre></div><h2 id="context-managers">context managers</h2>
+<p>I&rsquo;d surely used a <a href="https://docs.python.org/3/glossary.html#term-context-manager">context manager</a> in Python before but didn&rsquo;t realize what was happening. The code base I work in uses many <a href="https://docs.python.org/3/reference/compound_stmts.html#with">with</a> statements and these are used with context managers like:</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-python" data-lang="python"><span style="display:flex;"><span><span style="color:#66d9ef">with</span> EXPRESSION <span style="color:#66d9ef">as</span> TARGET:
+</span></span><span style="display:flex;"><span>    SUITE
+</span></span></code></pre></div><p>In the above case I often create a connection to a database using the <code>with</code> statement, then once the block is exited, the connection is cleaned up.</p>
+<h2 id="imports">imports</h2>
+<p>Coming from R, it&rsquo;s so nice in Python to be able to import specific functions, classes, etc. rather than having to load an entire file or package in R. In addition, <code>as</code> in Python imports is really nice to have.</p>
+<p>Python</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-python" data-lang="python"><span style="display:flex;"><span><span style="color:#f92672">from</span> x <span style="color:#f92672">import</span> y
+</span></span><span style="display:flex;"><span><span style="color:#f92672">import</span> pandas <span style="color:#66d9ef">as</span> pd
+</span></span></code></pre></div><p>R</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-r" data-lang="r"><span style="display:flex;"><span><span style="color:#a6e22e">require</span>(x)
+</span></span><span style="display:flex;"><span><span style="color:#a6e22e">library</span>(x)
+</span></span></code></pre></div><p>Sometimes I run into circular import issues in Python (as I did in R), which I&rsquo;ve yet to find a neat solution to sorting out.</p>
+]]></content:encoded>
     </item>
   </channel>
 </rss>

@@ -15,6 +15,65 @@
       <guid>http://localhost:1313/2016/03/hey-there/</guid>
       <description>GitHub issues are great for humans to correspond over software, or any other project. At rOpenSci we use an issue based software review system (ropensci/onboarding). Software authors and reviewers go back and forth on the software, making a better product in the end.
 We have a relatively small number of pieces of software under review at any one time compared to e.g., scientific journals - however, even with the small number, we as organizers, and authors and reviewers can forget things.</description>
+      <content:encoded><![CDATA[<p>GitHub issues are great for humans to correspond over software, or any other project. At rOpenSci we use an issue based software review system (<a href="https://github.com/ropensci/onboarding">ropensci/onboarding</a>). Software authors and reviewers go back and forth on the software, making a better product in the end.</p>
+<p>We have a relatively small number of pieces of software under review at any one time compared to e.g., scientific journals - however, even with the small number, we as organizers, and authors and reviewers can forget things. For example:</p>
+<ul>
+<li>an organizer can forget to remind a reviewer to get a review in</li>
+<li>a reviewer can forget about a review, and may benefit from a friendly reminder</li>
+<li>an author may forget about updating software based on the review</li>
+</ul>
+<p>As we are managing more package submissions through our system, automated things done by machine, or robot, will be increasingly helpful to keep the system moving smoothly.</p>
+<p>A big red flag with automated systems is the annoyance factor. We can try to be smart about this and only remind people when it&rsquo;s really needed.</p>
+<p>I&rsquo;ve been working on a thing for a while now, it&rsquo;s called <code>heythere</code>. It&rsquo;s a Ruby application that is currently set up to run on Heroku, though you could run it anywhere you want. It&rsquo;s running right now once per day to check to see if it should send any reminders to organizers, authors, reviewers.</p>
+<p><code>heythere</code> on GitHub: <a href="https://github.com/ropenscilabs/heythere">ropenscilabs/heythere</a></p>
+<h2 id="how-it-works">How it works</h2>
+<p><code>heythere</code> is controlled through a series of environment variables that controls GitHub authentication, the first day post reviewer assignment when a reminder should be sent, how many days after reviews are submitted to ask if the author needs any help, and more. Check out the <a href="https://github.com/ropenscilabs/heythere">repo</a> for all the env var options.</p>
+<p>The Ruby app can be run via a rake task from the command line, or triggered with a scheduler on something like Heroku.</p>
+<p>When the app runs, we look for environment variables that you set. If we don&rsquo;t find them we use sensible defaults.</p>
+<p>Using the env vars, we grab the issues for the repository you chose, limit to a subset of your choosing based on a series of labels, then compare dates on comments compared to your env vars, and either skip or send of comments on issues.</p>
+<p>We use <a href="https://github.com/octokit/octokit.rb">ockokit</a> under the hood to work with GitHub issues.</p>
+<h2 id="how-to-use-it">How to use it</h2>
+<h3 id="clone">clone</h3>
+<pre tabindex="0"><code>git clone git@github.com:ropenscilabs/heythere.git
+cd heythere
+</code></pre><h3 id="setup">setup</h3>
+<p>Change the repo in <code>Rakefile</code> to whatever your repository is.</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-ruby" data-lang="ruby"><span style="display:flex;"><span><span style="color:#66d9ef">Heythere</span><span style="color:#f92672">.</span>hey_there(repo <span style="color:#f92672">=</span> <span style="color:#e6db74">&#39;ropensci/onboarding&#39;</span>)
+</span></span></code></pre></div><p>Create the app (use a different name, of course)</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-bash" data-lang="bash"><span style="display:flex;"><span>heroku apps:create ropensci-hey-there
+</span></span></code></pre></div><p>Add the repository that you are targeting:</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-bash" data-lang="bash"><span style="display:flex;"><span>heroku config:add HEYTHERE_REPOSITORY<span style="color:#f92672">=</span>&lt;github-repository&gt; <span style="color:#f92672">(</span>like <span style="color:#e6db74">`</span>owner/repo<span style="color:#e6db74">`</span><span style="color:#f92672">)</span>
+</span></span></code></pre></div><p>Create a GitHub personal access token just for this application. You&rsquo;ll need to set a env var for your username and the token. We read these in the app.</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-bash" data-lang="bash"><span style="display:flex;"><span>heroku config:add GITHUB_USERNAME<span style="color:#f92672">=</span>&lt;github-user&gt;
+</span></span><span style="display:flex;"><span>heroku config:add GITHUB_PAT_OCTOKIT<span style="color:#f92672">=</span>&lt;github-pat-for-octokit&gt;
+</span></span></code></pre></div><p>Optionally, set env vars for various options. You don&rsquo;t have to set these - we&rsquo;ll use defaults</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-bash" data-lang="bash"><span style="display:flex;"><span>heroku config:add HEYTHERE_PRE_DEADLINE_DAYS<span style="color:#f92672">=</span>&lt;number-of-days-integer&gt;
+</span></span><span style="display:flex;"><span>heroku config:add HEYTHERE_DEADLINE_DAYS<span style="color:#f92672">=</span>&lt;number-of-days-integer&gt;
+</span></span><span style="display:flex;"><span>heroku config:add HEYTHERE_POST_DEADLINE_EVERY_DAYS<span style="color:#f92672">=</span>&lt;number-of-days-integer&gt;
+</span></span><span style="display:flex;"><span>heroku config:add HEYTHERE_POST_REVIEW_IN_DAYS<span style="color:#f92672">=</span>&lt;number-of-days-integer&gt;
+</span></span><span style="display:flex;"><span>heroku config:add HEYTHERE_POST_REVIEW_TOGGLE<span style="color:#f92672">=</span>&lt;boolean&gt;
+</span></span><span style="display:flex;"><span>heroku config:add HEYTHERE_BOT_NICKNAME<span style="color:#f92672">=</span>&lt;string&gt;
+</span></span></code></pre></div><p>Also save all these env vars in your <code>.bash_profile</code>, <code>.zshrc</code>, or similar so you can run the app locally. E.g. with entries like <code>export HEYTHERE_PRE_DEADLINE_DAYS=15</code></p>
+<p>You can see all your Heroku config vars using <code>heroku config</code> or use <code>rake envs</code></p>
+<p>Push your app to Heroku</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-bash" data-lang="bash"><span style="display:flex;"><span>git push heroku master
+</span></span></code></pre></div><p>Add the scheduler to your heroku app</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-bash" data-lang="bash"><span style="display:flex;"><span>heroku addons:create scheduler:standard
+</span></span><span style="display:flex;"><span>heroku addons:open scheduler
+</span></span></code></pre></div><p>Add the task <code>rake hey</code> to your heroku scheduler and set to whatever schedule you want.</p>
+<h3 id="usage">usage</h3>
+<p>If you have your repo in an env var as above, run the rake task <code>hey</code></p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-bash" data-lang="bash"><span style="display:flex;"><span>rake hey
+</span></span></code></pre></div><p>If not, then pass the repo to <code>hey</code> like</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-bash" data-lang="bash"><span style="display:flex;"><span>rake hey repo<span style="color:#f92672">=</span>owner/repo
+</span></span></code></pre></div><h3 id="what-does-it-look-like">what does it look like?</h3>
+<p>This is what a comment looks like in a thread</p>
+<p><img loading="lazy" src="/2016-03-24-hey-there/testhey.png" alt="assertr_img"  />
+</p>
+<p>You could set up a different GitHub account as your robot so it&rsquo;s clearly not coming from a real person.</p>
+<h2 id="feedback">feedback</h2>
+<p>I&rsquo;ll continue to improve <code>heythere</code> as we get feedback on its use in <code>ropensci/onboarding</code>. Would also love any feedback from you, internet. Thanks!</p>
+]]></content:encoded>
     </item>
   </channel>
 </rss>

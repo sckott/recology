@@ -15,6 +15,277 @@
       <guid>http://localhost:1313/2016/03/scrubr/</guid>
       <description>scrubr is an R library for cleaning species occurrence records. It&amp;rsquo;s general purpose, and has the following approach:
 We think using a piping workflow (%&amp;gt;%) makes code easier to build up, and easier to understand. However, you don&amp;rsquo;t have to use pipes in this package. All inputs and outputs are data.frame&amp;rsquo;s - which makes the above point easier Records trimmed off due to various filters are retained as attributes, so can still be accessed for later inspection, but don&amp;rsquo;t get in the way of the data.</description>
+      <content:encoded><![CDATA[<p><code>scrubr</code> is an R library for cleaning species occurrence records. It&rsquo;s general purpose, and has the following approach:</p>
+<ul>
+<li>We think using a piping workflow (<code>%&gt;%</code>) makes code easier to build up, and easier to understand. However, you don&rsquo;t have to use pipes in this package.</li>
+<li>All inputs and outputs are data.frame&rsquo;s - which makes the above point easier</li>
+<li>Records trimmed off due to various filters are retained as attributes, so can still be accessed for later inspection, but don&rsquo;t get in the way of the data.frame that gets modified for downstream use</li>
+<li>User interface vs. speed: This is the kind of package that surely can get faster. However, we&rsquo;re focusing on the UI first, then make speed improvements down the road.</li>
+<li>Since occurrence record datasets should all have columns with lat/long information, we automatically look for those columns for you. If identified, we use them, but you can supply lat/long column names manually as well.</li>
+</ul>
+<p>We have many packages that fetch species occurrence records from GBIF, iNaturalist, VertNet, iDigBio, Ecoengine, and more. <code>scrubr</code> fills a crucial missing niche as likely all uses of occurrence data requires cleaning of some kind. When using GBIF data via <code>rgbif</code>, that package has some utilities for cleaning data based on the issues returned with GBIF data - <code>scrubr</code> is a companion to do the rest of the cleaning.</p>
+<h2 id="scrubr-use-cases">scrubr use cases</h2>
+<h3 id="those-covered">Those covered</h3>
+<ul>
+<li>Impossible lat/long values: e.g., latitude 75</li>
+<li>Incomplete cases: one or the other of lat/long missing</li>
+<li>Unlikely lat/long values: e.g., points at 0,0</li>
+<li>Deduplication: try to identify duplicates, esp. when pulling data from multiple sources, e.g., can try to use occurrence IDs, if provided</li>
+<li>Date based cleaning</li>
+<li>Outside political boundary: User input to check for points in the wrong country, or points outside of a known country</li>
+<li>Taxonomic name based cleaning: via <code>taxize</code> (one method so far)</li>
+</ul>
+<h3 id="to-be-covered">To be covered</h3>
+<ul>
+<li>Political centroids: unlikely that occurrences fall exactly on these points, more likely a
+default position (Draft function started, but not exported, and commented out)</li>
+<li>Herbaria/Museums: many specimens may have location of the collection they are housed in</li>
+<li>Habitat type filtering: e.g., fish should not be on land; marine fish should not be in fresh water</li>
+<li>Check for contextually wrong values: That is, if 99 out of 100 lat/long coordinates are within the continental US, but 1 is in China, then perhaps something is wrong with that one point</li>
+<li>and many more&hellip;</li>
+</ul>
+<p>What else do you want included? <a href="https://github.com/ropenscilabs/scrubr/issues">Open an issue in the repo</a> to chat about use cases.</p>
+<h2 id="install">Install</h2>
+<p>From CRAN (binaries may not be up yet, but source is)</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-r" data-lang="r"><span style="display:flex;"><span><span style="color:#a6e22e">install.packages</span>(<span style="color:#e6db74">&#34;scrubr&#34;</span>)
+</span></span></code></pre></div><p>Or from GitHub</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-r" data-lang="r"><span style="display:flex;"><span>devtools<span style="color:#f92672">::</span><span style="color:#a6e22e">install_github</span>(<span style="color:#e6db74">&#34;ropenscilabs/scrubr&#34;</span>)
+</span></span></code></pre></div><div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-r" data-lang="r"><span style="display:flex;"><span><span style="color:#a6e22e">library</span>(<span style="color:#e6db74">&#34;scrubr&#34;</span>)
+</span></span></code></pre></div><h2 id="dframe">dframe</h2>
+<p><code>dframe()</code> is a tool to convert your data.frame to a compact <code>dplyr</code> like data.frame so that you can get a quick peek at your data each time you call a function - BUT, you don&rsquo;t have to use it.</p>
+<p>Compare <code>mtcars</code></p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-r" data-lang="r"><span style="display:flex;"><span>mtcars
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt;                      mpg cyl  disp  hp drat    wt  qsec vs am gear carb</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; Mazda RX4           21.0   6 160.0 110 3.90 2.620 16.46  0  1    4    4</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; Mazda RX4 Wag       21.0   6 160.0 110 3.90 2.875 17.02  0  1    4    4</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; Datsun 710          22.8   4 108.0  93 3.85 2.320 18.61  1  1    4    1</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; Hornet 4 Drive      21.4   6 258.0 110 3.08 3.215 19.44  1  0    3    1</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; Hornet Sportabout   18.7   8 360.0 175 3.15 3.440 17.02  0  0    3    2</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; Valiant             18.1   6 225.0 105 2.76 3.460 20.22  1  0    3    1</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; Duster 360          14.3   8 360.0 245 3.21 3.570 15.84  0  0    3    4</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; Merc 240D           24.4   4 146.7  62 3.69 3.190 20.00  1  0    4    2</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; Merc 230            22.8   4 140.8  95 3.92 3.150 22.90  1  0    4    2</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; Merc 280            19.2   6 167.6 123 3.92 3.440 18.30  1  0    4    4</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; Merc 280C           17.8   6 167.6 123 3.92 3.440 18.90  1  0    4    4</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; Merc 450SE          16.4   8 275.8 180 3.07 4.070 17.40  0  0    3    3</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; Merc 450SL          17.3   8 275.8 180 3.07 3.730 17.60  0  0    3    3</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; Merc 450SLC         15.2   8 275.8 180 3.07 3.780 18.00  0  0    3    3</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; Cadillac Fleetwood  10.4   8 472.0 205 2.93 5.250 17.98  0  0    3    4</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; Lincoln Continental 10.4   8 460.0 215 3.00 5.424 17.82  0  0    3    4</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; Chrysler Imperial   14.7   8 440.0 230 3.23 5.345 17.42  0  0    3    4</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; Fiat 128            32.4   4  78.7  66 4.08 2.200 19.47  1  1    4    1</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; Honda Civic         30.4   4  75.7  52 4.93 1.615 18.52  1  1    4    2</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; Toyota Corolla      33.9   4  71.1  65 4.22 1.835 19.90  1  1    4    1</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; Toyota Corona       21.5   4 120.1  97 3.70 2.465 20.01  1  0    3    1</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; Dodge Challenger    15.5   8 318.0 150 2.76 3.520 16.87  0  0    3    2</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; AMC Javelin         15.2   8 304.0 150 3.15 3.435 17.30  0  0    3    2</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; Camaro Z28          13.3   8 350.0 245 3.73 3.840 15.41  0  0    3    4</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; Pontiac Firebird    19.2   8 400.0 175 3.08 3.845 17.05  0  0    3    2</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; Fiat X1-9           27.3   4  79.0  66 4.08 1.935 18.90  1  1    4    1</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; Porsche 914-2       26.0   4 120.3  91 4.43 2.140 16.70  0  1    5    2</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; Lotus Europa        30.4   4  95.1 113 3.77 1.513 16.90  1  1    5    2</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; Ford Pantera L      15.8   8 351.0 264 4.22 3.170 14.50  0  1    5    4</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; Ferrari Dino        19.7   6 145.0 175 3.62 2.770 15.50  0  1    5    6</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; Maserati Bora       15.0   8 301.0 335 3.54 3.570 14.60  0  1    5    8</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; Volvo 142E          21.4   4 121.0 109 4.11 2.780 18.60  1  1    4    2</span>
+</span></span></code></pre></div><p>To</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-r" data-lang="r"><span style="display:flex;"><span><span style="color:#a6e22e">dframe</span>(mtcars)
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; &lt;scrubr dframe&gt;</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; Size: 32 X 11</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; </span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; </span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt;      mpg   cyl  disp    hp  drat    wt  qsec    vs    am  gear  carb</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt;    (dbl) (dbl) (dbl) (dbl) (dbl) (dbl) (dbl) (dbl) (dbl) (dbl) (dbl)</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; 1   21.0     6 160.0   110  3.90 2.620 16.46     0     1     4     4</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; 2   21.0     6 160.0   110  3.90 2.875 17.02     0     1     4     4</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; 3   22.8     4 108.0    93  3.85 2.320 18.61     1     1     4     1</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; 4   21.4     6 258.0   110  3.08 3.215 19.44     1     0     3     1</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; 5   18.7     8 360.0   175  3.15 3.440 17.02     0     0     3     2</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; 6   18.1     6 225.0   105  2.76 3.460 20.22     1     0     3     1</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; 7   14.3     8 360.0   245  3.21 3.570 15.84     0     0     3     4</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; 8   24.4     4 146.7    62  3.69 3.190 20.00     1     0     4     2</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; 9   22.8     4 140.8    95  3.92 3.150 22.90     1     0     4     2</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; 10  19.2     6 167.6   123  3.92 3.440 18.30     1     0     4     4</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; ..   ...   ...   ...   ...   ...   ...   ...   ...   ...   ...   ...</span>
+</span></span></code></pre></div><h2 id="coordinate-based-cleaning">Coordinate based cleaning</h2>
+<p>Load some sample data that comes with the package</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-r" data-lang="r"><span style="display:flex;"><span><span style="color:#a6e22e">data</span>(<span style="color:#e6db74">&#34;sampledata1&#34;</span>)
+</span></span></code></pre></div><p>Remove impossible coordinates (using sample data included in the pkg)</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-r" data-lang="r"><span style="display:flex;"><span><span style="color:#a6e22e">dframe</span>(sample_data_1) <span style="color:#f92672">%&gt;%</span> <span style="color:#a6e22e">coord_impossible</span>()
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; &lt;scrubr dframe&gt;</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; Size: 1500 X 5</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; Lat/Lon vars: latitude/longitude</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; </span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt;                name  longitude latitude                date        key</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt;               (chr)      (dbl)    (dbl)              (time)      (int)</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; 1  Ursus americanus  -79.68283 38.36662 2015-01-14 16:36:45 1065590124</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; 2  Ursus americanus  -82.42028 35.73304 2015-01-13 00:25:39 1065588899</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; 3  Ursus americanus  -99.09625 23.66893 2015-02-20 23:00:00 1098894889</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; 4  Ursus americanus  -72.77432 43.94883 2015-02-13 16:16:41 1065611122</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; 5  Ursus americanus  -72.34617 43.86464 2015-03-01 20:20:45 1088908315</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; 6  Ursus americanus -108.53674 32.65219 2015-03-29 17:06:54 1088932238</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; 7  Ursus americanus -108.53691 32.65237 2015-03-29 17:12:50 1088932273</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; 8  Ursus americanus -123.82900 40.13240 2015-03-28 23:00:00 1132403409</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; 9  Ursus americanus  -78.25027 36.93018 2015-03-20 21:11:24 1088923534</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; 10 Ursus americanus  -76.78671 35.53079 2015-04-05 23:00:00 1088954559</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; ..              ...        ...      ...                 ...        ...</span>
+</span></span></code></pre></div><p>Remove incomplete coordinates</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-r" data-lang="r"><span style="display:flex;"><span><span style="color:#a6e22e">dframe</span>(sample_data_1) <span style="color:#f92672">%&gt;%</span> <span style="color:#a6e22e">coord_incomplete</span>()
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; &lt;scrubr dframe&gt;</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; Size: 1306 X 5</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; Lat/Lon vars: latitude/longitude</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; </span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt;                name  longitude latitude                date        key</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt;               (chr)      (dbl)    (dbl)              (time)      (int)</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; 1  Ursus americanus  -79.68283 38.36662 2015-01-14 16:36:45 1065590124</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; 2  Ursus americanus  -82.42028 35.73304 2015-01-13 00:25:39 1065588899</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; 3  Ursus americanus  -99.09625 23.66893 2015-02-20 23:00:00 1098894889</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; 4  Ursus americanus  -72.77432 43.94883 2015-02-13 16:16:41 1065611122</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; 5  Ursus americanus  -72.34617 43.86464 2015-03-01 20:20:45 1088908315</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; 6  Ursus americanus -108.53674 32.65219 2015-03-29 17:06:54 1088932238</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; 7  Ursus americanus -108.53691 32.65237 2015-03-29 17:12:50 1088932273</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; 8  Ursus americanus -123.82900 40.13240 2015-03-28 23:00:00 1132403409</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; 9  Ursus americanus  -78.25027 36.93018 2015-03-20 21:11:24 1088923534</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; 10 Ursus americanus  -76.78671 35.53079 2015-04-05 23:00:00 1088954559</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; ..              ...        ...      ...                 ...        ...</span>
+</span></span></code></pre></div><p>Remove unlikely coordinates (e.g., those at 0,0)</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-r" data-lang="r"><span style="display:flex;"><span><span style="color:#a6e22e">dframe</span>(sample_data_1) <span style="color:#f92672">%&gt;%</span> <span style="color:#a6e22e">coord_unlikely</span>()
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; &lt;scrubr dframe&gt;</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; Size: 1488 X 5</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; Lat/Lon vars: latitude/longitude</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; </span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt;                name  longitude latitude                date        key</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt;               (chr)      (dbl)    (dbl)              (time)      (int)</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; 1  Ursus americanus  -79.68283 38.36662 2015-01-14 16:36:45 1065590124</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; 2  Ursus americanus  -82.42028 35.73304 2015-01-13 00:25:39 1065588899</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; 3  Ursus americanus  -99.09625 23.66893 2015-02-20 23:00:00 1098894889</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; 4  Ursus americanus  -72.77432 43.94883 2015-02-13 16:16:41 1065611122</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; 5  Ursus americanus  -72.34617 43.86464 2015-03-01 20:20:45 1088908315</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; 6  Ursus americanus -108.53674 32.65219 2015-03-29 17:06:54 1088932238</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; 7  Ursus americanus -108.53691 32.65237 2015-03-29 17:12:50 1088932273</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; 8  Ursus americanus -123.82900 40.13240 2015-03-28 23:00:00 1132403409</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; 9  Ursus americanus  -78.25027 36.93018 2015-03-20 21:11:24 1088923534</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; 10 Ursus americanus  -76.78671 35.53079 2015-04-05 23:00:00 1088954559</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; ..              ...        ...      ...                 ...        ...</span>
+</span></span></code></pre></div><p>Do all three</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-r" data-lang="r"><span style="display:flex;"><span><span style="color:#a6e22e">dframe</span>(sample_data_1) <span style="color:#f92672">%&gt;%</span>
+</span></span><span style="display:flex;"><span>  <span style="color:#a6e22e">coord_impossible</span>() <span style="color:#f92672">%&gt;%</span>
+</span></span><span style="display:flex;"><span>  <span style="color:#a6e22e">coord_incomplete</span>() <span style="color:#f92672">%&gt;%</span>
+</span></span><span style="display:flex;"><span>  <span style="color:#a6e22e">coord_unlikely</span>()
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; &lt;scrubr dframe&gt;</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; Size: 1294 X 5</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; Lat/Lon vars: latitude/longitude</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; </span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt;                name  longitude latitude                date        key</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt;               (chr)      (dbl)    (dbl)              (time)      (int)</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; 1  Ursus americanus  -79.68283 38.36662 2015-01-14 16:36:45 1065590124</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; 2  Ursus americanus  -82.42028 35.73304 2015-01-13 00:25:39 1065588899</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; 3  Ursus americanus  -99.09625 23.66893 2015-02-20 23:00:00 1098894889</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; 4  Ursus americanus  -72.77432 43.94883 2015-02-13 16:16:41 1065611122</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; 5  Ursus americanus  -72.34617 43.86464 2015-03-01 20:20:45 1088908315</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; 6  Ursus americanus -108.53674 32.65219 2015-03-29 17:06:54 1088932238</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; 7  Ursus americanus -108.53691 32.65237 2015-03-29 17:12:50 1088932273</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; 8  Ursus americanus -123.82900 40.13240 2015-03-28 23:00:00 1132403409</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; 9  Ursus americanus  -78.25027 36.93018 2015-03-20 21:11:24 1088923534</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; 10 Ursus americanus  -76.78671 35.53079 2015-04-05 23:00:00 1088954559</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; ..              ...        ...      ...                 ...        ...</span>
+</span></span></code></pre></div><p>Do vs. don&rsquo;t drop bad data</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-r" data-lang="r"><span style="display:flex;"><span><span style="color:#75715e"># do</span>
+</span></span><span style="display:flex;"><span><span style="color:#a6e22e">dframe</span>(sample_data_1) <span style="color:#f92672">%&gt;%</span> <span style="color:#a6e22e">coord_incomplete</span>(drop <span style="color:#f92672">=</span> <span style="color:#66d9ef">TRUE</span>) <span style="color:#f92672">%&gt;%</span> NROW
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; [1] 1306</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e"># don&#39;t</span>
+</span></span><span style="display:flex;"><span><span style="color:#a6e22e">dframe</span>(sample_data_1) <span style="color:#f92672">%&gt;%</span> <span style="color:#a6e22e">coord_incomplete</span>(drop <span style="color:#f92672">=</span> <span style="color:#66d9ef">FALSE</span>) <span style="color:#f92672">%&gt;%</span> NROW
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; [1] 1500</span>
+</span></span></code></pre></div><h2 id="deduplicate">Deduplicate</h2>
+<p>Get a smaller subset of a data.frame</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-r" data-lang="r"><span style="display:flex;"><span>smalldf <span style="color:#f92672">&lt;-</span> sample_data_1[1<span style="color:#f92672">:</span><span style="color:#ae81ff">20</span>, ]
+</span></span></code></pre></div><p>create a duplicate record</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-r" data-lang="r"><span style="display:flex;"><span>smalldf <span style="color:#f92672">&lt;-</span> <span style="color:#a6e22e">rbind</span>(smalldf, smalldf[10,])
+</span></span><span style="display:flex;"><span><span style="color:#a6e22e">row.names</span>(smalldf) <span style="color:#f92672">&lt;-</span> <span style="color:#66d9ef">NULL</span>
+</span></span></code></pre></div><p>make it slightly different</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-r" data-lang="r"><span style="display:flex;"><span>smalldf[21, <span style="color:#e6db74">&#34;key&#34;</span>] <span style="color:#f92672">&lt;-</span> <span style="color:#ae81ff">1088954555</span>
+</span></span><span style="display:flex;"><span><span style="color:#a6e22e">NROW</span>(smalldf)
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; [1] 21</span>
+</span></span></code></pre></div><p>It&rsquo;s 21 rows, including 1 duplicate. Do the deduplication</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-r" data-lang="r"><span style="display:flex;"><span>(dp <span style="color:#f92672">&lt;-</span> <span style="color:#a6e22e">dframe</span>(smalldf) <span style="color:#f92672">%&gt;%</span> <span style="color:#a6e22e">dedup</span>())
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; &lt;scrubr dframe&gt;</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; Size: 20 X 5</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; </span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; </span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt;                name  longitude latitude                date        key</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt;               (chr)      (dbl)    (dbl)              (time)      (dbl)</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; 1  Ursus americanus  -79.68283 38.36662 2015-01-14 16:36:45 1065590124</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; 2  Ursus americanus  -82.42028 35.73304 2015-01-13 00:25:39 1065588899</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; 3  Ursus americanus  -99.09625 23.66893 2015-02-20 23:00:00 1098894889</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; 4  Ursus americanus  -72.77432 43.94883 2015-02-13 16:16:41 1065611122</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; 5  Ursus americanus  -72.34617 43.86464 2015-03-01 20:20:45 1088908315</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; 6  Ursus americanus -108.53674 32.65219 2015-03-29 17:06:54 1088932238</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; 7  Ursus americanus -108.53691 32.65237 2015-03-29 17:12:50 1088932273</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; 8  Ursus americanus -123.82900 40.13240 2015-03-28 23:00:00 1132403409</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; 9  Ursus americanus  -78.25027 36.93018 2015-03-20 21:11:24 1088923534</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; 10 Ursus americanus -103.30058 29.27042 2015-04-29 22:00:00 1088964797</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; ..              ...        ...      ...                 ...        ...</span>
+</span></span></code></pre></div><p>Now its 20 rows, duplicate removed</p>
+<p>Here&rsquo;s the duplicates</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-r" data-lang="r"><span style="display:flex;"><span><span style="color:#a6e22e">attr</span>(dp, <span style="color:#e6db74">&#34;dups&#34;</span>)
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; &lt;scrubr dframe&gt;</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; Size: 1 X 5</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; </span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; </span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt;               name longitude latitude                date        key</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt;              (chr)     (dbl)    (dbl)              (time)      (dbl)</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; 1 Ursus americanus -76.78671 35.53079 2015-04-05 23:00:00 1088954555</span>
+</span></span></code></pre></div><h2 id="dates">Dates</h2>
+<p>Standardize/convert dates</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-r" data-lang="r"><span style="display:flex;"><span>df <span style="color:#f92672">&lt;-</span> sample_data_1
+</span></span><span style="display:flex;"><span><span style="color:#a6e22e">dframe</span>(df) <span style="color:#f92672">%&gt;%</span> 
+</span></span><span style="display:flex;"><span>  <span style="color:#a6e22e">date_standardize</span>(<span style="color:#e6db74">&#34;%d%b%Y&#34;</span>)
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; &lt;scrubr dframe&gt;</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; Size: 1500 X 5</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; </span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; </span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt;                name  longitude latitude      date        key</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt;               (chr)      (dbl)    (dbl)     (chr)      (int)</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; 1  Ursus americanus  -79.68283 38.36662 14Jan2015 1065590124</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; 2  Ursus americanus  -82.42028 35.73304 13Jan2015 1065588899</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; 3  Ursus americanus  -99.09625 23.66893 20Feb2015 1098894889</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; 4  Ursus americanus  -72.77432 43.94883 13Feb2015 1065611122</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; 5  Ursus americanus  -72.34617 43.86464 01Mar2015 1088908315</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; 6  Ursus americanus -108.53674 32.65219 29Mar2015 1088932238</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; 7  Ursus americanus -108.53691 32.65237 29Mar2015 1088932273</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; 8  Ursus americanus -123.82900 40.13240 28Mar2015 1132403409</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; 9  Ursus americanus  -78.25027 36.93018 20Mar2015 1088923534</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; 10 Ursus americanus  -76.78671 35.53079 05Apr2015 1088954559</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; ..              ...        ...      ...       ...        ...</span>
+</span></span></code></pre></div><p>Drop records without dates</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-r" data-lang="r"><span style="display:flex;"><span><span style="color:#a6e22e">NROW</span>(df)
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; [1] 1500</span>
+</span></span><span style="display:flex;"><span><span style="color:#a6e22e">NROW</span>(<span style="color:#a6e22e">dframe</span>(df) <span style="color:#f92672">%&gt;%</span> <span style="color:#a6e22e">date_missing</span>())
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; [1] 1498</span>
+</span></span></code></pre></div><p>Create date field from other fields</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-r" data-lang="r"><span style="display:flex;"><span><span style="color:#a6e22e">dframe</span>(sample_data_2) <span style="color:#f92672">%&gt;%</span> 
+</span></span><span style="display:flex;"><span>  <span style="color:#a6e22e">date_create</span>(year, month, day)
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; &lt;scrubr dframe&gt;</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; Size: 1500 X 8</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; </span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; </span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt;                name  longitude latitude        key  year month   day</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt;               (chr)      (dbl)    (dbl)      (int) (chr) (chr) (chr)</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; 1  Ursus americanus  -79.68283 38.36662 1065590124  2015    01    14</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; 2  Ursus americanus  -82.42028 35.73304 1065588899  2015    01    13</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; 3  Ursus americanus  -99.09625 23.66893 1098894889  2015    02    20</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; 4  Ursus americanus  -72.77432 43.94883 1065611122  2015    02    13</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; 5  Ursus americanus  -72.34617 43.86464 1088908315  2015    03    01</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; 6  Ursus americanus -108.53674 32.65219 1088932238  2015    03    29</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; 7  Ursus americanus -108.53691 32.65237 1088932273  2015    03    29</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; 8  Ursus americanus -123.82900 40.13240 1132403409  2015    03    28</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; 9  Ursus americanus  -78.25027 36.93018 1088923534  2015    03    20</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; 10 Ursus americanus  -76.78671 35.53079 1088954559  2015    04    05</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; ..              ...        ...      ...        ...   ...   ...   ...</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; Variables not shown: date (chr).</span>
+</span></span></code></pre></div><h2 id="bugs-and-such">bugs and such</h2>
+<p>Report them in the <a href="https://github.com/ropenscilabs/scrubr/issues">scrubr issue tracker</a></p>
+]]></content:encoded>
     </item>
   </channel>
 </rss>

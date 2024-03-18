@@ -17,6 +17,309 @@
 They&amp;rsquo;ve been talking about releasing an API for a long time, but have not done so.
 Thus, since at least some version of their data is in the public web, I&amp;rsquo;ve created a RESTful API for the data:
 source code: https://github.com/sckott/usdaplantsapi/ base URL: https://plantsdb.xyz Check out the API, and open issues for bugs/feature requests in the github repo.</description>
+      <content:encoded><![CDATA[<p>The USDA maintains a database of plant information, some of it trait data, some
+of it life history. Check it out at <a href="https://plants.usda.gov/java/">https://plants.usda.gov/java/</a></p>
+<p>They&rsquo;ve been talking about releasing an API for a long time, but have not done so.</p>
+<p>Thus, since at least some version of their data is in the public web,
+I&rsquo;ve created a RESTful API for the data:</p>
+<ul>
+<li>source code: <a href="https://github.com/sckott/usdaplantsapi/">https://github.com/sckott/usdaplantsapi/</a></li>
+<li>base URL: <a href="https://plantsdb.xyz">https://plantsdb.xyz</a></li>
+</ul>
+<p>Check out the API, and open issues for bugs/feature requests in the github repo.</p>
+<p>The following is an example using it from R, but you can use it from anywhere,
+the command line, Ruby, Python, a browser, whatevs.</p>
+<p>Here, we&rsquo;ll use <a href="https://github.com/sckott/request">request</a>, a higher level
+http client for R that I&rsquo;ve been working on. A small quirk with <code>request</code> is that
+when piping, you have to assign the output of the request to an object before you
+can do any further manipulation. But that&rsquo;s probably good for avoiding too long
+pipe chains.</p>
+<blockquote>
+<p>note, that I&rsquo;ve set <code>tibble.max_extra_cols = 15</code> to not print the many
+columns that are returned, for blog post brevity. When you run below
+you&rsquo;ll get more columns.</p>
+</blockquote>
+<p>Install from CRAN</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-r" data-lang="r"><span style="display:flex;"><span><span style="color:#a6e22e">install.packages</span>(<span style="color:#e6db74">&#34;request&#34;</span>)
+</span></span></code></pre></div><p>There is a small improvement in the dev version of <code>request</code> to make any data.frame&rsquo;s
+tibble&rsquo;s (which the below examples uses). To get that install from GitHub:</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-r" data-lang="r"><span style="display:flex;"><span>devtools<span style="color:#f92672">::</span><span style="color:#a6e22e">install_github</span>(<span style="color:#e6db74">&#34;sckott/request&#34;</span>)
+</span></span></code></pre></div><div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-r" data-lang="r"><span style="display:flex;"><span><span style="color:#a6e22e">library</span>(<span style="color:#e6db74">&#39;request&#39;</span>)
+</span></span><span style="display:flex;"><span><span style="color:#a6e22e">library</span>(<span style="color:#e6db74">&#39;tibble&#39;</span>)
+</span></span></code></pre></div><h3 id="heartbeat">Heartbeat</h3>
+<p>The simplest call to the API is to a route <code>/heartbeat</code>,
+which just lists the available routes.</p>
+<p>Set the base url we&rsquo;ll use throughout the work below</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-r" data-lang="r"><span style="display:flex;"><span>root <span style="color:#f92672">&lt;-</span> <span style="color:#a6e22e">api</span>(<span style="color:#e6db74">&#34;https://plantsdb.xyz&#34;</span>)
+</span></span></code></pre></div><div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-r" data-lang="r"><span style="display:flex;"><span>root <span style="color:#f92672">%&gt;%</span> <span style="color:#a6e22e">api_path</span>(heartbeat)
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; $routes</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; [1] &#34;/search (HEAD, GET)&#34; &#34;/heartbeat&#34;</span>
+</span></span></code></pre></div><p>Okay, so there are just two routes, <code>/search</code> and <code>/heartbeat</code>.</p>
+<h2 id="search">Search</h2>
+<p>The search route suppports the following parameters:</p>
+<ul>
+<li><code>fields</code>, e.g., <code>fields='Genus,Species'</code> (default: all fields returned)</li>
+<li><code>limit</code>, e.g., <code>limit=10</code> (default: 10)</li>
+<li><code>offset</code>, e.g., <code>offset=1</code> (default: 0)</li>
+<li>search on any fields in the output, e.g, <code>Genus=Pinus</code> or <code>Species=annua</code></li>
+</ul>
+<h3 id="basic-search">basic search</h3>
+<p>Let&rsquo;s first not pass any params</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-r" data-lang="r"><span style="display:flex;"><span>root <span style="color:#f92672">%&gt;%</span> <span style="color:#a6e22e">api_path</span>(search)
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; $count</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; [1] 92171</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt;</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; $returned</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; [1] 10</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt;</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; $citation</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; [1] &#34;USDA, NRCS. 2016. The PLANTS Database (https://plants.usda.gov, 12 July 2016). National Plant Data Team, Greensboro, NC 27401-4901 USA.&#34;</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt;</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; $terms</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; [1] &#34;Our plant information, including the distribution maps, lists, and text, is not copyrighted and is free for any use.&#34;</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt;</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; $data</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; # A tibble: 10 × 134</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt;       id Symbol Accepted_Symbol_x Synonym_Symbol_x</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; *  &lt;int&gt;  &lt;chr&gt;             &lt;chr&gt;            &lt;chr&gt;</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; 1      1   ABAB              ABAB</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; 2      2  ABAB2             ABPR3            ABAB2</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; 3      3  ABAB3              ABTH            ABAB3</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; 4      4 ABAB70            ABAB70</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; 5      5   ABAC             ABUMB             ABAC</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; 6      6   ABAL              ABAL</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; 7      7  ABAL2             ABUMU            ABAL2</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; 8      8  ABAL3             ABAL3</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; 9      9   ABAM              ABAM</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; 10    10  ABAM2             ABAM2</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; # ... with 130 more variables: Scientific_Name_x &lt;chr&gt;,</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; #   Hybrid_Genus_Indicator &lt;chr&gt;, Hybrid_Species_Indicator &lt;chr&gt;,</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; #   Species &lt;chr&gt;, Subspecies_Prefix &lt;chr&gt;,</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; #   Hybrid_Subspecies_Indicator &lt;chr&gt;, Subspecies &lt;chr&gt;,</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; #   Variety_Prefix &lt;chr&gt;, Hybrid_Variety_Indicator &lt;chr&gt;, Variety &lt;chr&gt;,</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; #   Subvariety_Prefix &lt;chr&gt;, Subvariety &lt;chr&gt;, Forma_Prefix &lt;chr&gt;,</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; #   Forma &lt;chr&gt;, Genera_Binomial_Author &lt;chr&gt;, ...</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt;</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; $error</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; NULL</span>
+</span></span></code></pre></div><p>You get slots:</p>
+<ul>
+<li><code>count</code>: number of results found</li>
+<li><code>returned</code>: numbef of results returned</li>
+<li><code>citation</code>: suggested citation, from USDA</li>
+<li><code>terms</code>: terms of use, from USDA</li>
+<li><code>data</code>: the results</li>
+<li><code>error</code>: if an error occurred, you&rsquo;ll see the message here</li>
+</ul>
+<p>Note that if any data.frame&rsquo;s are found, we make them into tibble&rsquo;s, nicely
+formatted data.frame&rsquo;s that make it easy to deal with large data.</p>
+<h3 id="pagination">Pagination</h3>
+<p>limit number of results</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-r" data-lang="r"><span style="display:flex;"><span>root <span style="color:#f92672">%&gt;%</span>
+</span></span><span style="display:flex;"><span>  <span style="color:#a6e22e">api_path</span>(search) <span style="color:#f92672">%&gt;%</span>
+</span></span><span style="display:flex;"><span>  <span style="color:#a6e22e">api_query</span>(limit <span style="color:#f92672">=</span> <span style="color:#ae81ff">5</span>)
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; $count</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; [1] 92171</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt;</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; $returned</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; [1] 5</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt;</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; $citation</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; [1] &#34;USDA, NRCS. 2016. The PLANTS Database (https://plants.usda.gov, 12 July 2016). National Plant Data Team, Greensboro, NC 27401-4901 USA.&#34;</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt;</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; $terms</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; [1] &#34;Our plant information, including the distribution maps, lists, and text, is not copyrighted and is free for any use.&#34;</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt;</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; $data</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; # A tibble: 5 × 134</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt;      id Symbol Accepted_Symbol_x Synonym_Symbol_x</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; * &lt;int&gt;  &lt;chr&gt;             &lt;chr&gt;            &lt;chr&gt;</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; 1     1   ABAB              ABAB</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; 2     2  ABAB2             ABPR3            ABAB2</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; 3     3  ABAB3              ABTH            ABAB3</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; 4     4 ABAB70            ABAB70</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; 5     5   ABAC             ABUMB             ABAC</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; # ... with 130 more variables: Scientific_Name_x &lt;chr&gt;,</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; #   Hybrid_Genus_Indicator &lt;chr&gt;, Hybrid_Species_Indicator &lt;chr&gt;,</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; #   Species &lt;chr&gt;, Subspecies_Prefix &lt;chr&gt;,</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; #   Hybrid_Subspecies_Indicator &lt;chr&gt;, Subspecies &lt;chr&gt;,</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; #   Variety_Prefix &lt;chr&gt;, Hybrid_Variety_Indicator &lt;chr&gt;, Variety &lt;chr&gt;,</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; #   Subvariety_Prefix &lt;chr&gt;, Subvariety &lt;chr&gt;, Forma_Prefix &lt;chr&gt;,</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; #   Forma &lt;chr&gt;, Genera_Binomial_Author &lt;chr&gt;, ...</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt;</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; $error</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; NULL</span>
+</span></span></code></pre></div><p>change record to start at</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-r" data-lang="r"><span style="display:flex;"><span>root <span style="color:#f92672">%&gt;%</span>
+</span></span><span style="display:flex;"><span>  <span style="color:#a6e22e">api_path</span>(search) <span style="color:#f92672">%&gt;%</span>
+</span></span><span style="display:flex;"><span>  <span style="color:#a6e22e">api_query</span>(limit <span style="color:#f92672">=</span> <span style="color:#ae81ff">5</span>, offset <span style="color:#f92672">=</span> <span style="color:#ae81ff">10</span>)
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; $count</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; [1] 92161</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt;</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; $returned</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; [1] 5</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt;</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; $citation</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; [1] &#34;USDA, NRCS. 2016. The PLANTS Database (https://plants.usda.gov, 12 July 2016). National Plant Data Team, Greensboro, NC 27401-4901 USA.&#34;</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt;</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; $terms</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; [1] &#34;Our plant information, including the distribution maps, lists, and text, is not copyrighted and is free for any use.&#34;</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt;</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; $data</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; # A tibble: 5 × 134</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt;      id Symbol Accepted_Symbol_x Synonym_Symbol_x</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; * &lt;int&gt;  &lt;chr&gt;             &lt;chr&gt;            &lt;chr&gt;</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; 1    11  ABAM3             ABAM3</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; 2    12  ABAM4              NAAM            ABAM4</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; 3    13  ABAM5              ABAB            ABAM5</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; 4    14   ABAN              ABAN</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; 5    15  ABANA              ABAN            ABANA</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; # ... with 130 more variables: Scientific_Name_x &lt;chr&gt;,</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; #   Hybrid_Genus_Indicator &lt;chr&gt;, Hybrid_Species_Indicator &lt;chr&gt;,</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; #   Species &lt;chr&gt;, Subspecies_Prefix &lt;chr&gt;,</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; #   Hybrid_Subspecies_Indicator &lt;chr&gt;, Subspecies &lt;chr&gt;,</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; #   Variety_Prefix &lt;chr&gt;, Hybrid_Variety_Indicator &lt;chr&gt;, Variety &lt;chr&gt;,</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; #   Subvariety_Prefix &lt;chr&gt;, Subvariety &lt;chr&gt;, Forma_Prefix &lt;chr&gt;,</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; #   Forma &lt;chr&gt;, Genera_Binomial_Author &lt;chr&gt;, ...</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt;</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; $error</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; NULL</span>
+</span></span></code></pre></div><h3 id="return-fields">Return fields</h3>
+<p>You can say what fields you want returned, useful when you just want a
+subset of fields</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-r" data-lang="r"><span style="display:flex;"><span>root <span style="color:#f92672">%&gt;%</span>
+</span></span><span style="display:flex;"><span>  <span style="color:#a6e22e">api_path</span>(search) <span style="color:#f92672">%&gt;%</span>
+</span></span><span style="display:flex;"><span>  <span style="color:#a6e22e">api_query</span>(fields <span style="color:#f92672">=</span> <span style="color:#e6db74">&#39;Genus,Species,Symbol&#39;</span>)
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; $count</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; [1] 92171</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt;</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; $returned</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; [1] 10</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt;</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; $citation</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; [1] &#34;USDA, NRCS. 2016. The PLANTS Database (https://plants.usda.gov, 12 July 2016). National Plant Data Team, Greensboro, NC 27401-4901 USA.&#34;</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt;</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; $terms</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; [1] &#34;Our plant information, including the distribution maps, lists, and text, is not copyrighted and is free for any use.&#34;</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt;</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; $data</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; # A tibble: 10 × 3</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt;    Symbol     Species       Genus</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; *   &lt;chr&gt;       &lt;chr&gt;       &lt;chr&gt;</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; 1    ABAB abutiloides    Abutilon</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; 2   ABAB2       abrus       Abrus</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; 3   ABAB3    abutilon    Abutilon</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; 4  ABAB70    abietina Abietinella</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; 5    ABAC   acutalata     Abronia</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; 6    ABAL      alpina     Abronia</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; 7   ABAL2        alba     Abronia</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; 8   ABAL3        alba       Abies</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; 9    ABAM    amabilis       Abies</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; 10  ABAM2     ameliae     Abronia</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt;</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; $error</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; NULL</span>
+</span></span></code></pre></div><h3 id="query">Query</h3>
+<p>You can query on individual fields</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-r" data-lang="r"><span style="display:flex;"><span>root <span style="color:#f92672">%&gt;%</span>
+</span></span><span style="display:flex;"><span>  <span style="color:#a6e22e">api_path</span>(search) <span style="color:#f92672">%&gt;%</span>
+</span></span><span style="display:flex;"><span>  <span style="color:#a6e22e">api_query</span>(Genus <span style="color:#f92672">=</span> Pinus, fields <span style="color:#f92672">=</span> <span style="color:#e6db74">&#34;Genus,Species&#34;</span>)
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; $count</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; [1] 185</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt;</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; $returned</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; [1] 10</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt;</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; $citation</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; [1] &#34;USDA, NRCS. 2016. The PLANTS Database (https://plants.usda.gov, 12 July 2016). National Plant Data Team, Greensboro, NC 27401-4901 USA.&#34;</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt;</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; $terms</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; [1] &#34;Our plant information, including the distribution maps, lists, and text, is not copyrighted and is free for any use.&#34;</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt;</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; $data</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; # A tibble: 10 × 2</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt;       Species Genus</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; *       &lt;chr&gt; &lt;chr&gt;</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; 1  albicaulis Pinus</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; 2    apacheca Pinus</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; 3    aristata Pinus</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; 4   arizonica Pinus</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; 5    armandii Pinus</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; 6   arizonica Pinus</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; 7    aristata Pinus</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; 8   arizonica Pinus</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; 9   arizonica Pinus</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; 10  attenuata Pinus</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt;</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; $error</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; NULL</span>
+</span></span></code></pre></div><p>Another query example</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-r" data-lang="r"><span style="display:flex;"><span>root <span style="color:#f92672">%&gt;%</span>
+</span></span><span style="display:flex;"><span>  <span style="color:#a6e22e">api_path</span>(search) <span style="color:#f92672">%&gt;%</span>
+</span></span><span style="display:flex;"><span>  <span style="color:#a6e22e">api_query</span>(Species <span style="color:#f92672">=</span> annua, fields <span style="color:#f92672">=</span> <span style="color:#e6db74">&#34;Genus,Species&#34;</span>)
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; $count</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; [1] 30</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt;</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; $returned</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; [1] 10</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt;</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; $citation</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; [1] &#34;USDA, NRCS. 2016. The PLANTS Database (https://plants.usda.gov, 12 July 2016). National Plant Data Team, Greensboro, NC 27401-4901 USA.&#34;</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt;</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; $terms</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; [1] &#34;Our plant information, including the distribution maps, lists, and text, is not copyrighted and is free for any use.&#34;</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt;</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; $data</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; # A tibble: 10 × 2</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt;    Species         Genus</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; *    &lt;chr&gt;         &lt;chr&gt;</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; 1    annua        Adonis</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; 2    annua     Artemisia</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; 3    annua   Bulbostylis</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; 4    annua    Castilleja</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; 5    annua   Craniolaria</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; 6    annua Dimorphotheca</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; 7    annua       Drosera</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; 8    annua    Eleocharis</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; 9    annua  Fimbristylis</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; 10   annua    Heliomeris</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt;</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; $error</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; NULL</span>
+</span></span></code></pre></div><p>And one more example, here we&rsquo;re interested in finding taxa that are perennials</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-r" data-lang="r"><span style="display:flex;"><span>root <span style="color:#f92672">%&gt;%</span>
+</span></span><span style="display:flex;"><span>  <span style="color:#a6e22e">api_path</span>(search) <span style="color:#f92672">%&gt;%</span>
+</span></span><span style="display:flex;"><span>  <span style="color:#a6e22e">api_query</span>(Duration <span style="color:#f92672">=</span> Perennial, fields <span style="color:#f92672">=</span> <span style="color:#e6db74">&#34;Genus,Species,Symbol,Duration&#34;</span>)
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; $count</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; [1] 25296</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt;</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; $returned</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; [1] 10</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt;</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; $citation</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; [1] &#34;USDA, NRCS. 2016. The PLANTS Database (https://plants.usda.gov, 12 July 2016). National Plant Data Team, Greensboro, NC 27401-4901 USA.&#34;</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt;</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; $terms</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; [1] &#34;Our plant information, including the distribution maps, lists, and text, is not copyrighted and is free for any use.&#34;</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt;</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; $data</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; # A tibble: 10 × 4</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt;    Symbol     Species  Duration    Genus</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; *   &lt;chr&gt;       &lt;chr&gt;     &lt;chr&gt;    &lt;chr&gt;</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; 1    ABAB abutiloides Perennial Abutilon</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; 2    ABAL      alpina Perennial  Abronia</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; 3   ABAL3        alba Perennial    Abies</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; 4    ABAM    amabilis Perennial    Abies</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; 5   ABAM2     ameliae Perennial  Abronia</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; 6   ABAM3   ammophila Perennial  Abronia</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; 7    ABAR   argillosa Perennial  Abronia</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; 8    ABAU     auritum Perennial Abutilon</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; 9    ABBA    balsamea Perennial    Abies</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; 10  ABBAB    balsamea Perennial    Abies</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt;</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; $error</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; NULL</span>
+</span></span></code></pre></div>]]></content:encoded>
     </item>
     <item>
       <title>scrubr - clean species occurrence records</title>
@@ -25,6 +328,277 @@ source code: https://github.com/sckott/usdaplantsapi/ base URL: https://plantsdb
       <guid>http://localhost:1313/2016/03/scrubr/</guid>
       <description>scrubr is an R library for cleaning species occurrence records. It&amp;rsquo;s general purpose, and has the following approach:
 We think using a piping workflow (%&amp;gt;%) makes code easier to build up, and easier to understand. However, you don&amp;rsquo;t have to use pipes in this package. All inputs and outputs are data.frame&amp;rsquo;s - which makes the above point easier Records trimmed off due to various filters are retained as attributes, so can still be accessed for later inspection, but don&amp;rsquo;t get in the way of the data.</description>
+      <content:encoded><![CDATA[<p><code>scrubr</code> is an R library for cleaning species occurrence records. It&rsquo;s general purpose, and has the following approach:</p>
+<ul>
+<li>We think using a piping workflow (<code>%&gt;%</code>) makes code easier to build up, and easier to understand. However, you don&rsquo;t have to use pipes in this package.</li>
+<li>All inputs and outputs are data.frame&rsquo;s - which makes the above point easier</li>
+<li>Records trimmed off due to various filters are retained as attributes, so can still be accessed for later inspection, but don&rsquo;t get in the way of the data.frame that gets modified for downstream use</li>
+<li>User interface vs. speed: This is the kind of package that surely can get faster. However, we&rsquo;re focusing on the UI first, then make speed improvements down the road.</li>
+<li>Since occurrence record datasets should all have columns with lat/long information, we automatically look for those columns for you. If identified, we use them, but you can supply lat/long column names manually as well.</li>
+</ul>
+<p>We have many packages that fetch species occurrence records from GBIF, iNaturalist, VertNet, iDigBio, Ecoengine, and more. <code>scrubr</code> fills a crucial missing niche as likely all uses of occurrence data requires cleaning of some kind. When using GBIF data via <code>rgbif</code>, that package has some utilities for cleaning data based on the issues returned with GBIF data - <code>scrubr</code> is a companion to do the rest of the cleaning.</p>
+<h2 id="scrubr-use-cases">scrubr use cases</h2>
+<h3 id="those-covered">Those covered</h3>
+<ul>
+<li>Impossible lat/long values: e.g., latitude 75</li>
+<li>Incomplete cases: one or the other of lat/long missing</li>
+<li>Unlikely lat/long values: e.g., points at 0,0</li>
+<li>Deduplication: try to identify duplicates, esp. when pulling data from multiple sources, e.g., can try to use occurrence IDs, if provided</li>
+<li>Date based cleaning</li>
+<li>Outside political boundary: User input to check for points in the wrong country, or points outside of a known country</li>
+<li>Taxonomic name based cleaning: via <code>taxize</code> (one method so far)</li>
+</ul>
+<h3 id="to-be-covered">To be covered</h3>
+<ul>
+<li>Political centroids: unlikely that occurrences fall exactly on these points, more likely a
+default position (Draft function started, but not exported, and commented out)</li>
+<li>Herbaria/Museums: many specimens may have location of the collection they are housed in</li>
+<li>Habitat type filtering: e.g., fish should not be on land; marine fish should not be in fresh water</li>
+<li>Check for contextually wrong values: That is, if 99 out of 100 lat/long coordinates are within the continental US, but 1 is in China, then perhaps something is wrong with that one point</li>
+<li>and many more&hellip;</li>
+</ul>
+<p>What else do you want included? <a href="https://github.com/ropenscilabs/scrubr/issues">Open an issue in the repo</a> to chat about use cases.</p>
+<h2 id="install">Install</h2>
+<p>From CRAN (binaries may not be up yet, but source is)</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-r" data-lang="r"><span style="display:flex;"><span><span style="color:#a6e22e">install.packages</span>(<span style="color:#e6db74">&#34;scrubr&#34;</span>)
+</span></span></code></pre></div><p>Or from GitHub</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-r" data-lang="r"><span style="display:flex;"><span>devtools<span style="color:#f92672">::</span><span style="color:#a6e22e">install_github</span>(<span style="color:#e6db74">&#34;ropenscilabs/scrubr&#34;</span>)
+</span></span></code></pre></div><div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-r" data-lang="r"><span style="display:flex;"><span><span style="color:#a6e22e">library</span>(<span style="color:#e6db74">&#34;scrubr&#34;</span>)
+</span></span></code></pre></div><h2 id="dframe">dframe</h2>
+<p><code>dframe()</code> is a tool to convert your data.frame to a compact <code>dplyr</code> like data.frame so that you can get a quick peek at your data each time you call a function - BUT, you don&rsquo;t have to use it.</p>
+<p>Compare <code>mtcars</code></p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-r" data-lang="r"><span style="display:flex;"><span>mtcars
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt;                      mpg cyl  disp  hp drat    wt  qsec vs am gear carb</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; Mazda RX4           21.0   6 160.0 110 3.90 2.620 16.46  0  1    4    4</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; Mazda RX4 Wag       21.0   6 160.0 110 3.90 2.875 17.02  0  1    4    4</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; Datsun 710          22.8   4 108.0  93 3.85 2.320 18.61  1  1    4    1</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; Hornet 4 Drive      21.4   6 258.0 110 3.08 3.215 19.44  1  0    3    1</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; Hornet Sportabout   18.7   8 360.0 175 3.15 3.440 17.02  0  0    3    2</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; Valiant             18.1   6 225.0 105 2.76 3.460 20.22  1  0    3    1</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; Duster 360          14.3   8 360.0 245 3.21 3.570 15.84  0  0    3    4</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; Merc 240D           24.4   4 146.7  62 3.69 3.190 20.00  1  0    4    2</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; Merc 230            22.8   4 140.8  95 3.92 3.150 22.90  1  0    4    2</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; Merc 280            19.2   6 167.6 123 3.92 3.440 18.30  1  0    4    4</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; Merc 280C           17.8   6 167.6 123 3.92 3.440 18.90  1  0    4    4</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; Merc 450SE          16.4   8 275.8 180 3.07 4.070 17.40  0  0    3    3</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; Merc 450SL          17.3   8 275.8 180 3.07 3.730 17.60  0  0    3    3</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; Merc 450SLC         15.2   8 275.8 180 3.07 3.780 18.00  0  0    3    3</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; Cadillac Fleetwood  10.4   8 472.0 205 2.93 5.250 17.98  0  0    3    4</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; Lincoln Continental 10.4   8 460.0 215 3.00 5.424 17.82  0  0    3    4</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; Chrysler Imperial   14.7   8 440.0 230 3.23 5.345 17.42  0  0    3    4</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; Fiat 128            32.4   4  78.7  66 4.08 2.200 19.47  1  1    4    1</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; Honda Civic         30.4   4  75.7  52 4.93 1.615 18.52  1  1    4    2</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; Toyota Corolla      33.9   4  71.1  65 4.22 1.835 19.90  1  1    4    1</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; Toyota Corona       21.5   4 120.1  97 3.70 2.465 20.01  1  0    3    1</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; Dodge Challenger    15.5   8 318.0 150 2.76 3.520 16.87  0  0    3    2</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; AMC Javelin         15.2   8 304.0 150 3.15 3.435 17.30  0  0    3    2</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; Camaro Z28          13.3   8 350.0 245 3.73 3.840 15.41  0  0    3    4</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; Pontiac Firebird    19.2   8 400.0 175 3.08 3.845 17.05  0  0    3    2</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; Fiat X1-9           27.3   4  79.0  66 4.08 1.935 18.90  1  1    4    1</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; Porsche 914-2       26.0   4 120.3  91 4.43 2.140 16.70  0  1    5    2</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; Lotus Europa        30.4   4  95.1 113 3.77 1.513 16.90  1  1    5    2</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; Ford Pantera L      15.8   8 351.0 264 4.22 3.170 14.50  0  1    5    4</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; Ferrari Dino        19.7   6 145.0 175 3.62 2.770 15.50  0  1    5    6</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; Maserati Bora       15.0   8 301.0 335 3.54 3.570 14.60  0  1    5    8</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; Volvo 142E          21.4   4 121.0 109 4.11 2.780 18.60  1  1    4    2</span>
+</span></span></code></pre></div><p>To</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-r" data-lang="r"><span style="display:flex;"><span><span style="color:#a6e22e">dframe</span>(mtcars)
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; &lt;scrubr dframe&gt;</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; Size: 32 X 11</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; </span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; </span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt;      mpg   cyl  disp    hp  drat    wt  qsec    vs    am  gear  carb</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt;    (dbl) (dbl) (dbl) (dbl) (dbl) (dbl) (dbl) (dbl) (dbl) (dbl) (dbl)</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; 1   21.0     6 160.0   110  3.90 2.620 16.46     0     1     4     4</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; 2   21.0     6 160.0   110  3.90 2.875 17.02     0     1     4     4</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; 3   22.8     4 108.0    93  3.85 2.320 18.61     1     1     4     1</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; 4   21.4     6 258.0   110  3.08 3.215 19.44     1     0     3     1</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; 5   18.7     8 360.0   175  3.15 3.440 17.02     0     0     3     2</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; 6   18.1     6 225.0   105  2.76 3.460 20.22     1     0     3     1</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; 7   14.3     8 360.0   245  3.21 3.570 15.84     0     0     3     4</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; 8   24.4     4 146.7    62  3.69 3.190 20.00     1     0     4     2</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; 9   22.8     4 140.8    95  3.92 3.150 22.90     1     0     4     2</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; 10  19.2     6 167.6   123  3.92 3.440 18.30     1     0     4     4</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; ..   ...   ...   ...   ...   ...   ...   ...   ...   ...   ...   ...</span>
+</span></span></code></pre></div><h2 id="coordinate-based-cleaning">Coordinate based cleaning</h2>
+<p>Load some sample data that comes with the package</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-r" data-lang="r"><span style="display:flex;"><span><span style="color:#a6e22e">data</span>(<span style="color:#e6db74">&#34;sampledata1&#34;</span>)
+</span></span></code></pre></div><p>Remove impossible coordinates (using sample data included in the pkg)</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-r" data-lang="r"><span style="display:flex;"><span><span style="color:#a6e22e">dframe</span>(sample_data_1) <span style="color:#f92672">%&gt;%</span> <span style="color:#a6e22e">coord_impossible</span>()
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; &lt;scrubr dframe&gt;</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; Size: 1500 X 5</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; Lat/Lon vars: latitude/longitude</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; </span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt;                name  longitude latitude                date        key</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt;               (chr)      (dbl)    (dbl)              (time)      (int)</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; 1  Ursus americanus  -79.68283 38.36662 2015-01-14 16:36:45 1065590124</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; 2  Ursus americanus  -82.42028 35.73304 2015-01-13 00:25:39 1065588899</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; 3  Ursus americanus  -99.09625 23.66893 2015-02-20 23:00:00 1098894889</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; 4  Ursus americanus  -72.77432 43.94883 2015-02-13 16:16:41 1065611122</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; 5  Ursus americanus  -72.34617 43.86464 2015-03-01 20:20:45 1088908315</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; 6  Ursus americanus -108.53674 32.65219 2015-03-29 17:06:54 1088932238</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; 7  Ursus americanus -108.53691 32.65237 2015-03-29 17:12:50 1088932273</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; 8  Ursus americanus -123.82900 40.13240 2015-03-28 23:00:00 1132403409</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; 9  Ursus americanus  -78.25027 36.93018 2015-03-20 21:11:24 1088923534</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; 10 Ursus americanus  -76.78671 35.53079 2015-04-05 23:00:00 1088954559</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; ..              ...        ...      ...                 ...        ...</span>
+</span></span></code></pre></div><p>Remove incomplete coordinates</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-r" data-lang="r"><span style="display:flex;"><span><span style="color:#a6e22e">dframe</span>(sample_data_1) <span style="color:#f92672">%&gt;%</span> <span style="color:#a6e22e">coord_incomplete</span>()
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; &lt;scrubr dframe&gt;</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; Size: 1306 X 5</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; Lat/Lon vars: latitude/longitude</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; </span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt;                name  longitude latitude                date        key</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt;               (chr)      (dbl)    (dbl)              (time)      (int)</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; 1  Ursus americanus  -79.68283 38.36662 2015-01-14 16:36:45 1065590124</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; 2  Ursus americanus  -82.42028 35.73304 2015-01-13 00:25:39 1065588899</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; 3  Ursus americanus  -99.09625 23.66893 2015-02-20 23:00:00 1098894889</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; 4  Ursus americanus  -72.77432 43.94883 2015-02-13 16:16:41 1065611122</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; 5  Ursus americanus  -72.34617 43.86464 2015-03-01 20:20:45 1088908315</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; 6  Ursus americanus -108.53674 32.65219 2015-03-29 17:06:54 1088932238</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; 7  Ursus americanus -108.53691 32.65237 2015-03-29 17:12:50 1088932273</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; 8  Ursus americanus -123.82900 40.13240 2015-03-28 23:00:00 1132403409</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; 9  Ursus americanus  -78.25027 36.93018 2015-03-20 21:11:24 1088923534</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; 10 Ursus americanus  -76.78671 35.53079 2015-04-05 23:00:00 1088954559</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; ..              ...        ...      ...                 ...        ...</span>
+</span></span></code></pre></div><p>Remove unlikely coordinates (e.g., those at 0,0)</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-r" data-lang="r"><span style="display:flex;"><span><span style="color:#a6e22e">dframe</span>(sample_data_1) <span style="color:#f92672">%&gt;%</span> <span style="color:#a6e22e">coord_unlikely</span>()
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; &lt;scrubr dframe&gt;</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; Size: 1488 X 5</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; Lat/Lon vars: latitude/longitude</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; </span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt;                name  longitude latitude                date        key</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt;               (chr)      (dbl)    (dbl)              (time)      (int)</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; 1  Ursus americanus  -79.68283 38.36662 2015-01-14 16:36:45 1065590124</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; 2  Ursus americanus  -82.42028 35.73304 2015-01-13 00:25:39 1065588899</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; 3  Ursus americanus  -99.09625 23.66893 2015-02-20 23:00:00 1098894889</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; 4  Ursus americanus  -72.77432 43.94883 2015-02-13 16:16:41 1065611122</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; 5  Ursus americanus  -72.34617 43.86464 2015-03-01 20:20:45 1088908315</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; 6  Ursus americanus -108.53674 32.65219 2015-03-29 17:06:54 1088932238</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; 7  Ursus americanus -108.53691 32.65237 2015-03-29 17:12:50 1088932273</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; 8  Ursus americanus -123.82900 40.13240 2015-03-28 23:00:00 1132403409</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; 9  Ursus americanus  -78.25027 36.93018 2015-03-20 21:11:24 1088923534</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; 10 Ursus americanus  -76.78671 35.53079 2015-04-05 23:00:00 1088954559</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; ..              ...        ...      ...                 ...        ...</span>
+</span></span></code></pre></div><p>Do all three</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-r" data-lang="r"><span style="display:flex;"><span><span style="color:#a6e22e">dframe</span>(sample_data_1) <span style="color:#f92672">%&gt;%</span>
+</span></span><span style="display:flex;"><span>  <span style="color:#a6e22e">coord_impossible</span>() <span style="color:#f92672">%&gt;%</span>
+</span></span><span style="display:flex;"><span>  <span style="color:#a6e22e">coord_incomplete</span>() <span style="color:#f92672">%&gt;%</span>
+</span></span><span style="display:flex;"><span>  <span style="color:#a6e22e">coord_unlikely</span>()
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; &lt;scrubr dframe&gt;</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; Size: 1294 X 5</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; Lat/Lon vars: latitude/longitude</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; </span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt;                name  longitude latitude                date        key</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt;               (chr)      (dbl)    (dbl)              (time)      (int)</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; 1  Ursus americanus  -79.68283 38.36662 2015-01-14 16:36:45 1065590124</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; 2  Ursus americanus  -82.42028 35.73304 2015-01-13 00:25:39 1065588899</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; 3  Ursus americanus  -99.09625 23.66893 2015-02-20 23:00:00 1098894889</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; 4  Ursus americanus  -72.77432 43.94883 2015-02-13 16:16:41 1065611122</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; 5  Ursus americanus  -72.34617 43.86464 2015-03-01 20:20:45 1088908315</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; 6  Ursus americanus -108.53674 32.65219 2015-03-29 17:06:54 1088932238</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; 7  Ursus americanus -108.53691 32.65237 2015-03-29 17:12:50 1088932273</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; 8  Ursus americanus -123.82900 40.13240 2015-03-28 23:00:00 1132403409</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; 9  Ursus americanus  -78.25027 36.93018 2015-03-20 21:11:24 1088923534</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; 10 Ursus americanus  -76.78671 35.53079 2015-04-05 23:00:00 1088954559</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; ..              ...        ...      ...                 ...        ...</span>
+</span></span></code></pre></div><p>Do vs. don&rsquo;t drop bad data</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-r" data-lang="r"><span style="display:flex;"><span><span style="color:#75715e"># do</span>
+</span></span><span style="display:flex;"><span><span style="color:#a6e22e">dframe</span>(sample_data_1) <span style="color:#f92672">%&gt;%</span> <span style="color:#a6e22e">coord_incomplete</span>(drop <span style="color:#f92672">=</span> <span style="color:#66d9ef">TRUE</span>) <span style="color:#f92672">%&gt;%</span> NROW
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; [1] 1306</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e"># don&#39;t</span>
+</span></span><span style="display:flex;"><span><span style="color:#a6e22e">dframe</span>(sample_data_1) <span style="color:#f92672">%&gt;%</span> <span style="color:#a6e22e">coord_incomplete</span>(drop <span style="color:#f92672">=</span> <span style="color:#66d9ef">FALSE</span>) <span style="color:#f92672">%&gt;%</span> NROW
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; [1] 1500</span>
+</span></span></code></pre></div><h2 id="deduplicate">Deduplicate</h2>
+<p>Get a smaller subset of a data.frame</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-r" data-lang="r"><span style="display:flex;"><span>smalldf <span style="color:#f92672">&lt;-</span> sample_data_1[1<span style="color:#f92672">:</span><span style="color:#ae81ff">20</span>, ]
+</span></span></code></pre></div><p>create a duplicate record</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-r" data-lang="r"><span style="display:flex;"><span>smalldf <span style="color:#f92672">&lt;-</span> <span style="color:#a6e22e">rbind</span>(smalldf, smalldf[10,])
+</span></span><span style="display:flex;"><span><span style="color:#a6e22e">row.names</span>(smalldf) <span style="color:#f92672">&lt;-</span> <span style="color:#66d9ef">NULL</span>
+</span></span></code></pre></div><p>make it slightly different</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-r" data-lang="r"><span style="display:flex;"><span>smalldf[21, <span style="color:#e6db74">&#34;key&#34;</span>] <span style="color:#f92672">&lt;-</span> <span style="color:#ae81ff">1088954555</span>
+</span></span><span style="display:flex;"><span><span style="color:#a6e22e">NROW</span>(smalldf)
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; [1] 21</span>
+</span></span></code></pre></div><p>It&rsquo;s 21 rows, including 1 duplicate. Do the deduplication</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-r" data-lang="r"><span style="display:flex;"><span>(dp <span style="color:#f92672">&lt;-</span> <span style="color:#a6e22e">dframe</span>(smalldf) <span style="color:#f92672">%&gt;%</span> <span style="color:#a6e22e">dedup</span>())
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; &lt;scrubr dframe&gt;</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; Size: 20 X 5</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; </span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; </span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt;                name  longitude latitude                date        key</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt;               (chr)      (dbl)    (dbl)              (time)      (dbl)</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; 1  Ursus americanus  -79.68283 38.36662 2015-01-14 16:36:45 1065590124</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; 2  Ursus americanus  -82.42028 35.73304 2015-01-13 00:25:39 1065588899</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; 3  Ursus americanus  -99.09625 23.66893 2015-02-20 23:00:00 1098894889</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; 4  Ursus americanus  -72.77432 43.94883 2015-02-13 16:16:41 1065611122</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; 5  Ursus americanus  -72.34617 43.86464 2015-03-01 20:20:45 1088908315</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; 6  Ursus americanus -108.53674 32.65219 2015-03-29 17:06:54 1088932238</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; 7  Ursus americanus -108.53691 32.65237 2015-03-29 17:12:50 1088932273</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; 8  Ursus americanus -123.82900 40.13240 2015-03-28 23:00:00 1132403409</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; 9  Ursus americanus  -78.25027 36.93018 2015-03-20 21:11:24 1088923534</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; 10 Ursus americanus -103.30058 29.27042 2015-04-29 22:00:00 1088964797</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; ..              ...        ...      ...                 ...        ...</span>
+</span></span></code></pre></div><p>Now its 20 rows, duplicate removed</p>
+<p>Here&rsquo;s the duplicates</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-r" data-lang="r"><span style="display:flex;"><span><span style="color:#a6e22e">attr</span>(dp, <span style="color:#e6db74">&#34;dups&#34;</span>)
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; &lt;scrubr dframe&gt;</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; Size: 1 X 5</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; </span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; </span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt;               name longitude latitude                date        key</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt;              (chr)     (dbl)    (dbl)              (time)      (dbl)</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; 1 Ursus americanus -76.78671 35.53079 2015-04-05 23:00:00 1088954555</span>
+</span></span></code></pre></div><h2 id="dates">Dates</h2>
+<p>Standardize/convert dates</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-r" data-lang="r"><span style="display:flex;"><span>df <span style="color:#f92672">&lt;-</span> sample_data_1
+</span></span><span style="display:flex;"><span><span style="color:#a6e22e">dframe</span>(df) <span style="color:#f92672">%&gt;%</span> 
+</span></span><span style="display:flex;"><span>  <span style="color:#a6e22e">date_standardize</span>(<span style="color:#e6db74">&#34;%d%b%Y&#34;</span>)
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; &lt;scrubr dframe&gt;</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; Size: 1500 X 5</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; </span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; </span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt;                name  longitude latitude      date        key</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt;               (chr)      (dbl)    (dbl)     (chr)      (int)</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; 1  Ursus americanus  -79.68283 38.36662 14Jan2015 1065590124</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; 2  Ursus americanus  -82.42028 35.73304 13Jan2015 1065588899</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; 3  Ursus americanus  -99.09625 23.66893 20Feb2015 1098894889</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; 4  Ursus americanus  -72.77432 43.94883 13Feb2015 1065611122</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; 5  Ursus americanus  -72.34617 43.86464 01Mar2015 1088908315</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; 6  Ursus americanus -108.53674 32.65219 29Mar2015 1088932238</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; 7  Ursus americanus -108.53691 32.65237 29Mar2015 1088932273</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; 8  Ursus americanus -123.82900 40.13240 28Mar2015 1132403409</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; 9  Ursus americanus  -78.25027 36.93018 20Mar2015 1088923534</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; 10 Ursus americanus  -76.78671 35.53079 05Apr2015 1088954559</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; ..              ...        ...      ...       ...        ...</span>
+</span></span></code></pre></div><p>Drop records without dates</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-r" data-lang="r"><span style="display:flex;"><span><span style="color:#a6e22e">NROW</span>(df)
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; [1] 1500</span>
+</span></span><span style="display:flex;"><span><span style="color:#a6e22e">NROW</span>(<span style="color:#a6e22e">dframe</span>(df) <span style="color:#f92672">%&gt;%</span> <span style="color:#a6e22e">date_missing</span>())
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; [1] 1498</span>
+</span></span></code></pre></div><p>Create date field from other fields</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-r" data-lang="r"><span style="display:flex;"><span><span style="color:#a6e22e">dframe</span>(sample_data_2) <span style="color:#f92672">%&gt;%</span> 
+</span></span><span style="display:flex;"><span>  <span style="color:#a6e22e">date_create</span>(year, month, day)
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; &lt;scrubr dframe&gt;</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; Size: 1500 X 8</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; </span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; </span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt;                name  longitude latitude        key  year month   day</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt;               (chr)      (dbl)    (dbl)      (int) (chr) (chr) (chr)</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; 1  Ursus americanus  -79.68283 38.36662 1065590124  2015    01    14</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; 2  Ursus americanus  -82.42028 35.73304 1065588899  2015    01    13</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; 3  Ursus americanus  -99.09625 23.66893 1098894889  2015    02    20</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; 4  Ursus americanus  -72.77432 43.94883 1065611122  2015    02    13</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; 5  Ursus americanus  -72.34617 43.86464 1088908315  2015    03    01</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; 6  Ursus americanus -108.53674 32.65219 1088932238  2015    03    29</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; 7  Ursus americanus -108.53691 32.65237 1088932273  2015    03    29</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; 8  Ursus americanus -123.82900 40.13240 1132403409  2015    03    28</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; 9  Ursus americanus  -78.25027 36.93018 1088923534  2015    03    20</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; 10 Ursus americanus  -76.78671 35.53079 1088954559  2015    04    05</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; ..              ...        ...      ...        ...   ...   ...   ...</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; Variables not shown: date (chr).</span>
+</span></span></code></pre></div><h2 id="bugs-and-such">bugs and such</h2>
+<p>Report them in the <a href="https://github.com/ropenscilabs/scrubr/issues">scrubr issue tracker</a></p>
+]]></content:encoded>
     </item>
     <item>
       <title>R ecology workshop</title>
@@ -32,6 +606,12 @@ We think using a piping workflow (%&amp;gt;%) makes code easier to build up, and
       <pubDate>Wed, 31 Jul 2013 00:00:00 +0000</pubDate>
       <guid>http://localhost:1313/2013/07/r-ecology-workshop/</guid>
       <description>After my presentation yesterday to a group of grad students on R resources, I did a presentation today on intro to R data manipulation, visualizations, and analyses/visualizations of biparite networks and community level analyses (diversity, rarefaction, ordination, etc.). As I said yesterday I&amp;rsquo;ve been playing with two ways to make reproducible presentations in R: RStudio&amp;rsquo;s presentations built in to RStudio IDE, and Slidify. Yesterday I went with RStudio&amp;rsquo;s product - today I used Slidify.</description>
+      <content:encoded><![CDATA[<p>After <a href="http://sckott.github.io/2013/07/r-resources/">my presentation yesterday</a> to a group of grad students on R resources, I did a presentation today on intro to R data manipulation, visualizations, and analyses/visualizations of biparite networks and community level analyses (diversity, rarefaction, ordination, etc.). As I said <a href="http://sckott.github.io/2013/07/r-resources/">yesterday</a> I&rsquo;ve been playing with two ways to make reproducible presentations in R: <a href="http://www.rstudio.com/ide/docs/presentations/overview">RStudio&rsquo;s presentations</a> built in to RStudio IDE, and <a href="http://slidify.org/">Slidify</a>. Yesterday I went with RStudio&rsquo;s product - today I used Slidify. See the Markdown file for the presentation <a href="https://github.com/sckott/posterstalks/blob/gh-pages/sfu/resources/r_resources.Rpres">here</a>.</p>
+<p>Check out the presentation slides <a href="https://bitly.com/sfuworkshop">here</a>, and if you want, fork <a href="http://bit.ly/1bKVX2O">the code on Github</a>, change it, submit changes back to me, etc. (click on the image to go to slides)</p>
+<p>How I actually ran the 2 hr workshop was to present a few slides, then live demo writing the code out with students following along, with a number of times where they do something on their own.</p>
+<p><a href="https://bitly.com/sfuworkshop"><img loading="lazy" src="/pres.png" alt=""  />
+</a></p>
+]]></content:encoded>
     </item>
     <item>
       <title>Beyond academia</title>
@@ -39,6 +619,26 @@ We think using a piping workflow (%&amp;gt;%) makes code easier to build up, and
       <pubDate>Thu, 25 Jul 2013 00:00:00 +0000</pubDate>
       <guid>http://localhost:1313/2013/07/beyond-academia/</guid>
       <description>As ecologists, we often start graduate school worshiping the ivory tower of academia with its freedom to pursue important ecological questions. However, studies have shown that most of us do not end up in academia. Greater numbers of ecology graduates are leaving the ivory tower for non-academic career paths. But for many graduates, moving from an academic environment to a non-academic job may be difficult. In graduate school we are trained to work in a particular way, often with loose deadlines and unlimited intellectual freedom (within reason of course).</description>
+      <content:encoded><![CDATA[<p>As ecologists, we often start graduate school worshiping the ivory tower of academia with its freedom to pursue important ecological questions. However, studies have shown that most of us do not end up in academia. Greater numbers of ecology graduates are leaving the ivory tower for non-academic career paths. But for many graduates, moving from an academic environment to a non-academic job may be difficult. In graduate school we are trained to work in a particular way, often with loose deadlines and unlimited intellectual freedom (within reason of course). The culture and expectations of the non-academic world may be quite different. What are the skills that you need in a government job, or in science journalism? How do you market yourself for a non-academic position? This is a timely topic because funding to academic ecologists is being cut, leaving fewer opportunities in the academic arena. In fact, an ESA Student Section survey found that an ESA 2013 session on non-academic career paths in ecology was the topic of greatest interest.</p>
+<p><a href="http://sandrachung.com/">Sandra Chung</a> and I organized an ESA lunchtime session on Tuesday the 6th with panelists from an array of non-academic careers to offer advice and share their experiences. Each panelist will speak briefly, introducing themselves and a bit about what they do. About half of the time will be reserved for an open discussion in which you all attending the session help decide what to talk about.</p>
+<p>You can find the description of the session at the ESA site <a href="http://eco.confex.com/eco/2013/webprogram/Session9083.html">here</a>.</p>
+<p><strong>The details:</strong></p>
+<ul>
+<li>When: Tuesday, August 6, 2013: 11:30 AM-1:15 PM</li>
+<li>Where: 101B, Minneapolis Convention Center</li>
+<li>Who (the panelists):
+<ul>
+<li><a href="http://www.virginiagewin.com/">Virginia Gewin</a>: Independent science journalist (w/ work in Science/Nature/etc.)</li>
+<li><a href="http://www.compassonline.org/staff/LizNeeley">Liz Neeley</a>: Science communication/journalism at COMPASS (a non-profit org.)</li>
+<li><a href="http://www.lpzoo.org/conservation-science/resources/staff-bios/joseph-l-simonis-phd">Joe Simonis</a>: Research scientist at the Lincon Park Zoo (a non-profit org.)</li>
+<li><a href="http://emhart.github.io/">Ted Hart</a>: Soon to be statistician at NEON</li>
+<li><a href="http://linkd.in/15NCg3j">Lael Goodman</a>: Analyst w/ the Union of Concerned Scientists</li>
+</ul>
+</li>
+</ul>
+<p><strong>Get involved</strong></p>
+<p>As a placeholder on the web for things related to Beyond Academia, and a place to find out more about the session at ESA, we started a wiki. Check it out <a href="http://beyondacademia.wikispaces.com/home">here</a>. Please do visit the wiki, and contribute your ideas for topics to discuss. In addition, we have a <em>Resources</em> page on the wiki <a href="http://beyondacademia.wikispaces.com/Resources">here</a> to collect resources related to moving beyond academia.</p>
+]]></content:encoded>
     </item>
     <item>
       <title>Displaying Your Data in Google Earth Using R2G2</title>
@@ -46,6 +646,73 @@ We think using a piping workflow (%&amp;gt;%) makes code easier to build up, and
       <pubDate>Wed, 24 Oct 2012 00:00:00 +0000</pubDate>
       <guid>http://localhost:1313/2012/10/r2g2-package/</guid>
       <description>Have you ever wanted to easily visualize your ecology data in Google Earth? R2G2 is a new package for R, available via R CRAN and formally described in this Molecular Ecology Resources article, which provides a user-friendly bridge between R and the Google Earth interface. Here, we will provide a brief introduction to the package, including a short tutorial, and then encourage you to try it out with your own data!</description>
+      <content:encoded><![CDATA[<p>Have you ever wanted to easily visualize your ecology data in <a href="http://earth.google.com">Google Earth</a>?  <a href="http://cran.r-project.org/web/packages/R2G2/index.html">R2G2</a> is a new package for R, available via <a href="http://cran.r-project.org/">R CRAN</a> and formally described in <a href="http://onlinelibrary.wiley.com/doi/10.1111/1755-0998.12012/abstract">this Molecular Ecology Resources article</a>, which provides a user-friendly bridge between R and the Google Earth interface.  Here, we will provide a brief introduction to the package, including a short tutorial, and then encourage you to try it out with your own data!</p>
+<p><a href="http://barkerlab.net/nils.html">Nils Arrigo</a>, with some help from <a href="http://portal.environment.arizona.edu/students/profiles/loren-albert">Loren Albert</a>, <a href="http://barkerlab.net/mike.html">Mike Barker</a>, and Pascal Mickelson (one of the contributors to <a href="http://sckott.github.io/about.html">Recology</a>), has created a set of R tools to generate KML files to view data with geographic components.  Instead of just telling you what the tools can do, though, we will show you a couple of examples using publically available data.  Note: a number of individual files are linked to throughout the tutorial below, but just in case you would rather download all the tutorial files in one go, have at it (<a href="/R2G2tutorial/R2G2tutorial.zip">tutorial zip file</a>).</p>
+<p>Among the basic tools in <a href="http://cran.r-project.org/web/packages/R2G2/index.html">R2G2</a> is the ability to place features—like dots, shapes, or images (including plots you produced in R)— that represent discrete observations at specific geographical locations.  For example, in the figure below, we show the migratory path of a particular turkey vulture in autumn of three successive years (red = 2009; blue = 2010; green = 2011).</p>
+
+<div align="center">
+<img src="/R2G2tutorial/Vulture_Path.jpg" alt="Google Earth image with three successive years of a particular turkey vulture's migration" width="800"><br>
+<small>Google Earth imagery showing migratory path of a particular turkey vulture in 2009, 2010, and 2011.</small>
+</div>  
+
+<p>We use the <em>PolyLines2GE</em> function that is part of <a href="http://cran.r-project.org/web/packages/R2G2/index.html">R2G2</a> to create line segments between the geographical coordinates which have been obtained from a turkey vulture tagged with a transponder (data accessed via the <a href="http://movebank.org/">Movebank Data Repository</a> and is from the <a href="http://movebank.org/movebank/#page%3Dstudies%2Cpath%3Dstudy481458">Turkey Vulture Acopian Center USA GPS</a>).  The <em>PolyLines2GE</em> function looks like the following:</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-r" data-lang="r"><span style="display:flex;"><span><span style="color:#a6e22e">PolyLines2GE</span>(coords <span style="color:#f92672">=</span> vulture_path[,<span style="color:#ae81ff">2</span><span style="color:#f92672">:</span><span style="color:#ae81ff">3</span>],  
+</span></span><span style="display:flex;"><span>			nesting <span style="color:#f92672">=</span> vulture_path[,<span style="color:#ae81ff">1</span>],  
+</span></span><span style="display:flex;"><span>			colors <span style="color:#f92672">=</span> <span style="color:#e6db74">&#34;auto&#34;</span>,  
+</span></span><span style="display:flex;"><span>			goo <span style="color:#f92672">=</span> <span style="color:#e6db74">&#34;Vulture_Path.kml&#34;</span>,  
+</span></span><span style="display:flex;"><span>			maxAlt <span style="color:#f92672">=</span> <span style="color:#ae81ff">1e4</span>,  
+</span></span><span style="display:flex;"><span>			fill <span style="color:#f92672">=</span> <span style="color:#66d9ef">FALSE</span>,  
+</span></span><span style="display:flex;"><span>			closepoly <span style="color:#f92672">=</span> <span style="color:#66d9ef">FALSE</span>,  
+</span></span><span style="display:flex;"><span>			lwd <span style="color:#f92672">=</span> <span style="color:#ae81ff">2</span>,  
+</span></span><span style="display:flex;"><span>			extrude <span style="color:#f92672">=</span> <span style="color:#ae81ff">0</span>)
+</span></span></code></pre></div><p>It expects to receive an array (&ldquo;coords&rdquo;) containing latitude and longitude coordinates in decimal degrees. Additionally, each individual coordinate has a flag associated with it (&ldquo;nesting&rdquo;) so that each data series can be distinguished.  Illustrating what you need is easier than explaining:</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-r" data-lang="r"><span style="display:flex;"><span>nesting longitude latitude
+</span></span><span style="display:flex;"><span><span style="color:#ae81ff">1</span>	long1A		lat1A
+</span></span><span style="display:flex;"><span><span style="color:#ae81ff">1</span>	long1B		lat1B
+</span></span><span style="display:flex;"><span><span style="color:#ae81ff">1</span>	long1C		lat1C
+</span></span><span style="display:flex;"><span><span style="color:#ae81ff">2</span>	long2A		lat2A
+</span></span><span style="display:flex;"><span><span style="color:#ae81ff">2</span>	long2B		lat2B
+</span></span><span style="display:flex;"><span><span style="color:#ae81ff">3</span>	long3A		lat3A
+</span></span><span style="display:flex;"><span><span style="color:#ae81ff">3</span>	long3B		lat3B
+</span></span><span style="display:flex;"><span><span style="color:#ae81ff">3</span>	long3C		lat3C
+</span></span></code></pre></div><p>Feeding the columns of this array to the function results in three differently colored lines:  the first would connect the coordinates 1A-1B-1C, while the second would connect 2A-2B, and the third would connect 3A-3B-3C.  The only other user-defined input that is strictly necessary is the output file name (&ldquo;Vulture_Path.kml&rdquo; in this case).  The other options—which allow you control of the appearance of the lines and of the altitude at which your line displays in Google Earth—have reasonable defaults that are well-documented in the function definition itself.  Check out this example in Google Earth <a href="/R2G2tutorial/Vulture_Path.kml">by downloading the KML file</a>.  Alternatively, <a href="/R2G2tutorial/Vulture_Path.R">download the annotated R script</a> and generate the KML file for yourself.</p>
+<p>Now, let&rsquo;s say you wanted to get a sense of the range and abundance of two congeneric species.  In this second example, we use the <em>Hist2GE</em> function to create a histogram—overlaid on the surface of the earth—which shows the species distribution of <em>Mimulus lewisii</em> (red) and <em>Mimulus nasutus</em> (blue) in North America.</p>
+
+<div align="center">
+<img src="/R2G2tutorial/Mimulus_Distribution.jpg" alt="Google Earth image showing the distribution of Mimulus in North America" width="800"><br>
+<small>Google Earth imagery showing the species distribution of <em>Mimulus lewisii</em> and <em>Mimulus nasutus</em></small>
+</div>
+
+<p>As you might expect, each polygon represents an occurrence of the species in question, while the height of the polygon represents the abundance of the species at that geographic location.  Species occurring within a particular distance of each other have been grouped together for the histogram.  For this example, we retrieve data from the <a href="http://data.gbif.org/">GBIF</a> database from within R (see the example code for how that is done).  Inputs to the Hist2GE function are:</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-r" data-lang="r"><span style="display:flex;"><span><span style="color:#a6e22e">Hist2GE</span>(coords <span style="color:#f92672">=</span> MyCompleteData[, <span style="color:#ae81ff">8</span><span style="color:#f92672">:</span><span style="color:#ae81ff">7</span>],  
+</span></span><span style="display:flex;"><span>		species <span style="color:#f92672">=</span> MyCompleteData[, <span style="color:#ae81ff">1</span>],  
+</span></span><span style="display:flex;"><span>		grid <span style="color:#f92672">=</span> grid10000,  
+</span></span><span style="display:flex;"><span>		goo <span style="color:#f92672">=</span> <span style="color:#e6db74">&#34;Mimulus&#34;</span>,  
+</span></span><span style="display:flex;"><span>		nedges <span style="color:#f92672">=</span> <span style="color:#ae81ff">6</span>,  
+</span></span><span style="display:flex;"><span>		orient <span style="color:#f92672">=</span> <span style="color:#ae81ff">45</span>,  
+</span></span><span style="display:flex;"><span>		maxAlt <span style="color:#f92672">=</span> <span style="color:#ae81ff">1e4</span>)
+</span></span></code></pre></div><p>As in the first example, the function expects to receive an array containing the longitude and latitude (&ldquo;coords&rdquo;), a vector distinguishing individual observations (&ldquo;species&rdquo;), and an output file name (&ldquo;goo&rdquo;).  In this case, however, we also need to specify the size of the grid we will use to group observations together to construct the histogram.  Several pre-defined grid sizes are included in the package to do this grouping; these all cover large geographic areas and therefore must account for the curvature of the earth.  Here is a list of these pre-defined grids:</p>
+
+<table border="1">
+    <tr><th>Grid Name</th><th>Approximate Area of Grid Division </th></tr>
+    <tr><td>grid20000</td><td>25,500 sq. km</td></tr>
+    <tr><td>grid10000</td><td>51,000 sq. km</td></tr>
+    <tr><td>grid5000</td><td>102,000 sq. km</td></tr>
+    <tr><td>grid500</td><td>1,020,000 sq. km</td></tr>
+    <tr><td>grid50</td><td>10,200,000 sq. km</td></tr>
+</table>  
+
+<p>For smaller geographic areas (less than 25,000 square kilometers, or an area of about 158 km per side), you can customize the grid size by specifying the bounds of your region of interest in decimal degrees, as well as the coarseness of the grid within that region.  While it is possible to use this custom grid definition for larger sizes, beware that not all areas defined thusly will be of equal size due to the earth&rsquo;s curvature (obviously the bigger you go, the worse it gets&hellip;).  Finally, you again have control over the display parameters of the histogram.  In particular, the maximum altitude (&ldquo;maxAlt&rdquo;) controls how high the tallest bar in the histogram will go.  Here is <a href="/R2G2tutorial/Mimulus_Distribution.kml">the resulting KML file</a>, as well as <a href="/R2G2tutorial/Mimulus_Distribution.R">the annotated R script</a> so you can further explore the example.</p>
+<p>More complex visual representations are also possible using <a href="http://cran.r-project.org/web/packages/R2G2/index.html">R2G2</a>.  For instance, you can also create contour plots or phylogenies overlaid directly on the surface of the earth.  We included a couple examples of this type in <a href="http://onlinelibrary.wiley.com/doi/10.1111/1755-0998.12012/abstract">our Molecular Ecology Resources article</a>, and if the response seems good, we may post a follow up tutorial showing how we went about creating those examples.</p>
+<p>It is our sincere hope that you will use the tools in <a href="http://cran.r-project.org/web/packages/R2G2/index.html">R2G2</a> to more effectively visualize the geographical aspects of your data.  In particular, we are excited about the potential for incorporating <a href="http://cran.r-project.org/web/packages/R2G2/index.html">R2G2</a> into data analysis pipelines connecting analysis in R with data visualization and exploration in Google Earth.  Ultimately, the inclusion of KML files as supplementary materials to journal articles should also enrich one&rsquo;s understanding of the data being presented!</p>
+
+<big><b>Note:  If you make something cool using <a href="http://cran.r-project.org/web/packages/R2G2/index.html">R2G2</a>, please post a link to your KML file in the comments; we would love to see!</b></big>
+
+<br />
+
+<p>Citation information for <a href="http://cran.r-project.org/web/packages/R2G2/index.html">R2G2</a>:<br>
+<em>Arrigo, N., Albert, L. P., Mickelson, P. G. and Barker, M. S. (2012), Quantitative visualization of biological data in Google Earth using R2G2, an R CRAN package. Molecular Ecology Resources. doi: 10.1111/1755-0998.12012</em></p>
+]]></content:encoded>
     </item>
     <item>
       <title>Getting ecology and evolution journal titles from R</title>
@@ -54,6 +721,75 @@ We think using a piping workflow (%&amp;gt;%) makes code easier to build up, and
       <guid>http://localhost:1313/2012/08/get-ecoevo-journal-titles/</guid>
       <description>So I want to mine some #altmetrics data for some research I&amp;rsquo;m thinking about doing. The steps would be:
 Get journal titles for ecology and evolution journals. Get DOI&amp;rsquo;s for all papers in all the above journal titles. Get altmetrics data on each DOI. Do some fancy analyses. Make som pretty figs. Write up results. It&amp;rsquo;s early days, so jus working on the first step. However, getting a list of journals in ecology and evolution is frustratingly hard.</description>
+      <content:encoded><![CDATA[<p>So I want to mine some #altmetrics data for some research I&rsquo;m thinking about doing.  The steps would be:</p>
+<ul>
+<li>Get journal titles for ecology and evolution journals.</li>
+<li>Get DOI&rsquo;s for all papers in all the above journal titles.</li>
+<li>Get altmetrics data on each DOI.</li>
+<li>Do some fancy analyses.</li>
+<li>Make som pretty figs.</li>
+<li>Write up results.</li>
+</ul>
+<p>It&rsquo;s early days, so jus working on the first step.  However, getting a list of journals in ecology and evolution is frustratingly hard.  This turns out to not be that easy if you are (1) trying to avoid <a href="http://thomsonreuters.com/">Thomson Reuters</a>, and (2) want a machine interface way to do it (read: API).</p>
+<p>Unfortunately, Mendeley&rsquo;s API does not have methods for getting a list of journals by field, or at least I don&rsquo;t know how to do it using <a href="http://apidocs.mendeley.com/">their API</a>.  No worries though - <a href="http://crossref.org/">Crossref</a> comes to save the day.   Here&rsquo;s my attempt at this using the <a href="http://help.crossref.org/#using_oai_pmh">Crossref OAI-PMH</a>.</p>
+<p>I wrote a little while loop to get journal titles from the Crossref OAI-PMH. This takes a while to run, but at least it works on my machine - hopefully yours too!</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-r" data-lang="r"><span style="display:flex;"><span><span style="color:#a6e22e">library</span>(XML)
+</span></span><span style="display:flex;"><span><span style="color:#a6e22e">library</span>(RCurl)
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>token <span style="color:#f92672">&lt;-</span> <span style="color:#e6db74">&#34;characters&#34;</span>  <span style="color:#75715e"># define a iterator, also used for gettingn the resumptionToken</span>
+</span></span><span style="display:flex;"><span>nameslist <span style="color:#f92672">&lt;-</span> <span style="color:#a6e22e">list</span>()  <span style="color:#75715e"># define empty list to put joural titles in to</span>
+</span></span><span style="display:flex;"><span><span style="color:#66d9ef">while</span> (<span style="color:#a6e22e">is.character</span>(token) <span style="color:#f92672">==</span> <span style="color:#66d9ef">TRUE</span>) {
+</span></span><span style="display:flex;"><span>    baseurl <span style="color:#f92672">&lt;-</span> <span style="color:#e6db74">&#34;http://oai.crossref.org/OAIHandler?verb=ListSets&#34;</span>
+</span></span><span style="display:flex;"><span>    <span style="color:#66d9ef">if</span> (token <span style="color:#f92672">==</span> <span style="color:#e6db74">&#34;characters&#34;</span>) {
+</span></span><span style="display:flex;"><span>        tok2 <span style="color:#f92672">&lt;-</span> <span style="color:#66d9ef">NULL</span>
+</span></span><span style="display:flex;"><span>    } <span style="color:#66d9ef">else</span> {
+</span></span><span style="display:flex;"><span>        tok2 <span style="color:#f92672">&lt;-</span> <span style="color:#a6e22e">paste</span>(<span style="color:#e6db74">&#34;&amp;resumptionToken=&#34;</span>, token, sep <span style="color:#f92672">=</span> <span style="color:#e6db74">&#34;&#34;</span>)
+</span></span><span style="display:flex;"><span>    }
+</span></span><span style="display:flex;"><span>    query <span style="color:#f92672">&lt;-</span> <span style="color:#a6e22e">paste</span>(baseurl, tok2, sep <span style="color:#f92672">=</span> <span style="color:#e6db74">&#34;&#34;</span>)
+</span></span><span style="display:flex;"><span>    crsets <span style="color:#f92672">&lt;-</span> <span style="color:#a6e22e">xmlToList</span>(<span style="color:#a6e22e">xmlParse</span>(<span style="color:#a6e22e">getURL</span>(query)))
+</span></span><span style="display:flex;"><span>    names <span style="color:#f92672">&lt;-</span> <span style="color:#a6e22e">as.character</span>(<span style="color:#a6e22e">sapply</span>(crsets[[4]], <span style="color:#66d9ef">function</span>(x) x[[<span style="color:#e6db74">&#34;setName&#34;</span>]]))
+</span></span><span style="display:flex;"><span>    nameslist[[token]] <span style="color:#f92672">&lt;-</span> names
+</span></span><span style="display:flex;"><span>    <span style="color:#66d9ef">if</span> (<span style="color:#a6e22e">class</span>(<span style="color:#a6e22e">try</span>(crsets[[2]]<span style="color:#f92672">$</span>.attrs[[<span style="color:#e6db74">&#34;resumptionToken&#34;</span>]])) <span style="color:#f92672">==</span> <span style="color:#e6db74">&#34;try-error&#34;</span>) {
+</span></span><span style="display:flex;"><span>        <span style="color:#a6e22e">stop</span>(<span style="color:#e6db74">&#34;no more data&#34;</span>)
+</span></span><span style="display:flex;"><span>    } <span style="color:#66d9ef">else</span> token <span style="color:#f92672">&lt;-</span> crsets[[2]]<span style="color:#f92672">$</span>.attrs[[<span style="color:#e6db74">&#34;resumptionToken&#34;</span>]]
+</span></span><span style="display:flex;"><span>}
+</span></span></code></pre></div><p>Yay!  Hopefully it worked if you tried it.  Let&rsquo;s see how long the list of journal titles is.</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-r" data-lang="r"><span style="display:flex;"><span><span style="color:#a6e22e">sapply</span>(nameslist, length)  <span style="color:#75715e"># length of each list</span>
+</span></span></code></pre></div><div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-r" data-lang="r"><span style="display:flex;"><span>                          characters c65ebc3f<span style="color:#f92672">-</span>b540<span style="color:#ae81ff">-4672-9</span>c00<span style="color:#f92672">-</span>f3135bf849e3 
+</span></span><span style="display:flex;"><span>                               <span style="color:#ae81ff">10001</span>                                <span style="color:#ae81ff">10001</span> 
+</span></span><span style="display:flex;"><span><span style="color:#ae81ff">6</span>f61b343<span style="color:#f92672">-</span>a8f4<span style="color:#ae81ff">-48</span>f1<span style="color:#ae81ff">-8297</span><span style="color:#f92672">-</span>c6f6909ca7f7 
+</span></span><span style="display:flex;"><span>                                <span style="color:#ae81ff">6864</span> 
+</span></span></code></pre></div><div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-r" data-lang="r"><span style="display:flex;"><span>allnames <span style="color:#f92672">&lt;-</span> <span style="color:#a6e22e">do.call</span>(c, nameslist)  <span style="color:#75715e"># combine to list</span>
+</span></span><span style="display:flex;"><span><span style="color:#a6e22e">length</span>(allnames)
+</span></span></code></pre></div><div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-r" data-lang="r"><span style="display:flex;"><span>[1] <span style="color:#ae81ff">26866</span>
+</span></span></code></pre></div><p>Now, let&rsquo;s use some <code>regex</code> to pull out the journal titles that are likely ecology and evolutionary biology journals.  The <code>^</code> symbol says &ldquo;the string must start here&rdquo;. The <code>\\s</code> means whitespace.  The <code>[]</code> lets you specify a set of letters you are looking for, e.g., <code>[Ee]</code> means capital <code>E</code> <em>OR</em> lowercase <code>e</code>.  I threw in titles that had the words systematic and natrualist too.  Tried to trim any whitespace as well using the <code>stringr</code> package.</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-r" data-lang="r"><span style="display:flex;"><span><span style="color:#a6e22e">library</span>(stringr)
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>ecotitles <span style="color:#f92672">&lt;-</span> <span style="color:#a6e22e">as.character</span>(allnames<span style="color:#a6e22e">[str_detect</span>(allnames, <span style="color:#e6db74">&#34;^[Ee]cology|\\s[Ee]cology&#34;</span>)])
+</span></span><span style="display:flex;"><span>evotitles <span style="color:#f92672">&lt;-</span> <span style="color:#a6e22e">as.character</span>(allnames<span style="color:#a6e22e">[str_detect</span>(allnames, <span style="color:#e6db74">&#34;^[Ee]volution|\\s[Ee]volution&#34;</span>)])
+</span></span><span style="display:flex;"><span>systtitles <span style="color:#f92672">&lt;-</span> <span style="color:#a6e22e">as.character</span>(allnames<span style="color:#a6e22e">[str_detect</span>(allnames, <span style="color:#e6db74">&#34;^[Ss]ystematic|\\s[Ss]systematic&#34;</span>)])
+</span></span><span style="display:flex;"><span>naturalist <span style="color:#f92672">&lt;-</span> <span style="color:#a6e22e">as.character</span>(allnames<span style="color:#a6e22e">[str_detect</span>(allnames, <span style="color:#e6db74">&#34;[Nn]aturalist&#34;</span>)])
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>ecoevotitles <span style="color:#f92672">&lt;-</span> <span style="color:#a6e22e">unique</span>(<span style="color:#a6e22e">c</span>(ecotitles, evotitles, systtitles, naturalist))  <span style="color:#75715e"># combine to list</span>
+</span></span><span style="display:flex;"><span>ecoevotitles <span style="color:#f92672">&lt;-</span> <span style="color:#a6e22e">str_trim</span>(ecoevotitles, side <span style="color:#f92672">=</span> <span style="color:#e6db74">&#34;both&#34;</span>)  <span style="color:#75715e"># trim whitespace, if any</span>
+</span></span><span style="display:flex;"><span><span style="color:#a6e22e">length</span>(ecoevotitles)
+</span></span></code></pre></div><div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-r" data-lang="r"><span style="display:flex;"><span>[1] <span style="color:#ae81ff">188</span>
+</span></span></code></pre></div><div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-r" data-lang="r"><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e"># Just the first ten titles</span>
+</span></span><span style="display:flex;"><span>ecoevotitles[1<span style="color:#f92672">:</span><span style="color:#ae81ff">10</span>]
+</span></span></code></pre></div><div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-r" data-lang="r"><span style="display:flex;"><span> [1] <span style="color:#e6db74">&#34;Microbial Ecology in Health and Disease&#34;</span>           
+</span></span><span style="display:flex;"><span> [2] <span style="color:#e6db74">&#34;Population Ecology&#34;</span>                                
+</span></span><span style="display:flex;"><span> [3] <span style="color:#e6db74">&#34;Researches on Population Ecology&#34;</span>                  
+</span></span><span style="display:flex;"><span> [4] <span style="color:#e6db74">&#34;Behavioral Ecology and Sociobiology&#34;</span>               
+</span></span><span style="display:flex;"><span> [5] <span style="color:#e6db74">&#34;Microbial Ecology&#34;</span>                                 
+</span></span><span style="display:flex;"><span> [6] <span style="color:#e6db74">&#34;Biochemical Systematics and Ecology&#34;</span>               
+</span></span><span style="display:flex;"><span> [7] <span style="color:#e6db74">&#34;FEMS Microbiology Ecology&#34;</span>                         
+</span></span><span style="display:flex;"><span> [8] <span style="color:#e6db74">&#34;Journal of Experimental Marine Biology and Ecology&#34;</span>
+</span></span><span style="display:flex;"><span> [9] <span style="color:#e6db74">&#34;Applied Soil Ecology&#34;</span>                              
+</span></span><span style="display:flex;"><span>[10] <span style="color:#e6db74">&#34;Forest Ecology and Management&#34;</span>                     
+</span></span></code></pre></div><p>Get the .Rmd file used to create this post <a href="https://github.com/sckott/sckott.github.com/tree/master/_drafts/2012-08-30-get-ecoevo-journal-titles.Rmd">at my github account</a>.</p>
+<p>Written in <a href="http://daringfireball.net/projects/markdown/">Markdown</a>, with help from <a href="http://yihui.name/knitr/">knitr</a>, and nice knitr highlighting/etc. in in <a href="http://rstudio.org/">RStudio</a>.</p>
+]]></content:encoded>
     </item>
     <item>
       <title>Ecology unconference at ESA 2013</title>
@@ -63,6 +799,17 @@ Get journal titles for ecology and evolution journals. Get DOI&amp;rsquo;s for a
       <description>So I heard many people say after or during the recent ESA conference in Portland that they really enjoyed the converstations more than listening to talks or looking at posters.
 There was some chatter about doing an unconference associated with next year&amp;rsquo;s ESA conference in Minneapolis. And Sandra Chung (@sandramchung) got on it and started a wiki that we can all conribute ideas to. The wiki is here
 What is an unconference?</description>
+      <content:encoded><![CDATA[<p>So I heard many people say after or during the recent ESA conference in Portland that they really enjoyed the converstations more than listening to talks or looking at posters.</p>
+<p>There was some chatter about doing an unconference associated with next year&rsquo;s ESA conference in Minneapolis. And Sandra Chung (@sandramchung) got on it and started a wiki that we can all conribute ideas to. The wiki is <a href="http://ecologyunconference.wikispaces.com/">here</a></p>
+<p>What is an unconference? The idea of an unconference is to have a community organized meetup in which interactions among people are emphasized over the traditional lecture and poster format. For example, many sessions may just be organized a single idea, and people attending have a discussion around the topic. The format can be decided by the community.</p>
+<p>What will we do there? The broadest restriction is that topics should be about science that happens online. You may say, &ldquo;Well, real ecology happens in the field!&rdquo;. Yes, but a lot of the products of ecology are put online, and increasingly the discussion of the practice of ecology happens online. Check out the <a href="http://scienceonline2012.com/">Science Online 2012 website</a> for a little taste of what we hope to achieve next year.</p>
+<p>How do I get involved? Go to <a href="http://ecologyunconference.wikispaces.com/">the wiki</a> and start contributing. There are already some suggestions for topics&hellip;Here&rsquo;s a screenshot of the ideas for Session Proposals page:</p>
+<p><img loading="lazy" src="/ecologyunconf.png" alt="ecologyunconf"  />
+</p>
+<p>Important!  Use the #esaun13 hashtag to talk about this unconference on Twitter, G+, and app.net.</p>
+<p>Get the .Rmd file used to create this post <a href="https://github.com/sckott/sckott.github.com/tree/master/_drafts/2012-08-30-making-matrices.Rmd">at my github account</a>.</p>
+<p>Written in <a href="http://daringfireball.net/projects/markdown/">Markdown</a>, with help from <a href="http://yihui.name/knitr/">knitr</a>.</p>
+]]></content:encoded>
     </item>
     <item>
       <title>Recent R packages for ecology and evolution</title>
@@ -71,6 +818,73 @@ What is an unconference?</description>
       <guid>http://localhost:1313/2012/06/recent-r-eeb-packages/</guid>
       <description>Many R packages/tools have come out recently for doing ecology and evolution. All of the below were described in Methods in Ecology and Evolution, except for spider, which came out in Molecular Ecology Resources. Here are some highlights.
 mvabund paper - get R pkg Model-based analysis of multivariate abundance data. Visualising data, fitting predictive models, checking assumptions, hypothesis testing. popdemo paper - get R pkg Population demography using projection matrix analysis.</description>
+      <content:encoded><![CDATA[<p>Many R packages/tools have come out recently for doing ecology and evolution. All of the below were described in Methods in Ecology and Evolution, except for spider, which came out in <a href="https://onlinelibrary.wiley.com/journal/10.1111/(ISSN)1755-0998">Molecular Ecology Resources</a>. Here are some highlights.</p>
+<ul>
+<li>mvabund <a href="https://onlinelibrary.wiley.com/doi/10.1111/j.2041-210X.2012.00190.x/abstract">paper</a> - <a href="https://cran.r-project.org/web/packages/mvabund/index.html">get R pkg</a>
+<ul>
+<li>Model-based analysis of multivariate abundance data. Visualising data, fitting predictive models, checking assumptions, hypothesis testing.</li>
+</ul>
+</li>
+<li>popdemo <a href="https://onlinelibrary.wiley.com/doi/10.1111/j.2041-210X.2012.00222.x/abstract">paper</a> - <a href="https://cran.r-project.org/web/packages/popdemo/index.html">get R pkg</a>
+<ul>
+<li>Population demography using projection matrix analysis.</li>
+</ul>
+</li>
+<li>motmot <a href="https://onlinelibrary.wiley.com/doi/10.1111/j.2041-210X.2011.00132.x/abstract">paper</a> - <a href="https://cran.r-project.org/web/packages/motmot/index.html">get R pkg</a>
+<ul>
+<li>Models of trait macroevolution on trees</li>
+</ul>
+</li>
+<li>spider <a href="https://onlinelibrary.wiley.com/doi/10.1111/j.1755-0998.2011.03108.x/abstract?deniedAccessCustomisedMessage=&amp;userIsAuthenticated=false">paper</a> - <a href="https://cran.r-project.org/web/packages/spider/index.html">get R pkg</a>
+<ul>
+<li>Analysis of species identity and evolution, with particular reference to DNA barcoding</li>
+</ul>
+</li>
+<li>BaSTA <a href="https://onlinelibrary.wiley.com/doi/10.1111/j.2041-210X.2012.00186.x/abstract">paper</a> - <a href="https://cran.r-project.org/web/packages/BaSTA/index.html">get R pkg</a>
+<ul>
+<li>Bayesian estimation of age-specific survival from incomplete mark–recapture/recovery data with covariates</li>
+</ul>
+</li>
+<li>abc <a href="https://onlinelibrary.wiley.com/doi/10.1111/j.2041-210X.2011.00179.x/abstract">paper</a> - <a href="https://cran.r-project.org/web/packages/abc/index.html">get R pkg</a>
+<ul>
+<li>Approximate Bayesian Computation (ABC)</li>
+</ul>
+</li>
+<li>RNetLogo <a href="https://onlinelibrary.wiley.com/doi/10.1111/j.2041-210X.2011.00180.x/abstract">paper</a> - <a href="https://cran.r-project.org/web/packages/RNetLogo/index.html">get R pkg</a>
+<ul>
+<li>Running and exploring individual-based models implemented in NetLogo</li>
+</ul>
+</li>
+<li>phytools <a href="https://onlinelibrary.wiley.com/doi/10.1111/j.2041-210X.2011.00169.x/abstract">paper</a> - <a href="https://cran.r-project.org/web/packages/phytools/index.html">get R pkg</a>
+<ul>
+<li>Tools for phylogenetic comparative biology</li>
+</ul>
+</li>
+<li>smatr <a href="https://onlinelibrary.wiley.com/doi/10.1111/j.2041-210X.2011.00153.x/abstract">paper</a> - <a href="https://cran.r-project.org/web/packages/smatr/index.html">get R pkg</a>
+<ul>
+<li>Estimation and inference about allometric lines</li>
+</ul>
+</li>
+<li>RBrownie <a href="https://onlinelibrary.wiley.com/doi/10.1111/j.2041-210X.2011.00112.x/abstract">paper</a> - <a href="https://www.brianomeara.info/tutorials/brownie">get R pkg ?</a>
+<ul>
+<li>Testing hypotheses about rates of evolutionary change</li>
+</ul>
+</li>
+<li>polytomy resolver <a href="https://onlinelibrary.wiley.com/doi/10.1111/j.2041-210X.2011.00103.x/abstract">paper</a> - <a href="https://onlinelibrary.wiley.com/doi/10.1111/j.2041-210X.2011.00103.x/suppinfo">get R pkg</a>
+<ul>
+<li>Resolve polytomies on dated phylogenies with their R scripts [here][].</li>
+</ul>
+</li>
+</ul>
+<p>And a cool tool came out for the Python programming language.</p>
+<ul>
+<li>NichePy <a href="https://onlinelibrary.wiley.com/doi/10.1111/j.2041-210X.2011.00184.x/abstract">paper</a> - <a href="https://github.com/bastodian/NichePy">get python</a>
+<ul>
+<li>Modular tools for estimating the similarity of ecological niche and species distribution models</li>
+</ul>
+</li>
+</ul>
+]]></content:encoded>
     </item>
     <item>
       <title>Take the INNGE survey on math and ecology</title>
@@ -80,6 +894,10 @@ mvabund paper - get R pkg Model-based analysis of multivariate abundance data. V
       <description>Many ecologists are R users, but we vary in our understanding of the math and statistical theory behind models we use. There is no clear consensus on what should be the basic mathematical training of ecologists.
 To learn what the community thinks, we invite you to fill out a short and anonymous questionnaire on this topic here.
 The questionnaire was designed by Frédéric Barraquand, a graduate student at Université Pierre et Marie Curie, in collaboration with the International Network of Next-Generation Ecologists (INNGE).</description>
+      <content:encoded><![CDATA[<p>Many ecologists are R users, but we vary in our understanding of the math and statistical theory behind models we use. There is no clear consensus on what should be the basic mathematical training of ecologists.</p>
+<p>To learn what the community thinks, we invite you to fill out a short and anonymous questionnaire on this topic <a href="https://sites.google.com/site/mathematicsandecologysurvey/">here</a>.</p>
+<p>The questionnaire was designed by <a href="http://www.cebc.cnrs.fr/Fidentite/barraquand/barraquand.htm">Frédéric Barraquand</a>, a graduate student at Université Pierre et Marie Curie, in collaboration with the International Network of Next-Generation Ecologists (<a href="http://www.innge.net">INNGE</a>).</p>
+]]></content:encoded>
     </item>
     <item>
       <title>Recology is 1 yr old</title>
@@ -88,6 +906,37 @@ The questionnaire was designed by Frédéric Barraquand, a graduate student at U
       <guid>http://localhost:1313/2011/12/recology-is-1-yr-old/</guid>
       <description>This blog has lasted a whole year already. Thanks for reading and commenting.
 There are a couple of announcements: Less blogging: I hope to put in many more years blogging here, but in full disclosure I am blogging for Journal of Ecology now, so I am going to be (and already have been) blogging less here. More blogging: If anyone wants to write guest posts at Recology on the topics of using R for ecology and evolution, or open science, please contact me.</description>
+      <content:encoded><![CDATA[<p>This blog has lasted a whole year already. Thanks for reading and commenting.</p>
+<h3 id="there-are-a-couple-of-announcements">There are a couple of announcements:</h3>
+<ol>
+<li>Less blogging: I hope to put in many more years blogging here, but in full disclosure <a href="http://jecologyblog.wordpress.com/">I am blogging for Journal of Ecology</a> now, so I am going to be (and already have been) blogging less here.</li>
+<li>More blogging: If anyone wants to write guest posts at Recology on the topics of using R for ecology and evolution, or open science, please contact me.</li>
+<li>Different blogging: I was going to roll out the new dynamic views for this blog, but Google doesn&rsquo;t allow javascript, which is how I include code using GitHub gists. Oh well&hellip;</li>
+</ol>
+<p>Anywho, here is the breakdown of visits to this blog, visualized using #ggplot2, of course. There were a total of about 23,000 pageviews in the first year of this blog.</p>
+<p>Here is the pie chart code I used:</p>
+
+<script src="https://gist.github.com/1515754.js?file=piechart.R"></script> 
+
+<p>Visits to top ten posts:</p>
+<p><img loading="lazy" src="http://farm8.staticflickr.com/7158/6613213609_e491cd6f95_d.jpg" alt=""  />
+</p>
+<p>Visits by by pages:</p>
+<p><img loading="lazy" src="http://farm8.staticflickr.com/7033/6613216069_6c7b0d2aca_d.jpg" alt=""  />
+</p>
+<p>Visits by top referring sites:</p>
+<p><img loading="lazy" src="http://farm8.staticflickr.com/7008/6613217859_a03bcfee3e_d.jpg" alt=""  />
+</p>
+<p>Visits by country:</p>
+<p><img loading="lazy" src="http://farm8.staticflickr.com/7027/6613219049_97cf21a84e_d.jpg" alt=""  />
+</p>
+<p>Visits by browsers:</p>
+<p><img loading="lazy" src="http://farm8.staticflickr.com/7147/6613232905_5a98d82f87_d.jpg" alt=""  />
+</p>
+<p>Visits by operating system:</p>
+<p><img loading="lazy" src="http://farm8.staticflickr.com/7005/6613236311_7cab55afd6_d.jpg" alt=""  />
+</p>
+]]></content:encoded>
     </item>
   </channel>
 </rss>

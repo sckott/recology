@@ -15,6 +15,11 @@
       <guid>http://localhost:1313/2023/10/fred-hutch/</guid>
       <description>Soooo, my last job at Deck was amazing. I loved it. I was doing data engineer stuff there, mostly maintaining infrastructure for data pipelines. Everyone was great and the mission was amazing: helping Democrats win. Yet the company was shut down about a month ago, sending me on another job search, the 3rd since early/mid 2021.
 I&amp;rsquo;m super thrilled to have landed a job (Software and Reproducibility Software Developer) at the Fred Hutch Data Science Lab (DASL), headed up by Jeff Leek, working with Sean Kross, Amy Paguirigan, and Monica Gerber, among many other amazing folks.</description>
+      <content:encoded><![CDATA[<p>Soooo, my last job at <a href="https://welcome.deck.tools/">Deck</a> was amazing. I loved it. I was doing data engineer stuff there, mostly maintaining infrastructure for data pipelines. Everyone was great and the mission was amazing: helping Democrats win. Yet the company was shut down about a month ago, sending me on another job search, the 3rd since early/mid 2021.</p>
+<p>I&rsquo;m super thrilled to have landed a job (Software and Reproducibility Software Developer) at the <a href="https://hutchdatascience.org/">Fred Hutch Data Science Lab (DASL)</a>, headed up by <a href="https://jtleek.com/">Jeff Leek</a>, working with <a href="https://seankross.com/">Sean Kross</a>, <a href="https://amypag.com/">Amy Paguirigan</a>, and <a href="https://www.monicagerber.com/">Monica Gerber</a>, among many other amazing folks.</p>
+<p>I&rsquo;m excited to help support the DASL mission to help cancer patients, care providers and researchers.</p>
+<p>In addition, I get to do a bunch (maybe all?) of software work as opensource, mostly in R and Python. After two jobs where opensource wasn&rsquo;t really part of the job, it&rsquo;s such a treat to get back to doing opensource work. Perhaps it will mostly be conversing with Fred Hutch people, but the goal is to make tools that will help far beyond Fred Hutch.</p>
+]]></content:encoded>
     </item>
     <item>
       <title>Python, ast, and redbaron</title>
@@ -24,6 +29,133 @@ I&amp;rsquo;m super thrilled to have landed a job (Software and Reproducibility 
       <description>I recently had a use case at work where I wanted to check that file paths given in a Python script actually existed. These paths were in various GitHub repositories, so all I had to do was pull out the paths and check if they exist on GitHub.
 There were a few catches though.
 First, I couldn&amp;rsquo;t simply get any string out of each Python script - they needed to be strings specficied by a specific function parameter, and match a regex (e.</description>
+      <content:encoded><![CDATA[<p>I recently had a use case at work where I wanted to check that file paths given in a Python script actually existed. These paths were in various GitHub repositories, so all I had to do was pull out the paths and check if they exist on GitHub.</p>
+<p>There were a few catches though.</p>
+<p>First, I couldn&rsquo;t simply get any string out of each Python script - they needed to be strings specficied by a specific function parameter, and match a regex (e.g., start with &lsquo;abc&rsquo;).</p>
+<p>Second, the script paths lack the GitHub repository root name. This name was part of the function name - so I needed to get access to the function that the path was specified within, and then parse the function name to get the repository name.</p>
+<p>The obvious solution I thought was the <a href="https://docs.python.org/3/library/ast.html">ast</a> library.</p>
+<h2 id="ast-library">ast library</h2>
+<p>I started by using <code>ast</code>. The <code>ast.NodeVisitor</code> class seemed like it would do the trick.</p>
+<p>An example script (&ldquo;my_script.py&rdquo;):</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-python" data-lang="python"><span style="display:flex;"><span><span style="color:#66d9ef">def</span> <span style="color:#a6e22e">hello</span>(path, stuff<span style="color:#f92672">=</span><span style="color:#66d9ef">None</span>):
+</span></span><span style="display:flex;"><span>    <span style="color:#66d9ef">return</span> path
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span><span style="color:#66d9ef">if</span> __name__ <span style="color:#f92672">==</span> <span style="color:#e6db74">&#34;__main__&#34;</span>:
+</span></span><span style="display:flex;"><span>    print(hello(path<span style="color:#f92672">=</span><span style="color:#e6db74">&#34;hello/world.py&#34;</span>, stuff<span style="color:#f92672">=</span><span style="color:#e6db74">&#34;hello mars&#34;</span>))
+</span></span></code></pre></div><div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-python" data-lang="python"><span style="display:flex;"><span><span style="color:#f92672">import</span> ast
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span><span style="color:#66d9ef">class</span> <span style="color:#a6e22e">CollectStrings</span>(ast<span style="color:#f92672">.</span>NodeVisitor):
+</span></span><span style="display:flex;"><span>    <span style="color:#66d9ef">def</span> <span style="color:#a6e22e">visit_Module</span>(self, node):
+</span></span><span style="display:flex;"><span>        self<span style="color:#f92672">.</span>out <span style="color:#f92672">=</span> set()
+</span></span><span style="display:flex;"><span>        self<span style="color:#f92672">.</span>generic_visit(node)
+</span></span><span style="display:flex;"><span>        <span style="color:#66d9ef">return</span> list(filter(<span style="color:#66d9ef">lambda</span> w: w<span style="color:#f92672">.</span>startswith(<span style="color:#e6db74">&#34;hello&#34;</span>) <span style="color:#f92672">and</span> w<span style="color:#f92672">.</span>endswith(<span style="color:#e6db74">&#34;.py&#34;</span>), self<span style="color:#f92672">.</span>out))
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>    <span style="color:#66d9ef">def</span> <span style="color:#a6e22e">visit_Str</span>(self, node):
+</span></span><span style="display:flex;"><span>        self<span style="color:#f92672">.</span>out<span style="color:#f92672">.</span>add(node<span style="color:#f92672">.</span>s)
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>file <span style="color:#f92672">=</span> <span style="color:#e6db74">&#34;my_script.py&#34;</span>
+</span></span><span style="display:flex;"><span><span style="color:#66d9ef">with</span> open(file, <span style="color:#e6db74">&#34;r&#34;</span>) <span style="color:#66d9ef">as</span> f:
+</span></span><span style="display:flex;"><span>    body <span style="color:#f92672">=</span> ast<span style="color:#f92672">.</span>parse(f<span style="color:#f92672">.</span>read())
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>coll <span style="color:#f92672">=</span> CollectStrings()
+</span></span><span style="display:flex;"><span>coll<span style="color:#f92672">.</span>visit(body)
+</span></span><span style="display:flex;"><span><span style="color:#75715e">## [&#39;hello/world.py&#39;]</span>
+</span></span></code></pre></div><p>That worked great at fetching paths - only because all the paths I was looking for started with the same text and all have the same file extension.</p>
+<p>HOWEVER - I also needed the function name that the <code>path</code> argument was called from. I tried to make this work with <code>ast.NodeVisitor</code> but couldn&rsquo;t get it to work.</p>
+<p>I eventually got frustrated enough and figured there must be some libraries that build on top of <code>ast</code> that make it easier to work with ast&rsquo;s in Python.</p>
+<h2 id="redbaron">redbaron</h2>
+<p>Enter <a href="https://github.com/PyCQA/redbaron">redbaron</a>. I found this library pretty quickly upon searching for a library building on top of <code>ast</code>.</p>
+<p>Another example script (&ldquo;their_script.py&rdquo;):</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-python" data-lang="python"><span style="display:flex;"><span><span style="color:#66d9ef">def</span> <span style="color:#a6e22e">hello</span>(path, stuff<span style="color:#f92672">=</span><span style="color:#66d9ef">None</span>):
+</span></span><span style="display:flex;"><span>    <span style="color:#66d9ef">return</span> path
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span><span style="color:#66d9ef">def</span> <span style="color:#a6e22e">goodbye</span>(path, stuff<span style="color:#f92672">=</span><span style="color:#66d9ef">None</span>):
+</span></span><span style="display:flex;"><span>    <span style="color:#66d9ef">return</span> path
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span><span style="color:#66d9ef">def</span> <span style="color:#a6e22e">world</span>():
+</span></span><span style="display:flex;"><span>    path_str <span style="color:#f92672">=</span> hello(path<span style="color:#f92672">=</span><span style="color:#e6db74">&#34;src/world.py&#34;</span>, stuff<span style="color:#f92672">=</span><span style="color:#e6db74">&#34;hello mars&#34;</span>)
+</span></span><span style="display:flex;"><span>    other_path_str <span style="color:#f92672">=</span> goodbye(path<span style="color:#f92672">=</span><span style="color:#e6db74">&#34;src/world.py&#34;</span>, stuff<span style="color:#f92672">=</span><span style="color:#e6db74">&#34;hello saturn&#34;</span>)
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>    <span style="color:#66d9ef">return</span> path_str, other_path_str
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span><span style="color:#66d9ef">if</span> __name__ <span style="color:#f92672">==</span> <span style="color:#e6db74">&#34;__main__&#34;</span>:
+</span></span><span style="display:flex;"><span>    print(world())
+</span></span></code></pre></div><div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-python" data-lang="python"><span style="display:flex;"><span><span style="color:#f92672">import</span> re
+</span></span><span style="display:flex;"><span><span style="color:#f92672">from</span> redbaron <span style="color:#f92672">import</span> RedBaron
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>file <span style="color:#f92672">=</span> <span style="color:#e6db74">&#34;their_script.py&#34;</span>
+</span></span><span style="display:flex;"><span><span style="color:#66d9ef">with</span> open(file, <span style="color:#e6db74">&#34;r&#34;</span>) <span style="color:#66d9ef">as</span> src:
+</span></span><span style="display:flex;"><span>  red <span style="color:#f92672">=</span> RedBaron(src<span style="color:#f92672">.</span>read())
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>red
+</span></span><span style="display:flex;"><span><span style="color:#75715e">## 0   def hello(path, stuff=None):</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">##         return path</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">##     </span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">##     </span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">##     </span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">## 1   def goodbye(path, stuff=None):</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">##         return path</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">##     </span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">##     </span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">##     </span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">## 2   def world():</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">##         path_str = hello(path=&#34;src/world.py&#34;, stuff=&#34;hello mars&#34;)</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">##         other_path_str = goodbye(path=&#34;src/world.py&#34;, stuff=&#34;hello saturn&#34;)</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">##     </span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">##         return path_str, other_path_str</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">##     </span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">##     </span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">##     </span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">## 3   if __name__ == &#34;__main__&#34;:</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">##         print(world())</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">## </span>
+</span></span></code></pre></div><p>Even just the resulting object you get from parsing something is useful:</p>
+<p>And with <code>.help()</code> you get a very detailed map of the structure of the thing you&rsquo;re trying to navigate (only printing first 20 lines):</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-python" data-lang="python"><span style="display:flex;"><span>red<span style="color:#f92672">.</span>help()
+</span></span><span style="display:flex;"><span><span style="color:#75715e">## 0 -----------------------------------------------------</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">## DefNode()</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">##   # identifiers: def, def_, defnode, funcdef, funcdef_</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">##   # default test value: name</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">##   async=False</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">##   name=&#39;hello&#39;</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">##   return_annotation -&gt;</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">##     None</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">##   decorators -&gt;</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">##   arguments -&gt;</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">##     * DefArgumentNode()</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">##         # identifiers: def_argument, def_argument_, defargument, defargumentnode</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">##         target -&gt;</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">##           NameNode() ...</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">##         annotation -&gt;</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">##           None</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">##         value -&gt;</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">##           None</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">##     * DefArgumentNode()</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">##         # identifiers: def_argument, def_argument_, defargument, defargumentnode</span>
+</span></span><span style="display:flex;"><span><span style="color:#f92672">...</span>
+</span></span></code></pre></div><p>Looking at the result from <code>red.help()</code> I can then use <code>.find_all()</code> to find certain nodes in the ast.</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-python" data-lang="python"><span style="display:flex;"><span>nodes <span style="color:#f92672">=</span> red<span style="color:#f92672">.</span>find_all(<span style="color:#e6db74">&#34;AtomtrailersNode&#34;</span>)
+</span></span><span style="display:flex;"><span>nodes <span style="color:#f92672">=</span> list(filter(<span style="color:#66d9ef">lambda</span> w: <span style="color:#e6db74">&#34;hello&#34;</span> <span style="color:#f92672">in</span> w<span style="color:#f92672">.</span>dumps(), nodes))
+</span></span><span style="display:flex;"><span>nodes
+</span></span><span style="display:flex;"><span><span style="color:#75715e">## [hello(path=&#34;src/world.py&#34;, stuff=&#34;hello mars&#34;), goodbye(path=&#34;src/world.py&#34;, stuff=&#34;hello saturn&#34;)]</span>
+</span></span></code></pre></div><p>Then I can write some okay code to extract out the function name, and ugly code to get the string supplied to the <code>path</code> parameter. Then f-string those together to get the path I&rsquo;m after.</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-python" data-lang="python"><span style="display:flex;"><span>paths <span style="color:#f92672">=</span> []
+</span></span><span style="display:flex;"><span><span style="color:#66d9ef">for</span> node <span style="color:#f92672">in</span> nodes:
+</span></span><span style="display:flex;"><span>    fxn_name <span style="color:#f92672">=</span> node<span style="color:#f92672">.</span>name<span style="color:#f92672">.</span>value
+</span></span><span style="display:flex;"><span>    command <span style="color:#f92672">=</span> re<span style="color:#f92672">.</span>search(<span style="color:#e6db74">&#34;src/.*</span><span style="color:#ae81ff">\\</span><span style="color:#e6db74">.py&#34;</span>, node<span style="color:#f92672">.</span>dumps())<span style="color:#f92672">.</span>group()
+</span></span><span style="display:flex;"><span>    paths<span style="color:#f92672">.</span>append(<span style="color:#e6db74">f</span><span style="color:#e6db74">&#34;</span><span style="color:#e6db74">{</span>fxn_name<span style="color:#e6db74">}</span><span style="color:#e6db74">/</span><span style="color:#e6db74">{</span>command<span style="color:#e6db74">}</span><span style="color:#e6db74">&#34;</span>)
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span><span style="color:#66d9ef">for</span> path <span style="color:#f92672">in</span> paths:
+</span></span><span style="display:flex;"><span>    print(path)
+</span></span><span style="display:flex;"><span><span style="color:#75715e">## hello/src/world.py</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">## goodbye/src/world.py</span>
+</span></span></code></pre></div><p>Not super proud of this but gets the job done for my use case - and when you&rsquo;re not making open source for others, you don&rsquo;t need to worry about other use cases :)</p>
+<p>I&rsquo;ll definitely try to learn how to properly extract stuff using <code>redbaron</code> - but it got me to answer much faster than the <code>ast</code> library.</p>
+]]></content:encoded>
     </item>
     <item>
       <title>List comprehension vs. filter vs. key lookup</title>
@@ -32,6 +164,70 @@ First, I couldn&amp;rsquo;t simply get any string out of each Python script - th
       <guid>http://localhost:1313/2022/04/lookup-vs-filter/</guid>
       <description>I was working on a work task last week, and needed to filter out one instance of a class from a list of class instances. No matter how you do this speed doesn&amp;rsquo;t matter too much if you&amp;rsquo;re doing this operation once or a few times.
 However, I this operation needs to be done about 100K times each time the script runs - so speed definitely does matter in this case.</description>
+      <content:encoded><![CDATA[<p>I was working on a work task last week, and needed to filter out one instance of a class from a list of class instances. No matter how you do this speed doesn&rsquo;t matter too much if you&rsquo;re doing this operation once or a few times.</p>
+<p>However, I this operation needs to be done about 100K times each time the script runs - so speed definitely does matter in this case.</p>
+<p>First, I naively started off with using <code>filter()</code>. When that lead to waiting more than ten minutes, I read that list comprehensions are faster.</p>
+<p>Second, I tried list comprehensions. Also waited more then ten minutes and gave up again.</p>
+<p>Last, I thought perhaps it would work to make a dictionary where the keys are the things I need to filter on and the values the class instances. This was the answer! Super fast.</p>
+<p>Now some examples of what I&rsquo;m talking about.</p>
+<p>Make a class called <code>Stuff</code>.</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-python" data-lang="python"><span style="display:flex;"><span><span style="color:#66d9ef">class</span> <span style="color:#a6e22e">Stuff</span>:
+</span></span><span style="display:flex;"><span>  <span style="color:#66d9ef">def</span> __init__(self, letter):
+</span></span><span style="display:flex;"><span>    self<span style="color:#f92672">.</span>letter <span style="color:#f92672">=</span> letter
+</span></span><span style="display:flex;"><span>    super(Stuff, self)<span style="color:#f92672">.</span>__init__()
+</span></span><span style="display:flex;"><span>  <span style="color:#66d9ef">def</span> __repr__(self):
+</span></span><span style="display:flex;"><span>        <span style="color:#66d9ef">return</span> <span style="color:#e6db74">&#34;&lt;</span><span style="color:#e6db74">{}</span><span style="color:#e6db74"> (</span><span style="color:#e6db74">{}</span><span style="color:#e6db74">)&gt;&#34;</span><span style="color:#f92672">.</span>format(self<span style="color:#f92672">.</span>__class__<span style="color:#f92672">.</span>__name__, self<span style="color:#f92672">.</span>letter)
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>x <span style="color:#f92672">=</span> Stuff(<span style="color:#e6db74">&#39;s&#39;</span>)
+</span></span><span style="display:flex;"><span>x
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; &lt;Stuff (s)&gt;</span>
+</span></span><span style="display:flex;"><span>x<span style="color:#f92672">.</span>letter
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; &#39;s&#39;</span>
+</span></span></code></pre></div><p>Make a list of instances of the class <code>Stuff</code></p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-python" data-lang="python"><span style="display:flex;"><span><span style="color:#f92672">import</span> string
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>lst <span style="color:#f92672">=</span> []
+</span></span><span style="display:flex;"><span><span style="color:#66d9ef">for</span> x <span style="color:#f92672">in</span> string<span style="color:#f92672">.</span>ascii_lowercase:
+</span></span><span style="display:flex;"><span>    lst<span style="color:#f92672">.</span>append(Stuff(x))
+</span></span><span style="display:flex;"><span>lst
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; [&lt;Stuff (a)&gt;, &lt;Stuff (b)&gt;, &lt;Stuff (c)&gt;, &lt;Stuff (d)&gt;, &lt;Stuff (e)&gt;, &lt;Stuff (f)&gt;, &lt;Stuff (g)&gt;, &lt;Stuff (h)&gt;, &lt;Stuff (i)&gt;, &lt;Stuff (j)&gt;, &lt;Stuff (k)&gt;, &lt;Stuff (l)&gt;, &lt;Stuff (m)&gt;, &lt;Stuff (n)&gt;, &lt;Stuff (o)&gt;, &lt;Stuff (p)&gt;, &lt;Stuff (q)&gt;, &lt;Stuff (r)&gt;, &lt;Stuff (s)&gt;, &lt;Stuff (t)&gt;, &lt;Stuff (u)&gt;, &lt;Stuff (v)&gt;, &lt;Stuff (w)&gt;, &lt;Stuff (x)&gt;, &lt;Stuff (y)&gt;, &lt;Stuff (z)&gt;]</span>
+</span></span><span style="display:flex;"><span>len(lst)
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; 26</span>
+</span></span></code></pre></div><p>List comprehension: This is how I did the list comprehension method. Filter the list <code>lst</code> where some attibute matched some value.</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-python" data-lang="python"><span style="display:flex;"><span>[x <span style="color:#66d9ef">for</span> x <span style="color:#f92672">in</span> lst <span style="color:#66d9ef">if</span> x<span style="color:#f92672">.</span>letter <span style="color:#f92672">==</span> <span style="color:#e6db74">&#39;f&#39;</span>]
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; [&lt;Stuff (f)&gt;]</span>
+</span></span></code></pre></div><p>Filter: This is how I did the filter method. Filter the list <code>lst</code> where some attibute matched some value.</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-python" data-lang="python"><span style="display:flex;"><span>list(filter(<span style="color:#66d9ef">lambda</span> x: x<span style="color:#f92672">.</span>letter <span style="color:#f92672">==</span> <span style="color:#e6db74">&#39;f&#39;</span>, lst))
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; [&lt;Stuff (f)&gt;]</span>
+</span></span></code></pre></div><p>And here&rsquo;s the dictionary approach. Here, I first make a dictionary via <code>dict(zip())</code> where the keys are some attribute of each instance. You can lookup by key.</p>
+<p>A major difference/drawback of this approach is that it only works if there&rsquo;s only one match per key because dictionaries don&rsquo;t allow duplicate keys.</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-python" data-lang="python"><span style="display:flex;"><span>lst_map <span style="color:#f92672">=</span> dict(zip([w<span style="color:#f92672">.</span>letter <span style="color:#66d9ef">for</span> w <span style="color:#f92672">in</span> lst], lst))
+</span></span><span style="display:flex;"><span>lst_map[<span style="color:#e6db74">&#39;f&#39;</span>]
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; &lt;Stuff (f)&gt;</span>
+</span></span></code></pre></div><p>And better yet, use <code>.get()</code> so you don&rsquo;t run into a <code>KeyError</code> when the key doesn&rsquo;t exist</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-python" data-lang="python"><span style="display:flex;"><span>lst_map<span style="color:#f92672">.</span>get(<span style="color:#e6db74">&#39;f&#39;</span>)
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; &lt;Stuff (f)&gt;</span>
+</span></span><span style="display:flex;"><span>lst_map<span style="color:#f92672">.</span>get(<span style="color:#e6db74">&#39;5&#39;</span>)
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; (returns None)</span>
+</span></span></code></pre></div><p>What about the timings:</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-python" data-lang="python"><span style="display:flex;"><span><span style="color:#f92672">from</span> timeit <span style="color:#f92672">import</span> timeit
+</span></span><span style="display:flex;"><span>n <span style="color:#f92672">=</span> <span style="color:#ae81ff">100000</span>
+</span></span><span style="display:flex;"><span>time_list_comp <span style="color:#f92672">=</span> timeit(<span style="color:#e6db74">&#34;[x for x in lst if x.letter == &#39;f&#39;]&#34;</span>, number<span style="color:#f92672">=</span>n, globals<span style="color:#f92672">=</span>globals())
+</span></span><span style="display:flex;"><span>time_filter <span style="color:#f92672">=</span> timeit(<span style="color:#e6db74">&#34;list(filter(lambda x: x.letter == &#39;f&#39;, lst))&#34;</span>, number<span style="color:#f92672">=</span>n, globals<span style="color:#f92672">=</span>globals())
+</span></span><span style="display:flex;"><span>time_dict <span style="color:#f92672">=</span> timeit(<span style="color:#e6db74">&#34;lst_map[&#39;f&#39;]&#34;</span>, number<span style="color:#f92672">=</span>n, globals<span style="color:#f92672">=</span>globals())
+</span></span><span style="display:flex;"><span>time_dict_get <span style="color:#f92672">=</span> timeit(<span style="color:#e6db74">&#34;lst_map.get(&#39;f&#39;)&#34;</span>, number<span style="color:#f92672">=</span>n, globals<span style="color:#f92672">=</span>globals())
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>round(time_list_comp, <span style="color:#ae81ff">3</span>)
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; 0.088</span>
+</span></span><span style="display:flex;"><span>round(time_filter, <span style="color:#ae81ff">3</span>)
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; 0.134</span>
+</span></span><span style="display:flex;"><span>round(time_dict, <span style="color:#ae81ff">3</span>)
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; 0.002</span>
+</span></span><span style="display:flex;"><span>round(time_dict_get, <span style="color:#ae81ff">3</span>)
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; 0.003</span>
+</span></span></code></pre></div><p>For bracketed lookup, the list comprehension is <strong>39</strong> times slower, and the filter is <strong>59</strong> times slower.</p>
+<p>For the <code>get()</code> lookup, the list comprehension is <strong>26</strong> times slower, and the filter is <strong>39</strong> times slower.</p>
+]]></content:encoded>
     </item>
     <item>
       <title>Notes on Python</title>
@@ -42,6 +238,44 @@ However, I this operation needs to be done about 100K times each time the script
 I have been using Python for many years, but not seriously or getting paid either. I&amp;rsquo;ve learned alot in the first 6 months.
 Some Python things learned:
 Functions and methods I used to think functions and methods were the same thing. But during the last 6 months I learned that functions and methods are not the same.</description>
+      <content:encoded><![CDATA[<p>It&rsquo;s been interesting switching jobs with respect to programming languages. I used to write 95% R - now I write 95% Python.</p>
+<p>I have been using Python for many years, but not seriously or getting paid either. I&rsquo;ve learned alot in the first 6 months.</p>
+<p>Some Python things learned:</p>
+<h2 id="functions-and-methods">Functions and methods</h2>
+<p>I used to think functions and methods were the same thing. But during the last 6 months I learned that functions and methods are not the same. Well, they&rsquo;re not that different. A function outside a class is just called a <a href="https://docs.python.org/3/glossary.html#term-function">function</a> while a function inside a class is called a <a href="https://docs.python.org/3/glossary.html#term-method">method</a>.  They could be exactly the same and do the same thing, but one is outside a class and the other inside a class.</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-python" data-lang="python"><span style="display:flex;"><span><span style="color:#66d9ef">class</span> <span style="color:#a6e22e">Stuff</span>(object):
+</span></span><span style="display:flex;"><span>  <span style="color:#66d9ef">def</span> <span style="color:#a6e22e">things</span>():
+</span></span><span style="display:flex;"><span>    <span style="color:#66d9ef">return</span> <span style="color:#ae81ff">5</span>
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span><span style="color:#66d9ef">def</span> <span style="color:#a6e22e">things</span>():
+</span></span><span style="display:flex;"><span>    <span style="color:#66d9ef">return</span> <span style="color:#ae81ff">5</span>
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>Stuff<span style="color:#f92672">.</span>things()
+</span></span><span style="display:flex;"><span><span style="color:#75715e"># 5</span>
+</span></span><span style="display:flex;"><span>things()
+</span></span><span style="display:flex;"><span><span style="color:#75715e"># 5</span>
+</span></span></code></pre></div><h2 id="sort-and-sorted">.sort and sorted</h2>
+<p><code>.sort</code> called on an object changes the object in place and <code>sorted()</code> creates a new object.</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-python" data-lang="python"><span style="display:flex;"><span>x <span style="color:#f92672">=</span> [<span style="color:#ae81ff">4</span>,<span style="color:#ae81ff">1</span>,<span style="color:#ae81ff">7</span>,<span style="color:#ae81ff">2</span>,<span style="color:#ae81ff">6</span>,<span style="color:#ae81ff">5</span>,<span style="color:#ae81ff">3</span>]
+</span></span><span style="display:flex;"><span>z <span style="color:#f92672">=</span> x<span style="color:#f92672">.</span>sort()
+</span></span><span style="display:flex;"><span><span style="color:#75715e"># nothing returned, z = None</span>
+</span></span><span style="display:flex;"><span>sorted(x)
+</span></span><span style="display:flex;"><span><span style="color:#75715e"># [1, 2, 3, 4, 5, 6, 7]</span>
+</span></span></code></pre></div><h2 id="context-managers">context managers</h2>
+<p>I&rsquo;d surely used a <a href="https://docs.python.org/3/glossary.html#term-context-manager">context manager</a> in Python before but didn&rsquo;t realize what was happening. The code base I work in uses many <a href="https://docs.python.org/3/reference/compound_stmts.html#with">with</a> statements and these are used with context managers like:</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-python" data-lang="python"><span style="display:flex;"><span><span style="color:#66d9ef">with</span> EXPRESSION <span style="color:#66d9ef">as</span> TARGET:
+</span></span><span style="display:flex;"><span>    SUITE
+</span></span></code></pre></div><p>In the above case I often create a connection to a database using the <code>with</code> statement, then once the block is exited, the connection is cleaned up.</p>
+<h2 id="imports">imports</h2>
+<p>Coming from R, it&rsquo;s so nice in Python to be able to import specific functions, classes, etc. rather than having to load an entire file or package in R. In addition, <code>as</code> in Python imports is really nice to have.</p>
+<p>Python</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-python" data-lang="python"><span style="display:flex;"><span><span style="color:#f92672">from</span> x <span style="color:#f92672">import</span> y
+</span></span><span style="display:flex;"><span><span style="color:#f92672">import</span> pandas <span style="color:#66d9ef">as</span> pd
+</span></span></code></pre></div><p>R</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-r" data-lang="r"><span style="display:flex;"><span><span style="color:#a6e22e">require</span>(x)
+</span></span><span style="display:flex;"><span><span style="color:#a6e22e">library</span>(x)
+</span></span></code></pre></div><p>Sometimes I run into circular import issues in Python (as I did in R), which I&rsquo;ve yet to find a neat solution to sorting out.</p>
+]]></content:encoded>
     </item>
     <item>
       <title>habanero update: Crossref data from Python</title>
@@ -51,6 +285,42 @@ Functions and methods I used to think functions and methods were the same thing.
       <description>I wrote about Crossref clients back nearly two years ago on this blog: Crossref programmatic clients.
 Since it&amp;rsquo;s been a while, it seems worth talking again about the the many ways to work programmatically with Crossref data - and focus in on the Python client habanero since it has some recent updates.
 The 3 clients work with the main Crossref API, which lets you do things like search for works by title, author, etc.</description>
+      <content:encoded><![CDATA[<p>I wrote about Crossref clients back nearly two years ago on this blog: <a href="https://recology.info/2015/11/crossref-clients/">Crossref programmatic clients</a>.</p>
+<p>Since it&rsquo;s been a while, it seems worth talking again about the the many ways to work programmatically with Crossref data - and focus in on the Python client <code>habanero</code> since it has some recent updates.</p>
+<p>The 3 clients work with the main <a href="https://api.crossref.org">Crossref API</a>, which lets you do things like search for works by title, author, etc. (e.g., books, articles), search for publishing members, for funders, for journals, for DOI prefixes, and for licenses. It&rsquo;s a powerful API with basically no rate limits, so you can work through lots of data quickly.</p>
+<p>Some deets:</p>
+<ul>
+<li>Crossref API documentation: <a href="https://api.crossref.org">https://api.crossref.org</a></li>
+<li>Python client <code>habanero</code>: <a href="https://github.com/sckott/habanero">https://github.com/sckott/habanero</a></li>
+<li>Ruby client <code>serrano</code>: <a href="https://github.com/sckott/serrano">https://github.com/sckott/serrano</a></li>
+<li>R client <code>rcrossref</code>: <a href="https://github.com/ropensci/rcrossref">https://github.com/ropensci/rcrossref</a></li>
+</ul>
+<p>At rOpenSci we&rsquo;ve maintained the R client for quite a few years now, but the Python and Ruby clients were a result of consulting work I did for Crossref.</p>
+<p>The R, Ruby, and Python clients are all quite feature complete, although software is never perfect :), and the thing about talking to an API to some other software is they can change stuff on their end - then we have to change suff on our end, on and on &hellip;</p>
+<p>Back when the earlier blog post was written about these Crossref clients, we were at the first versions of both <a href="https://github.com/sckott/serrano/tree/v0.1.1">serrano</a> and <a href="https://github.com/sckott/habanero/tree/v0.1.0">habanero</a>. As you can see in the changelogs of the three clients (<a href="https://github.com/sckott/serrano/blob/master/CHANGELOG.md">serrano</a>, <a href="https://github.com/sckott/habanero/blob/master/Changelog.rst">habanero</a>, <a href="https://github.com/ropensci/rcrossref/blob/master/NEWS.md">rcrossref</a>) alot has changed in the last two years as we&rsquo;ve made improvements and kept up with Crossref API changes.</p>
+<h3 id="ruby-and-r">Ruby and R</h3>
+<p>Nothing new to report for the Ruby (<a href="https://github.com/sckott/serrano">serrano</a>) and R (<a href="https://github.com/ropensci/rcrossref">rcrossref</a>) clients, though both will soon be getting the previous features just mentioned (<code>mailto</code> and <code>select</code>).</p>
+<h3 id="python-habanero">Python: habanero</h3>
+<p>I&rsquo;ve just released a new version of <code>habanero</code> - <a href="https://pypi.python.org/pypi/habanero">v0.6</a>. Noteable changes include adding ability to add a <code>mailto</code> to each request to get into the so called <a href="https://github.com/CrossRef/rest-api-doc#good-manners--more-reliable-service">&ldquo;polite pool&rdquo;</a>; <a href="https://github.com/CrossRef/rest-api-doc#selecting-which-elements-to-return"><code>select</code> parameter</a> added to select certain fields to get back; and the docs got a major overhaul (check em out at <a href="https://habanero.readthedocs.io/en/latest/">https://habanero.readthedocs.io/en/latest/</a>; hope you like it; get in touch if you think docs can be improved).</p>
+<p>To install:</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-sh" data-lang="sh"><span style="display:flex;"><span>pip3 install habanero
+</span></span><span style="display:flex;"><span><span style="color:#75715e"># or</span>
+</span></span><span style="display:flex;"><span>pip install habanero
+</span></span></code></pre></div><p>To get into the polite pool, add your <code>mailto</code> email address when you instantiate a Crossref object</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-python" data-lang="python"><span style="display:flex;"><span><span style="color:#f92672">from</span> habanero <span style="color:#f92672">import</span> Crossref
+</span></span><span style="display:flex;"><span>cr <span style="color:#f92672">=</span> Crossref(mailto <span style="color:#f92672">=</span> <span style="color:#e6db74">&#34;foo@bar.com&#34;</span>)
+</span></span></code></pre></div><p>Then when you call any  methods on <code>cr</code> your email address is sent in the request headers and you&rsquo;ll get into the polite pool.</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-python" data-lang="python"><span style="display:flex;"><span>cr<span style="color:#f92672">.</span>works()
+</span></span></code></pre></div><p>To use the select parameter, pass a comma separated string or a list of strings (both work):</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-python" data-lang="python"><span style="display:flex;"><span>cr<span style="color:#f92672">.</span>works(select <span style="color:#f92672">=</span> <span style="color:#e6db74">&#34;DOI,title&#34;</span>)
+</span></span></code></pre></div><h3 id="habanero-use-cases">habanero use cases</h3>
+<p>I&rsquo;ve seen some cool use cases using <code>habanero</code> lately.</p>
+<ul>
+<li>A bibliographic application at <a href="https://taccimo.info/tbl_sector_list.php">https://taccimo.info/tbl_sector_list.php</a> from <a href="https://github.com/sngordon">Sean Gordon</a>.</li>
+<li>An application called <a href="https://github.com/pr-omethe-us/PyKED">PyKED</a> from <a href="https://github.com/kyleniemeyer">Kyle Niemeyer</a> - &ldquo;a Python-based software package for validating and interacting with ChemKED (Chemical Kinetics Experimental Data format) files that describe fundamental experimental measurements of combustion phenomena&rdquo;.</li>
+<li>A Django app called <a href="https://tailordev-biblio.herokuapp.com/">TailorDev Biblio</a> from <a href="https://github.com/jmaupetit">Julien Maupetit</a> that manages references.</li>
+</ul>
+]]></content:encoded>
     </item>
     <item>
       <title>Crossref programmatic clients</title>
@@ -59,6 +329,150 @@ The 3 clients work with the main Crossref API, which lets you do things like sea
       <guid>http://localhost:1313/2015/11/crossref-clients/</guid>
       <description>I gave two talks recently at the annual Crossref meeting, one of which was a somewhat technical overview of programmatic clients for Crossref APIs. Check out the talk here. I talked about the motivation for working with Crossref data by writing code/etc. rather than going the GUI route, then went over the various clients, with brief examples.
 We (rOpenSci) have been working on the R client rcrossref for a while now, but I&amp;rsquo;m also working on the Python and Ruby clients for Crossref.</description>
+      <content:encoded><![CDATA[<p>I gave two talks recently at the annual <a href="https://www.crossref.org/annualmeeting/agenda.html">Crossref meeting</a>, one of which was a somewhat technical overview of programmatic clients for Crossref APIs. Check out the talk <a href="https://crossref.wistia.com/medias/8rh0jm5eda">here</a>. I talked about the motivation for working with Crossref data by writing code/etc. rather than going the GUI route, then went over the various clients, with brief examples.</p>
+<p>We (rOpenSci) have been working on the R client <a href="https://github.com/ropensci/rcrossref">rcrossref</a> for a while now, but I&rsquo;m also working on the Python and Ruby clients for Crossref. In addition, the Ruby client has a CLI client inside. The Javascript client is worked on independently by <a href="https://science.ai/">ScienceAI</a>.</p>
+<p>The R, Ruby, and Python clients are useable but not feature complete yet, and would benefit from lots of users surfacing bugs and highlighting nice to have features.</p>
+<p>The main Crossref API used in all the clients is documented at <a href="https://github.com/CrossRef/rest-api-doc/blob/master/rest_api.md">api.crossref.org</a>.</p>
+<p>I&rsquo;ve tried to make the APIs similar-ish across clients. Functions in each client match the main Crossref search API (api.crossref.org) routes:</p>
+<ul>
+<li><code>/works</code></li>
+<li><code>/members</code></li>
+<li><code>/funders</code></li>
+<li><code>/journals</code></li>
+<li><code>/types</code></li>
+<li><code>/licenses</code></li>
+</ul>
+<p>Other methods in all three clients:</p>
+<ul>
+<li>Get DOI minting agency
+<ul>
+<li>Uses api.crossref.org API</li>
+</ul>
+</li>
+<li>Get random DOIs
+<ul>
+<li>Uses api.crossref.org API</li>
+</ul>
+</li>
+<li>Content negotiation
+<ul>
+<li>Documented at <a href="https://www.crosscite.org/cn">https://www.crosscite.org/cn</a></li>
+</ul>
+</li>
+<li>Get full text
+<ul>
+<li>other clients in each language will focus on this use case</li>
+</ul>
+</li>
+<li>Get citation count
+<ul>
+<li>Uses service at <a href="https://www.crossref.org/openurl">https://www.crossref.org/openurl</a> - though this functionality may be in the api.crossref.org API at some point</li>
+</ul>
+</li>
+</ul>
+<p>The following shows how to install, and then examples from each client for a few use cases.</p>
+<h2 id="installation">Installation</h2>
+<h3 id="python">Python</h3>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-sh" data-lang="sh"><span style="display:flex;"><span>pip install habanero
+</span></span></code></pre></div><h3 id="ruby">Ruby</h3>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-sh" data-lang="sh"><span style="display:flex;"><span>gem install serrano
+</span></span></code></pre></div><h3 id="r">R</h3>
+<p>Inside R:</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-R" data-lang="R"><span style="display:flex;"><span><span style="color:#a6e22e">install.packages</span>(<span style="color:#e6db74">&#34;rcrossref&#34;</span>)
+</span></span></code></pre></div><h3 id="javascript">Javascript</h3>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-sh" data-lang="sh"><span style="display:flex;"><span>npm install crossref
+</span></span></code></pre></div><p>I won&rsquo;t do any examples with the js library, as I don&rsquo;t maintain it.</p>
+<h2 id="use-case-get-orcid-ids-for-authors">Use case: get ORCID IDs for authors</h2>
+<p>Python</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-python3" data-lang="python3"><span style="display:flex;"><span><span style="color:#f92672">from</span> habanero <span style="color:#f92672">import</span> Crossref
+</span></span><span style="display:flex;"><span>cr <span style="color:#f92672">=</span> Crossref()
+</span></span><span style="display:flex;"><span>res <span style="color:#f92672">=</span> cr<span style="color:#f92672">.</span>works(filter <span style="color:#f92672">=</span> {<span style="color:#e6db74">&#39;has_orcid&#39;</span>: <span style="color:#66d9ef">True</span>}, limit <span style="color:#f92672">=</span> <span style="color:#ae81ff">10</span>)
+</span></span><span style="display:flex;"><span>res2 <span style="color:#f92672">=</span> [ [ z<span style="color:#f92672">.</span>get(<span style="color:#e6db74">&#39;ORCID&#39;</span>) <span style="color:#66d9ef">for</span> z <span style="color:#f92672">in</span> x[<span style="color:#e6db74">&#39;author&#39;</span>] ] <span style="color:#66d9ef">for</span> x <span style="color:#f92672">in</span> res<span style="color:#f92672">.</span>result[<span style="color:#e6db74">&#39;message&#39;</span>][<span style="color:#e6db74">&#39;items&#39;</span>] ]
+</span></span><span style="display:flex;"><span>filter(<span style="color:#66d9ef">None</span>, reduce(<span style="color:#66d9ef">lambda</span> x, y: x<span style="color:#f92672">+</span>y, res2))
+</span></span></code></pre></div><div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-python3" data-lang="python3"><span style="display:flex;"><span>[<span style="color:#e6db74">u</span><span style="color:#e6db74">&#39;https://orcid.org/0000-0003-4087-8021&#39;</span>,
+</span></span><span style="display:flex;"><span> <span style="color:#e6db74">u</span><span style="color:#e6db74">&#39;https://orcid.org/0000-0002-2076-5452&#39;</span>,
+</span></span><span style="display:flex;"><span> <span style="color:#e6db74">u</span><span style="color:#e6db74">&#39;https://orcid.org/0000-0003-4087-8021&#39;</span>,
+</span></span><span style="display:flex;"><span> <span style="color:#e6db74">u</span><span style="color:#e6db74">&#39;https://orcid.org/0000-0002-2076-5452&#39;</span>,
+</span></span><span style="display:flex;"><span> <span style="color:#e6db74">u</span><span style="color:#e6db74">&#39;https://orcid.org/0000-0003-1710-1580&#39;</span>,
+</span></span><span style="display:flex;"><span> <span style="color:#e6db74">u</span><span style="color:#e6db74">&#39;https://orcid.org/0000-0003-1710-1580&#39;</span>,
+</span></span><span style="display:flex;"><span> <span style="color:#e6db74">u</span><span style="color:#e6db74">&#39;https://orcid.org/0000-0003-4637-238X&#39;</span>,
+</span></span><span style="display:flex;"><span> <span style="color:#e6db74">u</span><span style="color:#e6db74">&#39;https://orcid.org/0000-0003-4637-238X&#39;</span>,
+</span></span><span style="display:flex;"><span> <span style="color:#e6db74">u</span><span style="color:#e6db74">&#39;https://orcid.org/0000-0003-4637-238X&#39;</span>,
+</span></span><span style="display:flex;"><span> <span style="color:#e6db74">u</span><span style="color:#e6db74">&#39;https://orcid.org/0000-0003-4637-238X&#39;</span>,
+</span></span><span style="display:flex;"><span> <span style="color:#e6db74">u</span><span style="color:#e6db74">&#39;https://orcid.org/0000-0003-4637-238X&#39;</span>,
+</span></span><span style="display:flex;"><span> <span style="color:#e6db74">u</span><span style="color:#e6db74">&#39;https://orcid.org/0000-0003-2510-4271&#39;</span>]
+</span></span></code></pre></div><p>Ruby</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-ruby" data-lang="ruby"><span style="display:flex;"><span>require <span style="color:#e6db74">&#39;serrano&#39;</span>
+</span></span><span style="display:flex;"><span>res <span style="color:#f92672">=</span> <span style="color:#66d9ef">Serrano</span><span style="color:#f92672">.</span>works(<span style="color:#e6db74">filter</span>: {<span style="color:#e6db74">&#39;has_orcid&#39;</span>: <span style="color:#66d9ef">true</span>}, <span style="color:#e6db74">limit</span>: <span style="color:#ae81ff">10</span>)
+</span></span><span style="display:flex;"><span>res2 <span style="color:#f92672">=</span> res<span style="color:#f92672">[</span><span style="color:#e6db74">&#39;message&#39;</span><span style="color:#f92672">][</span><span style="color:#e6db74">&#39;items&#39;</span><span style="color:#f92672">].</span>collect { <span style="color:#f92672">|</span>x<span style="color:#f92672">|</span> x<span style="color:#f92672">[</span><span style="color:#e6db74">&#39;author&#39;</span><span style="color:#f92672">].</span>collect { <span style="color:#f92672">|</span>z<span style="color:#f92672">|</span> z<span style="color:#f92672">[</span><span style="color:#e6db74">&#39;ORCID&#39;</span><span style="color:#f92672">]</span> } }
+</span></span><span style="display:flex;"><span>res2<span style="color:#f92672">.</span>flatten<span style="color:#f92672">.</span>compact
+</span></span></code></pre></div><div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-ruby" data-lang="ruby"><span style="display:flex;"><span><span style="color:#f92672">=&gt;</span> <span style="color:#f92672">[</span><span style="color:#e6db74">&#34;https://orcid.org/0000-0003-4087-8021&#34;</span>,
+</span></span><span style="display:flex;"><span> <span style="color:#e6db74">&#34;https://orcid.org/0000-0002-2076-5452&#34;</span>,
+</span></span><span style="display:flex;"><span> <span style="color:#e6db74">&#34;https://orcid.org/0000-0003-4087-8021&#34;</span>,
+</span></span><span style="display:flex;"><span> <span style="color:#e6db74">&#34;https://orcid.org/0000-0002-2076-5452&#34;</span>,
+</span></span><span style="display:flex;"><span> <span style="color:#e6db74">&#34;https://orcid.org/0000-0003-1710-1580&#34;</span>,
+</span></span><span style="display:flex;"><span> <span style="color:#e6db74">&#34;https://orcid.org/0000-0003-1710-1580&#34;</span>,
+</span></span><span style="display:flex;"><span> <span style="color:#e6db74">&#34;https://orcid.org/0000-0003-4637-238X&#34;</span>,
+</span></span><span style="display:flex;"><span> <span style="color:#e6db74">&#34;https://orcid.org/0000-0003-4637-238X&#34;</span>,
+</span></span><span style="display:flex;"><span> <span style="color:#e6db74">&#34;https://orcid.org/0000-0003-4637-238X&#34;</span>,
+</span></span><span style="display:flex;"><span> <span style="color:#e6db74">&#34;https://orcid.org/0000-0003-4637-238X&#34;</span>,
+</span></span><span style="display:flex;"><span> <span style="color:#e6db74">&#34;https://orcid.org/0000-0003-4637-238X&#34;</span>,
+</span></span><span style="display:flex;"><span> <span style="color:#e6db74">&#34;https://orcid.org/0000-0003-2510-4271&#34;</span><span style="color:#f92672">]</span>
+</span></span></code></pre></div><p>R</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-R" data-lang="R"><span style="display:flex;"><span><span style="color:#a6e22e">library</span>(<span style="color:#e6db74">&#34;rcrossref&#34;</span>)
+</span></span><span style="display:flex;"><span>res <span style="color:#f92672">&lt;-</span> <span style="color:#a6e22e">cr_works</span>(filter<span style="color:#f92672">=</span><span style="color:#a6e22e">c</span>(has_orcid<span style="color:#f92672">=</span><span style="color:#66d9ef">TRUE</span>), limit <span style="color:#f92672">=</span> <span style="color:#ae81ff">10</span>)
+</span></span><span style="display:flex;"><span>orcids <span style="color:#f92672">&lt;-</span> <span style="color:#a6e22e">unlist</span>(<span style="color:#a6e22e">lapply</span>(res<span style="color:#f92672">$</span>data<span style="color:#f92672">$</span>author, <span style="color:#66d9ef">function</span>(z) z<span style="color:#f92672">$</span>ORCID))
+</span></span><span style="display:flex;"><span><span style="color:#a6e22e">Filter</span>(<span style="color:#66d9ef">function</span>(x) <span style="color:#f92672">!</span><span style="color:#a6e22e">is.na</span>(x), orcids)
+</span></span></code></pre></div><div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-R" data-lang="R"><span style="display:flex;"><span> [1] <span style="color:#e6db74">&#34;https://orcid.org/0000-0003-4087-8021&#34;</span>
+</span></span><span style="display:flex;"><span> [2] <span style="color:#e6db74">&#34;https://orcid.org/0000-0002-2076-5452&#34;</span>
+</span></span><span style="display:flex;"><span> [3] <span style="color:#e6db74">&#34;https://orcid.org/0000-0003-4087-8021&#34;</span>
+</span></span><span style="display:flex;"><span> [4] <span style="color:#e6db74">&#34;https://orcid.org/0000-0002-2076-5452&#34;</span>
+</span></span><span style="display:flex;"><span> [5] <span style="color:#e6db74">&#34;https://orcid.org/0000-0003-1710-1580&#34;</span>
+</span></span><span style="display:flex;"><span> [6] <span style="color:#e6db74">&#34;https://orcid.org/0000-0003-1710-1580&#34;</span>
+</span></span><span style="display:flex;"><span> [7] <span style="color:#e6db74">&#34;https://orcid.org/0000-0003-4637-238X&#34;</span>
+</span></span><span style="display:flex;"><span> [8] <span style="color:#e6db74">&#34;https://orcid.org/0000-0003-4637-238X&#34;</span>
+</span></span><span style="display:flex;"><span> [9] <span style="color:#e6db74">&#34;https://orcid.org/0000-0003-4637-238X&#34;</span>
+</span></span><span style="display:flex;"><span>[10] <span style="color:#e6db74">&#34;https://orcid.org/0000-0003-4637-238X&#34;</span>
+</span></span><span style="display:flex;"><span>[11] <span style="color:#e6db74">&#34;https://orcid.org/0000-0003-4637-238X&#34;</span>
+</span></span><span style="display:flex;"><span>[12] <span style="color:#e6db74">&#34;https://orcid.org/0000-0003-2510-4271&#34;</span>
+</span></span></code></pre></div><p>CLI</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-sh" data-lang="sh"><span style="display:flex;"><span>serrano works --filter<span style="color:#f92672">=</span>has_orcid:true --json --limit<span style="color:#f92672">=</span><span style="color:#ae81ff">12</span> | jq <span style="color:#e6db74">&#39;.message.items[].author[].ORCID | select(. != null)&#39;</span>
+</span></span></code></pre></div><div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-sh" data-lang="sh"><span style="display:flex;"><span><span style="color:#e6db74">&#34;https://orcid.org/0000-0003-4087-8021&#34;</span>
+</span></span><span style="display:flex;"><span><span style="color:#e6db74">&#34;https://orcid.org/0000-0002-2076-5452&#34;</span>
+</span></span><span style="display:flex;"><span><span style="color:#e6db74">&#34;https://orcid.org/0000-0003-4087-8021&#34;</span>
+</span></span><span style="display:flex;"><span><span style="color:#e6db74">&#34;https://orcid.org/0000-0002-2076-5452&#34;</span>
+</span></span><span style="display:flex;"><span><span style="color:#e6db74">&#34;https://orcid.org/0000-0003-1710-1580&#34;</span>
+</span></span><span style="display:flex;"><span><span style="color:#e6db74">&#34;https://orcid.org/0000-0003-1710-1580&#34;</span>
+</span></span><span style="display:flex;"><span><span style="color:#e6db74">&#34;https://orcid.org/0000-0003-4637-238X&#34;</span>
+</span></span><span style="display:flex;"><span><span style="color:#e6db74">&#34;https://orcid.org/0000-0003-4637-238X&#34;</span>
+</span></span><span style="display:flex;"><span><span style="color:#e6db74">&#34;https://orcid.org/0000-0003-4637-238X&#34;</span>
+</span></span><span style="display:flex;"><span><span style="color:#e6db74">&#34;https://orcid.org/0000-0003-4637-238X&#34;</span>
+</span></span><span style="display:flex;"><span><span style="color:#e6db74">&#34;https://orcid.org/0000-0003-4637-238X&#34;</span>
+</span></span><span style="display:flex;"><span><span style="color:#e6db74">&#34;https://orcid.org/0000-0003-2510-4271&#34;</span>
+</span></span><span style="display:flex;"><span><span style="color:#e6db74">&#34;https://orcid.org/0000-0001-9408-8207&#34;</span>
+</span></span><span style="display:flex;"><span><span style="color:#e6db74">&#34;https://orcid.org/0000-0002-2076-5452&#34;</span>
+</span></span></code></pre></div><h2 id="use-case-content-negotation">Use case: content negotation</h2>
+<p>Python</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-python3" data-lang="python3"><span style="display:flex;"><span><span style="color:#f92672">from</span> habanero <span style="color:#f92672">import</span> cn
+</span></span><span style="display:flex;"><span>cn<span style="color:#f92672">.</span>content_negotiation(ids <span style="color:#f92672">=</span> <span style="color:#e6db74">&#39;10.1126/science.169.3946.635&#39;</span>, format <span style="color:#f92672">=</span> <span style="color:#e6db74">&#34;text&#34;</span>)
+</span></span></code></pre></div><div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-python3" data-lang="python3"><span style="display:flex;"><span><span style="color:#e6db74">u</span><span style="color:#e6db74">&#39;Frank, H. S. (1970). The Structure of Ordinary Water: New data and interpretations are yielding new insights into this fascinating substance. Science, 169(3946), 635</span><span style="color:#ae81ff">\xe2\x80\x93</span><span style="color:#e6db74">641. doi:10.1126/science.169.3946.635</span><span style="color:#ae81ff">\n</span><span style="color:#e6db74">&#39;</span>
+</span></span></code></pre></div><p>Ruby</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-ruby" data-lang="ruby"><span style="display:flex;"><span>require <span style="color:#e6db74">&#39;serrano&#39;</span>
+</span></span><span style="display:flex;"><span><span style="color:#66d9ef">Serrano</span><span style="color:#f92672">.</span>content_negotiation(<span style="color:#e6db74">ids</span>: <span style="color:#e6db74">&#39;10.1126/science.169.3946.635&#39;</span>, format: <span style="color:#e6db74">&#34;text&#34;</span>)
+</span></span></code></pre></div><div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-ruby" data-lang="ruby"><span style="display:flex;"><span><span style="color:#f92672">=&gt;</span> <span style="color:#f92672">[</span><span style="color:#e6db74">&#34;Frank, H. S. (1970). The Structure of Ordinary Water: New data and interpretations are yielding new insights into this fascinating substance. Science, 169(3946), 635</span><span style="color:#ae81ff">\xE2\x80\x93</span><span style="color:#e6db74">641. doi:10.1126/science.169.3946.635</span><span style="color:#ae81ff">\n</span><span style="color:#e6db74">&#34;</span><span style="color:#f92672">]</span>
+</span></span></code></pre></div><p>R</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-r" data-lang="r"><span style="display:flex;"><span><span style="color:#a6e22e">library</span>(<span style="color:#e6db74">&#34;rcrossref&#34;</span>)
+</span></span><span style="display:flex;"><span><span style="color:#a6e22e">cr_cn</span>(dois<span style="color:#f92672">=</span><span style="color:#e6db74">&#34;10.1126/science.169.3946.635&#34;</span>, <span style="color:#e6db74">&#34;text&#34;</span>)
+</span></span></code></pre></div><div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-r" data-lang="r"><span style="display:flex;"><span>[1] <span style="color:#e6db74">&#34;Frank, H. S. (1970). The Structure of Ordinary Water: New data and interpretations are yielding new insights into this fascinating substance. Science, 169(3946), 635–641. doi:10.1126/science.169.3946.635&#34;</span>
+</span></span></code></pre></div><p>CLI</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-bash" data-lang="bash"><span style="display:flex;"><span>serrano contneg 10.1890/13-0590.1 --format<span style="color:#f92672">=</span>text
+</span></span></code></pre></div><div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-bash" data-lang="bash"><span style="display:flex;"><span>Murtaugh, P. A. <span style="color:#f92672">(</span>2014<span style="color:#f92672">)</span>.  In defense of P values . Ecology, 95<span style="color:#f92672">(</span>3<span style="color:#f92672">)</span>, 611–617. doi:10.1890/13-0590.1
+</span></span></code></pre></div><h2 id="more">More</h2>
+<p>There are definitely issues with data in the Crossref search API, some of which I cover in my talks. However, it is still the best place to go for scholarly metadata.</p>
+<p>Let us know of other use cases - there are others not covered here for brevity sake.</p>
+<p>There are lots of examples in the docs for each client. If you can think of any doc improvements file an issue.</p>
+<p>If you find any bugs, please do file an issue.</p>
+]]></content:encoded>
     </item>
     <item>
       <title>pygbif - GBIF client for Python</title>
@@ -68,6 +482,121 @@ We (rOpenSci) have been working on the R client rcrossref for a while now, but I
       <description>I maintain an R client for the GBIF API, at rgbif. Been working on it for a few years, and recently been thinking that there should be a nice low level client for Python as well. I didn&amp;rsquo;t see one searching Github, etc. so I started working on one recently: pygbif
 It&amp;rsquo;s up on pypi.
 There&amp;rsquo;s not much in pygbif yet - I wanted to get something up to start getting some users to more quickly make the library useful to people.</description>
+      <content:encoded><![CDATA[<p>I maintain an R client for the GBIF API, at <a href="https://github.com/ropensci/rgbif">rgbif</a>. Been working on it for a few years, and recently been thinking that there should be a nice low level client for Python as well. I didn&rsquo;t see one searching Github, etc. so I started working on one recently: <a href="https://github.com/sckott/pygbif">pygbif</a></p>
+<p>It&rsquo;s up on <a href="https://pypi.python.org/pypi/pygbif/0.1.1">pypi</a>.</p>
+<p>There&rsquo;s not much in <code>pygbif</code> yet - I wanted to get something up to start getting some users to more quickly make the library useful to people.</p>
+<p>There&rsquo;s three modules, with a few methods each:</p>
+<ul>
+<li>species
+<ul>
+<li><code>name_backbone()</code></li>
+<li><code>name_suggest()</code></li>
+</ul>
+</li>
+<li>registry
+<ul>
+<li><code>nodes()</code></li>
+<li><code>dataset_metrics()</code></li>
+<li><code>datasets()</code></li>
+</ul>
+</li>
+<li>occurrences
+<ul>
+<li><code>search()</code></li>
+<li><code>get()</code></li>
+<li><code>get_verbatim()</code></li>
+<li><code>get_fragment()</code></li>
+<li><code>count()</code></li>
+<li><code>count_basisofrecord()</code></li>
+<li><code>count_year()</code></li>
+<li><code>count_datasets()</code></li>
+<li><code>count_countries()</code></li>
+<li><code>count_publishingcountries()</code></li>
+<li><code>count_schema()</code></li>
+</ul>
+</li>
+</ul>
+<p>Here&rsquo;s a quick intro (<a href="https://github.com/sckott/pygbif/blob/master/demos/pygbif-intro.ipynb">in a Jupyter notebook</a>):</p>
+<h3 id="install">Install</h3>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-python3" data-lang="python3"><span style="display:flex;"><span>pip install pygbif
+</span></span></code></pre></div><h3 id="registrydatasets">Registry/datasets</h3>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-python3" data-lang="python3"><span style="display:flex;"><span><span style="color:#f92672">from</span> pygbif <span style="color:#f92672">import</span> registry
+</span></span><span style="display:flex;"><span>registry<span style="color:#f92672">.</span>dataset_metrics(uuid<span style="color:#f92672">=</span><span style="color:#e6db74">&#39;3f8a1297-3259-4700-91fc-acc4170b27ce&#39;</span>)
+</span></span></code></pre></div><div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-python3" data-lang="python3"><span style="display:flex;"><span>{<span style="color:#e6db74">u</span><span style="color:#e6db74">&#39;colCoveragePct&#39;</span>: <span style="color:#ae81ff">79</span>,
+</span></span><span style="display:flex;"><span> <span style="color:#e6db74">u</span><span style="color:#e6db74">&#39;colMatchingCount&#39;</span>: <span style="color:#ae81ff">24335</span>,
+</span></span><span style="display:flex;"><span> <span style="color:#e6db74">u</span><span style="color:#e6db74">&#39;countByConstituent&#39;</span>: {},
+</span></span><span style="display:flex;"><span> <span style="color:#e6db74">u</span><span style="color:#e6db74">&#39;countByIssue&#39;</span>: {<span style="color:#e6db74">u</span><span style="color:#e6db74">&#39;BACKBONE_MATCH_FUZZY&#39;</span>: <span style="color:#ae81ff">573</span>,
+</span></span><span style="display:flex;"><span>  <span style="color:#e6db74">u</span><span style="color:#e6db74">&#39;BACKBONE_MATCH_NONE&#39;</span>: <span style="color:#ae81ff">1306</span>,
+</span></span><span style="display:flex;"><span>  <span style="color:#e6db74">u</span><span style="color:#e6db74">&#39;VERNACULAR_NAME_INVALID&#39;</span>: <span style="color:#ae81ff">7777</span>},
+</span></span><span style="display:flex;"><span> <span style="color:#e6db74">u</span><span style="color:#e6db74">&#39;countByKingdom&#39;</span>: {<span style="color:#e6db74">u</span><span style="color:#e6db74">&#39;ANIMALIA&#39;</span>: <span style="color:#ae81ff">30</span>,
+</span></span><span style="display:flex;"><span>  <span style="color:#e6db74">u</span><span style="color:#e6db74">&#39;FUNGI&#39;</span>: <span style="color:#ae81ff">3</span>,
+</span></span><span style="display:flex;"><span>  <span style="color:#e6db74">u</span><span style="color:#e6db74">&#39;INCERTAE_SEDIS&#39;</span>: <span style="color:#ae81ff">26</span>,
+</span></span><span style="display:flex;"><span>  <span style="color:#e6db74">u</span><span style="color:#e6db74">&#39;PLANTAE&#39;</span>: <span style="color:#ae81ff">10997</span>,
+</span></span><span style="display:flex;"><span>  <span style="color:#e6db74">u</span><span style="color:#e6db74">&#39;PROTOZOA&#39;</span>: <span style="color:#ae81ff">1</span>},
+</span></span><span style="display:flex;"><span> <span style="color:#f92672">...</span>
+</span></span><span style="display:flex;"><span>}
+</span></span></code></pre></div><h3 id="taxonomic-names">Taxonomic names</h3>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-python3" data-lang="python3"><span style="display:flex;"><span><span style="color:#f92672">from</span> pygbif <span style="color:#f92672">import</span> species
+</span></span><span style="display:flex;"><span>species<span style="color:#f92672">.</span>name_suggest(q<span style="color:#f92672">=</span><span style="color:#e6db74">&#39;Puma concolor&#39;</span>, limit <span style="color:#f92672">=</span> <span style="color:#ae81ff">1</span>)
+</span></span></code></pre></div><div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-python3" data-lang="python3"><span style="display:flex;"><span>{<span style="color:#e6db74">&#39;data&#39;</span>: [{<span style="color:#e6db74">u</span><span style="color:#e6db74">&#39;canonicalName&#39;</span>: <span style="color:#e6db74">u</span><span style="color:#e6db74">&#39;Puma concolor&#39;</span>,
+</span></span><span style="display:flex;"><span>   <span style="color:#e6db74">u</span><span style="color:#e6db74">&#39;class&#39;</span>: <span style="color:#e6db74">u</span><span style="color:#e6db74">&#39;Mammalia&#39;</span>,
+</span></span><span style="display:flex;"><span>   <span style="color:#e6db74">u</span><span style="color:#e6db74">&#39;classKey&#39;</span>: <span style="color:#ae81ff">359</span>,
+</span></span><span style="display:flex;"><span>   <span style="color:#e6db74">u</span><span style="color:#e6db74">&#39;family&#39;</span>: <span style="color:#e6db74">u</span><span style="color:#e6db74">&#39;Felidae&#39;</span>,
+</span></span><span style="display:flex;"><span>   <span style="color:#e6db74">u</span><span style="color:#e6db74">&#39;familyKey&#39;</span>: <span style="color:#ae81ff">9703</span>,
+</span></span><span style="display:flex;"><span>   <span style="color:#e6db74">u</span><span style="color:#e6db74">&#39;genus&#39;</span>: <span style="color:#e6db74">u</span><span style="color:#e6db74">&#39;Puma&#39;</span>,
+</span></span><span style="display:flex;"><span>   <span style="color:#e6db74">u</span><span style="color:#e6db74">&#39;genusKey&#39;</span>: <span style="color:#ae81ff">2435098</span>,
+</span></span><span style="display:flex;"><span>   <span style="color:#e6db74">u</span><span style="color:#e6db74">&#39;key&#39;</span>: <span style="color:#ae81ff">2435099</span>,
+</span></span><span style="display:flex;"><span>   <span style="color:#e6db74">u</span><span style="color:#e6db74">&#39;kingdom&#39;</span>: <span style="color:#e6db74">u</span><span style="color:#e6db74">&#39;Animalia&#39;</span>,
+</span></span><span style="display:flex;"><span>   <span style="color:#e6db74">u</span><span style="color:#e6db74">&#39;kingdomKey&#39;</span>: <span style="color:#ae81ff">1</span>,
+</span></span><span style="display:flex;"><span>   <span style="color:#e6db74">u</span><span style="color:#e6db74">&#39;nubKey&#39;</span>: <span style="color:#ae81ff">2435099</span>,
+</span></span><span style="display:flex;"><span>   <span style="color:#e6db74">u</span><span style="color:#e6db74">&#39;order&#39;</span>: <span style="color:#e6db74">u</span><span style="color:#e6db74">&#39;Carnivora&#39;</span>,
+</span></span><span style="display:flex;"><span>   <span style="color:#e6db74">u</span><span style="color:#e6db74">&#39;orderKey&#39;</span>: <span style="color:#ae81ff">732</span>,
+</span></span><span style="display:flex;"><span>   <span style="color:#e6db74">u</span><span style="color:#e6db74">&#39;parent&#39;</span>: <span style="color:#e6db74">u</span><span style="color:#e6db74">&#39;Puma&#39;</span>,
+</span></span><span style="display:flex;"><span>   <span style="color:#e6db74">u</span><span style="color:#e6db74">&#39;parentKey&#39;</span>: <span style="color:#ae81ff">2435098</span>,
+</span></span><span style="display:flex;"><span>   <span style="color:#e6db74">u</span><span style="color:#e6db74">&#39;phylum&#39;</span>: <span style="color:#e6db74">u</span><span style="color:#e6db74">&#39;Chordata&#39;</span>,
+</span></span><span style="display:flex;"><span>   <span style="color:#e6db74">u</span><span style="color:#e6db74">&#39;phylumKey&#39;</span>: <span style="color:#ae81ff">44</span>,
+</span></span><span style="display:flex;"><span>   <span style="color:#e6db74">u</span><span style="color:#e6db74">&#39;rank&#39;</span>: <span style="color:#e6db74">u</span><span style="color:#e6db74">&#39;SPECIES&#39;</span>,
+</span></span><span style="display:flex;"><span>   <span style="color:#e6db74">u</span><span style="color:#e6db74">&#39;species&#39;</span>: <span style="color:#e6db74">u</span><span style="color:#e6db74">&#39;Puma concolor&#39;</span>,
+</span></span><span style="display:flex;"><span>   <span style="color:#e6db74">u</span><span style="color:#e6db74">&#39;speciesKey&#39;</span>: <span style="color:#ae81ff">2435099</span>}],
+</span></span><span style="display:flex;"><span> <span style="color:#e6db74">&#39;hierarchy&#39;</span>: [{<span style="color:#e6db74">u</span><span style="color:#e6db74">&#39;1&#39;</span>: <span style="color:#e6db74">u</span><span style="color:#e6db74">&#39;Animalia&#39;</span>,
+</span></span><span style="display:flex;"><span>   <span style="color:#e6db74">u</span><span style="color:#e6db74">&#39;2435098&#39;</span>: <span style="color:#e6db74">u</span><span style="color:#e6db74">&#39;Puma&#39;</span>,
+</span></span><span style="display:flex;"><span>   <span style="color:#e6db74">u</span><span style="color:#e6db74">&#39;359&#39;</span>: <span style="color:#e6db74">u</span><span style="color:#e6db74">&#39;Mammalia&#39;</span>,
+</span></span><span style="display:flex;"><span>   <span style="color:#e6db74">u</span><span style="color:#e6db74">&#39;44&#39;</span>: <span style="color:#e6db74">u</span><span style="color:#e6db74">&#39;Chordata&#39;</span>,
+</span></span><span style="display:flex;"><span>   <span style="color:#e6db74">u</span><span style="color:#e6db74">&#39;732&#39;</span>: <span style="color:#e6db74">u</span><span style="color:#e6db74">&#39;Carnivora&#39;</span>,
+</span></span><span style="display:flex;"><span>   <span style="color:#e6db74">u</span><span style="color:#e6db74">&#39;9703&#39;</span>: <span style="color:#e6db74">u</span><span style="color:#e6db74">&#39;Felidae&#39;</span>}]}
+</span></span></code></pre></div><h3 id="occurrence-data">Occurrence data</h3>
+<p>Search</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-python3" data-lang="python3"><span style="display:flex;"><span><span style="color:#f92672">from</span> pygbif <span style="color:#f92672">import</span> occurrences
+</span></span><span style="display:flex;"><span>res <span style="color:#f92672">=</span> occurrences<span style="color:#f92672">.</span>search(taxonKey <span style="color:#f92672">=</span> <span style="color:#ae81ff">3329049</span>, limit <span style="color:#f92672">=</span> <span style="color:#ae81ff">10</span>)
+</span></span><span style="display:flex;"><span>[ x[<span style="color:#e6db74">&#39;phylum&#39;</span>] <span style="color:#66d9ef">for</span> x <span style="color:#f92672">in</span> res[<span style="color:#e6db74">&#39;results&#39;</span>] ]
+</span></span></code></pre></div><div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-python3" data-lang="python3"><span style="display:flex;"><span>[<span style="color:#e6db74">u</span><span style="color:#e6db74">&#39;Basidiomycota&#39;</span>,
+</span></span><span style="display:flex;"><span> <span style="color:#e6db74">u</span><span style="color:#e6db74">&#39;Basidiomycota&#39;</span>,
+</span></span><span style="display:flex;"><span> <span style="color:#e6db74">u</span><span style="color:#e6db74">&#39;Basidiomycota&#39;</span>,
+</span></span><span style="display:flex;"><span> <span style="color:#e6db74">u</span><span style="color:#e6db74">&#39;Basidiomycota&#39;</span>,
+</span></span><span style="display:flex;"><span> <span style="color:#e6db74">u</span><span style="color:#e6db74">&#39;Basidiomycota&#39;</span>,
+</span></span><span style="display:flex;"><span> <span style="color:#e6db74">u</span><span style="color:#e6db74">&#39;Basidiomycota&#39;</span>,
+</span></span><span style="display:flex;"><span> <span style="color:#e6db74">u</span><span style="color:#e6db74">&#39;Basidiomycota&#39;</span>,
+</span></span><span style="display:flex;"><span> <span style="color:#e6db74">u</span><span style="color:#e6db74">&#39;Basidiomycota&#39;</span>,
+</span></span><span style="display:flex;"><span> <span style="color:#e6db74">u</span><span style="color:#e6db74">&#39;Basidiomycota&#39;</span>,
+</span></span><span style="display:flex;"><span> <span style="color:#e6db74">u</span><span style="color:#e6db74">&#39;Basidiomycota&#39;</span>]
+</span></span></code></pre></div><p>Fetch specific occurrences</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-python3" data-lang="python3"><span style="display:flex;"><span>occurrences<span style="color:#f92672">.</span>get(key <span style="color:#f92672">=</span> <span style="color:#ae81ff">252408386</span>)
+</span></span></code></pre></div><div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-python3" data-lang="python3"><span style="display:flex;"><span>{<span style="color:#e6db74">u</span><span style="color:#e6db74">&#39;basisOfRecord&#39;</span>: <span style="color:#e6db74">u</span><span style="color:#e6db74">&#39;OBSERVATION&#39;</span>,
+</span></span><span style="display:flex;"><span> <span style="color:#e6db74">u</span><span style="color:#e6db74">&#39;catalogNumber&#39;</span>: <span style="color:#e6db74">u</span><span style="color:#e6db74">&#39;70875196&#39;</span>,
+</span></span><span style="display:flex;"><span> <span style="color:#e6db74">u</span><span style="color:#e6db74">&#39;collectionCode&#39;</span>: <span style="color:#e6db74">u</span><span style="color:#e6db74">&#39;7472&#39;</span>,
+</span></span><span style="display:flex;"><span> <span style="color:#e6db74">u</span><span style="color:#e6db74">&#39;continent&#39;</span>: <span style="color:#e6db74">u</span><span style="color:#e6db74">&#39;EUROPE&#39;</span>,
+</span></span><span style="display:flex;"><span> <span style="color:#e6db74">u</span><span style="color:#e6db74">&#39;country&#39;</span>: <span style="color:#e6db74">u</span><span style="color:#e6db74">&#39;United Kingdom&#39;</span>,
+</span></span><span style="display:flex;"><span> <span style="color:#e6db74">u</span><span style="color:#e6db74">&#39;countryCode&#39;</span>: <span style="color:#e6db74">u</span><span style="color:#e6db74">&#39;GB&#39;</span>,
+</span></span><span style="display:flex;"><span> <span style="color:#e6db74">u</span><span style="color:#e6db74">&#39;datasetKey&#39;</span>: <span style="color:#e6db74">u</span><span style="color:#e6db74">&#39;26a49731-9457-45b2-9105-1b96063deb26&#39;</span>,
+</span></span><span style="display:flex;"><span> <span style="color:#e6db74">u</span><span style="color:#e6db74">&#39;day&#39;</span>: <span style="color:#ae81ff">30</span>,
+</span></span><span style="display:flex;"><span><span style="color:#f92672">...</span>
+</span></span><span style="display:flex;"><span>}
+</span></span></code></pre></div><p>Occurrence counts API</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-python3" data-lang="python3"><span style="display:flex;"><span>occurrences<span style="color:#f92672">.</span>count(isGeoreferenced <span style="color:#f92672">=</span> <span style="color:#66d9ef">True</span>)
+</span></span></code></pre></div><div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-python3" data-lang="python3"><span style="display:flex;"><span><span style="color:#ae81ff">500283031</span>
+</span></span></code></pre></div><h3 id="feedback">feedback</h3>
+<p>Would love any feedback&hellip;</p>
+]]></content:encoded>
     </item>
     <item>
       <title>pytaxize - low level ITIS functions</title>
@@ -77,6 +606,107 @@ There&amp;rsquo;s not much in pygbif yet - I wanted to get something up to start
       <description>I&amp;rsquo;ve been working on a Python port of the R package taxize that I maintain. It&amp;rsquo;s still early days with this Python library, I&amp;rsquo;d love to know what people think. For example, I&amp;rsquo;m giving back Pandas DataFrame&amp;rsquo;s from most functions. Does this make sense?
 Installation sudo pip install git+git://github.com/sckott/pytaxize.git#egg=pytaxize Or git clone the repo down, and python setup.py build &amp;amp;&amp;amp; python setup.py install
 Load library import pytaxize ITIS ping pytaxize.itis_ping() &amp;#39;This is the ITIS Web Service, providing access to the data behind www.</description>
+      <content:encoded><![CDATA[<p>I&rsquo;ve been working on a Python port of the R package <code>taxize</code> that I maintain. It&rsquo;s still early days with this Python library, I&rsquo;d love to know what people think. For example, I&rsquo;m giving back Pandas DataFrame&rsquo;s from most functions. Does this make sense?</p>
+<h2 id="installation">Installation</h2>
+<pre tabindex="0"><code>sudo pip install git+git://github.com/sckott/pytaxize.git#egg=pytaxize
+</code></pre><p>Or <code>git clone</code> the repo down, and <code>python setup.py build &amp;&amp; python setup.py install</code></p>
+<h2 id="load-library">Load library</h2>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-python3" data-lang="python3"><span style="display:flex;"><span><span style="color:#f92672">import</span> pytaxize
+</span></span></code></pre></div><h2 id="itis-ping">ITIS ping</h2>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-python3" data-lang="python3"><span style="display:flex;"><span>pytaxize<span style="color:#f92672">.</span>itis_ping()
+</span></span></code></pre></div><div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-python3" data-lang="python3"><span style="display:flex;"><span><span style="color:#e6db74">&#39;This is the ITIS Web Service, providing access to the data behind www.itis.gov. The database contains 665,266 scientific names (501,207 of them valid/accepted) and 122,735 common names.&#39;</span>
+</span></span></code></pre></div><h2 id="get-hierarchy-down-from-tsn">Get hierarchy down from tsn</h2>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-python3" data-lang="python3"><span style="display:flex;"><span>pytaxize<span style="color:#f92672">.</span>gethierarchydownfromtsn(tsn <span style="color:#f92672">=</span> <span style="color:#ae81ff">161030</span>)
+</span></span></code></pre></div><div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-python3" data-lang="python3"><span style="display:flex;"><span>      tsn rankName       taxonName    parentName parentTsn
+</span></span><span style="display:flex;"><span><span style="color:#ae81ff">0</span>  <span style="color:#ae81ff">161048</span>    Class   Sarcopterygii  Osteichthyes    <span style="color:#ae81ff">161030</span>
+</span></span><span style="display:flex;"><span><span style="color:#ae81ff">1</span>  <span style="color:#ae81ff">161061</span>    Class  Actinopterygii  Osteichthyes    <span style="color:#ae81ff">161030</span>
+</span></span></code></pre></div><h2 id="get-hierarchy-up-from-tsn">Get hierarchy up from tsn</h2>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-python3" data-lang="python3"><span style="display:flex;"><span>pytaxize<span style="color:#f92672">.</span>gethierarchyupfromtsn(tsn <span style="color:#f92672">=</span> <span style="color:#ae81ff">37906</span>)
+</span></span></code></pre></div><div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-python3" data-lang="python3"><span style="display:flex;"><span>               author  parentName parentTsn rankName taxonName    tsn
+</span></span><span style="display:flex;"><span><span style="color:#ae81ff">0</span>  Gaertn<span style="color:#f92672">.</span> ex Schreb<span style="color:#f92672">.</span>  Asteraceae     <span style="color:#ae81ff">35420</span>    Genus   Liatris  <span style="color:#ae81ff">37906</span>
+</span></span></code></pre></div><h2 id="get-rank-names">Get rank names</h2>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-python3" data-lang="python3"><span style="display:flex;"><span>pytaxize<span style="color:#f92672">.</span>getranknames()
+</span></span></code></pre></div><div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-python3" data-lang="python3"><span style="display:flex;"><span>    kingdomname rankid      rankname
+</span></span><span style="display:flex;"><span><span style="color:#ae81ff">0</span>      Bacteria     <span style="color:#ae81ff">10</span>       Kingdom
+</span></span><span style="display:flex;"><span><span style="color:#ae81ff">1</span>      Bacteria     <span style="color:#ae81ff">20</span>    Subkingdom
+</span></span><span style="display:flex;"><span><span style="color:#ae81ff">2</span>      Bacteria     <span style="color:#ae81ff">30</span>        Phylum
+</span></span><span style="display:flex;"><span><span style="color:#ae81ff">3</span>      Bacteria     <span style="color:#ae81ff">40</span>     Subphylum
+</span></span><span style="display:flex;"><span><span style="color:#ae81ff">4</span>      Bacteria     <span style="color:#ae81ff">50</span>    Superclass
+</span></span><span style="display:flex;"><span><span style="color:#ae81ff">5</span>      Bacteria     <span style="color:#ae81ff">60</span>         Class
+</span></span><span style="display:flex;"><span><span style="color:#ae81ff">6</span>      Bacteria     <span style="color:#ae81ff">70</span>      Subclass
+</span></span><span style="display:flex;"><span><span style="color:#ae81ff">7</span>      Bacteria     <span style="color:#ae81ff">80</span>    Infraclass
+</span></span><span style="display:flex;"><span><span style="color:#ae81ff">8</span>      Bacteria     <span style="color:#ae81ff">90</span>    Superorder
+</span></span><span style="display:flex;"><span><span style="color:#ae81ff">9</span>      Bacteria    <span style="color:#ae81ff">100</span>         Order
+</span></span><span style="display:flex;"><span><span style="color:#ae81ff">10</span>     Bacteria    <span style="color:#ae81ff">110</span>      Suborder
+</span></span><span style="display:flex;"><span><span style="color:#ae81ff">11</span>     Bacteria    <span style="color:#ae81ff">120</span>    Infraorder
+</span></span><span style="display:flex;"><span><span style="color:#ae81ff">12</span>     Bacteria    <span style="color:#ae81ff">130</span>   Superfamily
+</span></span><span style="display:flex;"><span><span style="color:#ae81ff">13</span>     Bacteria    <span style="color:#ae81ff">140</span>        Family
+</span></span><span style="display:flex;"><span><span style="color:#ae81ff">14</span>     Bacteria    <span style="color:#ae81ff">150</span>     Subfamily
+</span></span><span style="display:flex;"><span><span style="color:#ae81ff">15</span>     Bacteria    <span style="color:#ae81ff">160</span>         Tribe
+</span></span><span style="display:flex;"><span><span style="color:#ae81ff">16</span>     Bacteria    <span style="color:#ae81ff">170</span>      Subtribe
+</span></span><span style="display:flex;"><span><span style="color:#ae81ff">17</span>     Bacteria    <span style="color:#ae81ff">180</span>         Genus
+</span></span><span style="display:flex;"><span><span style="color:#ae81ff">18</span>     Bacteria    <span style="color:#ae81ff">190</span>      Subgenus
+</span></span><span style="display:flex;"><span><span style="color:#ae81ff">19</span>     Bacteria    <span style="color:#ae81ff">220</span>       Species
+</span></span><span style="display:flex;"><span><span style="color:#ae81ff">20</span>     Bacteria    <span style="color:#ae81ff">230</span>    Subspecies
+</span></span><span style="display:flex;"><span><span style="color:#ae81ff">21</span>     Protozoa     <span style="color:#ae81ff">10</span>       Kingdom
+</span></span><span style="display:flex;"><span><span style="color:#ae81ff">22</span>     Protozoa     <span style="color:#ae81ff">20</span>    Subkingdom
+</span></span><span style="display:flex;"><span><span style="color:#ae81ff">23</span>     Protozoa     <span style="color:#ae81ff">25</span>  Infrakingdom
+</span></span><span style="display:flex;"><span><span style="color:#ae81ff">24</span>     Protozoa     <span style="color:#ae81ff">30</span>        Phylum
+</span></span><span style="display:flex;"><span><span style="color:#ae81ff">25</span>     Protozoa     <span style="color:#ae81ff">40</span>     Subphylum
+</span></span><span style="display:flex;"><span><span style="color:#ae81ff">26</span>     Protozoa     <span style="color:#ae81ff">45</span>   Infraphylum
+</span></span><span style="display:flex;"><span><span style="color:#ae81ff">27</span>     Protozoa     <span style="color:#ae81ff">47</span>    Parvphylum
+</span></span><span style="display:flex;"><span><span style="color:#ae81ff">28</span>     Protozoa     <span style="color:#ae81ff">50</span>    Superclass
+</span></span><span style="display:flex;"><span><span style="color:#ae81ff">29</span>     Protozoa     <span style="color:#ae81ff">60</span>         Class
+</span></span><span style="display:flex;"><span><span style="color:#f92672">..</span>          <span style="color:#f92672">...</span>    <span style="color:#f92672">...</span>           <span style="color:#f92672">...</span>
+</span></span><span style="display:flex;"><span><span style="color:#ae81ff">150</span>   Chromista    <span style="color:#ae81ff">190</span>      Subgenus
+</span></span><span style="display:flex;"><span><span style="color:#ae81ff">151</span>   Chromista    <span style="color:#ae81ff">200</span>       Section
+</span></span><span style="display:flex;"><span><span style="color:#ae81ff">152</span>   Chromista    <span style="color:#ae81ff">210</span>    Subsection
+</span></span><span style="display:flex;"><span><span style="color:#ae81ff">153</span>   Chromista    <span style="color:#ae81ff">220</span>       Species
+</span></span><span style="display:flex;"><span><span style="color:#ae81ff">154</span>   Chromista    <span style="color:#ae81ff">230</span>    Subspecies
+</span></span><span style="display:flex;"><span><span style="color:#ae81ff">155</span>   Chromista    <span style="color:#ae81ff">240</span>       Variety
+</span></span><span style="display:flex;"><span><span style="color:#ae81ff">156</span>   Chromista    <span style="color:#ae81ff">250</span>    Subvariety
+</span></span><span style="display:flex;"><span><span style="color:#ae81ff">157</span>   Chromista    <span style="color:#ae81ff">260</span>          Form
+</span></span><span style="display:flex;"><span><span style="color:#ae81ff">158</span>   Chromista    <span style="color:#ae81ff">270</span>       Subform
+</span></span><span style="display:flex;"><span><span style="color:#ae81ff">159</span>     Archaea     <span style="color:#ae81ff">10</span>       Kingdom
+</span></span><span style="display:flex;"><span><span style="color:#ae81ff">160</span>     Archaea     <span style="color:#ae81ff">20</span>    Subkingdom
+</span></span><span style="display:flex;"><span><span style="color:#ae81ff">161</span>     Archaea     <span style="color:#ae81ff">30</span>        Phylum
+</span></span><span style="display:flex;"><span><span style="color:#ae81ff">162</span>     Archaea     <span style="color:#ae81ff">40</span>     Subphylum
+</span></span><span style="display:flex;"><span><span style="color:#ae81ff">163</span>     Archaea     <span style="color:#ae81ff">50</span>    Superclass
+</span></span><span style="display:flex;"><span><span style="color:#ae81ff">164</span>     Archaea     <span style="color:#ae81ff">60</span>         Class
+</span></span><span style="display:flex;"><span><span style="color:#ae81ff">165</span>     Archaea     <span style="color:#ae81ff">70</span>      Subclass
+</span></span><span style="display:flex;"><span><span style="color:#ae81ff">166</span>     Archaea     <span style="color:#ae81ff">80</span>    Infraclass
+</span></span><span style="display:flex;"><span><span style="color:#ae81ff">167</span>     Archaea     <span style="color:#ae81ff">90</span>    Superorder
+</span></span><span style="display:flex;"><span><span style="color:#ae81ff">168</span>     Archaea    <span style="color:#ae81ff">100</span>         Order
+</span></span><span style="display:flex;"><span><span style="color:#ae81ff">169</span>     Archaea    <span style="color:#ae81ff">110</span>      Suborder
+</span></span><span style="display:flex;"><span><span style="color:#ae81ff">170</span>     Archaea    <span style="color:#ae81ff">120</span>    Infraorder
+</span></span><span style="display:flex;"><span><span style="color:#ae81ff">171</span>     Archaea    <span style="color:#ae81ff">130</span>   Superfamily
+</span></span><span style="display:flex;"><span><span style="color:#ae81ff">172</span>     Archaea    <span style="color:#ae81ff">140</span>        Family
+</span></span><span style="display:flex;"><span><span style="color:#ae81ff">173</span>     Archaea    <span style="color:#ae81ff">150</span>     Subfamily
+</span></span><span style="display:flex;"><span><span style="color:#ae81ff">174</span>     Archaea    <span style="color:#ae81ff">160</span>         Tribe
+</span></span><span style="display:flex;"><span><span style="color:#ae81ff">175</span>     Archaea    <span style="color:#ae81ff">170</span>      Subtribe
+</span></span><span style="display:flex;"><span><span style="color:#ae81ff">176</span>     Archaea    <span style="color:#ae81ff">180</span>         Genus
+</span></span><span style="display:flex;"><span><span style="color:#ae81ff">177</span>     Archaea    <span style="color:#ae81ff">190</span>      Subgenus
+</span></span><span style="display:flex;"><span><span style="color:#ae81ff">178</span>     Archaea    <span style="color:#ae81ff">220</span>       Species
+</span></span><span style="display:flex;"><span><span style="color:#ae81ff">179</span>     Archaea    <span style="color:#ae81ff">230</span>    Subspecies
+</span></span></code></pre></div><h2 id="search-by-scientific-name">Search by scientific name</h2>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-python3" data-lang="python3"><span style="display:flex;"><span>pytaxize<span style="color:#f92672">.</span>searchbyscientificname(x<span style="color:#f92672">=</span><span style="color:#e6db74">&#34;Tardigrada&#34;</span>)
+</span></span></code></pre></div><div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-python3" data-lang="python3"><span style="display:flex;"><span>           combinedname     tsn
+</span></span><span style="display:flex;"><span><span style="color:#ae81ff">0</span>    Rotaria tardigrada   <span style="color:#ae81ff">58274</span>
+</span></span><span style="display:flex;"><span><span style="color:#ae81ff">1</span>  Notommata tardigrada   <span style="color:#ae81ff">58898</span>
+</span></span><span style="display:flex;"><span><span style="color:#ae81ff">2</span>   Pilargis tardigrada   <span style="color:#ae81ff">65562</span>
+</span></span><span style="display:flex;"><span><span style="color:#ae81ff">3</span>            Tardigrada  <span style="color:#ae81ff">155166</span>
+</span></span><span style="display:flex;"><span><span style="color:#ae81ff">4</span>      Heterotardigrada  <span style="color:#ae81ff">155167</span>
+</span></span><span style="display:flex;"><span><span style="color:#ae81ff">5</span>      Arthrotardigrada  <span style="color:#ae81ff">155168</span>
+</span></span><span style="display:flex;"><span><span style="color:#ae81ff">6</span>        Mesotardigrada  <span style="color:#ae81ff">155358</span>
+</span></span><span style="display:flex;"><span><span style="color:#ae81ff">7</span>          Eutardigrada  <span style="color:#ae81ff">155362</span>
+</span></span><span style="display:flex;"><span><span style="color:#ae81ff">8</span>   Scytodes tardigrada  <span style="color:#ae81ff">866744</span>
+</span></span></code></pre></div><h2 id="get-accepted-names-from-tsn">Get accepted names from tsn</h2>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-python3" data-lang="python3"><span style="display:flex;"><span>pytaxize<span style="color:#f92672">.</span>getacceptednamesfromtsn(<span style="color:#e6db74">&#39;208527&#39;</span>)
+</span></span></code></pre></div><p>If accepted, returns the same id</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-python3" data-lang="python3"><span style="display:flex;"><span><span style="color:#e6db74">&#39;208527&#39;</span>
+</span></span></code></pre></div><h2 id="more">More</h2>
+<p>For the other functions see <a href="https://github.com/sckott/pytaxize/blob/master/pytaxize/itis.py">https://github.com/sckott/pytaxize/blob/master/pytaxize/itis.py</a></p>
+]]></content:encoded>
     </item>
     <item>
       <title>icanhaz altmetrics</title>
@@ -86,6 +716,125 @@ Load library import pytaxize ITIS ping pytaxize.itis_ping() &amp;#39;This is the
       <description>The Lagotto application is a Rails app that collects and serves up via RESTful API article level metrics data for research objects. So far, this application has only been applied to scholarly articles, but will see action on datasets soon.
 Martin Fenner has lead the development of Lagotto. He recently set up a discussion site if you want to chat about it.
 The application has a nice GUI interface, and a quite nice RESTful API.</description>
+      <content:encoded><![CDATA[<p>The Lagotto application is a Rails app that collects and serves up via RESTful API article level metrics data for research objects. So far, this application has only been applied to scholarly articles, but will <a href="https://articlemetrics.github.io/MDC/">see action on datasets soon</a>.</p>
+<p><a href="https://blog.martinfenner.org/">Martin Fenner</a> has lead the development of Lagotto. He recently set up <a href="https://discuss.lagotto.io/">a discussion site</a> if you want to chat about it.</p>
+<p>The application has a <a href="https://alm.plos.org/">nice GUI interface</a>, and a quite nice <a href="https://alm.plos.org/docs/api">RESTful API</a>.</p>
+<p>Lagotto is open source! Because of this, and the quality of the software, other publishers have started using it to gather and deliver publicly article level metrics data, including:</p>
+<ul>
+<li><a href="https://lagotto.svr.elifesciences.org/">eLife</a></li>
+<li><a href="https://pkp-alm.lib.sfu.ca/">Public Knowledge Project (PKP)</a></li>
+<li><a href="https://metricus.copernicus.org/">Copernicus</a></li>
+<li><a href="https://det.labs.crossref.org/">Crossref</a></li>
+<li><a href="https://alm.pensoft.net:81/">Pensoft</a></li>
+</ul>
+<p>The PLOS instance at <a href="https://alm.plos.org/">https://alm.plos.org/</a> is always the most up to date with the Lagotto software, but <a href="https://det.labs.crossref.org/">Crossref</a> has the largest number of articles.</p>
+<p>I&rsquo;ve been working on three clients for the Lagotto REST API, including for a while now on <code>R</code>, recently on <code>Python</code>, and just last week on <code>Ruby</code>.</p>
+<p>Please do try the clients, report bugs, request features - you know the open source drill&hellip;</p>
+<p>I&rsquo;d say the R client is the most mature, while Python is less so, end the Ruby gem the least mature.</p>
+<h2 id="installation">Installation</h2>
+<p>R</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-r" data-lang="r"><span style="display:flex;"><span><span style="color:#a6e22e">install.packages</span>(<span style="color:#e6db74">&#34;devtools&#34;</span>)
+</span></span><span style="display:flex;"><span>devtools<span style="color:#f92672">::</span><span style="color:#a6e22e">install_github</span>(<span style="color:#e6db74">&#34;ropensci/alm&#34;</span>)
+</span></span></code></pre></div><p>Python</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-r" data-lang="r"><span style="display:flex;"><span>git clone https<span style="color:#f92672">://</span>github.com<span style="color:#f92672">/</span>cameronneylon<span style="color:#f92672">/</span>pyalm.git
+</span></span><span style="display:flex;"><span>cd pyalm
+</span></span><span style="display:flex;"><span>git checkout scott
+</span></span><span style="display:flex;"><span>python setup.py install
+</span></span></code></pre></div><p>Ruby</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-r" data-lang="r"><span style="display:flex;"><span>gem install httparty json rake
+</span></span><span style="display:flex;"><span>git clone https<span style="color:#f92672">://</span>github.com<span style="color:#f92672">/</span>sckott<span style="color:#f92672">/</span>alm.git
+</span></span><span style="display:flex;"><span>cd alm
+</span></span><span style="display:flex;"><span>make <span style="color:#75715e"># which runs build and install tasks</span>
+</span></span></code></pre></div><p>If you don&rsquo;t have <code>make</code>, then just run <code>gem build alm.gemspec</code> and 	<code>gem install alm-0.1.0.gem</code> seperately.</p>
+<h2 id="example">Example</h2>
+<p>In this example, we&rsquo;ll get altmetrics data for two DOIs: <a href="https://www.plosone.org/article/info%3Adoi%2F10.1371%2Fjournal.pone.0029797">10.1371/journal.pone.0029797</a>, and <a href="https://www.plosone.org/article/info%3Adoi%2F10.1371%2Fjournal.pone.0029798">10.1371/journal.pone.0029798</a> (click on links to go to paper).</p>
+<h3 id="r">R</h3>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-r" data-lang="r"><span style="display:flex;"><span><span style="color:#a6e22e">library</span>(<span style="color:#e6db74">&#39;alm&#39;</span>)
+</span></span><span style="display:flex;"><span>ids <span style="color:#f92672">&lt;-</span> <span style="color:#a6e22e">c</span>(<span style="color:#e6db74">&#34;10.1371/journal.pone.0029797&#34;</span>,<span style="color:#e6db74">&#34;10.1371/journal.pone.0029798&#34;</span>)
+</span></span><span style="display:flex;"><span><span style="color:#a6e22e">alm_ids</span>(ids, info<span style="color:#f92672">=</span><span style="color:#e6db74">&#34;summary&#34;</span>)
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; $meta</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt;   total total_pages page error</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; 1     2           1    1    NA</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; </span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; $data</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; $data$`10.1371/journal.pone.0029798`</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; $data$`10.1371/journal.pone.0029798`$info</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt;                            doi</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; 1 10.1371/journal.pone.0029798</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt;                                                                                     title</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; 1 Mitochondrial Electron Transport Is the Cellular Target of the Oncology Drug Elesclomol</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt;                                                                canonical_url</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; 1 https://www.plosone.org/article/info%3Adoi%2F10.1371%2Fjournal.pone.0029798</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt;       pmid   pmcid                        mendeley_uuid</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; 1 22253786 3256171 b08cc99e-b526-3f0c-adaa-d5ee6d0d978a</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt;            update_date     issued</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; 1 2014-12-09T02:52:47Z 2012-01-11</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; </span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; $data$`10.1371/journal.pone.0029798`$signposts</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt;                            doi viewed saved discussed cited</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; 1 10.1371/journal.pone.0029798   4346    14         2    26</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; </span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; </span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; $data$`10.1371/journal.pone.0029797`</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; $data$`10.1371/journal.pone.0029797`$info</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt;                            doi</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; 1 10.1371/journal.pone.0029797</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt;                                                                             title</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; 1 Ecological Guild Evolution and the Discovery of the World&#39;s Smallest Vertebrate</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt;                                                                canonical_url</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; 1 https://www.plosone.org/article/info%3Adoi%2F10.1371%2Fjournal.pone.0029797</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt;       pmid   pmcid                        mendeley_uuid</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; 1 22253785 3256195 897fbbd6-5a23-3552-8077-97251b82c1e1</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt;            update_date     issued</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; 1 2014-12-09T02:52:46Z 2012-01-11</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; </span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; $data$`10.1371/journal.pone.0029797`$signposts</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt;                            doi viewed saved discussed cited</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; 1 10.1371/journal.pone.0029797  34282    81       244     8</span>
+</span></span></code></pre></div><h3 id="python">Python</h3>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-r" data-lang="r"><span style="display:flex;"><span>import pyalm
+</span></span><span style="display:flex;"><span>ids <span style="color:#f92672">=</span> [<span style="color:#e6db74">&#34;10.1371/journal.pone.0029797&#34;</span>,<span style="color:#e6db74">&#34;10.1371/journal.pone.0029798&#34;</span>]
+</span></span><span style="display:flex;"><span><span style="color:#a6e22e">pyalm.get_alm</span>(ids, info<span style="color:#f92672">=</span><span style="color:#e6db74">&#34;summary&#34;</span>)
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; {&#39;articles&#39;: [&lt;ArticleALM Mitochondrial Electron Transport Is the Cellular Target of the Oncology Drug Elesclomol,</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; DOI 10.1371/journal.pone.0029798&gt;,</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt;   &lt;ArticleALM Ecological Guild Evolution and the Discovery of the World&#39;s Smallest Vertebrate,</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt;         DOI 10.1371/journal.pone.0029797&gt;],</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt;  &#39;meta&#39;: {u&#39;error&#39;: None, u&#39;page&#39;: 1, u&#39;total&#39;: 2, u&#39;total_pages&#39;: 1}}</span>
+</span></span></code></pre></div><h3 id="ruby">Ruby</h3>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-r" data-lang="r"><span style="display:flex;"><span>require <span style="color:#e6db74">&#39;alm&#39;</span>
+</span></span><span style="display:flex;"><span><span style="color:#a6e22e">Alm.alm</span>(ids<span style="color:#f92672">:</span> [<span style="color:#e6db74">&#34;10.1371/journal.pone.0029797&#34;</span>,<span style="color:#e6db74">&#34;10.1371/journal.pone.0029798&#34;</span>], key<span style="color:#f92672">:</span> ENV[<span style="color:#e6db74">&#39;PLOS_API_KEY&#39;</span>])
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; =&gt; {&#34;total&#34;=&gt;2,</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt;  &#34;total_pages&#34;=&gt;1,</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt;  &#34;page&#34;=&gt;1,</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt;  &#34;error&#34;=&gt;nil,</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt;  &#34;data&#34;=&gt;</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt;   [{&#34;doi&#34;=&gt;&#34;10.1371/journal.pone.0029798&#34;,</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt;     &#34;title&#34;=&gt;&#34;Mitochondrial Electron Transport Is the Cellular Target of the Oncology Drug Elesclomol&#34;,</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt;     &#34;issued&#34;=&gt;{&#34;date-parts&#34;=&gt;[[2012, 1, 11]]},</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt;     &#34;canonical_url&#34;=&gt;&#34;https://www.plosone.org/article/info%3Adoi%2F10.1371%2Fjournal.pone.0029798&#34;,</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt;     &#34;pmid&#34;=&gt;&#34;22253786&#34;,</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt;     &#34;pmcid&#34;=&gt;&#34;3256171&#34;,</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt;     &#34;mendeley_uuid&#34;=&gt;&#34;b08cc99e-b526-3f0c-adaa-d5ee6d0d978a&#34;,</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt;     &#34;viewed&#34;=&gt;4346,</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt;     &#34;saved&#34;=&gt;14,</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt;     &#34;discussed&#34;=&gt;2,</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt;     &#34;cited&#34;=&gt;26,</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt;     &#34;update_date&#34;=&gt;&#34;2014-12-09T02:52:47Z&#34;},</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt;    {&#34;doi&#34;=&gt;&#34;10.1371/journal.pone.0029797&#34;,</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt;     &#34;title&#34;=&gt;&#34;Ecological Guild Evolution and the Discovery of the World&#39;s Smallest Vertebrate&#34;,</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt;     &#34;issued&#34;=&gt;{&#34;date-parts&#34;=&gt;[[2012, 1, 11]]},</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt;     &#34;canonical_url&#34;=&gt;&#34;https://www.plosone.org/article/info%3Adoi%2F10.1371%2Fjournal.pone.0029797&#34;,</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt;     &#34;pmid&#34;=&gt;&#34;22253785&#34;,</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt;     &#34;pmcid&#34;=&gt;&#34;3256195&#34;,</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt;     &#34;mendeley_uuid&#34;=&gt;&#34;897fbbd6-5a23-3552-8077-97251b82c1e1&#34;,</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt;     &#34;viewed&#34;=&gt;34282,</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt;     &#34;saved&#34;=&gt;81,</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt;     &#34;discussed&#34;=&gt;244,</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt;     &#34;cited&#34;=&gt;8,</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt;     &#34;update_date&#34;=&gt;&#34;2014-12-09T02:52:46Z&#34;}]}</span>
+</span></span></code></pre></div>]]></content:encoded>
     </item>
     <item>
       <title>Taxonomy data from the web in three languages</title>
@@ -94,6 +843,62 @@ The application has a nice GUI interface, and a quite nice RESTful API.</descrip
       <guid>http://localhost:1313/2013/09/taxonomy-in-three-acts/</guid>
       <description>Eduard Szöcs and I started developing a taxonomic toolbelt for the R language a while back , which lets you interact with a multitude of taxonomic databases on the web. We have a paper in F1000Research if you want to find out more (see here).
 I thought it would be fun to rewrite some of taxize in other languages to learn more languages. Ruby and Python made the most sense to try.</description>
+      <content:encoded><![CDATA[<p>Eduard Szöcs and I started developing a taxonomic toolbelt for the R language a while back , which lets you interact with a multitude of taxonomic databases on the web. We have a paper in F1000Research if you want to find out more (see <a href="http://f1000research.com/articles/2-191/v1">here</a>).</p>
+<p>I thought it would be fun to rewrite some of taxize in other languages to learn more languages. Ruby and Python made the most sense to try. I did try others (Julia, Node), but gave up on those for now. The goal here isn&rsquo;t to port taxize to Python and Ruby right now - it&rsquo;s for me to learn myself some coding.</p>
+<p>Anyway, here&rsquo;s use of the same function in three languages: R, Ruby, and Python. The function searches the <a href="http://gni.globalnames.org/">Global Names Index</a>, but is named slightly differently in R (<code>gni_search</code>) vs. Ruby/Python (<code>gniSearch</code>). (yes, I realize the package names aren&rsquo;t consistent)</p>
+<p>Note that there are only a few functions available in the Ruby and Python versions:</p>
+<ul>
+<li>itisPing</li>
+<li>gnrResolve</li>
+<li>gniParse</li>
+<li>gniSearch</li>
+<li>gniDetails</li>
+<li>colChildren (Python, not Ruby)</li>
+</ul>
+<p>And the behavior of these functions does not necessarily match that in the R version.</p>
+<p>One thing I have learned is that packaging in R is much harder than in Python or Ruby. <a href="cran.r-project.org/web/packages/devtools/index.html">devtools</a> does make R packaging easier, but still&hellip;</p>
+<p><!-- raw HTML omitted --><!-- raw HTML omitted --></p>
+<h3 id="r">R</h3>
+<p>Code <a href="https://github.com/ropensci/taxize_">here</a></p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-r" data-lang="r"><span style="display:flex;"><span><span style="color:#a6e22e">install.packages</span>(<span style="color:#e6db74">&#34;taxize&#34;</span>)
+</span></span><span style="display:flex;"><span><span style="color:#a6e22e">library</span>(taxize)
+</span></span></code></pre></div><p>Then search for a taxonomic name</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-r" data-lang="r"><span style="display:flex;"><span>out <span style="color:#f92672">&lt;-</span> <span style="color:#a6e22e">gni_search</span>(<span style="color:#e6db74">&#39;Helianthus annuus&#39;</span>)
+</span></span><span style="display:flex;"><span>out[1,]
+</span></span></code></pre></div><div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-r" data-lang="r"><span style="display:flex;"><span>               name      id
+</span></span><span style="display:flex;"><span><span style="color:#ae81ff">1</span> Helianthus annuus <span style="color:#ae81ff">3329657</span>
+</span></span><span style="display:flex;"><span>                                                                 lsid
+</span></span><span style="display:flex;"><span><span style="color:#ae81ff">1</span> urn<span style="color:#f92672">:</span>lsid<span style="color:#f92672">:</span>globalnames.org<span style="color:#f92672">:</span>index<span style="color:#f92672">:</span><span style="color:#ae81ff">18</span>f9c244<span style="color:#f92672">-</span>a450<span style="color:#ae81ff">-535</span>e<span style="color:#f92672">-</span>adcd<span style="color:#ae81ff">-2</span>bfaf85c9b2e
+</span></span><span style="display:flex;"><span>                              uuid_hex resource_url
+</span></span><span style="display:flex;"><span><span style="color:#ae81ff">1</span> <span style="color:#ae81ff">18</span>f9c244<span style="color:#f92672">-</span>a450<span style="color:#ae81ff">-535</span>e<span style="color:#f92672">-</span>adcd<span style="color:#ae81ff">-2</span>bfaf85c9b2e         none
+</span></span></code></pre></div><p><!-- raw HTML omitted --><!-- raw HTML omitted --></p>
+<h3 id="ruby">Ruby</h3>
+<p>Code <a href="https://github.com/sckott/tacksize">here</a></p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-bash" data-lang="bash"><span style="display:flex;"><span>git clone https://github.com/sckott/tacksize.git
+</span></span><span style="display:flex;"><span>cd tacksize
+</span></span><span style="display:flex;"><span>gem build tacksize.gemspec
+</span></span><span style="display:flex;"><span>gem install ./tacksize-0.0.1.gem
+</span></span></code></pre></div><p>In a Ruby repl, like <code>irb</code>, search for a taxonomic name</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-ruby" data-lang="ruby"><span style="display:flex;"><span>require <span style="color:#e6db74">&#39;tacksize&#39;</span>
+</span></span><span style="display:flex;"><span>out <span style="color:#f92672">=</span> <span style="color:#66d9ef">Tacksize</span><span style="color:#f92672">.</span>gniSearch(<span style="color:#e6db74">:search_term</span> <span style="color:#f92672">=&gt;</span> <span style="color:#e6db74">&#39;Helianthus annuus&#39;</span>)
+</span></span><span style="display:flex;"><span>out<span style="color:#f92672">[</span><span style="color:#ae81ff">0</span><span style="color:#f92672">]</span>
+</span></span></code></pre></div><div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-ruby" data-lang="ruby"><span style="display:flex;"><span><span style="color:#f92672">=&gt;</span> {<span style="color:#e6db74">&#34;uuid_hex&#34;</span><span style="color:#f92672">=&gt;</span><span style="color:#e6db74">&#34;18f9c244-a450-535e-adcd-2bfaf85c9b2e&#34;</span>, <span style="color:#e6db74">&#34;name&#34;</span><span style="color:#f92672">=&gt;</span><span style="color:#e6db74">&#34;Helianthus annuus&#34;</span>, <span style="color:#e6db74">&#34;lsid&#34;</span><span style="color:#f92672">=&gt;</span><span style="color:#e6db74">&#34;urn:lsid:globalnames.org:index:18f9c244-a450-535e-adcd-2bfaf85c9b2e&#34;</span>, <span style="color:#e6db74">&#34;resource_uri&#34;</span><span style="color:#f92672">=&gt;</span><span style="color:#e6db74">&#34;http://gni.globalnames.org/name_strings/3329657.xml&#34;</span>, <span style="color:#e6db74">&#34;id&#34;</span><span style="color:#f92672">=&gt;</span><span style="color:#ae81ff">3329657</span>}
+</span></span></code></pre></div><p><!-- raw HTML omitted --><!-- raw HTML omitted --></p>
+<h3 id="python">Python</h3>
+<p>Code <a href="https://github.com/sckott/pytaxize">here</a></p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-bash" data-lang="bash"><span style="display:flex;"><span>git clone https://github.com/sckott/pytaxize.git
+</span></span><span style="display:flex;"><span>cd pytaxize
+</span></span><span style="display:flex;"><span>python setup.py install
+</span></span></code></pre></div><p>In a Python repl, like <code>ipython</code>, search for a taxonomic name</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-python3" data-lang="python3"><span style="display:flex;"><span><span style="color:#f92672">import</span> pytaxize
+</span></span><span style="display:flex;"><span>out <span style="color:#f92672">=</span> pytaxize<span style="color:#f92672">.</span>gniSearch(name <span style="color:#f92672">=</span> <span style="color:#e6db74">&#39;Helianthus annuus&#39;</span>)
+</span></span><span style="display:flex;"><span>out[<span style="color:#e6db74">&#39;name_strings&#39;</span>][<span style="color:#ae81ff">0</span>]
+</span></span></code></pre></div><div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-python3" data-lang="python3"><span style="display:flex;"><span>{<span style="color:#e6db74">u</span><span style="color:#e6db74">&#39;id&#39;</span>: <span style="color:#ae81ff">3329657</span>,
+</span></span><span style="display:flex;"><span> <span style="color:#e6db74">u</span><span style="color:#e6db74">&#39;lsid&#39;</span>: <span style="color:#e6db74">u</span><span style="color:#e6db74">&#39;urn:lsid:globalnames.org:index:18f9c244-a450-535e-adcd-2bfaf85c9b2e&#39;</span>,
+</span></span><span style="display:flex;"><span> <span style="color:#e6db74">u</span><span style="color:#e6db74">&#39;name&#39;</span>: <span style="color:#e6db74">u</span><span style="color:#e6db74">&#39;Helianthus annuus&#39;</span>,
+</span></span><span style="display:flex;"><span> <span style="color:#e6db74">u</span><span style="color:#e6db74">&#39;resource_uri&#39;</span>: <span style="color:#e6db74">u</span><span style="color:#e6db74">&#39;http://gni.globalnames.org/name_strings/3329657.xml&#39;</span>,
+</span></span><span style="display:flex;"><span> <span style="color:#e6db74">u</span><span style="color:#e6db74">&#39;uuid_hex&#39;</span>: <span style="color:#e6db74">u</span><span style="color:#e6db74">&#39;18f9c244-a450-535e-adcd-2bfaf85c9b2e&#39;</span>}
+</span></span></code></pre></div>]]></content:encoded>
     </item>
   </channel>
 </rss>

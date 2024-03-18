@@ -16,6 +16,162 @@
       <description>I wrote the other day about overcoming an issue with Shiny.
 Another issue I ran into concurrently was about file inputs. The issue was that file inputs (i.e., shiny::fileInput) was difficult to clear. That is, after a user uploads a file, it was easy to get some of the various parts cleared/cleaned up, but not others:
 (Not Easy) The UI components of fileInput (the text of the file name, the loading display) (Not Easy) The data behind the fileInput handler (Easy) Displaying some feedback in the UI after handling file input Load libraries</description>
+      <content:encoded><![CDATA[<p>I <a href="/2024/03/shiny-events/">wrote the other day</a> about overcoming an issue with <a href="https://shiny.posit.co/">Shiny</a>.</p>
+<p>Another issue I ran into concurrently was about file inputs. The issue was that file inputs (i.e., <code>shiny::fileInput</code>) was difficult to clear. That is, after a user uploads a file, it was easy to get some of the various parts cleared/cleaned up, but not others:</p>
+<ul>
+<li>(Not Easy) The UI components of <code>fileInput</code> (the text of the file name, the loading display)</li>
+<li>(Not Easy) The data behind the <code>fileInput</code> handler</li>
+<li>(Easy) Displaying some feedback in the UI after handling file input</li>
+</ul>
+<p>Load libraries</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-r" data-lang="r"><span style="display:flex;"><span><span style="color:#a6e22e">library</span>(shiny)
+</span></span><span style="display:flex;"><span><span style="color:#a6e22e">library</span>(shinyjs)
+</span></span><span style="display:flex;"><span><span style="color:#a6e22e">library</span>(bslib)
+</span></span><span style="display:flex;"><span><span style="color:#a6e22e">library</span>(DT)
+</span></span><span style="display:flex;"><span><span style="color:#a6e22e">library</span>(vroom)
+</span></span></code></pre></div><p>A helper function to handle reactive inputs</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-r" data-lang="r"><span style="display:flex;"><span>reactiveInput <span style="color:#f92672">&lt;-</span> <span style="color:#66d9ef">function</span>(rval, path) {
+</span></span><span style="display:flex;"><span>  <span style="color:#66d9ef">if</span> (<span style="color:#a6e22e">is.null</span>(rval)) {
+</span></span><span style="display:flex;"><span>    <span style="color:#66d9ef">return</span>(<span style="color:#66d9ef">NULL</span>)
+</span></span><span style="display:flex;"><span>  } <span style="color:#66d9ef">else</span> <span style="color:#66d9ef">if</span> (rval <span style="color:#f92672">==</span> <span style="color:#e6db74">&#39;loaded&#39;</span>) {
+</span></span><span style="display:flex;"><span>    <span style="color:#66d9ef">return</span>(path)
+</span></span><span style="display:flex;"><span>  } <span style="color:#66d9ef">else</span> <span style="color:#66d9ef">if</span> (rval <span style="color:#f92672">==</span> <span style="color:#e6db74">&#39;reset&#39;</span>) {
+</span></span><span style="display:flex;"><span>    <span style="color:#66d9ef">return</span>(<span style="color:#66d9ef">NULL</span>)
+</span></span><span style="display:flex;"><span>  }
+</span></span><span style="display:flex;"><span>}
+</span></span></code></pre></div><p>A <code>bslib</code> ui component</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-r" data-lang="r"><span style="display:flex;"><span>ui <span style="color:#f92672">&lt;-</span> <span style="color:#a6e22e">page_sidebar</span>(
+</span></span><span style="display:flex;"><span>  title <span style="color:#f92672">=</span> <span style="color:#e6db74">&#34;My dashboard&#34;</span>,
+</span></span><span style="display:flex;"><span>  sidebar <span style="color:#f92672">=</span> <span style="color:#a6e22e">list</span>(
+</span></span><span style="display:flex;"><span>    <span style="color:#a6e22e">actionButton</span>(<span style="color:#e6db74">&#34;submit&#34;</span>, <span style="color:#e6db74">&#34;Submit&#34;</span>),
+</span></span><span style="display:flex;"><span>    <span style="color:#a6e22e">actionButton</span>(<span style="color:#e6db74">&#34;reset&#34;</span>, <span style="color:#e6db74">&#34;Reset&#34;</span>)
+</span></span><span style="display:flex;"><span>  ),
+</span></span><span style="display:flex;"><span>  <span style="color:#a6e22e">fileInput</span>(inputId <span style="color:#f92672">=</span> <span style="color:#e6db74">&#34;afile&#34;</span>, <span style="color:#e6db74">&#34;Upload file&#34;</span>, accept <span style="color:#f92672">=</span> <span style="color:#e6db74">&#34;.csv&#34;</span>),
+</span></span><span style="display:flex;"><span>  DT<span style="color:#f92672">::</span><span style="color:#a6e22e">DTOutput</span>(<span style="color:#e6db74">&#34;result&#34;</span>),
+</span></span><span style="display:flex;"><span>  shinyjs<span style="color:#f92672">::</span><span style="color:#a6e22e">useShinyjs</span>()
+</span></span><span style="display:flex;"><span>)
+</span></span></code></pre></div><p>Here&rsquo;s the server part that was giving me trouble.</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-r" data-lang="r"><span style="display:flex;"><span>server <span style="color:#f92672">&lt;-</span> <span style="color:#66d9ef">function</span>(input, output) {
+</span></span><span style="display:flex;"><span>  <span style="color:#a6e22e">observeEvent</span>(input<span style="color:#f92672">$</span>submit, {
+</span></span><span style="display:flex;"><span>    output<span style="color:#f92672">$</span>result <span style="color:#f92672">&lt;-</span> DT<span style="color:#f92672">::</span><span style="color:#a6e22e">renderDataTable</span>({
+</span></span><span style="display:flex;"><span>      dat <span style="color:#f92672">&lt;-</span> vroom<span style="color:#f92672">::</span><span style="color:#a6e22e">vroom</span>(
+</span></span><span style="display:flex;"><span>        <span style="color:#a6e22e">isolate</span>(input<span style="color:#f92672">$</span>afile<span style="color:#f92672">$</span>datapath)
+</span></span><span style="display:flex;"><span>      )
+</span></span><span style="display:flex;"><span>      DT<span style="color:#f92672">::</span><span style="color:#a6e22e">datatable</span>(dat)
+</span></span><span style="display:flex;"><span>    })
+</span></span><span style="display:flex;"><span>  })
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>  <span style="color:#a6e22e">observeEvent</span>(input<span style="color:#f92672">$</span>reset, {
+</span></span><span style="display:flex;"><span>    shinyjs<span style="color:#f92672">::</span><span style="color:#a6e22e">reset</span>(<span style="color:#e6db74">&#34;afile&#34;</span>)
+</span></span><span style="display:flex;"><span>    output<span style="color:#f92672">$</span>result <span style="color:#f92672">&lt;-</span> <span style="color:#a6e22e">renderText</span>({})
+</span></span><span style="display:flex;"><span>  })
+</span></span><span style="display:flex;"><span>}
+</span></span></code></pre></div><p>With <code>shinyjs::reset</code> we can reset the UI components of the file input handler, and with <code>renderText</code> with an empty input we can reset the UI feedback. However, the data backing the file input handler is not reset. This led to problems in the UI where you could keep pressing submit after clicking the Reset button because the data for the last uploaded file was still there, whereas the user should get an error that they need to upload a file before clicking Submit.</p>
+<p>To be able to completey reset data behind the file input handler I found out about a solution using reactive values via stackoverflow. Basically, the change involves handling file input data through a reactive value and keeping track of the state of the file input loader.</p>
+<p>Here&rsquo;s the entire app that doesn&rsquo;t work</p>
+<details>
+  <summary>Click to expand</summary>
+  <div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-r" data-lang="r"><span style="display:flex;"><span><span style="color:#a6e22e">library</span>(shiny)
+</span></span><span style="display:flex;"><span><span style="color:#a6e22e">library</span>(shinyjs)
+</span></span><span style="display:flex;"><span><span style="color:#a6e22e">library</span>(bslib)
+</span></span><span style="display:flex;"><span><span style="color:#a6e22e">library</span>(DT)
+</span></span><span style="display:flex;"><span><span style="color:#a6e22e">library</span>(vroom)
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>ui <span style="color:#f92672">&lt;-</span> <span style="color:#a6e22e">page_sidebar</span>(
+</span></span><span style="display:flex;"><span>  title <span style="color:#f92672">=</span> <span style="color:#e6db74">&#34;My dashboard&#34;</span>,
+</span></span><span style="display:flex;"><span>  sidebar <span style="color:#f92672">=</span> <span style="color:#a6e22e">list</span>(
+</span></span><span style="display:flex;"><span>    <span style="color:#a6e22e">actionButton</span>(<span style="color:#e6db74">&#34;submit&#34;</span>, <span style="color:#e6db74">&#34;Submit&#34;</span>),
+</span></span><span style="display:flex;"><span>    <span style="color:#a6e22e">actionButton</span>(<span style="color:#e6db74">&#34;reset&#34;</span>, <span style="color:#e6db74">&#34;Reset&#34;</span>)
+</span></span><span style="display:flex;"><span>  ),
+</span></span><span style="display:flex;"><span>  <span style="color:#a6e22e">fileInput</span>(inputId <span style="color:#f92672">=</span> <span style="color:#e6db74">&#34;afile&#34;</span>, <span style="color:#e6db74">&#34;Upload file&#34;</span>, accept <span style="color:#f92672">=</span> <span style="color:#e6db74">&#34;.csv&#34;</span>),
+</span></span><span style="display:flex;"><span>  DT<span style="color:#f92672">::</span><span style="color:#a6e22e">DTOutput</span>(<span style="color:#e6db74">&#34;result&#34;</span>),
+</span></span><span style="display:flex;"><span>  shinyjs<span style="color:#f92672">::</span><span style="color:#a6e22e">useShinyjs</span>()
+</span></span><span style="display:flex;"><span>)
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>server <span style="color:#f92672">&lt;-</span> <span style="color:#66d9ef">function</span>(input, output) {
+</span></span><span style="display:flex;"><span>  <span style="color:#a6e22e">observeEvent</span>(input<span style="color:#f92672">$</span>submit, {
+</span></span><span style="display:flex;"><span>    output<span style="color:#f92672">$</span>result <span style="color:#f92672">&lt;-</span> DT<span style="color:#f92672">::</span><span style="color:#a6e22e">renderDataTable</span>({
+</span></span><span style="display:flex;"><span>      dat <span style="color:#f92672">&lt;-</span> vroom<span style="color:#f92672">::</span><span style="color:#a6e22e">vroom</span>(
+</span></span><span style="display:flex;"><span>        <span style="color:#a6e22e">isolate</span>(input<span style="color:#f92672">$</span>afile<span style="color:#f92672">$</span>datapath)
+</span></span><span style="display:flex;"><span>      )
+</span></span><span style="display:flex;"><span>      DT<span style="color:#f92672">::</span><span style="color:#a6e22e">datatable</span>(dat)
+</span></span><span style="display:flex;"><span>    })
+</span></span><span style="display:flex;"><span>  })
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>  <span style="color:#a6e22e">observeEvent</span>(input<span style="color:#f92672">$</span>reset, {
+</span></span><span style="display:flex;"><span>    shinyjs<span style="color:#f92672">::</span><span style="color:#a6e22e">reset</span>(<span style="color:#e6db74">&#34;afile&#34;</span>)
+</span></span><span style="display:flex;"><span>    output<span style="color:#f92672">$</span>result <span style="color:#f92672">&lt;-</span> <span style="color:#a6e22e">renderText</span>({})
+</span></span><span style="display:flex;"><span>  })
+</span></span><span style="display:flex;"><span>}
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span><span style="color:#a6e22e">shinyApp</span>(ui, server)
+</span></span></code></pre></div>
+</details>
+
+<br />
+
+<p>And here&rsquo;s the entire app that does work</p>
+<details>
+  <summary>Click to expand</summary>
+  <div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-r" data-lang="r"><span style="display:flex;"><span><span style="color:#a6e22e">library</span>(shiny)
+</span></span><span style="display:flex;"><span><span style="color:#a6e22e">library</span>(shinyjs)
+</span></span><span style="display:flex;"><span><span style="color:#a6e22e">library</span>(bslib)
+</span></span><span style="display:flex;"><span><span style="color:#a6e22e">library</span>(DT)
+</span></span><span style="display:flex;"><span><span style="color:#a6e22e">library</span>(vroom)
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>reactiveInput <span style="color:#f92672">&lt;-</span> <span style="color:#66d9ef">function</span>(rval, path) {
+</span></span><span style="display:flex;"><span>  <span style="color:#66d9ef">if</span> (<span style="color:#a6e22e">is.null</span>(rval)) {
+</span></span><span style="display:flex;"><span>    <span style="color:#66d9ef">return</span>(<span style="color:#66d9ef">NULL</span>)
+</span></span><span style="display:flex;"><span>  } <span style="color:#66d9ef">else</span> <span style="color:#66d9ef">if</span> (rval <span style="color:#f92672">==</span> <span style="color:#e6db74">&#39;loaded&#39;</span>) {
+</span></span><span style="display:flex;"><span>    <span style="color:#66d9ef">return</span>(path)
+</span></span><span style="display:flex;"><span>  } <span style="color:#66d9ef">else</span> <span style="color:#66d9ef">if</span> (rval <span style="color:#f92672">==</span> <span style="color:#e6db74">&#39;reset&#39;</span>) {
+</span></span><span style="display:flex;"><span>    <span style="color:#66d9ef">return</span>(<span style="color:#66d9ef">NULL</span>)
+</span></span><span style="display:flex;"><span>  }
+</span></span><span style="display:flex;"><span>}
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>ui <span style="color:#f92672">&lt;-</span> <span style="color:#a6e22e">page_sidebar</span>(
+</span></span><span style="display:flex;"><span>  title <span style="color:#f92672">=</span> <span style="color:#e6db74">&#34;My dashboard&#34;</span>,
+</span></span><span style="display:flex;"><span>  sidebar <span style="color:#f92672">=</span> <span style="color:#a6e22e">list</span>(
+</span></span><span style="display:flex;"><span>    <span style="color:#a6e22e">actionButton</span>(<span style="color:#e6db74">&#34;submit&#34;</span>, <span style="color:#e6db74">&#34;Submit&#34;</span>),
+</span></span><span style="display:flex;"><span>    <span style="color:#a6e22e">actionButton</span>(<span style="color:#e6db74">&#34;reset&#34;</span>, <span style="color:#e6db74">&#34;Reset&#34;</span>)
+</span></span><span style="display:flex;"><span>  ),
+</span></span><span style="display:flex;"><span>  <span style="color:#a6e22e">fileInput</span>(inputId <span style="color:#f92672">=</span> <span style="color:#e6db74">&#34;afile&#34;</span>, <span style="color:#e6db74">&#34;Upload file&#34;</span>, accept <span style="color:#f92672">=</span> <span style="color:#e6db74">&#34;.csv&#34;</span>),
+</span></span><span style="display:flex;"><span>  DT<span style="color:#f92672">::</span><span style="color:#a6e22e">DTOutput</span>(<span style="color:#e6db74">&#34;result&#34;</span>),
+</span></span><span style="display:flex;"><span>  shinyjs<span style="color:#f92672">::</span><span style="color:#a6e22e">useShinyjs</span>()
+</span></span><span style="display:flex;"><span>)
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>server <span style="color:#f92672">&lt;-</span> <span style="color:#66d9ef">function</span>(input, output) {
+</span></span><span style="display:flex;"><span>  rv_file <span style="color:#f92672">&lt;-</span> <span style="color:#a6e22e">reactiveValues</span>(file_state <span style="color:#f92672">=</span> <span style="color:#66d9ef">NULL</span>)
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>  thefile <span style="color:#f92672">&lt;-</span> <span style="color:#a6e22e">reactive</span>({
+</span></span><span style="display:flex;"><span>    <span style="color:#a6e22e">reactiveInput</span>(rv_file<span style="color:#f92672">$</span>file_state, input<span style="color:#f92672">$</span>afile<span style="color:#f92672">$</span>datapath)
+</span></span><span style="display:flex;"><span>  })
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>  <span style="color:#a6e22e">observeEvent</span>(input<span style="color:#f92672">$</span>afile, {
+</span></span><span style="display:flex;"><span>    rv_file<span style="color:#f92672">$</span>file_state <span style="color:#f92672">&lt;-</span> <span style="color:#e6db74">&#39;loaded&#39;</span>
+</span></span><span style="display:flex;"><span>  })
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>  <span style="color:#a6e22e">observeEvent</span>(input<span style="color:#f92672">$</span>submit, {
+</span></span><span style="display:flex;"><span>    output<span style="color:#f92672">$</span>result <span style="color:#f92672">&lt;-</span> DT<span style="color:#f92672">::</span><span style="color:#a6e22e">renderDataTable</span>({
+</span></span><span style="display:flex;"><span>      dat <span style="color:#f92672">&lt;-</span> vroom<span style="color:#f92672">::</span><span style="color:#a6e22e">vroom</span>(
+</span></span><span style="display:flex;"><span>        <span style="color:#a6e22e">isolate</span>(<span style="color:#a6e22e">thefile</span>())
+</span></span><span style="display:flex;"><span>      )
+</span></span><span style="display:flex;"><span>      DT<span style="color:#f92672">::</span><span style="color:#a6e22e">datatable</span>(dat)
+</span></span><span style="display:flex;"><span>    })
+</span></span><span style="display:flex;"><span>  })
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>  <span style="color:#a6e22e">observeEvent</span>(input<span style="color:#f92672">$</span>reset, {
+</span></span><span style="display:flex;"><span>    shinyjs<span style="color:#f92672">::</span><span style="color:#a6e22e">reset</span>(<span style="color:#e6db74">&#34;afile&#34;</span>)
+</span></span><span style="display:flex;"><span>    rv_file<span style="color:#f92672">$</span>file_state <span style="color:#f92672">&lt;-</span> <span style="color:#e6db74">&#39;reset&#39;</span>
+</span></span><span style="display:flex;"><span>    output<span style="color:#f92672">$</span>result <span style="color:#f92672">&lt;-</span> <span style="color:#a6e22e">renderText</span>({})
+</span></span><span style="display:flex;"><span>  })
+</span></span><span style="display:flex;"><span>}
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span><span style="color:#a6e22e">shinyApp</span>(ui, server)
+</span></span></code></pre></div>
+</details>
+
+]]></content:encoded>
     </item>
     <item>
       <title>Shiny button weirdness</title>
@@ -27,6 +183,137 @@ Load libraries
 library(shiny) library(bslib) library(crul) Helper function, returned a random UUID from an httpbin server
 httpbin_uuid &amp;lt;- function(...) { con &amp;lt;- crul::HttpClient$new(&amp;#34;https://hb.opencpu.org&amp;#34;) res &amp;lt;- con$get(&amp;#34;uuid&amp;#34;) jsonlite::fromJSON(res$parse(&amp;#34;UTF-8&amp;#34;))$uuid } A bslib ui component
 ui &amp;lt;- page_sidebar( title = &amp;#34;My dashboard&amp;#34;, sidebar = list( actionButton(&amp;#34;submit&amp;#34;, &amp;#34;Submit&amp;#34;), actionButton(&amp;#34;reset&amp;#34;, &amp;#34;Reset&amp;#34;) ), textInput(inputId = &amp;#34;name&amp;#34;, &amp;#34;Your name&amp;#34;), textOutput(&amp;#34;uuid&amp;#34;) ) Here&amp;rsquo;s the server part that was giving me trouble.</description>
+      <content:encoded><![CDATA[<p>I&rsquo;ve been working on <a href="https://shiny.posit.co/">Shiny</a> app at work for the past few months. One of the many frustrating things about Shiny lately has been around buttons. Well, it wasn&rsquo;t really about buttons, but that&rsquo;s where it started.</p>
+<p>Load libraries</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-r" data-lang="r"><span style="display:flex;"><span><span style="color:#a6e22e">library</span>(shiny)
+</span></span><span style="display:flex;"><span><span style="color:#a6e22e">library</span>(bslib)
+</span></span><span style="display:flex;"><span><span style="color:#a6e22e">library</span>(crul)
+</span></span></code></pre></div><p>Helper function, returned a random UUID from an httpbin server</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-r" data-lang="r"><span style="display:flex;"><span>httpbin_uuid <span style="color:#f92672">&lt;-</span> <span style="color:#66d9ef">function</span>(<span style="color:#66d9ef">...</span>) {
+</span></span><span style="display:flex;"><span>  con <span style="color:#f92672">&lt;-</span> crul<span style="color:#f92672">::</span>HttpClient<span style="color:#f92672">$</span><span style="color:#a6e22e">new</span>(<span style="color:#e6db74">&#34;https://hb.opencpu.org&#34;</span>)
+</span></span><span style="display:flex;"><span>  res <span style="color:#f92672">&lt;-</span> con<span style="color:#f92672">$</span><span style="color:#a6e22e">get</span>(<span style="color:#e6db74">&#34;uuid&#34;</span>)
+</span></span><span style="display:flex;"><span>  jsonlite<span style="color:#f92672">::</span><span style="color:#a6e22e">fromJSON</span>(res<span style="color:#f92672">$</span><span style="color:#a6e22e">parse</span>(<span style="color:#e6db74">&#34;UTF-8&#34;</span>))<span style="color:#f92672">$</span>uuid
+</span></span><span style="display:flex;"><span>}
+</span></span></code></pre></div><p>A bslib ui component</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-r" data-lang="r"><span style="display:flex;"><span>ui <span style="color:#f92672">&lt;-</span> <span style="color:#a6e22e">page_sidebar</span>(
+</span></span><span style="display:flex;"><span>  title <span style="color:#f92672">=</span> <span style="color:#e6db74">&#34;My dashboard&#34;</span>,
+</span></span><span style="display:flex;"><span>  sidebar <span style="color:#f92672">=</span> <span style="color:#a6e22e">list</span>(
+</span></span><span style="display:flex;"><span>    <span style="color:#a6e22e">actionButton</span>(<span style="color:#e6db74">&#34;submit&#34;</span>, <span style="color:#e6db74">&#34;Submit&#34;</span>),
+</span></span><span style="display:flex;"><span>    <span style="color:#a6e22e">actionButton</span>(<span style="color:#e6db74">&#34;reset&#34;</span>, <span style="color:#e6db74">&#34;Reset&#34;</span>)
+</span></span><span style="display:flex;"><span>  ),
+</span></span><span style="display:flex;"><span>  <span style="color:#a6e22e">textInput</span>(inputId <span style="color:#f92672">=</span> <span style="color:#e6db74">&#34;name&#34;</span>, <span style="color:#e6db74">&#34;Your name&#34;</span>),
+</span></span><span style="display:flex;"><span>  <span style="color:#a6e22e">textOutput</span>(<span style="color:#e6db74">&#34;uuid&#34;</span>)
+</span></span><span style="display:flex;"><span>)
+</span></span></code></pre></div><p>Here&rsquo;s the server part that was giving me trouble. As I said this was an inherited repo, and the server side handling for many buttons was done with <code>eventReactive</code> as below. Using <code>eventReactive</code> meant that button clicks only sometimes triggered the server side code.</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-r" data-lang="r"><span style="display:flex;"><span>server <span style="color:#f92672">&lt;-</span> <span style="color:#66d9ef">function</span>(input, output, session) {
+</span></span><span style="display:flex;"><span>  tmp <span style="color:#f92672">&lt;-</span> <span style="color:#a6e22e">eventReactive</span>(input<span style="color:#f92672">$</span>submit, {
+</span></span><span style="display:flex;"><span>    <span style="color:#a6e22e">httpbin_uuid</span>(input<span style="color:#f92672">$</span>name)
+</span></span><span style="display:flex;"><span>  })
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>  output<span style="color:#f92672">$</span>uuid <span style="color:#f92672">&lt;-</span> <span style="color:#a6e22e">renderText</span>({ <span style="color:#a6e22e">tmp</span>() })
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>  <span style="color:#a6e22e">observeEvent</span>(input<span style="color:#f92672">$</span>reset, {
+</span></span><span style="display:flex;"><span>    <span style="color:#a6e22e">updateTextInput</span>(session, <span style="color:#e6db74">&#34;name&#34;</span>, <span style="color:#e6db74">&#34;Your name&#34;</span>, <span style="color:#e6db74">&#34;&#34;</span>)
+</span></span><span style="display:flex;"><span>    output<span style="color:#f92672">$</span>uuid <span style="color:#f92672">&lt;-</span> <span style="color:#a6e22e">renderText</span>({})
+</span></span><span style="display:flex;"><span>  })
+</span></span><span style="display:flex;"><span>}
+</span></span></code></pre></div><p>Eventually I landed upon switching from <code>eventReactive</code> to <code>observeEvent</code> for a variety of reasons. And tried something like this:</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-r" data-lang="r"><span style="display:flex;"><span>  <span style="color:#a6e22e">observeEvent</span>(input<span style="color:#f92672">$</span>submit, {
+</span></span><span style="display:flex;"><span>    output<span style="color:#f92672">$</span>uuid <span style="color:#f92672">&lt;-</span> <span style="color:#a6e22e">renderText</span>({
+</span></span><span style="display:flex;"><span>      <span style="color:#a6e22e">httpbin_uuid</span>(input<span style="color:#f92672">$</span>name)
+</span></span><span style="display:flex;"><span>    })
+</span></span><span style="display:flex;"><span>  })
+</span></span></code></pre></div><p>However, keen eyes will notice that this still doesn&rsquo;t work. The final missing piece was the function <code>isolate</code>. Without <code>isolate</code> the <code>observeEvent</code> handler was being triggered on changes other than just a button click.</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-r" data-lang="r"><span style="display:flex;"><span>  <span style="color:#a6e22e">observeEvent</span>(input<span style="color:#f92672">$</span>submit, {
+</span></span><span style="display:flex;"><span>    output<span style="color:#f92672">$</span>uuid <span style="color:#f92672">&lt;-</span> <span style="color:#a6e22e">renderText</span>({
+</span></span><span style="display:flex;"><span>      <span style="color:#a6e22e">isolate</span>(
+</span></span><span style="display:flex;"><span>      	<span style="color:#a6e22e">httpbin_uuid</span>(input<span style="color:#f92672">$</span>name)
+</span></span><span style="display:flex;"><span>      )
+</span></span><span style="display:flex;"><span>    })
+</span></span><span style="display:flex;"><span>  })
+</span></span></code></pre></div><p>Here&rsquo;s the entire app with <code>eventReactive</code> that didn&rsquo;t work:</p>
+<details>
+  <summary>Click to expand</summary>
+  <div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-r" data-lang="r"><span style="display:flex;"><span><span style="color:#a6e22e">library</span>(shiny)
+</span></span><span style="display:flex;"><span><span style="color:#a6e22e">library</span>(bslib)
+</span></span><span style="display:flex;"><span><span style="color:#a6e22e">library</span>(crul)
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>httpbin_uuid <span style="color:#f92672">&lt;-</span> <span style="color:#66d9ef">function</span>(<span style="color:#66d9ef">...</span>) {
+</span></span><span style="display:flex;"><span>  con <span style="color:#f92672">&lt;-</span> crul<span style="color:#f92672">::</span>HttpClient<span style="color:#f92672">$</span><span style="color:#a6e22e">new</span>(<span style="color:#e6db74">&#34;https://hb.opencpu.org&#34;</span>)
+</span></span><span style="display:flex;"><span>  res <span style="color:#f92672">&lt;-</span> con<span style="color:#f92672">$</span><span style="color:#a6e22e">get</span>(<span style="color:#e6db74">&#34;uuid&#34;</span>)
+</span></span><span style="display:flex;"><span>  jsonlite<span style="color:#f92672">::</span><span style="color:#a6e22e">fromJSON</span>(res<span style="color:#f92672">$</span><span style="color:#a6e22e">parse</span>(<span style="color:#e6db74">&#34;UTF-8&#34;</span>))<span style="color:#f92672">$</span>uuid
+</span></span><span style="display:flex;"><span>}
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>ui <span style="color:#f92672">&lt;-</span> <span style="color:#a6e22e">page_sidebar</span>(
+</span></span><span style="display:flex;"><span>  title <span style="color:#f92672">=</span> <span style="color:#e6db74">&#34;My dashboard&#34;</span>,
+</span></span><span style="display:flex;"><span>  sidebar <span style="color:#f92672">=</span> <span style="color:#a6e22e">list</span>(
+</span></span><span style="display:flex;"><span>    <span style="color:#a6e22e">actionButton</span>(<span style="color:#e6db74">&#34;submit&#34;</span>, <span style="color:#e6db74">&#34;Submit&#34;</span>),
+</span></span><span style="display:flex;"><span>    <span style="color:#a6e22e">actionButton</span>(<span style="color:#e6db74">&#34;reset&#34;</span>, <span style="color:#e6db74">&#34;Reset&#34;</span>)
+</span></span><span style="display:flex;"><span>  ),
+</span></span><span style="display:flex;"><span>  <span style="color:#a6e22e">textInput</span>(inputId <span style="color:#f92672">=</span> <span style="color:#e6db74">&#34;name&#34;</span>, <span style="color:#e6db74">&#34;Your name&#34;</span>),
+</span></span><span style="display:flex;"><span>  <span style="color:#a6e22e">textOutput</span>(<span style="color:#e6db74">&#34;uuid&#34;</span>)
+</span></span><span style="display:flex;"><span>)
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>server <span style="color:#f92672">&lt;-</span> <span style="color:#66d9ef">function</span>(input, output, session) {
+</span></span><span style="display:flex;"><span>  tmp <span style="color:#f92672">&lt;-</span> <span style="color:#a6e22e">eventReactive</span>(input<span style="color:#f92672">$</span>submit, {
+</span></span><span style="display:flex;"><span>    <span style="color:#a6e22e">httpbin_uuid</span>(input<span style="color:#f92672">$</span>name)
+</span></span><span style="display:flex;"><span>  })
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>  output<span style="color:#f92672">$</span>uuid <span style="color:#f92672">&lt;-</span> <span style="color:#a6e22e">renderText</span>({ <span style="color:#a6e22e">tmp</span>() })
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>  <span style="color:#a6e22e">observeEvent</span>(input<span style="color:#f92672">$</span>reset, {
+</span></span><span style="display:flex;"><span>    <span style="color:#a6e22e">updateTextInput</span>(session, <span style="color:#e6db74">&#34;name&#34;</span>, <span style="color:#e6db74">&#34;Your name&#34;</span>, <span style="color:#e6db74">&#34;&#34;</span>)
+</span></span><span style="display:flex;"><span>    output<span style="color:#f92672">$</span>uuid <span style="color:#f92672">&lt;-</span> <span style="color:#a6e22e">renderText</span>({})
+</span></span><span style="display:flex;"><span>  })
+</span></span><span style="display:flex;"><span>}
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span><span style="color:#a6e22e">shinyApp</span>(ui, server)
+</span></span></code></pre></div>
+</details>
+
+<br />
+
+<p>And here&rsquo;s the entire app with <code>obseveEvent</code> and <code>isolate</code> that worked:</p>
+<details>
+  <summary>Click to expand</summary>
+  <div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-r" data-lang="r"><span style="display:flex;"><span><span style="color:#a6e22e">library</span>(shiny)
+</span></span><span style="display:flex;"><span><span style="color:#a6e22e">library</span>(bslib)
+</span></span><span style="display:flex;"><span><span style="color:#a6e22e">library</span>(crul)
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>httpbin_uuid <span style="color:#f92672">&lt;-</span> <span style="color:#66d9ef">function</span>(<span style="color:#66d9ef">...</span>) {
+</span></span><span style="display:flex;"><span>  con <span style="color:#f92672">&lt;-</span> crul<span style="color:#f92672">::</span>HttpClient<span style="color:#f92672">$</span><span style="color:#a6e22e">new</span>(<span style="color:#e6db74">&#34;https://hb.opencpu.org&#34;</span>)
+</span></span><span style="display:flex;"><span>  res <span style="color:#f92672">&lt;-</span> con<span style="color:#f92672">$</span><span style="color:#a6e22e">get</span>(<span style="color:#e6db74">&#34;uuid&#34;</span>)
+</span></span><span style="display:flex;"><span>  jsonlite<span style="color:#f92672">::</span><span style="color:#a6e22e">fromJSON</span>(res<span style="color:#f92672">$</span><span style="color:#a6e22e">parse</span>(<span style="color:#e6db74">&#34;UTF-8&#34;</span>))<span style="color:#f92672">$</span>uuid
+</span></span><span style="display:flex;"><span>}
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>ui <span style="color:#f92672">&lt;-</span> <span style="color:#a6e22e">page_sidebar</span>(
+</span></span><span style="display:flex;"><span>  title <span style="color:#f92672">=</span> <span style="color:#e6db74">&#34;My dashboard&#34;</span>,
+</span></span><span style="display:flex;"><span>  sidebar <span style="color:#f92672">=</span> <span style="color:#a6e22e">list</span>(
+</span></span><span style="display:flex;"><span>    <span style="color:#a6e22e">actionButton</span>(<span style="color:#e6db74">&#34;submit&#34;</span>, <span style="color:#e6db74">&#34;Submit&#34;</span>),
+</span></span><span style="display:flex;"><span>    <span style="color:#a6e22e">actionButton</span>(<span style="color:#e6db74">&#34;reset&#34;</span>, <span style="color:#e6db74">&#34;Reset&#34;</span>)
+</span></span><span style="display:flex;"><span>  ),
+</span></span><span style="display:flex;"><span>  <span style="color:#a6e22e">textInput</span>(inputId <span style="color:#f92672">=</span> <span style="color:#e6db74">&#34;name&#34;</span>, <span style="color:#e6db74">&#34;Your name&#34;</span>),
+</span></span><span style="display:flex;"><span>  <span style="color:#a6e22e">textOutput</span>(<span style="color:#e6db74">&#34;uuid&#34;</span>)
+</span></span><span style="display:flex;"><span>)
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>server <span style="color:#f92672">&lt;-</span> <span style="color:#66d9ef">function</span>(input, output, session) {
+</span></span><span style="display:flex;"><span>  <span style="color:#a6e22e">observeEvent</span>(input<span style="color:#f92672">$</span>submit, {
+</span></span><span style="display:flex;"><span>    output<span style="color:#f92672">$</span>uuid <span style="color:#f92672">&lt;-</span> <span style="color:#a6e22e">renderText</span>({
+</span></span><span style="display:flex;"><span>      <span style="color:#a6e22e">isolate</span>(<span style="color:#a6e22e">httpbin_uuid</span>(input<span style="color:#f92672">$</span>name))
+</span></span><span style="display:flex;"><span>    })
+</span></span><span style="display:flex;"><span>  })
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>  <span style="color:#a6e22e">observeEvent</span>(input<span style="color:#f92672">$</span>reset, {
+</span></span><span style="display:flex;"><span>    <span style="color:#a6e22e">updateTextInput</span>(session, <span style="color:#e6db74">&#34;name&#34;</span>, <span style="color:#e6db74">&#34;Your name&#34;</span>, <span style="color:#e6db74">&#34;&#34;</span>)
+</span></span><span style="display:flex;"><span>    output<span style="color:#f92672">$</span>uuid <span style="color:#f92672">&lt;-</span> <span style="color:#a6e22e">renderText</span>({})
+</span></span><span style="display:flex;"><span>  })
+</span></span><span style="display:flex;"><span>}
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span><span style="color:#a6e22e">shinyApp</span>(ui, server)
+</span></span></code></pre></div>
+</details>
+
+]]></content:encoded>
     </item>
     <item>
       <title>Shiny apps are awesome</title>
@@ -35,6 +322,57 @@ ui &amp;lt;- page_sidebar( title = &amp;#34;My dashboard&amp;#34;, sidebar = lis
       <guid>http://localhost:1313/2012/12/shiny-r/</guid>
       <description>RStudio has a new product called Shiny that, quoting from their website, &amp;ldquo;makes it super simple for R users like you to turn analyses into interactive web applications that anyone can use&amp;rdquo;. See here for more information.
 A Shiny basically consists of two files: a ui.r file and a server.r file. The ui.r file, as it says, provides the user interface, and the server.r file provides the the server logic.</description>
+      <content:encoded><![CDATA[<p>RStudio has a new product called <code>Shiny</code> that, quoting from their website, &ldquo;makes it super simple for R users like you to turn analyses into interactive web applications that anyone can use&rdquo;. <a href="http://www.rstudio.com/shiny/">See here</a> for more information.</p>
+<p>A <code>Shiny</code> basically consists of two files: a <code>ui.r</code> file and a <code>server.r</code> file.  The <code>ui.r</code> file, as it says, provides the user interface, and the <code>server.r</code> file provides the the server logic.</p>
+<p>Below is what it looks like in the wild (on a browser).</p>
+<p><img loading="lazy" src="http://sckott.github.io/public/img/shiny_ss.png" alt="center"  />
+</p>
+<p>It was pretty easy (for <a href="http://emhart.github.com/">Ted Hart of rOpenSci</a>) to build this app to demonstrate output from the <a href="http://cran.r-project.org/web/packages/rgbif/index.html"><code>ropensci rgbif</code> package</a>.</p>
+<h3 id="you-may-need-to-install-packages-first">You may need to install packages first.</h3>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-r" data-lang="r"><span style="display:flex;"><span><span style="color:#a6e22e">install.packages</span>(<span style="color:#a6e22e">c</span>(<span style="color:#e6db74">&#34;shiny&#34;</span>, <span style="color:#e6db74">&#34;ggplot2&#34;</span>, <span style="color:#e6db74">&#34;plyr&#34;</span>, <span style="color:#e6db74">&#34;rgbif&#34;</span>))
+</span></span></code></pre></div><h3 id="we-tried-to-build-in-making-real-time-api-calls-to-gbifs-servers-but-the-calls-took-too-long-for-web-speed--so-we-prepare-the-data-first-and-then-serve-it-up-from-saved-data-in-a-rda-file-lets-first-prepare-the-data---well-this-is-what-we-do-on-the-app-itself-but-see-the-next-code-block-for">We tried to build in making real time API calls to GBIF&rsquo;s servers, but the calls took too long for web speed.  So we prepare the data first, and then serve it up from saved data in a <code>.rda</code> file. Let&rsquo;s first prepare the data. &ndash;Well, this is what we do on the app itself, but see the next code block for</h3>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-r" data-lang="r"><span style="display:flex;"><span><span style="color:#a6e22e">library</span>(rgbif)
+</span></span><span style="display:flex;"><span>splist <span style="color:#f92672">&lt;-</span> <span style="color:#a6e22e">c</span>(<span style="color:#e6db74">&#34;Accipiter erythronemius&#34;</span>, <span style="color:#e6db74">&#34;Junco hyemalis&#34;</span>, <span style="color:#e6db74">&#34;Aix sponsa&#34;</span>, <span style="color:#e6db74">&#34;Haliaeetus leucocephalus&#34;</span>, 
+</span></span><span style="display:flex;"><span>    <span style="color:#e6db74">&#34;Corvus corone&#34;</span>, <span style="color:#e6db74">&#34;Threskiornis molucca&#34;</span>, <span style="color:#e6db74">&#34;Merops malimbicus&#34;</span>)
+</span></span><span style="display:flex;"><span>out <span style="color:#f92672">&lt;-</span> <span style="color:#a6e22e">llply</span>(splist, <span style="color:#66d9ef">function</span>(x) <span style="color:#a6e22e">occurrencelist</span>(x, coordinatestatus <span style="color:#f92672">=</span> T, maxresults <span style="color:#f92672">=</span> <span style="color:#ae81ff">100</span>))
+</span></span><span style="display:flex;"><span><span style="color:#a6e22e">names</span>(out) <span style="color:#f92672">&lt;-</span> splist  <span style="color:#75715e"># name each data.frame with the species names</span>
+</span></span><span style="display:flex;"><span><span style="color:#a6e22e">setwd</span>(<span style="color:#e6db74">&#34;~/ShinyApps/rgbif2&#34;</span>)  <span style="color:#75715e"># set directory</span>
+</span></span><span style="display:flex;"><span><span style="color:#a6e22e">save</span>(out, file <span style="color:#f92672">=</span> <span style="color:#e6db74">&#34;speciesdata.rda&#34;</span>)  <span style="color:#75715e"># save the list of data.frames into an .rda file to serve up</span>
+</span></span></code></pre></div><h3 id="heres-the-server-logic">Here&rsquo;s the server logic</h3>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-r" data-lang="r"><span style="display:flex;"><span><span style="color:#a6e22e">library</span>(shiny)
+</span></span><span style="display:flex;"><span><span style="color:#a6e22e">library</span>(plyr)
+</span></span><span style="display:flex;"><span><span style="color:#a6e22e">library</span>(ggplot2)
+</span></span><span style="display:flex;"><span><span style="color:#a6e22e">library</span>(rgbif)
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">## Set up server output</span>
+</span></span><span style="display:flex;"><span><span style="color:#a6e22e">shinyServer</span>(<span style="color:#66d9ef">function</span>(input, output) {
+</span></span><span style="display:flex;"><span>    <span style="color:#a6e22e">load</span>(<span style="color:#e6db74">&#34;speciesdata.rda&#34;</span>)
+</span></span><span style="display:flex;"><span>    <span style="color:#75715e"># define function for server plot output</span>
+</span></span><span style="display:flex;"><span>    output<span style="color:#f92672">$</span>gbifplot <span style="color:#f92672">&lt;-</span> <span style="color:#a6e22e">reactivePlot</span>(<span style="color:#66d9ef">function</span>() {
+</span></span><span style="display:flex;"><span>        species <span style="color:#f92672">&lt;-</span> input<span style="color:#f92672">$</span>spec
+</span></span><span style="display:flex;"><span>        df <span style="color:#f92672">&lt;-</span> out<span style="color:#a6e22e">[names</span>(out) <span style="color:#f92672">%in%</span> species]
+</span></span><span style="display:flex;"><span>        <span style="color:#a6e22e">print</span>(<span style="color:#a6e22e">gbifmap</span>(df))
+</span></span><span style="display:flex;"><span>    })
+</span></span><span style="display:flex;"><span>    output<span style="color:#f92672">$</span>cbt <span style="color:#f92672">&lt;-</span> <span style="color:#a6e22e">reactiveText</span>(<span style="color:#66d9ef">function</span>() {
+</span></span><span style="display:flex;"><span>    })
+</span></span><span style="display:flex;"><span>})
+</span></span></code></pre></div><h3 id="the-user-interface">The user interface</h3>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-r" data-lang="r"><span style="display:flex;"><span><span style="color:#a6e22e">library</span>(shiny)
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e"># Define UI for application that plots random distributions</span>
+</span></span><span style="display:flex;"><span><span style="color:#a6e22e">shinyUI</span>(<span style="color:#a6e22e">pageWithSidebar</span>(<span style="color:#a6e22e">headerPanel</span>(<span style="color:#e6db74">&#34;rgbif example&#34;</span>), <span style="color:#a6e22e">sidebarPanel</span>(<span style="color:#a6e22e">checkboxGroupInput</span>(<span style="color:#e6db74">&#34;spec&#34;</span>, 
+</span></span><span style="display:flex;"><span>    <span style="color:#e6db74">&#34;Species to map:&#34;</span>, <span style="color:#a6e22e">c</span>(`Sharp shinned hawk (Accipiter erythronemius)` <span style="color:#f92672">=</span> <span style="color:#e6db74">&#34;Accipiter erythronemius&#34;</span>, 
+</span></span><span style="display:flex;"><span>        `Dark eyed junco (Junco hyemalis)` <span style="color:#f92672">=</span> <span style="color:#e6db74">&#34;Junco hyemalis&#34;</span>, `Wood duck (Aix sponsa)` <span style="color:#f92672">=</span> <span style="color:#e6db74">&#34;Aix sponsa&#34;</span>, 
+</span></span><span style="display:flex;"><span>        `Bald eagle (Haliaeetus leucocephalus)` <span style="color:#f92672">=</span> <span style="color:#e6db74">&#34;Haliaeetus leucocephalus&#34;</span>, 
+</span></span><span style="display:flex;"><span>        `Carrion crow (Corvus corone)` <span style="color:#f92672">=</span> <span style="color:#e6db74">&#34;Corvus corone&#34;</span>, `Australian White Ibis (Threskiornis molucca)` <span style="color:#f92672">=</span> <span style="color:#e6db74">&#34;Threskiornis molucca&#34;</span>, 
+</span></span><span style="display:flex;"><span>        `Rosy Bee-eater (Merops malimbicus)` <span style="color:#f92672">=</span> <span style="color:#e6db74">&#34;Merops malimbicus&#34;</span>), selected <span style="color:#f92672">=</span> <span style="color:#a6e22e">c</span>(<span style="color:#e6db74">&#34;Bald eagle (Haliaeetus leucocephalus)&#34;</span>))), 
+</span></span><span style="display:flex;"><span>    <span style="color:#a6e22e">mainPanel</span>(<span style="color:#a6e22e">h5</span>(<span style="color:#e6db74">&#34;A map of your selected species: Please note that GBIF is queried for every selection so loading times vary&#34;</span>), 
+</span></span><span style="display:flex;"><span>        <span style="color:#a6e22e">plotOutput</span>(<span style="color:#e6db74">&#34;gbifplot&#34;</span>))))
+</span></span></code></pre></div><p>This should be all you need. To actually serve up the app in the web, request to be part of their beta-test of Shiny server on the web <a href="https://rstudio.wufoo.com/forms/shiny-server-beta-program/">here</a>.</p>
+<p>Go play with our Shiny app <a href="http://glimmer.rstudio.com/ropensci/rgbif2/">here</a> to see the kind of visualization you can do with the <code>rgbif</code> package.</p>
+<p>Get the .Rmd file used to create this post <a href="https://github.com/sckott/sckott.github.com/tree/master/_drafts/2012-12-10-shiny-r.Rmd">at my github account</a> - or <a href="https://github.com/sckott/sckott.github.com/tree/master/_posts/2012-12-10-shiny-r.md">.md file</a>.</p>
+<p>Written in <a href="http://daringfireball.net/projects/markdown/">Markdown</a>, with help from <a href="http://yihui.name/knitr/">knitr</a>.</p>
+]]></content:encoded>
     </item>
   </channel>
 </rss>

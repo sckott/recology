@@ -16,6 +16,91 @@
       <description>In rOpenSci - as in presumably most open source projects - we want the entire project to be sustainable, but also each individual software project to be sustainable.
 A big part of each software project (aka R package in this case) being sustainable is the people making it, particularly whether:
 how many contributors a project has, and how contributions are spread across contibutors There are discussions going on about how to increase contributors to any given project.</description>
+      <content:encoded><![CDATA[<p>In rOpenSci - as in presumably most open source projects - we want the entire project to be sustainable, but also each individual software project to be sustainable.</p>
+<p>A big part of each software project (aka R package in this case) being sustainable is the people making it, particularly whether:</p>
+<ul>
+<li>how many contributors a project has, and</li>
+<li>how contributions are spread across contibutors</li>
+</ul>
+<p>There are discussions going on about how to increase contributors to any given project. But the first thing to do is to do an assesment of where you&rsquo;re at. One way to do that is visualization.</p>
+<p>We can look at a sort of proxy of contributions, git commits, to get at this. This isn&rsquo;t perfect because everyone differs in their &ldquo;commit style&rdquo;, where some make a lot of changes in a single commit, while others spread changes across commits. (one could look at additions/deletions of actual code for example)</p>
+<p>In terms of where to get data, one could get it from the API of any of Github, Gitlab, Bitbucket, or using whatever local git repos you have on your machine. rOpenSci has a nice git R client called <a href="https://github.com/ropensci/git2r">git2r</a> maintained by <a href="https://github.com/stewid">Stefan Widgren</a>. I have a lot of rOpenSci&rsquo;s R packages locally on my machine, though not all of them.</p>
+<p>Below is a first attempt at starting to look at the distribution of commits across rOpenSci packages. The visualization is meant to get a quick look across packages in terms of a) number of contributors to a package, and b) distribution of commits across each contributor within a package.</p>
+<h2 id="the-actual-work">the actual work</h2>
+<p>Load libraries</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-r" data-lang="r"><span style="display:flex;"><span><span style="color:#a6e22e">library</span>(git2r)
+</span></span><span style="display:flex;"><span><span style="color:#a6e22e">library</span>(ggplot2)
+</span></span><span style="display:flex;"><span><span style="color:#a6e22e">library</span>(dplyr)
+</span></span></code></pre></div><p>Get directory paths. I was interested in specific packages, so I made a text file of certain repos, rather than getting all repos in my <code>github/ropensci</code> folder on my machine</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-r" data-lang="r"><span style="display:flex;"><span>dirs <span style="color:#f92672">&lt;-</span> <span style="color:#a6e22e">readLines</span>(<span style="color:#e6db74">&#34;dirs.txt&#34;</span>)
+</span></span><span style="display:flex;"><span>paths <span style="color:#f92672">&lt;-</span> <span style="color:#a6e22e">file.path</span>(<span style="color:#a6e22e">path.expand</span>(<span style="color:#e6db74">&#34;~/github/ropensci&#34;</span>), dirs)
+</span></span></code></pre></div><p>Function to get data.frame of commit authors</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-r" data-lang="r"><span style="display:flex;"><span>make_authors_table <span style="color:#f92672">&lt;-</span> <span style="color:#66d9ef">function</span>(x) {  
+</span></span><span style="display:flex;"><span>  repo <span style="color:#f92672">&lt;-</span> git2r<span style="color:#f92672">::</span><span style="color:#a6e22e">repository</span>(x)
+</span></span><span style="display:flex;"><span>  res <span style="color:#f92672">&lt;-</span> <span style="color:#a6e22e">commits</span>(repo)
+</span></span><span style="display:flex;"><span>  auths <span style="color:#f92672">&lt;-</span> <span style="color:#a6e22e">vapply</span>(res, <span style="color:#66d9ef">function</span>(z) z<span style="color:#f92672">@</span>author<span style="color:#f92672">@</span>name, <span style="color:#a6e22e">character</span>(<span style="color:#ae81ff">1</span>))
+</span></span><span style="display:flex;"><span>  tmp <span style="color:#f92672">&lt;-</span> <span style="color:#a6e22e">data.frame</span>(<span style="color:#a6e22e">table</span>(auths), stringsAsFactors <span style="color:#f92672">=</span> <span style="color:#66d9ef">FALSE</span>)
+</span></span><span style="display:flex;"><span>  tmp<span style="color:#f92672">$</span>auths <span style="color:#f92672">&lt;-</span> <span style="color:#a6e22e">as.character</span>(tmp<span style="color:#f92672">$</span>auths)
+</span></span><span style="display:flex;"><span>  tmp
+</span></span><span style="display:flex;"><span>}
+</span></span></code></pre></div><p>Get commit authors for each directory</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-r" data-lang="r"><span style="display:flex;"><span>dat <span style="color:#f92672">&lt;-</span> <span style="color:#a6e22e">lapply</span>(paths, make_authors_table)
+</span></span><span style="display:flex;"><span>dat <span style="color:#f92672">&lt;-</span> stats<span style="color:#f92672">::</span><span style="color:#a6e22e">setNames</span>(dat, <span style="color:#a6e22e">basename</span>(paths))
+</span></span></code></pre></div><p>Remove those with no rows (i.e., commits)</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-r" data-lang="r"><span style="display:flex;"><span>dat <span style="color:#f92672">&lt;-</span> <span style="color:#a6e22e">Filter</span>(<span style="color:#66d9ef">function</span>(z) <span style="color:#a6e22e">NROW</span>(z) <span style="color:#f92672">&gt;</span> <span style="color:#ae81ff">0</span>, dat)
+</span></span></code></pre></div><p>Since person names for commits can vary depending on where the person makes the commit from (a git GUI vs. cli vs. Github web interface, etc.), I made a little table for deduping names, and cleaned up each package&rsquo;s commit summary.</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-r" data-lang="r"><span style="display:flex;"><span>dups <span style="color:#f92672">&lt;-</span> <span style="color:#a6e22e">read.csv</span>(<span style="color:#e6db74">&#34;github_dups.csv&#34;</span>, stringsAsFactors<span style="color:#f92672">=</span><span style="color:#66d9ef">FALSE</span>)
+</span></span><span style="display:flex;"><span>dups<span style="color:#f92672">$</span>duplicates <span style="color:#f92672">&lt;-</span> <span style="color:#a6e22e">vapply</span>(dups<span style="color:#f92672">$</span>duplicates, <span style="color:#66d9ef">function</span>(z) <span style="color:#a6e22e">gsub</span>(<span style="color:#e6db74">&#34;,&#34;</span>, <span style="color:#e6db74">&#34;|&#34;</span>, z), <span style="color:#a6e22e">character</span>(<span style="color:#ae81ff">1</span>))
+</span></span><span style="display:flex;"><span>dat <span style="color:#f92672">&lt;-</span> <span style="color:#a6e22e">lapply</span>(dat, <span style="color:#66d9ef">function</span>(z) {
+</span></span><span style="display:flex;"><span>  z<span style="color:#f92672">$</span>auths <span style="color:#f92672">&lt;-</span> <span style="color:#a6e22e">unname</span>(<span style="color:#a6e22e">vapply</span>(z<span style="color:#f92672">$</span>auths, <span style="color:#66d9ef">function</span>(w) {
+</span></span><span style="display:flex;"><span>      mtch <span style="color:#f92672">&lt;-</span> <span style="color:#a6e22e">grepl</span>(w, dups<span style="color:#f92672">$</span>duplicates)
+</span></span><span style="display:flex;"><span>      <span style="color:#66d9ef">if</span> (<span style="color:#a6e22e">any</span>(mtch)) dups<span style="color:#f92672">$</span>name_to_use[mtch] <span style="color:#66d9ef">else</span> w
+</span></span><span style="display:flex;"><span>  }, <span style="color:#a6e22e">character</span>(<span style="color:#ae81ff">1</span>)))
+</span></span><span style="display:flex;"><span>  <span style="color:#a6e22e">aggregate</span>(Freq <span style="color:#f92672">~</span> auths, data <span style="color:#f92672">=</span> z, FUN <span style="color:#f92672">=</span> sum)
+</span></span><span style="display:flex;"><span>})
+</span></span></code></pre></div><p>Reorder each data.frame by number of commits (the <code>Freq</code> column)</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-r" data-lang="r"><span style="display:flex;"><span>dat <span style="color:#f92672">&lt;-</span> <span style="color:#a6e22e">lapply</span>(dat, <span style="color:#66d9ef">function</span>(x) dplyr<span style="color:#f92672">::</span><span style="color:#a6e22e">arrange</span>(x, Freq))
+</span></span></code></pre></div><p>Combine into single data.frame, and make a column <code>order</code> so ggplot doesn&rsquo;t mess up our ordering in each facet</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-r" data-lang="r"><span style="display:flex;"><span>df <span style="color:#f92672">&lt;-</span> dplyr<span style="color:#f92672">::</span><span style="color:#a6e22e">bind_rows</span>(dat, .id <span style="color:#f92672">=</span> <span style="color:#e6db74">&#39;id&#39;</span>)
+</span></span><span style="display:flex;"><span>df<span style="color:#f92672">$</span>order <span style="color:#f92672">&lt;-</span> <span style="color:#a6e22e">seq_len</span>(<span style="color:#a6e22e">NROW</span>(df))
+</span></span><span style="display:flex;"><span><span style="color:#a6e22e">head</span>(df)
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt;      id         auths Freq order</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; 1 agent        jeroen    8     1</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; 2 ALA4R   Dave Martin    1     2</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; 3 ALA4R        mbohun    1     3</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; 4 ALA4R rforge rforge    1     4</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; 5 ALA4R   Tom Saleeba    3     5</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; 6 ALA4R       Tasilee   53     6</span>
+</span></span></code></pre></div><p>Make the plot</p>
+<ul>
+<li>Each panel is an ropensci package</li>
+<li>Each dot is a person for the most part (I tried to remove duplicates, but there&rsquo;s still some)</li>
+<li>Dots are arranged from less to more commits (from left to right)</li>
+</ul>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-r" data-lang="r"><span style="display:flex;"><span><span style="color:#a6e22e">ggplot</span>(df, <span style="color:#a6e22e">aes</span>(order, Freq)) <span style="color:#f92672">+</span> 
+</span></span><span style="display:flex;"><span>  <span style="color:#a6e22e">geom_point</span>(size <span style="color:#f92672">=</span> <span style="color:#ae81ff">0.5</span>) <span style="color:#f92672">+</span> 
+</span></span><span style="display:flex;"><span>  <span style="color:#a6e22e">facet_wrap</span>(<span style="color:#f92672">~</span> id, scales <span style="color:#f92672">=</span> <span style="color:#e6db74">&#34;free&#34;</span>) <span style="color:#f92672">+</span>
+</span></span><span style="display:flex;"><span>  <span style="color:#a6e22e">theme</span>(
+</span></span><span style="display:flex;"><span>    axis.title.x<span style="color:#f92672">=</span><span style="color:#a6e22e">element_blank</span>(),
+</span></span><span style="display:flex;"><span>    axis.text.x<span style="color:#f92672">=</span><span style="color:#a6e22e">element_blank</span>(),
+</span></span><span style="display:flex;"><span>    axis.ticks.x<span style="color:#f92672">=</span><span style="color:#a6e22e">element_blank</span>(),
+</span></span><span style="display:flex;"><span>    axis.title.y<span style="color:#f92672">=</span><span style="color:#a6e22e">element_blank</span>(),
+</span></span><span style="display:flex;"><span>    axis.text.y<span style="color:#f92672">=</span><span style="color:#a6e22e">element_blank</span>(),
+</span></span><span style="display:flex;"><span>    axis.ticks.y<span style="color:#f92672">=</span><span style="color:#a6e22e">element_blank</span>(),
+</span></span><span style="display:flex;"><span>    panel.grid.major <span style="color:#f92672">=</span> <span style="color:#a6e22e">element_blank</span>(),
+</span></span><span style="display:flex;"><span>    panel.grid.minor <span style="color:#f92672">=</span> <span style="color:#a6e22e">element_blank</span>(),
+</span></span><span style="display:flex;"><span>    strip.background <span style="color:#f92672">=</span> <span style="color:#a6e22e">element_blank</span>(),
+</span></span><span style="display:flex;"><span>    strip.text.x <span style="color:#f92672">=</span> <span style="color:#a6e22e">element_blank</span>()
+</span></span><span style="display:flex;"><span>  )
+</span></span></code></pre></div><p><img loading="lazy" src="https://i.imgur.com/LMpbt5K.png" alt=""  />
+</p>
+<p>Curious what the packages are? Check out <a href="https://i.imgur.com/5ZfHJXq.png">the same plot but with facet titles with package names</a>.</p>
+<h2 id="some-observations">Some observations</h2>
+<ul>
+<li>There&rsquo;s quite a few packages with a single contributor. These could be targeted first possibly for getting at least one additional contrib.</li>
+<li>Of those that have more than one contributor, there&rsquo;s often a large jump between the person with the most commits and the next most. We could target making that a smoother transition - that is, less of a jump between the main contributor and the others</li>
+</ul>
+]]></content:encoded>
     </item>
   </channel>
 </rss>

@@ -15,6 +15,215 @@
       <guid>http://localhost:1313/2019/03/apis-text-mining-logs/</guid>
       <description>Acquiring full text articles fulltext is an R package I maintain to obtain full text versions of research articles for text mining.
 It&amp;rsquo;s a hard problem, with a spaghetti web of code. One of the hard problems is figuring out what the URL is for the full text version of an article. Publishers do not have consistent URL patterns through time, and so you can not set rules once and never revisit them.</description>
+      <content:encoded><![CDATA[<h2 id="acquiring-full-text-articles">Acquiring full text articles</h2>
+<p><a href="https://github.com/ropensci/fulltext/">fulltext</a> is an R package I maintain to obtain full text versions of research articles
+for text mining.</p>
+<p>It&rsquo;s a hard problem, with a spaghetti web of code. One of the hard problems is
+figuring out what the URL is for the full text version of an article. Publishers
+do not have consistent URL patterns through time, and so you can not set rules once
+and never revisit them.</p>
+<p>The <a href="https://github.com/CrossRef/rest-api-doc">Crossref API</a> has links available to
+full text versions for publishers that choose to share them. However, even if
+publishers choose to share their full text links, they may be out of date or completely
+wrong (not actually lead to the full text).</p>
+<p>There&rsquo;s a variety of other APIs out there for getting links to articles, but none
+really hit the spot, which lead to the creation of the <a href="https://ftdoi.org/">ftdoi API</a>.</p>
+<h2 id="the-ftdoi-api">the ftdoi API</h2>
+<p>The <a href="https://ftdoi.org/">ftdoi API</a> is a web API, with it&rsquo;s main goal for getting a best guess at
+the URL for the full text version of an article from its DOI (this is done via the
+<code>/api/doi/{doi}/</code> route). The API gives back URLs for all those possible, including
+pdf, xml, and html. Most publishers only give full text as PDF, but when XML is
+available we give those URLs as well.</p>
+<p>The API uses the rules maintained in the <a href="https://github.com/ropenscilabs/pubpatterns/tree/master/src">pubpatterns</a>
+repo. The rules are only rough guidelines though and often require at least one
+step of making a web request to the publishers site or another site, that&rsquo;s NOT
+specified in the pubpatterns rules. For example, the <a href="https://github.com/ropenscilabs/pubpatterns/blob/master/src/biorxiv.json">Biorxiv file</a>
+has notes about how to get the parts necessary for the full URL, but the actual logic
+to do so in in the API code base <a href="https://github.com/ropenscilabs/pubpatternsapi/blob/master/utils.rb#L590-L601">here</a>.</p>
+<p>The ftdoi API caches responses for requests for 24 hrs, so even if a request takes 5 seconds
+or so to process, at least for the next 24 hrs it will be nearly instantaneous. We don&rsquo;t
+want to cache indefinitely because URLs may be changed at any time by the publishers.</p>
+<p>The <code>fulltext</code> package uses the ftdoi API internally, mostly hidden from users, to
+get a full text URL.</p>
+<h2 id="but-why-an-api">But why an API?</h2>
+<p>Why not just have a set of rules in the <code>fulltext</code> R package, and go from there?
+An API was relatively easy for me to stand up, and i think it has many benefits:
+can be used by anything/anyone, not just R users; updates to publisher specific
+rules for generating URLs can evolve independently of <code>fulltext</code>; the logs
+can be used as a tool to improve the API.</p>
+<h2 id="what-do-people-actually-want">what do people actually want?</h2>
+<p>The ftdoi API has been running for a while now, maybe a year or so, and I&rsquo;ve been
+collecting logs. Seems smart to look at the logs to determine what publishers
+users are requesting articles from that the ftdoi API does not currently support,
+so that the API can hopefully add those publishers. For obvious reasons, I can&rsquo;t share
+the log data.</p>
+<p>Load packages and define file path.</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-r" data-lang="r"><span style="display:flex;"><span><span style="color:#a6e22e">library</span>(rcrossref)
+</span></span><span style="display:flex;"><span><span style="color:#a6e22e">library</span>(dplyr)
+</span></span><span style="display:flex;"><span><span style="color:#a6e22e">library</span>(rex)
+</span></span><span style="display:flex;"><span>logs <span style="color:#f92672">&lt;-</span> <span style="color:#e6db74">&#34;~/pubpatterns_api_calls.log&#34;</span>
+</span></span></code></pre></div><p>The logs look like (IP addresses removed, some user agents shortened):</p>
+<pre tabindex="0"><code>[28/Nov/2018:20:09:49 +0000] GET /api/members/  HTTP/2.0 200 4844 Mozilla/5.0 ...
+[28/Nov/2018:20:23:15 +0000] GET /api/members/317/  HTTP/2.0 200 228 Mozilla/5.0 ...
+[29/Nov/2018:01:52:58 +0000] GET /api/members/19/  HTTP/1.1 400 65 fulltext/1.1.0
+[29/Nov/2018:01:52:58 +0000] GET /api/members/2308/  HTTP/1.1 400 65 fulltext/1.1.0
+[29/Nov/2018:01:52:59 +0000] GET /api/members/239/  HTTP/1.1 400 65 fulltext/1.1.0
+[29/Nov/2018:01:53:00 +0000] GET /api/members/2581/  HTTP/1.1 400 65 fulltext/1.1.0
+[29/Nov/2018:01:53:00 +0000] GET /api/members/27/  HTTP/1.1 400 65 fulltext/1.1.0
+[29/Nov/2018:01:53:01 +0000] GET /api/members/297/  HTTP/1.1 200 336 fulltext/1.1.0
+[29/Nov/2018:01:53:01 +0000] GET /api/members/7995/  HTTP/1.1 400 65 fulltext/1.1.0
+[29/Nov/2018:10:46:53 +0000] GET /api/members/unknown/  HTTP/1.1 400 65 fulltext/1.1.0.9130
+</code></pre><p>Use the awesome <a href="https://github.com/kevinushey/rex/">rex</a> package from Kevin Ushey et al. to parse the logs, pulling out
+just the Crossref member ID in the API request, as well as the HTTP status code. There
+are of course other API requests in the logs, but we&rsquo;re only interested here in the ones
+to the <code>/api/doi/{doi}/</code> route.</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-r" data-lang="r"><span style="display:flex;"><span>df <span style="color:#f92672">&lt;-</span> <span style="color:#a6e22e">tbl_df</span>(<span style="color:#a6e22e">scan</span>(logs, what <span style="color:#f92672">=</span> <span style="color:#e6db74">&#34;character&#34;</span>, sep <span style="color:#f92672">=</span> <span style="color:#e6db74">&#34;\n&#34;</span>) <span style="color:#f92672">%&gt;%</span>
+</span></span><span style="display:flex;"><span>  <span style="color:#a6e22e">re_matches</span>(
+</span></span><span style="display:flex;"><span>    <span style="color:#a6e22e">rex</span>(
+</span></span><span style="display:flex;"><span>      <span style="color:#e6db74">&#34;/api/members/&#34;</span>,
+</span></span><span style="display:flex;"><span>        <span style="color:#a6e22e">capture</span>(name <span style="color:#f92672">=</span> <span style="color:#e6db74">&#34;route&#34;</span>,
+</span></span><span style="display:flex;"><span>          <span style="color:#a6e22e">one_or_more</span>(numbers)
+</span></span><span style="display:flex;"><span>        ),
+</span></span><span style="display:flex;"><span>      <span style="color:#e6db74">&#34;/&#34;</span>,
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>      space, space, <span style="color:#e6db74">&#34;HTTP/&#34;</span>, numbers, <span style="color:#e6db74">&#34;.&#34;</span>, numbers, space,
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>      <span style="color:#a6e22e">capture</span>(name <span style="color:#f92672">=</span> <span style="color:#e6db74">&#34;status_code&#34;</span>,
+</span></span><span style="display:flex;"><span>        <span style="color:#a6e22e">one_or_more</span>(numbers)
+</span></span><span style="display:flex;"><span>      )
+</span></span><span style="display:flex;"><span>    )
+</span></span><span style="display:flex;"><span>  ))
+</span></span><span style="display:flex;"><span>df<span style="color:#f92672">$</span>route <span style="color:#f92672">&lt;-</span> <span style="color:#a6e22e">as.numeric</span>(df<span style="color:#f92672">$</span>route)
+</span></span><span style="display:flex;"><span>df
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; # A tibble: 896,035 x 2</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt;    route status_code</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt;    &lt;dbl&gt; &lt;chr&gt;      </span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt;  1    NA &lt;NA&gt;       </span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt;  2   317 200        </span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt;  3    19 400        </span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt;  4  2308 400        </span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt;  5   239 400        </span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt;  6  2581 400        </span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt;  7    27 400        </span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt;  8   297 200        </span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt;  9  7995 400        </span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; 10    NA &lt;NA&gt;       </span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; # … with 896,025 more rows</span>
+</span></span></code></pre></div><p>Filter to those requests that resulted in a 400 HTTP status code, that is, they
+resulted in no returned data, indicating that we likely do not have a mapping for that
+Crossref member.</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-r" data-lang="r"><span style="display:flex;"><span>res <span style="color:#f92672">&lt;-</span> df <span style="color:#f92672">%&gt;%</span>
+</span></span><span style="display:flex;"><span>  <span style="color:#a6e22e">filter</span>(status_code <span style="color:#f92672">==</span> <span style="color:#ae81ff">400</span>) <span style="color:#f92672">%&gt;%</span>
+</span></span><span style="display:flex;"><span>  <span style="color:#a6e22e">select</span>(route) <span style="color:#f92672">%&gt;%</span> 
+</span></span><span style="display:flex;"><span>  <span style="color:#a6e22e">group_by</span>(route) <span style="color:#f92672">%&gt;%</span>
+</span></span><span style="display:flex;"><span>  <span style="color:#a6e22e">summarize</span>(count <span style="color:#f92672">=</span> <span style="color:#a6e22e">n</span>()) <span style="color:#f92672">%&gt;%</span> 
+</span></span><span style="display:flex;"><span>  <span style="color:#a6e22e">arrange</span>(<span style="color:#a6e22e">desc</span>(count))
+</span></span><span style="display:flex;"><span>res
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; # A tibble: 530 x 2</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt;    route  count</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt;    &lt;dbl&gt;  &lt;int&gt;</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt;  1    10 345045</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt;  2   530   7165</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt;  3   286   3062</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt;  4   276   2975</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt;  5   239   2493</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt;  6  8611   1085</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt;  7    56    853</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt;  8   235    722</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt;  9   382    706</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; 10   175    590</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; # … with 520 more rows</span>
+</span></span></code></pre></div><p>Add crossref metadata</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-r" data-lang="r"><span style="display:flex;"><span>(members <span style="color:#f92672">&lt;-</span> <span style="color:#a6e22e">cr_members</span>(res<span style="color:#f92672">$</span>route))
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; $meta</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; NULL</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; </span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; $data</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; # A tibble: 530 x 56</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt;       id primary_name location last_status_che… total.dois current.dois</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt;    &lt;int&gt; &lt;chr&gt;        &lt;chr&gt;    &lt;date&gt;           &lt;chr&gt;      &lt;chr&gt;       </span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt;  1    10 American Me… 330 N. … 2019-03-20       600092     14714       </span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt;  2   530 FapUNIFESP … FAP-UNI… 2019-03-20       353338     38339       </span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt;  3   286 Oxford Univ… Academi… 2019-03-20       3696643    289338      </span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt;  4   276 Ovid Techno… 100 Riv… 2019-03-20       2059352    167272      </span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt;  5   239 BMJ          BMA Hou… 2019-03-20       891239     61267       </span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt;  6  8611 AME Publish… c/o NAN… 2019-03-20       20067      15666       </span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt;  7    56 Cambridge U… The Edi… 2019-03-20       1529029    84018       </span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt;  8   235 American So… 1752 N … 2019-03-20       178890     13984       </span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt;  9   382 Joule Inc.   1031 Ba… 2019-03-20       12666      1868        </span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; 10   175 The Royal S… 6 Carlt… 2019-03-20       89219      7262        </span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; # … with 520 more rows, and 50 more variables: backfile.dois &lt;chr&gt;,</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; #   prefixes &lt;chr&gt;, coverge.affiliations.current &lt;chr&gt;,</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; #   coverge.similarity.checking.current &lt;chr&gt;,</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; #   coverge.funders.backfile &lt;chr&gt;, coverge.licenses.backfile &lt;chr&gt;,</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; #   coverge.funders.current &lt;chr&gt;, coverge.affiliations.backfile &lt;chr&gt;,</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; #   coverge.resource.links.backfile &lt;chr&gt;, coverge.orcids.backfile &lt;chr&gt;,</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; #   coverge.update.policies.current &lt;chr&gt;,</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; #   coverge.open.references.backfile &lt;chr&gt;, coverge.orcids.current &lt;chr&gt;,</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; #   coverge.similarity.checking.backfile &lt;chr&gt;,</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; #   coverge.references.backfile &lt;chr&gt;,</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; #   coverge.award.numbers.backfile &lt;chr&gt;,</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; #   coverge.update.policies.backfile &lt;chr&gt;,</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; #   coverge.licenses.current &lt;chr&gt;, coverge.award.numbers.current &lt;chr&gt;,</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; #   coverge.abstracts.backfile &lt;chr&gt;,</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; #   coverge.resource.links.current &lt;chr&gt;, coverge.abstracts.current &lt;chr&gt;,</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; #   coverge.open.references.current &lt;chr&gt;,</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; #   coverge.references.current &lt;chr&gt;,</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; #   flags.deposits.abstracts.current &lt;chr&gt;,</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; #   flags.deposits.orcids.current &lt;chr&gt;, flags.deposits &lt;chr&gt;,</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; #   flags.deposits.affiliations.backfile &lt;chr&gt;,</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; #   flags.deposits.update.policies.backfile &lt;chr&gt;,</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; #   flags.deposits.similarity.checking.backfile &lt;chr&gt;,</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; #   flags.deposits.award.numbers.current &lt;chr&gt;,</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; #   flags.deposits.resource.links.current &lt;chr&gt;,</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; #   flags.deposits.articles &lt;chr&gt;,</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; #   flags.deposits.affiliations.current &lt;chr&gt;,</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; #   flags.deposits.funders.current &lt;chr&gt;,</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; #   flags.deposits.references.backfile &lt;chr&gt;,</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; #   flags.deposits.abstracts.backfile &lt;chr&gt;,</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; #   flags.deposits.licenses.backfile &lt;chr&gt;,</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; #   flags.deposits.award.numbers.backfile &lt;chr&gt;,</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; #   flags.deposits.open.references.backfile &lt;chr&gt;,</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; #   flags.deposits.open.references.current &lt;chr&gt;,</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; #   flags.deposits.references.current &lt;chr&gt;,</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; #   flags.deposits.resource.links.backfile &lt;chr&gt;,</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; #   flags.deposits.orcids.backfile &lt;chr&gt;,</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; #   flags.deposits.funders.backfile &lt;chr&gt;,</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; #   flags.deposits.update.policies.current &lt;chr&gt;,</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; #   flags.deposits.similarity.checking.current &lt;chr&gt;,</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; #   flags.deposits.licenses.current &lt;chr&gt;, names &lt;chr&gt;, tokens &lt;chr&gt;</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; </span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; $facets</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; NULL</span>
+</span></span></code></pre></div><p>Add Crossref member names to the log data.</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-r" data-lang="r"><span style="display:flex;"><span>alldat <span style="color:#f92672">&lt;-</span> <span style="color:#a6e22e">left_join</span>(res, <span style="color:#a6e22e">select</span>(members<span style="color:#f92672">$</span>data, id, primary_name),
+</span></span><span style="display:flex;"><span>  by <span style="color:#f92672">=</span> <span style="color:#a6e22e">c</span>(<span style="color:#e6db74">&#34;route&#34;</span> <span style="color:#f92672">=</span> <span style="color:#e6db74">&#34;id&#34;</span>))
+</span></span><span style="display:flex;"><span>alldat
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; # A tibble: 530 x 3</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt;    route  count primary_name                             </span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt;    &lt;dbl&gt;  &lt;int&gt; &lt;chr&gt;                                    </span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt;  1    10 345045 American Medical Association (AMA)       </span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt;  2   530   7165 FapUNIFESP (SciELO)                      </span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt;  3   286   3062 Oxford University Press (OUP)            </span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt;  4   276   2975 Ovid Technologies (Wolters Kluwer Health)</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt;  5   239   2493 BMJ                                      </span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt;  6  8611   1085 AME Publishing Company                   </span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt;  7    56    853 Cambridge University Press (CUP)         </span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt;  8   235    722 American Society for Microbiology        </span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt;  9   382    706 Joule Inc.                               </span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; 10   175    590 The Royal Society                        </span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; # … with 520 more rows</span>
+</span></span></code></pre></div><p>Theres <strong>A LOT</strong> of requests to the American Medical Association. Coming in
+a distant second is FapUNIFESP (SciELO), then the Oxford University Press,
+Ovid Technologies (Wolters Kluwer Health), BMJ, and AME Publishing Company,
+all with greater than 1000 requests.</p>
+<p>These are some clear leads for publishers to work into the ftdoi API, working
+my way down the data.frame to less frequently requested publishers.</p>
+<h2 id="more-work-to-do">more work to do</h2>
+<p>I&rsquo;ve got a good list of publishers which I know users want URLs for, so
+I can get started implementing rules/etc. for those publishers. And I can
+repeat this process from time to time to add more publishers in high demand.</p>
+]]></content:encoded>
     </item>
     <item>
       <title>Getting ecology and evolution journal titles from R</title>
@@ -23,6 +232,75 @@ It&amp;rsquo;s a hard problem, with a spaghetti web of code. One of the hard pro
       <guid>http://localhost:1313/2012/08/get-ecoevo-journal-titles/</guid>
       <description>So I want to mine some #altmetrics data for some research I&amp;rsquo;m thinking about doing. The steps would be:
 Get journal titles for ecology and evolution journals. Get DOI&amp;rsquo;s for all papers in all the above journal titles. Get altmetrics data on each DOI. Do some fancy analyses. Make som pretty figs. Write up results. It&amp;rsquo;s early days, so jus working on the first step. However, getting a list of journals in ecology and evolution is frustratingly hard.</description>
+      <content:encoded><![CDATA[<p>So I want to mine some #altmetrics data for some research I&rsquo;m thinking about doing.  The steps would be:</p>
+<ul>
+<li>Get journal titles for ecology and evolution journals.</li>
+<li>Get DOI&rsquo;s for all papers in all the above journal titles.</li>
+<li>Get altmetrics data on each DOI.</li>
+<li>Do some fancy analyses.</li>
+<li>Make som pretty figs.</li>
+<li>Write up results.</li>
+</ul>
+<p>It&rsquo;s early days, so jus working on the first step.  However, getting a list of journals in ecology and evolution is frustratingly hard.  This turns out to not be that easy if you are (1) trying to avoid <a href="http://thomsonreuters.com/">Thomson Reuters</a>, and (2) want a machine interface way to do it (read: API).</p>
+<p>Unfortunately, Mendeley&rsquo;s API does not have methods for getting a list of journals by field, or at least I don&rsquo;t know how to do it using <a href="http://apidocs.mendeley.com/">their API</a>.  No worries though - <a href="http://crossref.org/">Crossref</a> comes to save the day.   Here&rsquo;s my attempt at this using the <a href="http://help.crossref.org/#using_oai_pmh">Crossref OAI-PMH</a>.</p>
+<p>I wrote a little while loop to get journal titles from the Crossref OAI-PMH. This takes a while to run, but at least it works on my machine - hopefully yours too!</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-r" data-lang="r"><span style="display:flex;"><span><span style="color:#a6e22e">library</span>(XML)
+</span></span><span style="display:flex;"><span><span style="color:#a6e22e">library</span>(RCurl)
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>token <span style="color:#f92672">&lt;-</span> <span style="color:#e6db74">&#34;characters&#34;</span>  <span style="color:#75715e"># define a iterator, also used for gettingn the resumptionToken</span>
+</span></span><span style="display:flex;"><span>nameslist <span style="color:#f92672">&lt;-</span> <span style="color:#a6e22e">list</span>()  <span style="color:#75715e"># define empty list to put joural titles in to</span>
+</span></span><span style="display:flex;"><span><span style="color:#66d9ef">while</span> (<span style="color:#a6e22e">is.character</span>(token) <span style="color:#f92672">==</span> <span style="color:#66d9ef">TRUE</span>) {
+</span></span><span style="display:flex;"><span>    baseurl <span style="color:#f92672">&lt;-</span> <span style="color:#e6db74">&#34;http://oai.crossref.org/OAIHandler?verb=ListSets&#34;</span>
+</span></span><span style="display:flex;"><span>    <span style="color:#66d9ef">if</span> (token <span style="color:#f92672">==</span> <span style="color:#e6db74">&#34;characters&#34;</span>) {
+</span></span><span style="display:flex;"><span>        tok2 <span style="color:#f92672">&lt;-</span> <span style="color:#66d9ef">NULL</span>
+</span></span><span style="display:flex;"><span>    } <span style="color:#66d9ef">else</span> {
+</span></span><span style="display:flex;"><span>        tok2 <span style="color:#f92672">&lt;-</span> <span style="color:#a6e22e">paste</span>(<span style="color:#e6db74">&#34;&amp;resumptionToken=&#34;</span>, token, sep <span style="color:#f92672">=</span> <span style="color:#e6db74">&#34;&#34;</span>)
+</span></span><span style="display:flex;"><span>    }
+</span></span><span style="display:flex;"><span>    query <span style="color:#f92672">&lt;-</span> <span style="color:#a6e22e">paste</span>(baseurl, tok2, sep <span style="color:#f92672">=</span> <span style="color:#e6db74">&#34;&#34;</span>)
+</span></span><span style="display:flex;"><span>    crsets <span style="color:#f92672">&lt;-</span> <span style="color:#a6e22e">xmlToList</span>(<span style="color:#a6e22e">xmlParse</span>(<span style="color:#a6e22e">getURL</span>(query)))
+</span></span><span style="display:flex;"><span>    names <span style="color:#f92672">&lt;-</span> <span style="color:#a6e22e">as.character</span>(<span style="color:#a6e22e">sapply</span>(crsets[[4]], <span style="color:#66d9ef">function</span>(x) x[[<span style="color:#e6db74">&#34;setName&#34;</span>]]))
+</span></span><span style="display:flex;"><span>    nameslist[[token]] <span style="color:#f92672">&lt;-</span> names
+</span></span><span style="display:flex;"><span>    <span style="color:#66d9ef">if</span> (<span style="color:#a6e22e">class</span>(<span style="color:#a6e22e">try</span>(crsets[[2]]<span style="color:#f92672">$</span>.attrs[[<span style="color:#e6db74">&#34;resumptionToken&#34;</span>]])) <span style="color:#f92672">==</span> <span style="color:#e6db74">&#34;try-error&#34;</span>) {
+</span></span><span style="display:flex;"><span>        <span style="color:#a6e22e">stop</span>(<span style="color:#e6db74">&#34;no more data&#34;</span>)
+</span></span><span style="display:flex;"><span>    } <span style="color:#66d9ef">else</span> token <span style="color:#f92672">&lt;-</span> crsets[[2]]<span style="color:#f92672">$</span>.attrs[[<span style="color:#e6db74">&#34;resumptionToken&#34;</span>]]
+</span></span><span style="display:flex;"><span>}
+</span></span></code></pre></div><p>Yay!  Hopefully it worked if you tried it.  Let&rsquo;s see how long the list of journal titles is.</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-r" data-lang="r"><span style="display:flex;"><span><span style="color:#a6e22e">sapply</span>(nameslist, length)  <span style="color:#75715e"># length of each list</span>
+</span></span></code></pre></div><div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-r" data-lang="r"><span style="display:flex;"><span>                          characters c65ebc3f<span style="color:#f92672">-</span>b540<span style="color:#ae81ff">-4672-9</span>c00<span style="color:#f92672">-</span>f3135bf849e3 
+</span></span><span style="display:flex;"><span>                               <span style="color:#ae81ff">10001</span>                                <span style="color:#ae81ff">10001</span> 
+</span></span><span style="display:flex;"><span><span style="color:#ae81ff">6</span>f61b343<span style="color:#f92672">-</span>a8f4<span style="color:#ae81ff">-48</span>f1<span style="color:#ae81ff">-8297</span><span style="color:#f92672">-</span>c6f6909ca7f7 
+</span></span><span style="display:flex;"><span>                                <span style="color:#ae81ff">6864</span> 
+</span></span></code></pre></div><div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-r" data-lang="r"><span style="display:flex;"><span>allnames <span style="color:#f92672">&lt;-</span> <span style="color:#a6e22e">do.call</span>(c, nameslist)  <span style="color:#75715e"># combine to list</span>
+</span></span><span style="display:flex;"><span><span style="color:#a6e22e">length</span>(allnames)
+</span></span></code></pre></div><div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-r" data-lang="r"><span style="display:flex;"><span>[1] <span style="color:#ae81ff">26866</span>
+</span></span></code></pre></div><p>Now, let&rsquo;s use some <code>regex</code> to pull out the journal titles that are likely ecology and evolutionary biology journals.  The <code>^</code> symbol says &ldquo;the string must start here&rdquo;. The <code>\\s</code> means whitespace.  The <code>[]</code> lets you specify a set of letters you are looking for, e.g., <code>[Ee]</code> means capital <code>E</code> <em>OR</em> lowercase <code>e</code>.  I threw in titles that had the words systematic and natrualist too.  Tried to trim any whitespace as well using the <code>stringr</code> package.</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-r" data-lang="r"><span style="display:flex;"><span><span style="color:#a6e22e">library</span>(stringr)
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>ecotitles <span style="color:#f92672">&lt;-</span> <span style="color:#a6e22e">as.character</span>(allnames<span style="color:#a6e22e">[str_detect</span>(allnames, <span style="color:#e6db74">&#34;^[Ee]cology|\\s[Ee]cology&#34;</span>)])
+</span></span><span style="display:flex;"><span>evotitles <span style="color:#f92672">&lt;-</span> <span style="color:#a6e22e">as.character</span>(allnames<span style="color:#a6e22e">[str_detect</span>(allnames, <span style="color:#e6db74">&#34;^[Ee]volution|\\s[Ee]volution&#34;</span>)])
+</span></span><span style="display:flex;"><span>systtitles <span style="color:#f92672">&lt;-</span> <span style="color:#a6e22e">as.character</span>(allnames<span style="color:#a6e22e">[str_detect</span>(allnames, <span style="color:#e6db74">&#34;^[Ss]ystematic|\\s[Ss]systematic&#34;</span>)])
+</span></span><span style="display:flex;"><span>naturalist <span style="color:#f92672">&lt;-</span> <span style="color:#a6e22e">as.character</span>(allnames<span style="color:#a6e22e">[str_detect</span>(allnames, <span style="color:#e6db74">&#34;[Nn]aturalist&#34;</span>)])
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>ecoevotitles <span style="color:#f92672">&lt;-</span> <span style="color:#a6e22e">unique</span>(<span style="color:#a6e22e">c</span>(ecotitles, evotitles, systtitles, naturalist))  <span style="color:#75715e"># combine to list</span>
+</span></span><span style="display:flex;"><span>ecoevotitles <span style="color:#f92672">&lt;-</span> <span style="color:#a6e22e">str_trim</span>(ecoevotitles, side <span style="color:#f92672">=</span> <span style="color:#e6db74">&#34;both&#34;</span>)  <span style="color:#75715e"># trim whitespace, if any</span>
+</span></span><span style="display:flex;"><span><span style="color:#a6e22e">length</span>(ecoevotitles)
+</span></span></code></pre></div><div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-r" data-lang="r"><span style="display:flex;"><span>[1] <span style="color:#ae81ff">188</span>
+</span></span></code></pre></div><div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-r" data-lang="r"><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e"># Just the first ten titles</span>
+</span></span><span style="display:flex;"><span>ecoevotitles[1<span style="color:#f92672">:</span><span style="color:#ae81ff">10</span>]
+</span></span></code></pre></div><div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-r" data-lang="r"><span style="display:flex;"><span> [1] <span style="color:#e6db74">&#34;Microbial Ecology in Health and Disease&#34;</span>           
+</span></span><span style="display:flex;"><span> [2] <span style="color:#e6db74">&#34;Population Ecology&#34;</span>                                
+</span></span><span style="display:flex;"><span> [3] <span style="color:#e6db74">&#34;Researches on Population Ecology&#34;</span>                  
+</span></span><span style="display:flex;"><span> [4] <span style="color:#e6db74">&#34;Behavioral Ecology and Sociobiology&#34;</span>               
+</span></span><span style="display:flex;"><span> [5] <span style="color:#e6db74">&#34;Microbial Ecology&#34;</span>                                 
+</span></span><span style="display:flex;"><span> [6] <span style="color:#e6db74">&#34;Biochemical Systematics and Ecology&#34;</span>               
+</span></span><span style="display:flex;"><span> [7] <span style="color:#e6db74">&#34;FEMS Microbiology Ecology&#34;</span>                         
+</span></span><span style="display:flex;"><span> [8] <span style="color:#e6db74">&#34;Journal of Experimental Marine Biology and Ecology&#34;</span>
+</span></span><span style="display:flex;"><span> [9] <span style="color:#e6db74">&#34;Applied Soil Ecology&#34;</span>                              
+</span></span><span style="display:flex;"><span>[10] <span style="color:#e6db74">&#34;Forest Ecology and Management&#34;</span>                     
+</span></span></code></pre></div><p>Get the .Rmd file used to create this post <a href="https://github.com/sckott/sckott.github.com/tree/master/_drafts/2012-08-30-get-ecoevo-journal-titles.Rmd">at my github account</a>.</p>
+<p>Written in <a href="http://daringfireball.net/projects/markdown/">Markdown</a>, with help from <a href="http://yihui.name/knitr/">knitr</a>, and nice knitr highlighting/etc. in in <a href="http://rstudio.org/">RStudio</a>.</p>
+]]></content:encoded>
     </item>
   </channel>
 </rss>
