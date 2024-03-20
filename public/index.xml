@@ -6,8 +6,49 @@
     <description>Recent content on Recology</description>
     <generator>Hugo -- gohugo.io</generator>
     <language>en-us</language>
-    <lastBuildDate>Wed, 20 Mar 2024 15:22:11 -0700</lastBuildDate>
+    <lastBuildDate>Wed, 20 Mar 2024 15:24:38 -0700</lastBuildDate>
     <atom:link href="http://localhost:1313/index.xml" rel="self" type="application/rss+xml" />
+    <item>
+      <title>Refactoring notes</title>
+      <link>http://localhost:1313/2024/03/refactoring-notes/</link>
+      <pubDate>Wed, 20 Mar 2024 15:24:38 -0700</pubDate>
+      <guid>http://localhost:1313/2024/03/refactoring-notes/</guid>
+      <description><![CDATA[<p>I worked on a refactor of an R package at work the other day. Here&rsquo;s some notes about that after doing the work. This IS NOT a best practices post - it&rsquo;s just a collection of thoughts.</p>
+<p>For context, the package is an API client.</p>
+<p>It made sense to break the work for any given exported function into the following components, as applicable depending on the endpoint being handled (some endpoints needed just a few lines of code, so those funtions were left unchanged):</p>
+<ul>
+<li>query building</li>
+<li>http request (including error handling)</li>
+<li>http response handling</li>
+</ul>
+<p>Before this separation each exported function did all three of the above items. For example, before the change the single function with all the code is called <code>fetch_items</code>. After the separation we still have the exported function <code>fetch_items</code>, but within <code>fetch_items</code> are up to three functions (as applicable) that have distinct duties:</p>
+<ul>
+<li><code>fetch_items_query</code>: prepare the http request components</li>
+<li><code>fetch_items_http</code>: the http request handling, includes http status code checking/handling</li>
+<li><code>fetch_items_process</code>: process the http response</li>
+</ul>
+<p>So code would be:</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-r" data-lang="r"><span style="display:flex;"><span>fetch_items <span style="color:#f92672">&lt;-</span> <span style="color:#66d9ef">function</span>(a, b, token) {
+</span></span><span style="display:flex;"><span>  request <span style="color:#f92672">&lt;-</span> <span style="color:#a6e22e">fetch_items_query</span>(a, b)
+</span></span><span style="display:flex;"><span>  response <span style="color:#f92672">&lt;-</span> <span style="color:#a6e22e">fetch_items_http</span>(request, token)
+</span></span><span style="display:flex;"><span>  <span style="color:#a6e22e">fetch_items_process</span>(response)
+</span></span><span style="display:flex;"><span>}
+</span></span></code></pre></div><p>You may still need to do additional refactoring for the functions used inside of <code>fetch_items</code>. In fact, the functions that do processing of the http response (i.e., <code>fetch_items_process</code>) are sometimes pretty massive and need refactoring - BUT! are waiting on examples that will touch all the code paths - womp womp womp&hellip;</p>
+<p>This separation of concerns and code improves the package because:</p>
+<ul>
+<li><em>You can iterate on tests faster for code that&rsquo;s not doing http requests</em>. For example, the response handling function can rapidly run through a lot of tests since it doesn&rsquo;t have to wait on http requests - assuming you have responses cached in the package to run through it, which is easy enough
+<ul>
+<li>You can still run fast tests on tests that do http requests if you use fixtures so you&rsquo;re not doing real http request other than to record the fixtures, e.g. using package <a href="https://github.com/ropensci/vcr">vcr</a></li>
+</ul>
+</li>
+<li><em>Separating concerns makes the code easier to reason about</em>. That is - assuming you have well named functions whose intent is clear - it&rsquo;s easier to understand code flow, etc.</li>
+<li><em>Smaller functions are easier to understand</em>. This is pretty straightforward, and not specific to any particular type of code. If there&rsquo;s less going on in any one function it&rsquo;s easier to make changes to a package.</li>
+<li><em>Breaking code down may reveal redundant code blocks that could be reused</em>. For example, after pulling out code from different functions you might notice that you&rsquo;re doing very similar tasks and can make a function that can be used across the exported functions rather than having repeated code.</li>
+</ul>
+<h3 id="dont-forget-about-failing-early">don&rsquo;t forget about failing early</h3>
+<p>I had to go back and make sure fail early code wasn&rsquo;t lost in breaking up code into chunks. For example, if you are checking if a parameter is of an acceptable type, or some other critical piece is not correct/available, those things should be done first thing so the function fails early.</p>
+]]></description>
+    </item>
     <item>
       <title>Moved to Hugo</title>
       <link>http://localhost:1313/2024/03/move-to-hugo/</link>
@@ -576,76 +617,6 @@ before returning to the physical. Anyway&hellip;blah blah blah</p>
 <a href="https://badges.cranchecks.info/worst/dplyr.svg">https://badges.cranchecks.info/worst/dplyr.svg</a>
 <a href="https://badges.cranchecks.info/flavor/r-devel-linux-x86_64-fedora-clang/DT.svg">https://badges.cranchecks.info/flavor/r-devel-linux-x86_64-fedora-clang/DT.svg</a></p>
 <p>If you find any issues with the badges at <a href="https://badges.cranchecks.info">https://badges.cranchecks.info</a> <a href="https://github.com/sckott/cchecksbadges/issues">open an issue</a>.</p>
-]]></description>
-    </item>
-    <item>
-      <title>List comprehension vs. filter vs. key lookup</title>
-      <link>http://localhost:1313/2022/04/lookup-vs-filter/</link>
-      <pubDate>Mon, 18 Apr 2022 00:00:00 +0000</pubDate>
-      <guid>http://localhost:1313/2022/04/lookup-vs-filter/</guid>
-      <description><![CDATA[<p>I was working on a work task last week, and needed to filter out one instance of a class from a list of class instances. No matter how you do this speed doesn&rsquo;t matter too much if you&rsquo;re doing this operation once or a few times.</p>
-<p>However, I this operation needs to be done about 100K times each time the script runs - so speed definitely does matter in this case.</p>
-<p>First, I naively started off with using <code>filter()</code>. When that lead to waiting more than ten minutes, I read that list comprehensions are faster.</p>
-<p>Second, I tried list comprehensions. Also waited more then ten minutes and gave up again.</p>
-<p>Last, I thought perhaps it would work to make a dictionary where the keys are the things I need to filter on and the values the class instances. This was the answer! Super fast.</p>
-<p>Now some examples of what I&rsquo;m talking about.</p>
-<p>Make a class called <code>Stuff</code>.</p>
-<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-python" data-lang="python"><span style="display:flex;"><span><span style="color:#66d9ef">class</span> <span style="color:#a6e22e">Stuff</span>:
-</span></span><span style="display:flex;"><span>  <span style="color:#66d9ef">def</span> __init__(self, letter):
-</span></span><span style="display:flex;"><span>    self<span style="color:#f92672">.</span>letter <span style="color:#f92672">=</span> letter
-</span></span><span style="display:flex;"><span>    super(Stuff, self)<span style="color:#f92672">.</span>__init__()
-</span></span><span style="display:flex;"><span>  <span style="color:#66d9ef">def</span> __repr__(self):
-</span></span><span style="display:flex;"><span>        <span style="color:#66d9ef">return</span> <span style="color:#e6db74">&#34;&lt;</span><span style="color:#e6db74">{}</span><span style="color:#e6db74"> (</span><span style="color:#e6db74">{}</span><span style="color:#e6db74">)&gt;&#34;</span><span style="color:#f92672">.</span>format(self<span style="color:#f92672">.</span>__class__<span style="color:#f92672">.</span>__name__, self<span style="color:#f92672">.</span>letter)
-</span></span><span style="display:flex;"><span>
-</span></span><span style="display:flex;"><span>x <span style="color:#f92672">=</span> Stuff(<span style="color:#e6db74">&#39;s&#39;</span>)
-</span></span><span style="display:flex;"><span>x
-</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; &lt;Stuff (s)&gt;</span>
-</span></span><span style="display:flex;"><span>x<span style="color:#f92672">.</span>letter
-</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; &#39;s&#39;</span>
-</span></span></code></pre></div><p>Make a list of instances of the class <code>Stuff</code></p>
-<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-python" data-lang="python"><span style="display:flex;"><span><span style="color:#f92672">import</span> string
-</span></span><span style="display:flex;"><span>
-</span></span><span style="display:flex;"><span>lst <span style="color:#f92672">=</span> []
-</span></span><span style="display:flex;"><span><span style="color:#66d9ef">for</span> x <span style="color:#f92672">in</span> string<span style="color:#f92672">.</span>ascii_lowercase:
-</span></span><span style="display:flex;"><span>    lst<span style="color:#f92672">.</span>append(Stuff(x))
-</span></span><span style="display:flex;"><span>lst
-</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; [&lt;Stuff (a)&gt;, &lt;Stuff (b)&gt;, &lt;Stuff (c)&gt;, &lt;Stuff (d)&gt;, &lt;Stuff (e)&gt;, &lt;Stuff (f)&gt;, &lt;Stuff (g)&gt;, &lt;Stuff (h)&gt;, &lt;Stuff (i)&gt;, &lt;Stuff (j)&gt;, &lt;Stuff (k)&gt;, &lt;Stuff (l)&gt;, &lt;Stuff (m)&gt;, &lt;Stuff (n)&gt;, &lt;Stuff (o)&gt;, &lt;Stuff (p)&gt;, &lt;Stuff (q)&gt;, &lt;Stuff (r)&gt;, &lt;Stuff (s)&gt;, &lt;Stuff (t)&gt;, &lt;Stuff (u)&gt;, &lt;Stuff (v)&gt;, &lt;Stuff (w)&gt;, &lt;Stuff (x)&gt;, &lt;Stuff (y)&gt;, &lt;Stuff (z)&gt;]</span>
-</span></span><span style="display:flex;"><span>len(lst)
-</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; 26</span>
-</span></span></code></pre></div><p>List comprehension: This is how I did the list comprehension method. Filter the list <code>lst</code> where some attibute matched some value.</p>
-<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-python" data-lang="python"><span style="display:flex;"><span>[x <span style="color:#66d9ef">for</span> x <span style="color:#f92672">in</span> lst <span style="color:#66d9ef">if</span> x<span style="color:#f92672">.</span>letter <span style="color:#f92672">==</span> <span style="color:#e6db74">&#39;f&#39;</span>]
-</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; [&lt;Stuff (f)&gt;]</span>
-</span></span></code></pre></div><p>Filter: This is how I did the filter method. Filter the list <code>lst</code> where some attibute matched some value.</p>
-<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-python" data-lang="python"><span style="display:flex;"><span>list(filter(<span style="color:#66d9ef">lambda</span> x: x<span style="color:#f92672">.</span>letter <span style="color:#f92672">==</span> <span style="color:#e6db74">&#39;f&#39;</span>, lst))
-</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; [&lt;Stuff (f)&gt;]</span>
-</span></span></code></pre></div><p>And here&rsquo;s the dictionary approach. Here, I first make a dictionary via <code>dict(zip())</code> where the keys are some attribute of each instance. You can lookup by key.</p>
-<p>A major difference/drawback of this approach is that it only works if there&rsquo;s only one match per key because dictionaries don&rsquo;t allow duplicate keys.</p>
-<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-python" data-lang="python"><span style="display:flex;"><span>lst_map <span style="color:#f92672">=</span> dict(zip([w<span style="color:#f92672">.</span>letter <span style="color:#66d9ef">for</span> w <span style="color:#f92672">in</span> lst], lst))
-</span></span><span style="display:flex;"><span>lst_map[<span style="color:#e6db74">&#39;f&#39;</span>]
-</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; &lt;Stuff (f)&gt;</span>
-</span></span></code></pre></div><p>And better yet, use <code>.get()</code> so you don&rsquo;t run into a <code>KeyError</code> when the key doesn&rsquo;t exist</p>
-<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-python" data-lang="python"><span style="display:flex;"><span>lst_map<span style="color:#f92672">.</span>get(<span style="color:#e6db74">&#39;f&#39;</span>)
-</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; &lt;Stuff (f)&gt;</span>
-</span></span><span style="display:flex;"><span>lst_map<span style="color:#f92672">.</span>get(<span style="color:#e6db74">&#39;5&#39;</span>)
-</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; (returns None)</span>
-</span></span></code></pre></div><p>What about the timings:</p>
-<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-python" data-lang="python"><span style="display:flex;"><span><span style="color:#f92672">from</span> timeit <span style="color:#f92672">import</span> timeit
-</span></span><span style="display:flex;"><span>n <span style="color:#f92672">=</span> <span style="color:#ae81ff">100000</span>
-</span></span><span style="display:flex;"><span>time_list_comp <span style="color:#f92672">=</span> timeit(<span style="color:#e6db74">&#34;[x for x in lst if x.letter == &#39;f&#39;]&#34;</span>, number<span style="color:#f92672">=</span>n, globals<span style="color:#f92672">=</span>globals())
-</span></span><span style="display:flex;"><span>time_filter <span style="color:#f92672">=</span> timeit(<span style="color:#e6db74">&#34;list(filter(lambda x: x.letter == &#39;f&#39;, lst))&#34;</span>, number<span style="color:#f92672">=</span>n, globals<span style="color:#f92672">=</span>globals())
-</span></span><span style="display:flex;"><span>time_dict <span style="color:#f92672">=</span> timeit(<span style="color:#e6db74">&#34;lst_map[&#39;f&#39;]&#34;</span>, number<span style="color:#f92672">=</span>n, globals<span style="color:#f92672">=</span>globals())
-</span></span><span style="display:flex;"><span>time_dict_get <span style="color:#f92672">=</span> timeit(<span style="color:#e6db74">&#34;lst_map.get(&#39;f&#39;)&#34;</span>, number<span style="color:#f92672">=</span>n, globals<span style="color:#f92672">=</span>globals())
-</span></span><span style="display:flex;"><span>
-</span></span><span style="display:flex;"><span>round(time_list_comp, <span style="color:#ae81ff">3</span>)
-</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; 0.088</span>
-</span></span><span style="display:flex;"><span>round(time_filter, <span style="color:#ae81ff">3</span>)
-</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; 0.134</span>
-</span></span><span style="display:flex;"><span>round(time_dict, <span style="color:#ae81ff">3</span>)
-</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; 0.002</span>
-</span></span><span style="display:flex;"><span>round(time_dict_get, <span style="color:#ae81ff">3</span>)
-</span></span><span style="display:flex;"><span><span style="color:#75715e">#&gt; 0.003</span>
-</span></span></code></pre></div><p>For bracketed lookup, the list comprehension is <strong>39</strong> times slower, and the filter is <strong>59</strong> times slower.</p>
-<p>For the <code>get()</code> lookup, the list comprehension is <strong>26</strong> times slower, and the filter is <strong>39</strong> times slower.</p>
 ]]></description>
     </item>
   </channel>
