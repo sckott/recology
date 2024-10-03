@@ -8,8 +8,65 @@
 <title>Fun with the GitHub API | Recology</title>
 <meta name="keywords" content="R, API, github">
 <meta name="description" content="Recently I&rsquo;ve had fun playing with the GitHub API, and here are some notes to self about this fun having.
-Setup Get/load packages
-install.packages(c(&#39;devtools&#39;,&#39;jsonlite&#39;,&#39;httr&#39;,&#39;yaml&#39;)) library(&#34;devtools&#34;) library(&#34;httr&#34;) library(&#34;yaml&#34;) Define a vector of package names pkgs &lt;- c(&#34;alm&#34;, &#34;bmc&#34;, &#34;bold&#34;, &#34;clifro&#34;, &#34;ecoengine&#34;, &#34;elastic&#34;, &#34;fulltext&#34;, &#34;geonames&#34;, &#34;gistr&#34;, &#34;RNeXML&#34;, &#34;rnoaa&#34;, &#34;rnpn&#34;, &#34;traits&#34;, &#34;rplos&#34;, &#34;rsnps&#34;, &#34;rWBclimate&#34;, &#34;solr&#34;, &#34;spocc&#34;, &#34;taxize&#34;, &#34;togeojson&#34;, &#34;treeBASE&#34;) pkgs &lt;- sort(pkgs) Define functions github_auth &lt;- function(appname = getOption(&#34;gh_appname&#34;), key = getOption(&#34;gh_id&#34;), secret = getOption(&#34;gh_secret&#34;)) { if (is.">
+Setup
+Get/load packages
+install.packages(c(&#39;devtools&#39;,&#39;jsonlite&#39;,&#39;httr&#39;,&#39;yaml&#39;))
+library(&#34;devtools&#34;)
+library(&#34;httr&#34;)
+library(&#34;yaml&#34;)
+Define a vector of package names
+pkgs &lt;- c(&#34;alm&#34;, &#34;bmc&#34;, &#34;bold&#34;, &#34;clifro&#34;, &#34;ecoengine&#34;,
+  &#34;elastic&#34;, &#34;fulltext&#34;, &#34;geonames&#34;, &#34;gistr&#34;,
+  &#34;RNeXML&#34;, &#34;rnoaa&#34;, &#34;rnpn&#34;, &#34;traits&#34;, &#34;rplos&#34;, &#34;rsnps&#34;,
+  &#34;rWBclimate&#34;, &#34;solr&#34;, &#34;spocc&#34;, &#34;taxize&#34;, &#34;togeojson&#34;, &#34;treeBASE&#34;)
+pkgs &lt;- sort(pkgs)
+Define functions
+github_auth &lt;- function(appname = getOption(&#34;gh_appname&#34;), key = getOption(&#34;gh_id&#34;),
+                        secret = getOption(&#34;gh_secret&#34;)) {
+  if (is.null(getOption(&#34;gh_token&#34;))) {
+    myapp &lt;- oauth_app(appname, key, secret)
+    token &lt;- oauth2.0_token(oauth_endpoints(&#34;github&#34;), myapp)
+    options(gh_token = token)
+  } else {
+    token &lt;- getOption(&#34;gh_token&#34;)
+  }
+  return(token)
+}
+
+make_url &lt;- function(x, y, z) {
+  sprintf(&#34;https://api.github.com/repos/%s/%s/%s&#34;, x, y, z)
+}
+
+process_result &lt;- function(x) {
+  stop_for_status(x)
+  if (!x$headers$`content-type` == &#34;application/json; charset=utf-8&#34;)
+    stop(&#34;content type mismatch&#34;)
+  tmp &lt;- content(x, as = &#34;text&#34;)
+  jsonlite::fromJSON(tmp, flatten = TRUE)
+}
+
+parse_file &lt;- function(x) {
+  tmp &lt;- gsub(&#34;\n\\s&#43;&#34;, &#34;\n&#34;, 
+              paste(vapply(strsplit(x, &#34;\n&#34;)[[1]], RCurl::base64Decode,
+                           character(1), USE.NAMES = FALSE), collapse = &#34; &#34;))
+  lines &lt;- readLines(textConnection(tmp))
+  vapply(lines, gsub, character(1), pattern = &#34;\\s&#34;, replacement = &#34;&#34;,
+         USE.NAMES = FALSE)
+}
+
+request &lt;- function(owner = &#34;ropensci&#34;, repo, file=&#34;DESCRIPTION&#34;, ...) {
+  req &lt;- GET(make_url(owner, repo, paste0(&#34;contents/&#34;, file)), 
+             config = c(token = github_auth(), ...))
+  if(req$status_code != 200) { NA } else {
+    cts &lt;- process_result(req)$content
+    parse_file(cts)
+  }
+}
+
+has_term &lt;- function(what, ...) any(grepl(what, request(...)))
+has_file &lt;- function(what, ...) if(all(is.na(request(file = what, ...)))) FALSE else TRUE
+Do stuff
+Does a package depend on a particular package? e.g., look for httr in the DESCRIPTION file (which is the default file name in request() above)">
 <meta name="author" content="Scott Chamberlain">
 <link rel="canonical" href="http://localhost:1313/2014/11/github-fun/">
 <link crossorigin="anonymous" href="/assets/css/stylesheet.f4cda22486791d430ef692108ba33a982c3c552eca57e99456bb55aa4bd22568.css" integrity="sha256-9M2iJIZ5HUMO9pIQi6M6mCw8VS7KV&#43;mUVrtVqkvSJWg=" rel="preload stylesheet" as="style">

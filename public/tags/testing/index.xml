@@ -10,22 +10,30 @@
     <atom:link href="http://localhost:1313/tags/testing/index.xml" rel="self" type="application/rss+xml" />
     <item>
       <title>Refactoring notes</title>
-      <link>http://localhost:1313/2024/03/more-testable/</link>
+      <link>http://localhost:1313/2024/03/refactoring-notes/</link>
       <pubDate>Wed, 20 Mar 2024 15:24:38 -0700</pubDate>
-      <guid>http://localhost:1313/2024/03/more-testable/</guid>
-      <description><![CDATA[<p>I worked on a refactor of an R package at work the other day. Here&rsquo;s some notes about that after doing the work. The package was an API client for context.</p>
-<p>It made sense to break the work for any given exported function into the following components, as applicable depending on the endpoint being handled:</p>
+      <guid>http://localhost:1313/2024/03/refactoring-notes/</guid>
+      <description><![CDATA[<p>I worked on a refactor of an R package at work the other day. Here&rsquo;s some notes about that after doing the work. This IS NOT a best practices post - it&rsquo;s just a collection of thoughts.</p>
+<p>For context, the package is an API client.</p>
+<p>It made sense to break the work for any given exported function into the following components, as applicable depending on the endpoint being handled (some endpoints needed just a few lines of code, so those funtions were left unchanged):</p>
 <ul>
 <li>query building</li>
 <li>http request (including error handling)</li>
 <li>http response handling</li>
 </ul>
-<p>Before this separation each function did all three of the above items. For example, before the change the single function with all the code is called <code>fetch_items</code>. After the separation we still have the exported function <code>fetch_items</code>, but within <code>fetch_items</code> are up to three functions (as applicable) that have distinct duties:</p>
+<p>Before this separation each exported function did all three of the above items. For example, before the change the single function with all the code is called <code>fetch_items</code>. After the separation we still have the exported function <code>fetch_items</code>, but within <code>fetch_items</code> are up to three functions (as applicable) that have distinct duties:</p>
 <ul>
 <li><code>fetch_items_query</code>: prepare the http request components</li>
 <li><code>fetch_items_http</code>: the http request handling, includes http status code checking/handling</li>
 <li><code>fetch_items_process</code>: process the http response</li>
 </ul>
+<p>So code would be:</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-r" data-lang="r"><span style="display:flex;"><span>fetch_items <span style="color:#f92672">&lt;-</span> <span style="color:#66d9ef">function</span>(a, b, token) {
+</span></span><span style="display:flex;"><span>  request <span style="color:#f92672">&lt;-</span> <span style="color:#a6e22e">fetch_items_query</span>(a, b)
+</span></span><span style="display:flex;"><span>  response <span style="color:#f92672">&lt;-</span> <span style="color:#a6e22e">fetch_items_http</span>(request, token)
+</span></span><span style="display:flex;"><span>  <span style="color:#a6e22e">fetch_items_process</span>(response)
+</span></span><span style="display:flex;"><span>}
+</span></span></code></pre></div><p>You may still need to do additional refactoring for the functions used inside of <code>fetch_items</code>. In fact, the functions that do processing of the http response (i.e., <code>fetch_items_process</code>) are sometimes pretty massive and need refactoring - BUT! are waiting on examples that will touch all the code paths - womp womp womp&hellip;</p>
 <p>This separation of concerns and code improves the package because:</p>
 <ul>
 <li><em>You can iterate on tests faster for code that&rsquo;s not doing http requests</em>. For example, the response handling function can rapidly run through a lot of tests since it doesn&rsquo;t have to wait on http requests - assuming you have responses cached in the package to run through it, which is easy enough
@@ -37,6 +45,7 @@
 <li><em>Smaller functions are easier to understand</em>. This is pretty straightforward, and not specific to any particular type of code. If there&rsquo;s less going on in any one function it&rsquo;s easier to make changes to a package.</li>
 <li><em>Breaking code down may reveal redundant code blocks that could be reused</em>. For example, after pulling out code from different functions you might notice that you&rsquo;re doing very similar tasks and can make a function that can be used across the exported functions rather than having repeated code.</li>
 </ul>
+<h3 id="dont-forget-about-failing-early">don&rsquo;t forget about failing early</h3>
 <p>I had to go back and make sure fail early code wasn&rsquo;t lost in breaking up code into chunks. For example, if you are checking if a parameter is of an acceptable type, or some other critical piece is not correct/available, those things should be done first thing so the function fails early.</p>
 ]]></description>
     </item>
