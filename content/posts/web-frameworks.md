@@ -4,7 +4,6 @@ layout: post
 title: "Picking a web framework"
 date: 2025-03-05
 author: Scott Chamberlain
-draft: true
 tags:
 - ruby
 - rails
