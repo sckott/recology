@@ -115,15 +115,15 @@ We wanted to make sure the following things were true with the packages' example
 - they don't fail when CRAN folks are running them
 - they clean up after themselves so whoever runs them isn't leaving created resources to lie fallow and accumulate costs
 
-The approach we laneded on was to mostly use `@examplesIf aws_has_creds()`. That is, only run the examples if appropriate AWS credentials are found (code is from `paws`).
+The approach we laneded on was to mostly use `@examplesIf aws_has_creds()`; inspired by a similar pattern in Jenny Bryan's [googledrive][] package (see for example [`@examplesIf drive_has_token()`](https://github.com/tidyverse/googledrive/blob/main/R/drive_get.R#L65C4-L65C33)). That is, with `@examplesIf aws_has_creds()` we only run the example if appropriate AWS credentials are found.
 
 In examples where we wanted to be especially careful we used `@examplesIf aws_has_creds() && interactive()` so that examples only run when AWS credentials are available and the user is running the examples interactively.
 
-A tricky part of `sixtyfour` examples is that they hit real AWS services, so any failures in examples means that they may not have been cleaned up properly and could leave services running. It's not reasonable to expect users to set up some kind of mock service (e.g., Minio, Localstack; see [Testing]({{< ref "#testing" >}}) below) - so we can't go that route. Although in software testing we can make sure to cleanup after ourselves, it's harder to think about how to do that with examples where you want the examples to have just the code that's important and not other tidying code laying around.
+A tricky part of `sixtyfour` examples is that they hit real AWS services, so any failures in examples means that they may not have been cleaned up properly and could leave services running. It's not reasonable to expect users to set up some kind of mock service (e.g., Minio, Localstack; see [Testing]({{< ref "#testing" >}}) below) - so we can't go that route. Although in software testing we can make sure to cleanup after ourselves, it's harder to think about how to do that with examples where you want the examples to have just the code that's important and not other tidying code lying around.
 
 ### Maintaining examples for internal functions
 
-There's a fair number of examples that are meant for internal use or perhaps for more technical users. Instead of talking about this in detail read about this in a recent post I did: [Keeping internal function examples alive](https://recology.info/2025/02/r-examples-internal/).
+There's a fair number of examples in `sixtyfour` that are meant for internal use or perhaps for more technical users. Instead of talking about this in detail read about this in a recent post I did: [Keeping internal function examples alive](https://recology.info/2025/02/r-examples-internal/).
 
 ## Testing
 
@@ -150,15 +150,15 @@ Table 2. AWS services that we test with Minio or Localstack
 | RDS | -- | -- |
 | Cost Explorer | -- | -- |
 
-There are a few tests that use the real AWS services. As RDS and Cost Explorer are not available in the free Localstack version, we use the real AWS services. For RDS, we use [vcr][] to record and replay HTTP requests for RDS tests so that at least after a cassette is recorded, subsequent tests that match the cassette will not make real HTTP requests. This speeds up tests and reduces the chance of spinnning up a database and forgetting about it.
+There are a few tests that use the real AWS services or we mock them because they are not available in Localstack. One of these is RDS for which we use [vcr][] to record and replay HTTP requests so that at least after a cassette is recorded, subsequent tests that match the cassette will not make real HTTP requests. This speeds up tests and reduces the chance of spinnning up an RDS database and forgetting about it.
 
 For Cost Explorer, we use mocking via [webmockr][]. We went the mocking route for this service because we wanted to avoid git checking in vcr cassettes with potentially sensitive billing data.
 
-An important gotcha with either approach above (`vcr` or `webmockr`) is that if a test fails before cleaning up, then a resource (e.g., an RDS database) could be left running and could incur huge charges. We haven't done this yet but plan to make sure cleanup steps (delete resources) are run even on test failures.
+An important gotcha with either approach above (`vcr` or `webmockr`) is that if a test fails before cleaning up, then a resource (e.g., an RDS database) could be left running and could incur huge charges. We haven't done this yet but plan to make sure cleanup steps (i.e., delete AWS resources) are run even on test failures.
 
 ## Fin
 
-Please do try `sixtyfour`, and let us know if you have any [questions or feedback][sixtyfourissues].
+Please do try `sixtyfour`! Let us know if you have any [questions or feedback][sixtyfourissues].
 
 
 
@@ -173,3 +173,4 @@ Please do try `sixtyfour`, and let us know if you have any [questions or feedbac
 [withr]: https://withr.r-lib.org/
 [moto]: https://github.com/getmoto/moto
 [aws-sdk-mock]: https://www.npmjs.com/package/aws-sdk-mock
+[googledrive]: https://github.com/tidyverse/googledrive/
