@@ -2,7 +2,7 @@
 name: sixtyfour
 layout: post
 title: "sixtyfour: writing robust code against AWS"
-date: 2025-03-10
+date: 2025-03-13
 author: Scott Chamberlain
 tags:
 - r
@@ -11,11 +11,11 @@ tags:
 
 ## Introduction
 
-At [work][] we've been working on an R package (`sixtyfour`) over the last ~1.5 years. This post is a quick intro to the package with some learnings about working with AWS.
+At work ([Fred Hutch Cancer Center][work]) we've been working on an R package (`sixtyfour`) over the last ~1.5 years. This post is a quick intro to the package with some learnings about working with AWS.
 
 [sixtyfour][] is a science-focused, more humane R interface to AWS. It is built on top of the great `paws` package maintained by [Dyfan Jones][dyfan], which handles authentication and the low-level work of interacting with AWS services while `sixtyfour` provides higher-level interfaces for common tasks.
 
-Maintaining code that interacts with AWS is no easy task. With the release of the first public version of `sixtyfour`, I'd like to do a brief quickstart to the package and go over some of the more salient topics related to interacting with AWS, including sensitive pieces of information, examples and tests.
+Maintaining code that interacts with AWS is no easy task. With the release of the first public version of `sixtyfour`, I'd like to do a brief quickstart to the package and go over some of our learnings related to interacting with AWS, including sensitive pieces of information, examples and tests.
 
 ## sixtyfour quickstart
 
@@ -78,7 +78,7 @@ However, with the open source version of Minio and Localstack there's some AWS s
 
 In addition, it is essential I think to run the code against a real AWS account to make sure it works for real users who aren't running the code against Minio and Localstack - even if this is just manually checked occasionally.
 
-We were able to get a test AWS account at Fred Hutch, so we were lucky. If we were not able to, we'd have to take many more precations to make sure we weren't accidentally messing up production accounts/services folks are using
+We were able to get a test AWS account at Fred Hutch, so we were lucky. If we were not able to, we'd have to take many more precations to make sure we weren't accidentally messing up production accounts/services folks are using.
 
 ## Sensitive information
 
@@ -113,7 +113,7 @@ We wanted to make sure the following things were true with the packages' example
 
 - they're in sync with the code - i.e., an example doesn't reflect a historical version of the function
 - they don't fail when CRAN folks are running them
-- they clean up after themselves so whoever runs them isn't leaving created resources lay fallow and accumulating costs
+- they clean up after themselves so whoever runs them isn't leaving created resources to lie fallow and accumulate costs
 
 The approach we laneded on was to mostly use `@examplesIf aws_has_creds()`. That is, only run the examples if appropriate AWS credentials are found (code is from `paws`).
 
@@ -162,7 +162,7 @@ Please do try `sixtyfour`, and let us know if you have any [questions or feedbac
 
 
 
-[work]: https://hutchdatascience.org/
+[work]: https://ocdo.fredhutch.org/
 [sixtyfour]: https://getwilds.org/sixtyfour/
 [sixtyfourgh]: https://github.com/getwilds/sixtyfour
 [sixtyfourissues]: https://github.com/getwilds/sixtyfour/issues
