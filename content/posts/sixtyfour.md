@@ -68,21 +68,9 @@ six_bucket_add_user(
 )
 ```
 
-## How our AWS account fits in
-
-Having a test AWS account is essential - depending on what institution you're at this can be a significant burden, so may not be within reach for some.
-
-As we [discuss below]({{< ref "#testing" >}}) tests in `sixtyfour` are run whenever possible against Minio or Localstack so we're not hitting the real AWS account.
-
-However, with the open source version of Minio and Localstack there's some AWS services for which we'd have to use real AWS requests.
-
-In addition, it is essential I think to run the code against a real AWS account to make sure it works for real users who aren't running the code against Minio and Localstack - even if this is just manually checked occasionally.
-
-We were able to get a test AWS account at Fred Hutch, so we were lucky. If we were not able to, we'd have to take many more precations to make sure we weren't accidentally messing up production accounts/services folks are using.
-
 ## Sensitive information
 
-When interacting with AWS there's many situations where you may not want certain pieces of information shown. These include
+When interacting with AWS there's many pieces of information that you likely do not want shown to other people. These include:
 
 - Access keys
 - Secret keys
@@ -94,7 +82,28 @@ When interacting with AWS there's many situations where you may not want certain
 We used a few different approaches to safeguard users (including us as we develop the package):
 
 - Many packages allow credentials to be passed in as arguments to functions. We don't allow this because it would make it easy for users to pass raw strings in to functions that are sensitive. `paws` already handled finding credentials and so we rely on it.
-- Provide the function `aws_configure()` to let users redact secrets in outputs from the AWS API - and the  `with_redacted` fxn allows you to temporarily redact sensitive information from a code block (in a [withr][] fashion).
+- Provide the function `aws_configure()` to let users redact secrets in outputs from the AWS API - and the  `with_redacted` function allows you to temporarily redact sensitive information from the output of a code block (like a `with` context manager in Python). What does this look like? Here's an example:
+
+```r
+with_redacted(
+  new_user <- six_user_create(random_user())
+)
+#> ℹ Added policy UserInfo to BarreledRunoff
+#> ✔ Key pair created for BarreledRunoff
+#> ℹ AccessKeyId: *****
+#> ℹ SecretAccessKey: *****
+#> Email template copied to your clipboard
+```
+
+If we didn't use `with_redacted`, the output would show the access key ID and the secret. You haven't lost the actual key and secret though assuming you assigned it to a variable (here `new_user`) - even if you forget to assign to a variable you can always do `.Last.value`.
+
+In addition, for `six_user_create` we copy an email template to your clipboard for sharing the new AWS user with the real person it should be associated with.
+
+Why would we want to redact secrets? There's a number of use cases that demand it:
+
+- You're using `sixtyfour` on your laptop in a coffee shop or other public place where you probably don't want someone peeking over your shoulder at your secrets
+- You're using `sixtyfour` in a Quarto or Rmarkdown document where the output will be rendered and shared
+
 
 ## Package examples
 
@@ -115,7 +124,7 @@ We wanted to make sure the following things were true with the packages' example
 - they don't fail when CRAN folks are running them
 - they clean up after themselves so whoever runs them isn't leaving created resources to lie fallow and accumulate costs
 
-The approach we laneded on was to mostly use `@examplesIf aws_has_creds()`; inspired by a similar pattern in Jenny Bryan's [googledrive][] package (see for example [`@examplesIf drive_has_token()`](https://github.com/tidyverse/googledrive/blob/main/R/drive_get.R#L65C4-L65C33)). That is, with `@examplesIf aws_has_creds()` we only run the example if appropriate AWS credentials are found.
+The approach we landed on was to mostly use `@examplesIf aws_has_creds()`; inspired by a similar pattern in Jenny Bryan's [googledrive][] package (see for example [`@examplesIf drive_has_token()`](https://github.com/tidyverse/googledrive/blob/main/R/drive_get.R#L65C4-L65C33)). That is, with `@examplesIf aws_has_creds()` we only run the example if appropriate AWS credentials are found.
 
 In examples where we wanted to be especially careful we used `@examplesIf aws_has_creds() && interactive()` so that examples only run when AWS credentials are available and the user is running the examples interactively.
 
@@ -134,7 +143,7 @@ We use the open source (and free) versions of a few tools to test our code witho
 - [Minio](https://min.io/)
 - [Localstack](https://localstack.cloud/)
 
-If we were writing this package in Python or Javascript we'd have additional tools at our dispoasl as those ecosystems have more mature tools for testing code. For example, Python has [moto][] and Javascript has [aws-sdk-mock][]. Because Minio and Localstack aren't language specific libraries we can use them in R.
+If we were writing this package in Python or Javascript we'd have additional tools at our disposal as those ecosystems have more mature tools for testing code. For example, Python has [moto][] and Javascript has [aws-sdk-mock][]. Because Minio and Localstack aren't language specific libraries we can use them in R.
 
 We use Minio mainly for testing S3 functionality in `sixtyfour`, and we use Localstack for testing other AWS services (e.g., IAM, secrets manager, VPC security groups, etc.). We set these up on GitHub Actions, and skip tests that use these if either service is not available.
 
@@ -155,6 +164,16 @@ There are a few tests that use the real AWS services or we mock them because the
 For Cost Explorer, we use mocking via [webmockr][]. We went the mocking route for this service because we wanted to avoid git checking in vcr cassettes with potentially sensitive billing data.
 
 An important gotcha with either approach above (`vcr` or `webmockr`) is that if a test fails before cleaning up, then a resource (e.g., an RDS database) could be left running and could incur huge charges. We haven't done this yet but plan to make sure cleanup steps (i.e., delete AWS resources) are run even on test failures.
+
+## Get a test AWS account if you can
+
+What I mean by a test account is that it's not an account used for "production" work. That is, one ideally shouldn't run automated tests against an account used for real work - even with the best of intentions mistakes can be made.
+
+We were able to get a test AWS account at Fred Hutch, so we were lucky. If we were not able to, we'd have to take many more precautions to make sure we weren't accidentally messing up production accounts/services folks are using.
+
+Depending on what institution you're at getting an AWS account just for testing can be a significant burden, so may not be within reach for some.
+
+Why not just avoid using an AWS account for testing all together? I think it's important to run code against a real AWS account to make sure it works for real users who aren't running the code against mocks, etc. - even if it's just manually done.
 
 ## Fin
 
