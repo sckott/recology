@@ -111,14 +111,16 @@ Why would we want to redact secrets? There's a number of use cases that demand i
 
 In earlier versions of `sixtyfour` the examples for exported functions were pretty barebones: they only worked if x, y, or z was already done and it wasn't documented, and they didn't clean up after themselves.
 
-Recently we've done a big refresh of all the examples, going over them with a fine-toothed comb. Now all examples should be (doesn't hurt to hedge 😬) able to run without issues regardless of the machine and whether credentials are available or not:
+Recently we've done a big refresh of all the examples, going over them with a fine-toothed comb. Now all examples should be (doesn't hurt to hedge <i class="fa-solid fa-face-grimace"></i>) handled correctly without issues regardless of the machine and whether credentials are available or not:
 
-||Me|User|CRAN|
-|----|---|---|---|
-|w/ credentials|✅|✅|✅|
-|w/o credentials|✅|✅|✅|
+Table 1. Examples that require credentials correctly run (<i class="fa-solid fa-circle-check"></i>) or don't run (<i class="fa-solid fa-circle-xmark"></i>), or does not apply ("N/A").
 
-We wanted to make sure the following things were true with the packages' examples:
+||Me|User|GHA Pkgdown[^1]|CRAN[^2]|
+|---|:---:|:---:|:---:|:---:|
+| w/ credentials | <i class="fa-solid fa-circle-check"></i> | <i class="fa-solid fa-circle-check"></i> | <i class="fa-solid fa-circle-check"></i> | N/A |
+| w/o credentials | <i class="fa-solid fa-circle-xmark"></i> | <i class="fa-solid fa-circle-xmark"></i>| <i class="fa-solid fa-circle-xmark"></i> | <i class="fa-solid fa-circle-xmark"></i> |
+
+We wanted to make sure the following things were true with `sixtyfour` examples:
 
 - they're in sync with the code - i.e., an example doesn't reflect a historical version of the function
 - they don't fail when CRAN folks are running them
@@ -143,7 +145,7 @@ We use the open source (and free) versions of a few tools to test our code witho
 - [Minio](https://min.io/)
 - [Localstack](https://localstack.cloud/)
 
-If we were writing this package in Python or Javascript we'd have additional tools at our disposal as those ecosystems have more mature tools for testing code. For example, Python has [moto][] and Javascript has [aws-sdk-mock][]. Because Minio and Localstack aren't language specific libraries we can use them in R.
+If we were writing this package in Python or Javascript we'd have additional tools at our disposal as those ecosystems have more mature tools for testing code. For example, Python has [moto][] and Javascript has [aws-sdk-mock][]. Because Minio and Localstack aren't language specific tools we can use them in R.
 
 We use Minio mainly for testing S3 functionality in `sixtyfour`, and we use Localstack for testing other AWS services (e.g., IAM, secrets manager, VPC security groups, etc.). We set these up on GitHub Actions, and skip tests that use these if either service is not available.
 
@@ -151,11 +153,11 @@ Table 2. AWS services that we test with Minio or Localstack
 
 | Service | Minio | Localstack |
 | --- | --- | --- |
-| S3 | ✅ | ✅ |
-| IAM | -- | ✅ |
-| Secrets Manager | -- | ✅ |
-| VPC Security Groups (EC2) | -- | ✅ |
-| Redshift | -- | ✅ |
+| S3 | <i class="fa-solid fa-circle-check"></i> | <i class="fa-solid fa-circle-check"></i> |
+| IAM | -- | <i class="fa-solid fa-circle-check"></i> |
+| Secrets Manager | -- | <i class="fa-solid fa-circle-check"></i> |
+| VPC Security Groups (EC2) | -- | <i class="fa-solid fa-circle-check"></i> |
+| Redshift | -- | <i class="fa-solid fa-circle-check"></i> |
 | RDS | -- | -- |
 | Cost Explorer | -- | -- |
 
@@ -180,6 +182,8 @@ Why not just avoid using an AWS account for testing all together? I think it's i
 Please do try `sixtyfour`! Let us know if you have any [questions or feedback][sixtyfourissues].
 
 
+[^1]: Our GitHub Actions `pkgdown` workflow runs the examples with AWS credentials present so that users can see rendered examples. Currently our GHA R CMD CHECK workflow doesn't run examples, but maybe we should change that?
+[^2]: In theory, a CRAN team member could have AWS credentials set on a machinen they're running checks on but that seems unlikely.
 
 [work]: https://ocdo.fredhutch.org/
 [sixtyfour]: https://getwilds.org/sixtyfour/
