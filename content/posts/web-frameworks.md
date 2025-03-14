@@ -2,7 +2,7 @@
 name: web-frameworks
 layout: post
 title: "Picking a web framework"
-date: 2025-03-05
+date: 2025-03-14
 author: Scott Chamberlain
 tags:
 - ruby
@@ -66,7 +66,7 @@ Explanation of the above outcomes:
 
 - Language: I am - and fellow team members are - more proficient in Python than JavaScript and Ruby.
 - Community/Help: This one is not clear cut because I'd need more time with each framework, but first impressions are that HTMX/FastAPI is slightly easier to navigate and get help with - but that is maybe due to just being more familiar with Python vs. the other languages.
-- Iterate: Iterating quickly is essential. Part of that is up to the PM/whoever is running the project - but with respect to technology, having a programming language your comfortable with, and that's easy to write tests for, goes a long way.
+- Iterate: Iterating quickly is essential. Part of that is up to the PM/whoever is running the project - but with respect to technology, having a programming language you're comfortable with, and that's easy to write tests for, goes a long way.
 - Extension support: Javascript has the largest ecosystem of any language, but Python is no slouch. Ruby also has a massive number of gems.
 - Performance/scalability: In my playing around with these frameworks Svelte felt the snappiest, and opinions on the internet seem to suggest the same.
 - Good for our team: We have a small team. AFAICT that's unlikely to change - if any, only slightly. Therefore, it's critical that the framework we choose is easy to get started with, easy to maintain, easy to reason about, and easy to debug.
@@ -82,7 +82,7 @@ There were many other factors that contributed to the outcome that were even les
 - What do I like using personally: I love using Ruby, so I'd be happy with landing on Rails. However, Rails wasn't the best option for other reasons
 - What can we hire for easily? In our space, at least AFAICT it'd be easiest to hire folks with a Python background
 - Will the team continue to be the same size? or will it grow/shrink?: AFAICT we're not likely to grow much, so picking a framework that a small team can manage is critical
-- User growth? If we expect rapid growth in number of users of our app, we may want to account for whether the framework can handle the user numb
+- User growth? If we expect rapid growth in number of users of our app, we'd want to account for that
 
 ## Framework specific observations
 
