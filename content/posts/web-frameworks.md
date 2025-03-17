@@ -111,6 +111,24 @@ There were many other factors that contributed to the outcome that were even les
 - Had to use a 3rd party library for auto-reload of the UI - but came out of box with server reload
 - FastAPI comes with OpenAPI browser docs for the server API which is a really nice feature
 
+## A simple heuristic?
+
+There's alot that can go into picking a web framework. Somtimes I wonder if there any simpler heuristics that can be used to pick a framework.
+
+What if we simply look at the file structure for a default project for each framework? The following is a screenshot of the file structure for each of (left to right) Rails, Svelte, and HTMX/FastAPI using the [tree][] command:
+
+```bash
+tree -L 3 -I '.git|__py_cache__|node_modules|public|bin'
+```
+
+Where `-L` means 3 levels deep from the root of each directory, and `-I` excludes gitignored files/dirs, and manually ignore rendered file dirs, and binaries, etc. The yellow tree tips are directories.
+
+<img src="/proof-web-frameworks.jpg" height="400" alt="tree comparison of rails, svelte, htmx/fastapi">
+
+The comparison is quite stark: Rails has a lot going on, HTMX/FastAPI has very little going on, and Svelte is in the middle (leaning closer to HTMX/FastAPI).
+
+This could be looked at two different ways. One, for Rails proponents this is probably just a reflection of the desired batteries included approach (and I do realize many Rails components/features are optional). The other though is that with Rails there's a lot going on and a lot to hold in your head at one time, whereas with HTMX/FastAPI there's very little complexity and therefore may be easier to reason about.
+
 ## What's next?
 
 When we get the green light to work on this, we'll try HTMX/FastAPI first, and hopefully that will suit or our needs. If it doesn't I'd likely reach for Svelte Kit as the next option.
@@ -130,3 +148,4 @@ When we get the green light to work on this, we'll try HTMX/FastAPI first, and h
 [HTMX]: https://htmx.org/
 [FastAPI]: https://fastapi.tiangolo.com/
 [python]: https://www.python.org/
+[tree]: https://linux.die.net/man/1/tree
