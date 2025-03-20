@@ -97,8 +97,6 @@ with_redacted(
 
 If we didn't use `with_redacted`, the output would show the access key ID and the secret. You haven't lost the actual key and secret though assuming you assigned it to a variable (here `new_user`) - even if you forget to assign to a variable you can always do `.Last.value`.
 
-In addition, for `six_user_create` we copy an email template to your clipboard for sharing the new AWS user with the real person it should be associated with.
-
 Why would we want to redact secrets? There's a number of use cases that demand it:
 
 - You're using `sixtyfour` on your laptop in a coffee shop or other public place where you probably don't want someone peeking over your shoulder at your secrets
