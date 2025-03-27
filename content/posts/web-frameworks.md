@@ -2,7 +2,7 @@
 name: web-frameworks
 layout: post
 title: "Picking a web framework"
-date: 2025-03-14
+date: 2025-03-27
 author: Scott Chamberlain
 tags:
 - ruby
