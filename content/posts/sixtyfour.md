@@ -21,10 +21,13 @@ Maintaining code that interacts with AWS is no easy task. With the release of th
 
 Most `sixtyfour` functions are prefixed with `aws_`, while a smaller set of functions are prefixed with `six_`. These `six_` functions are our so called "magical" functions, in that they get a task done with sensible defaults and with verbose output to keep you informed. For example, below we'll use two `six_` functions to create a user, create a bucket, and give that user permissions to the bucket.
 
-Install the package from [GitHub][sixtyfourgh] using `pak`:
+Install the package from CRAN or [GitHub][sixtyfourgh] using `pak`:
 
 ```r
 # install.packages("pak")
+# CRAN
+pak::pak("sixtyfour")
+# GitHub
 pak::pak("getwilds/sixtyfour")
 ```
 
