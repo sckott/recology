@@ -2,7 +2,7 @@
 name: sixtyfour
 layout: post
 title: "sixtyfour: writing robust code against AWS"
-date: 2025-03-13
+date: 2025-04-02
 author: Scott Chamberlain
 tags:
 - r
