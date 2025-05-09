@@ -9,7 +9,7 @@ Blog (mostly [^1]) by Scott Chamberlain.
 
 - Website: <https://scottchamberlain.info>
 - GitHub: <https://github.com/sckott>
-- Mastodon: [@sckottie@fosstodon.org](https://fosstodon.org/@sckottie)
+- Mastodon: [@sckottie@hachyderm.io](https://hachyderm.io/@sckottie)
 - Bluesky: [sckott@bsky.social](https://bsky.app/profile/sckott.bsky.social)
 
 Posts are mostly about code, though posts meander off that path sometimes.
