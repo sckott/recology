@@ -6,7 +6,7 @@ date: 2025-05-12
 target: https://stackoverflow.com/questions/13321458/meaning-of-git-checkout-double-dashes/13321491#13321491
 type: links
 tags:
-- blogging
+- git
 ---
 
 Always undone changes to files like `git checkout somefile` - but stumbled upon `git checkout -- somefile` instead, and wondered WTF mate.
