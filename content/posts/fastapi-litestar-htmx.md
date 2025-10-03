@@ -4,7 +4,6 @@ layout: post
 title: "Notes on FastAPI, LiteStar and HTMX"
 date: 2025-10-03
 author: Scott Chamberlain
-draft: true
 tags:
 - python
 - fastapi
