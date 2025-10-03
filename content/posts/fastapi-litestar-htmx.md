@@ -93,8 +93,20 @@ class UserController(Controller):
     async def create_user(self) -> str:
         return "Creating a new user"
 
+    @patch("/{user_id:int}")
+    async def update_user(self, user_id: int) -> str:
+        return f"Updating user with ID: {user_id}"
+
 app = Litestar(route_handlers=[UserController])
 ```
+
+Which gives us the routes:
+
+- GET /users/{user_id}
+- POST /users
+- PATCH /users/{user_id}
+
+It'd be simple to add shared requirements for these routes under `UserController`, for example authentication, content types, etc.
 
 ## LiteStar pain points
 
