@@ -12,11 +12,11 @@ tags:
 - html
 ---
 
-I recently wrote about [Picking a web framework]({{< relref "web-frameworks.md" >}}) for a project at work. We're moving from an R Shiny app to something else. We weren't sure what that something else should be so I rebuilt the app (in part) in three different web frameworks (each in a different programming language):
+I recently wrote about [Picking a web framework]({{< relref "web-frameworks.md" >}}) for a project at [work](https://ocdo.fredhutch.org/). We're moving from an R Shiny app to something else. We weren't sure what that something else should be so I rebuilt the app (in part) in three different web frameworks (each in a different programming language):
 
-- FastAPI (Python)
-- Rails (Ruby)
-- Svelte (JavaScript)
+- [FastAPI](https://fastapi.tiangolo.com/) (Python)
+- [Rails](https://rubyonrails.org/) (Ruby)
+- [Svelte](https://svelte.dev/) (JavaScript)
 
 I decided to go with FastAPI for many reasons - go read the post linked above.
 
@@ -54,7 +54,9 @@ async def root():
     return {"message": "Hello World"}
 ```
 
-These are just very slightly different, but LiteStar's syntax is slightly more concise, and as [James Bennett points out](https://www.b-list.org/weblog/2025/aug/06/litestar/) `@app.get` is a bound method while `@get` is a standalone function. LiteStar's approach makes it easier to organize routes or sets of routes in various files, making it easier to "scale" applications from small to large with respect to complexity, not requests or users.
+These are just very slightly different, but LiteStar's syntax is slightly more concise, and as [James Bennett points out](https://www.b-list.org/weblog/2025/aug/06/litestar/) `@app.get` is a bound method while `@get` is a standalone function. LiteStar's approach makes it easier to organize routes or sets of routes in various files, making it easier to "scale" applications from small to large with respect to complexity, not requests or users. It's harder with FastAPI because as Bennett points out:
+
+> You need to import the main application object into the other files in order to decorate the routes, but you need to import the other files into your “main” application file to make sure the route registrations are visible from there, and now you have a circular import, and that doesn’t work.
 
 ### HTMX is built in to LiteStar
 
@@ -74,9 +76,9 @@ Although this isn't a huge difference-maker for any web app at a small size and 
 
 There's not a huge difference between FastAPI and LiteStar here, but LiteStar is a little nicer here. LiteStar has some built-in support for handling content types, whereas it's more DIY in FastAPI.
 
-### Routing
+### Grouping routes
 
-LiteStar makes it easy to [organize routes](https://docs.litestar.dev/2/usage/routing/). Our app is a candidate for this for sure - though we haven't taken advantage of it yet, we will. For example, you can organize many routes that share the same root route like:
+LiteStar makes it easy to [organize routes](https://docs.litestar.dev/2/usage/routing/) using Routers and Controllers. Our app is a candidate for this for sure - though we haven't taken advantage of it yet, we will. For example, you can organize many routes that share the same root route like:
 
 ```python
 from litestar import Litestar, Controller, get, post
@@ -105,7 +107,9 @@ Which gives us the routes:
 - POST /users
 - PATCH /users/{user_id}
 
-It'd be simple to add shared requirements for these routes under `UserController`, for example authentication, content types, etc.
+This approach makes it easy to add shared requirements for these routes under `UserController` - for example authentication, content types, etc. - rather than having to repeat those components for each route separately.
+
+From what I understand you can achieve the same thing with FastAPI but with third party libraries, e.g., [fastapi-utils](https://fastapi-utils.davidmontague.xyz/user-guide/class-based-views/).
 
 ## LiteStar pain points
 
