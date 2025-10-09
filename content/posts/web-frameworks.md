@@ -12,6 +12,7 @@ tags:
 - python
 - htmx
 - html
+- fastapi
 ---
 
 Over the past few months at work we've been looking into web framework options for a project that currently uses [R Shiny][shiny]. Our needs have grown beyond what Shiny can provide. We decided to try Rails, SvelteKit, and HTMX/FastAPI to see which one would best suit our needs.
