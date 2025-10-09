@@ -2,7 +2,7 @@
 name: fastapi-litestar-htmx
 layout: post
 title: "Notes on FastAPI, LiteStar and HTMX"
-date: 2025-10-03
+date: 2025-10-09
 author: Scott Chamberlain
 tags:
 - python
@@ -74,7 +74,7 @@ Although this isn't a huge difference-maker for any web app at a small size and 
 
 We're using the [SQLAlchemyPlugin](https://docs.advanced-alchemy.litestar.dev/latest/reference/extensions/litestar/index.html#advanced_alchemy.extensions.litestar.SQLAlchemyPlugin), the [JsonB type](https://docs.advanced-alchemy.litestar.dev/latest/usage/types.html#jsonb), the [DateTimeUTC type](https://docs.advanced-alchemy.litestar.dev/latest/usage/types.html#datetime-utc), and the [UUIDBase class](https://docs.advanced-alchemy.litestar.dev/latest/usage/modeling.html#base-classes) that automatically generates UUIDs for us.
 
-I did experiment with using the [pagination utilities in advanced-alchemy](https://docs.advanced-alchemy.litestar.dev/latest/usage/repositories.html#pagination). It was for an external API instead of a database - for that reason I think it didn't work as well as I'd hoped. We do have a database used by the app that's separate from the API, so may come back to the pagination utilities.
+I did experiment with using the [pagination utilities in advanced-alchemy](https://docs.advanced-alchemy.litestar.dev/latest/usage/repositories.html#pagination). It was for an external API instead of a database - for that reason I think it didn't work as well as I'd hoped. We do have a database used by the app that's separate from the API, so we may come back to the pagination utilities.
 
 ### Handling multiple content types
 
