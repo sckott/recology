@@ -14,6 +14,8 @@ Blog (mostly [^1]) by Scott Chamberlain.
 
 Posts are mostly about code, though posts meander off that path sometimes.
 
+I blogged for 9 years at rOpenSci - there's many of my posts over yonder as well <i class="fa-regular fa-hand-point-right"></i> <https://ropensci.org/author/scott-chamberlain/>.
+
 [^1]: Most posts are by me. Some are by my friend [Pascal][] :)
 
 [Pascal]: https://www.linkedin.com/in/pascalmickelson/
